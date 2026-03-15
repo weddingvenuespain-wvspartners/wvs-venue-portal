@@ -105,7 +105,7 @@ export default function LeadsPage() {
                         <td><span style={{ fontSize: '10.5px', padding: '2px 8px', background: 'var(--ivory)', borderRadius: '10px', color: 'var(--warm-gray)' }}>{lead.source || 'Web'}</span></td>
                         <td>
                           <span className={`badge badge-${lead.status}`}>
-                            {{'new':'Nuevo','contacted':'Contactado','visit':'Visita','quote':'Presupuesto','booked':'Reservado','done':'Realizada'}[lead.status] || lead.status}
+                           {({'new':'Nuevo','contacted':'Contactado','visit':'Visita','quote':'Presupuesto','booked':'Reservado','done':'Realizada'} as Record<string, string>)[lead.status] || lead.status}
                           </span>
                         </td>
                       </tr>
