@@ -91,3 +91,5 @@ lib/
   supabase.ts  → Cliente de Supabase
   wordpress.ts → Helpers para la API de WordPress
 ```
+
+# Portal WVS
