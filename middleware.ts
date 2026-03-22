@@ -3,22 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl
-
-  // Rutas públicas — no requieren auth
-  if (
-    pathname === '/' ||
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
-    pathname.includes('.')
-  ) {
-    return NextResponse.next()
-  }
-
-  let res = NextResponse.next({
-    request: { headers: req.headers },
-  })
+  let supabaseResponse = NextResponse.next({ request: req })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,26 +14,43 @@ export async function middleware(req: NextRequest) {
           return req.cookies.getAll()
         },
         setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
-          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
-          res = NextResponse.next({ request: req })
           cookiesToSet.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
+            req.cookies.set(name, value)
+          )
+          supabaseResponse = NextResponse.next({ request: req })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
           )
         },
       },
     }
   )
 
-  // IMPORTANTE: usar getUser() en vez de getSession() en middleware
+  // CRÍTICO: esto refresca la sesión y actualiza las cookies
+  // No usar getSession() aquí — usar getUser() es más seguro
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Sin sesión → login
-  if (!user) {
-    return NextResponse.redirect(new URL('/login', req.url))
+  const { pathname } = req.nextUrl
+
+  // Rutas públicas
+  const isPublic = pathname === '/' || pathname.startsWith('/login')
+  
+  if (!isPublic && !user) {
+    // Sin sesión → redirigir al login
+    const url = req.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
   }
 
-  // Rutas de admin — verificar rol
-  if (pathname.startsWith('/admin')) {
+  if (isPublic && user && pathname === '/login') {
+    // Ya autenticado y va al login → redirigir al dashboard
+    const url = req.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
+
+  // Rutas de admin
+  if (pathname.startsWith('/admin') && user) {
     const { data: profile } = await supabase
       .from('venue_profiles')
       .select('role')
@@ -56,13 +58,18 @@ export async function middleware(req: NextRequest) {
       .single()
 
     if (profile?.role !== 'admin') {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
+      const url = req.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
     }
   }
 
-  return res
+  // CRÍTICO: devolver siempre supabaseResponse para que las cookies se propaguen
+  return supabaseResponse
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)',
+  ],
 }
