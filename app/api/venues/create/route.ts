@@ -4,7 +4,6 @@ import { cookies } from 'next/headers'
 
 const WP_URL = process.env.NEXT_PUBLIC_WP_URL || 'https://weddingvenuesspain.com'
 
-// Basic Auth con Application Password de WP (no caduca nunca)
 function getWpAdminAuth() {
   const user = process.env.WORDPRESS_ADMIN_USER
   const pass = process.env.WORDPRESS_ADMIN_PASSWORD
@@ -14,8 +13,7 @@ function getWpAdminAuth() {
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Verificar que el que llama es admin del portal
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -45,7 +43,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 2. Leer datos del body
     const body = await req.json()
     const { onboarding_user_id, target_user_id, ...directData } = body
 
@@ -65,7 +62,6 @@ export async function POST(req: NextRequest) {
       venueData = onboarding
     }
 
-    // 3. Construir el payload para WP
     const wpPayload: Record<string, any> = {
       status: 'publish',
       title: venueData.name || venueData.H1_Venue || 'Nuevo venue',
@@ -87,7 +83,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Crear el post en WordPress con Basic Auth
     const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/wedding-venues`, {
       method: 'POST',
       headers: {
@@ -109,7 +104,6 @@ export async function POST(req: NextRequest) {
 
     const newWpId = wpData.id
 
-    // 5. Actualizar Supabase si hay usuario vinculado
     if (targetUserId) {
       await supabase
         .from('venue_onboarding')
