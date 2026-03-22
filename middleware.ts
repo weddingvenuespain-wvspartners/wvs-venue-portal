@@ -7,7 +7,7 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // Rutas públicas — no requieren auth
-  if (pathname.startsWith('/login') || pathname.startsWith('/_next') || pathname.startsWith('/api')) {
+  if (pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/_next') || pathname.startsWith('/api')) {
     return res
   }
 
