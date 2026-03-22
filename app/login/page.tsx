@@ -1,10 +1,12 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
 type Mode = 'login' | 'signup' | 'reset' | 'new_password'
 
 export default function LoginPage() {
+  const router = useRouter()
   const [mode, setMode]               = useState<Mode>('login')
   const [email, setEmail]             = useState('')
   const [password, setPassword]       = useState('')
@@ -13,6 +15,14 @@ export default function LoginPage() {
   const [loading, setLoading]         = useState(false)
   const [error, setError]             = useState('')
   const [success, setSuccess]         = useState('')
+
+  useEffect(() => {
+    // Detectar hash de recovery en la URL
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash
+      if (hash.includes('type=recovery')) setMode('new_password')
+    }
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -23,8 +33,13 @@ export default function LoginPage() {
     if (error) {
       setError(error.message)
       setLoading(false)
-    } else if (data.session) {
-      window.location.href = '/dashboard'
+      return
+    }
+    if (data.session) {
+      // Esperar a que las cookies se escriban antes de navegar
+      await new Promise(resolve => setTimeout(resolve, 500))
+      router.push('/dashboard')
+      router.refresh()
     } else {
       setError('No se pudo iniciar sesión. Inténtalo de nuevo.')
       setLoading(false)
@@ -64,7 +79,11 @@ export default function LoginPage() {
     const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) { setError(error.message); setLoading(false) }
-    else { window.location.href = '/dashboard' }
+    else {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      router.push('/dashboard')
+      router.refresh()
+    }
   }
 
   const handleGoogle = async () => {
@@ -81,7 +100,7 @@ export default function LoginPage() {
         <div className="login-logo">Wedding Venues Spain</div>
         <div className="login-subtitle">Partner Portal</div>
 
-        {error   && <div className="login-error">{error}</div>}
+        {error && <div className="login-error">{error}</div>}
         {success && (
           <div style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)', color: '#86efac', borderRadius: 8, padding: '10px 14px', fontSize: 12, marginBottom: 16 }}>
             {success}
