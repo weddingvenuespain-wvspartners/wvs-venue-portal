@@ -18,8 +18,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const supabase = createClient()
 
-    const loadSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
+    // Cargar sesión inicial
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
         const { data: prof } = await supabase
@@ -27,15 +27,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .select('*')
           .eq('user_id', session.user.id)
           .single()
-        setProfile(prof)
+        setProfile(prof || null)
       }
       setLoading(false)
-    }
+    })
 
-    loadSession()
-
-    // Escuchar cambios de sesión (login/logout)
+    // Escuchar cambios
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setProfile(null)
+        setLoading(false)
+        return
+      }
       if (session?.user) {
         setUser(session.user)
         const { data: prof } = await supabase
@@ -43,10 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .select('*')
           .eq('user_id', session.user.id)
           .single()
-        setProfile(prof)
-      } else {
-        setUser(null)
-        setProfile(null)
+        setProfile(prof || null)
       }
       setLoading(false)
     })
