@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import { useAuth } from '@/lib/auth-context'
 import { Plus, Search, X } from 'lucide-react'
 
 const STATUS_OPTIONS = [
@@ -31,6 +32,7 @@ const emptyForm = { name: '', email: '', phone: '', wedding_date: '', guests: ''
 
 export default function LeadsPage() {
   const router = useRouter()
+  const { user, profile, loading: authLoading } = useAuth()
   const [user, setUser]     = useState<any>(null)
   const [leads, setLeads]   = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,7 +50,6 @@ export default function LeadsPage() {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
-      setUser(session.user)
       const { data } = await supabase
         .from('leads').select('*').eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
@@ -116,7 +117,7 @@ export default function LeadsPage() {
 
   return (
     <div style={{ display: 'flex' }}>
-      <Sidebar venueName="Mi Venue" userEmail={user?.email} />
+      <Sidebar />
       <div className="main-layout">
         <div className="topbar">
           <div className="topbar-title">Leads</div>

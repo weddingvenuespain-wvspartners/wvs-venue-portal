@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import { useAuth } from '@/lib/auth-context'
 import { ACCOMMODATION_OPTIONS, VENUE_PRICE_OPTIONS } from '@/lib/wordpress'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -11,9 +12,9 @@ type Tab = 'info' | 'descripcion' | 'precios' | 'ubicacion' | 'fotos'
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function FichaPage() {
   const router = useRouter()
+  const { user, profile, loading: authLoading } = useAuth()
   const [user, setUser]       = useState<any>(null)
   const [venue, setVenue]     = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('info')
   const [saving, setSaving]   = useState(false)
@@ -70,7 +71,6 @@ export default function FichaPage() {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
-      setUser(session.user)
 
       const { data: prof } = await supabase
         .from('venue_profiles')
@@ -287,7 +287,7 @@ export default function FichaPage() {
 
   return (
     <div style={{ display: 'flex' }}>
-      <Sidebar venueName={venue?.acf?.H1_Venue || venue?.title?.rendered} userEmail={user?.email} />
+      <Sidebar />
       <div className="main-layout">
         <div className="topbar">
           <div className="topbar-title">Mi ficha</div>

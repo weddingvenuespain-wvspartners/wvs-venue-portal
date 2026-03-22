@@ -3,12 +3,13 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import { useAuth } from '@/lib/auth-context'
 import { User, Lock, Bell } from 'lucide-react'
 
 export default function PerfilPage() {
   const router = useRouter()
+  const { user, profile, loading: authLoading } = useAuth()
   const [user, setUser]       = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
   const [success, setSuccess] = useState('')
@@ -30,7 +31,6 @@ export default function PerfilPage() {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
-      setUser(session.user)
 
       const { data: prof } = await supabase
         .from('venue_profiles').select('*').eq('user_id', session.user.id).single()
@@ -101,7 +101,7 @@ export default function PerfilPage() {
 
   return (
     <div style={{ display: 'flex' }}>
-      <Sidebar venueName="Mi Venue" userEmail={user?.email} />
+      <Sidebar />
       <div className="main-layout">
         <div className="topbar">
           <div className="topbar-title">Mi perfil</div>

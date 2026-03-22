@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import { useAuth } from '@/lib/auth-context'
 
 const STATUS_LABELS: Record<string, string> = {
   new: 'Nuevo', contacted: 'Contactado', visit: 'Visita',
@@ -16,7 +17,7 @@ const STATUS_CLASSES: Record<string, string> = {
 
 export default function CrmPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const { user, profile, loading: authLoading } = useAuth()
   const [leads, setLeads] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -33,7 +34,6 @@ export default function CrmPage() {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
-      setUser(session.user)
       await loadLeads(session.user.id)
       setLoading(false)
     }
@@ -79,7 +79,7 @@ export default function CrmPage() {
 
   return (
     <div style={{ display: 'flex' }}>
-      <Sidebar userEmail={user?.email} />
+      <Sidebar />
       <div className="main-layout">
         <div className="topbar">
           <div className="topbar-title">Todos los contactos</div>
