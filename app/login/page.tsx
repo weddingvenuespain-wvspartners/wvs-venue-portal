@@ -1,12 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
 type Mode = 'login' | 'signup' | 'reset' | 'new_password'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [mode, setMode]         = useState<Mode>('login')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -39,7 +37,8 @@ export default function LoginPage() {
         }
         setLoading(false)
       } else if (data.session) {
-        router.push('/dashboard')
+        // Usar window.location para forzar una navegación completa con las cookies ya guardadas
+        window.location.href = '/dashboard'
       } else {
         setError('No se pudo iniciar sesión. Inténtalo de nuevo.')
         setLoading(false)
@@ -104,7 +103,7 @@ export default function LoginPage() {
       setError('Error al actualizar la contraseña. El enlace puede haber expirado.')
       setLoading(false)
     } else {
-      router.push('/dashboard')
+      window.location.href = '/dashboard'
     }
   }
 
