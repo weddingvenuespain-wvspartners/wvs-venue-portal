@@ -25,13 +25,29 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError('Email o contraseña incorrectos')
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        console.error('Login error:', error)
+        if (error.message.includes('Invalid login credentials')) {
+          setError('Email o contraseña incorrectos')
+        } else if (error.message.includes('Email not confirmed')) {
+          setError('Confirma tu email antes de entrar. Revisa tu bandeja de entrada.')
+        } else {
+          setError(error.message)
+        }
+        setLoading(false)
+      } else if (data.session) {
+        router.push('/dashboard')
+      } else {
+        setError('No se pudo iniciar sesión. Inténtalo de nuevo.')
+        setLoading(false)
+      }
+    } catch (err: any) {
+      console.error('Unexpected login error:', err)
+      setError('Error de conexión. Verifica tu internet e inténtalo de nuevo.')
       setLoading(false)
-    } else {
-      router.push('/dashboard')
     }
   }
 

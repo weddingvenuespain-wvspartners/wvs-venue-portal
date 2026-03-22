@@ -8,18 +8,15 @@ export default function Home() {
   const { user, loading } = useAuth()
 
   useEffect(() => {
-    // Redirect immediately when auth state is known
     if (!loading) {
       if (user) router.push('/dashboard')
       else router.push('/login')
       return
     }
-
-    // Safety fallback: if still loading after 3s, redirect to login
+    // Fallback: si carga más de 4s, ir al login
     const timeout = setTimeout(() => {
       router.push('/login')
-    }, 3000)
-
+    }, 4000)
     return () => clearTimeout(timeout)
   }, [user, loading, router])
 
@@ -31,7 +28,6 @@ export default function Home() {
           {[0, 1, 2].map(i => (
             <div key={i} style={{
               width: 6, height: 6, borderRadius: '50%', background: '#C4975A',
-              opacity: 0.4,
               animation: 'pulse 1.2s ease-in-out infinite',
               animationDelay: `${i * 0.2}s`
             }} />

@@ -3,30 +3,47 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
   const { pathname } = req.nextUrl
 
   // Rutas públicas — no requieren auth
-  if (pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/_next') || pathname.startsWith('/api')) {
-    return res
+  if (
+    pathname === '/' ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.includes('.')
+  ) {
+    return NextResponse.next()
   }
+
+  let res = NextResponse.next({
+    request: { headers: req.headers },
+  })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => req.cookies.get(name)?.value,
-        set: (name: string, value: string, options: any) => res.cookies.set({ name, value, ...options }),
-remove: (name: string, options: any) => res.cookies.set({ name, value: '', ...options }),
+        getAll() {
+          return req.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
+          res = NextResponse.next({ request: req })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            res.cookies.set(name, value, options)
+          )
+        },
       },
     }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
+  // IMPORTANTE: usar getUser() en vez de getSession() en middleware
+  const { data: { user } } = await supabase.auth.getUser()
 
   // Sin sesión → login
-  if (!session) {
+  if (!user) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
@@ -35,7 +52,7 @@ remove: (name: string, options: any) => res.cookies.set({ name, value: '', ...op
     const { data: profile } = await supabase
       .from('venue_profiles')
       .select('role')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single()
 
     if (profile?.role !== 'admin') {
@@ -47,5 +64,5 @@ remove: (name: string, options: any) => res.cookies.set({ name, value: '', ...op
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)'],
 }
