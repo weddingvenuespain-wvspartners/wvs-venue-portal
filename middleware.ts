@@ -14,9 +14,7 @@ export async function middleware(req: NextRequest) {
           return req.cookies.getAll()
         },
         setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            req.cookies.set(name, value)
-          )
+          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request: req })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
@@ -26,31 +24,37 @@ export async function middleware(req: NextRequest) {
     }
   )
 
-  // CRÍTICO: esto refresca la sesión y actualiza las cookies
-  // No usar getSession() aquí — usar getUser() es más seguro
-  const { data: { user } } = await supabase.auth.getUser()
-
   const { pathname } = req.nextUrl
 
-  // Rutas públicas
-  const isPublic = pathname === '/' || pathname.startsWith('/login')
-  
-  if (!isPublic && !user) {
-    // Sin sesión → redirigir al login
+  // Rutas completamente públicas — no tocar
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.includes('.') ||
+    pathname === '/'
+  ) {
+    return supabaseResponse
+  }
+
+  // Refrescar sesión — getUser() verifica con Supabase server
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Sin sesión y ruta protegida → login
+  if (!user && !pathname.startsWith('/login')) {
     const url = req.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if (isPublic && user && pathname === '/login') {
-    // Ya autenticado y va al login → redirigir al dashboard
+  // Con sesión y en login → dashboard
+  if (user && pathname.startsWith('/login')) {
     const url = req.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 
   // Rutas de admin
-  if (pathname.startsWith('/admin') && user) {
+  if (user && pathname.startsWith('/admin')) {
     const { data: profile } = await supabase
       .from('venue_profiles')
       .select('role')
@@ -64,12 +68,9 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // CRÍTICO: devolver siempre supabaseResponse para que las cookies se propaguen
   return supabaseResponse
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }
