@@ -33,7 +33,6 @@ const emptyForm = { name: '', email: '', phone: '', wedding_date: '', guests: ''
 export default function LeadsPage() {
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
-  const [user, setUser]     = useState<any>(null)
   const [leads, setLeads]   = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
