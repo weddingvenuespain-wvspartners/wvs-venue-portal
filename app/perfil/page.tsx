@@ -9,7 +9,6 @@ import { User, Lock, Bell } from 'lucide-react'
 export default function PerfilPage() {
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
-  const [user, setUser]       = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
   const [success, setSuccess] = useState('')
