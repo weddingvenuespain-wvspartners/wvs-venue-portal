@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
-import { Search, UserPlus, Building2, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { Search, UserPlus } from 'lucide-react'
 
 type Profile = {
   id: string
@@ -25,14 +25,11 @@ export default function AdminPage() {
   const [success, setSuccess]     = useState('')
   const [error, setError]         = useState('')
   const [search, setSearch]       = useState('')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterStatus, setFilterStatus] = useState('all')
   const [assignVenue, setAssignVenue]   = useState<Record<string, string>>({})
-
-  // Modal crear usuario
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [newEmail, setNewEmail]       = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [creatingUser, setCreatingUser] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [newEmail, setNewEmail]   = useState('')
+  const [newPass, setNewPass]     = useState('')
 
   useEffect(() => {
     const init = async () => {
@@ -41,21 +38,27 @@ export default function AdminPage() {
       if (!session) { router.push('/login'); return }
       setUserEmail(session.user.email || '')
 
-      const { data: myProfile } = await supabase
+      const { data: me } = await supabase
         .from('venue_profiles').select('role').eq('user_id', session.user.id).single()
-      if (myProfile?.role !== 'admin') { router.push('/dashboard'); return }
+      if (me?.role !== 'admin') { router.push('/dashboard'); return }
 
-      const { data: allProfiles } = await supabase
+      const { data: all } = await supabase
         .from('venue_profiles').select('*').order('created_at', { ascending: false })
-      if (allProfiles) setProfiles(allProfiles)
+      if (all) setProfiles(all)
 
+      // Cargar venues de WP — post type correcto: wedding-venues
       try {
         const res = await fetch(
-          'https://weddingvenuesspain.com/wp-json/wp/v2/wedding-venues?per_page=100&acf_format=standard',
+          'https://weddingvenuesspain.com/wp-json/wp/v2/wedding-venues?per_page=100&acf_format=standard&_fields=id,title,acf,link',
           { cache: 'no-store' }
         )
-        if (res.ok) setWpVenues(await res.json())
-      } catch {}
+        if (res.ok) {
+          const data = await res.json()
+          setWpVenues(Array.isArray(data) ? data : [])
+        }
+      } catch (e) {
+        console.error('Error cargando venues WP:', e)
+      }
 
       setLoading(false)
     }
@@ -63,26 +66,23 @@ export default function AdminPage() {
   }, [router])
 
   const notify = (msg: string, isError = false) => {
-    if (isError) setError(msg)
-    else setSuccess(msg)
+    isError ? setError(msg) : setSuccess(msg)
     setTimeout(() => { setSuccess(''); setError('') }, 4000)
   }
 
-  const handleAssignVenue = async (userId: string) => {
-    const wpVenueId = assignVenue[userId]
-    if (!wpVenueId) { notify('Selecciona un venue primero', true); return }
+  const handleAssign = async (userId: string) => {
+    const wpId = assignVenue[userId]
+    if (!wpId) { notify('Selecciona un venue primero', true); return }
     setSaving(userId)
     const supabase = createClient()
     const { error: err } = await supabase
       .from('venue_profiles')
-      .update({ wp_venue_id: parseInt(wpVenueId), status: 'active' })
+      .update({ wp_venue_id: parseInt(wpId), status: 'active' })
       .eq('user_id', userId)
-    if (err) notify('Error al asignar el venue', true)
+    if (err) notify('Error al asignar', true)
     else {
       notify('Venue asignado correctamente')
-      setProfiles(prev => prev.map(p =>
-        p.user_id === userId ? { ...p, wp_venue_id: parseInt(wpVenueId), status: 'active' } : p
-      ))
+      setProfiles(p => p.map(x => x.user_id === userId ? { ...x, wp_venue_id: parseInt(wpId), status: 'active' } : x))
     }
     setSaving(null)
   }
@@ -96,68 +96,46 @@ export default function AdminPage() {
         body: JSON.stringify({ onboarding_user_id: userId })
       })
       const data = await res.json()
-      if (!res.ok) notify(data.message || data.error || 'Error al crear el venue', true)
+      if (!res.ok) notify(data.message || 'Error al crear venue', true)
       else {
-        notify(`Venue creado en WordPress — ID ${data.wp_venue_id}`)
-        setProfiles(prev => prev.map(p =>
-          p.user_id === userId ? { ...p, wp_venue_id: data.wp_venue_id, status: 'active' } : p
-        ))
+        notify(`Venue creado — WP ID ${data.wp_venue_id}`)
+        setProfiles(p => p.map(x => x.user_id === userId ? { ...x, wp_venue_id: data.wp_venue_id, status: 'active' } : x))
       }
     } catch { notify('Error de conexión', true) }
     setSaving(null)
   }
 
-  const handleToggleStatus = async (userId: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'active' ? 'inactive' : 'active'
-    setSaving(userId + '-status')
+  const handleToggle = async (userId: string, status: string) => {
+    const next = status === 'active' ? 'inactive' : 'active'
+    setSaving(userId + '-s')
     const supabase = createClient()
-    await supabase.from('venue_profiles').update({ status: newStatus }).eq('user_id', userId)
-    setProfiles(prev => prev.map(p => p.user_id === userId ? { ...p, status: newStatus } : p))
+    await supabase.from('venue_profiles').update({ status: next }).eq('user_id', userId)
+    setProfiles(p => p.map(x => x.user_id === userId ? { ...x, status: next } : x))
     setSaving(null)
   }
 
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setCreatingUser(true)
-    const supabase = createClient()
-    const { error } = await supabase.auth.admin?.createUser
-      ? await (supabase.auth as any).admin.createUser({ email: newEmail, password: newPassword, email_confirm: true })
-      : { error: { message: 'No disponible desde cliente' } }
-
-    if (error) {
-      notify('Para crear usuarios ve a Supabase → Authentication → Users → Add user', true)
-    } else {
-      notify(`Usuario ${newEmail} creado correctamente`)
-      setShowCreateModal(false)
-      setNewEmail('')
-      setNewPassword('')
-    }
-    setCreatingUser(false)
+  const getVenueName = (id: number | null) => {
+    if (!id) return null
+    const v = wpVenues.find(v => v.id === id)
+    return v ? (v.acf?.H1_Venue || v.title?.rendered || `WP #${id}`) : `WP #${id}`
   }
 
-  const getVenueName = (wpId: number | null) => {
-    if (!wpId) return null
-    const v = wpVenues.find(v => v.id === wpId)
-    return v ? (v.acf?.H1_Venue || v.title?.rendered) : `WP #${wpId}`
-  }
-
-  const venueOwners = profiles.filter(p => p.role !== 'admin')
-  const filtered = venueOwners.filter(p => {
-    const matchStatus = filterStatus === 'all' || p.status === filterStatus
-    const matchSearch = !search || p.user_id.includes(search) || p.wp_username?.includes(search)
-    return matchStatus && matchSearch
+  const owners = profiles.filter(p => p.role !== 'admin')
+  const filtered = owners.filter(p => {
+    const matchS = filterStatus === 'all' || p.status === filterStatus
+    const matchQ = !search || p.user_id.includes(search.toLowerCase()) || (p.wp_username || '').toLowerCase().includes(search.toLowerCase())
+    return matchS && matchQ
   })
 
-  const stats = {
-    total: venueOwners.length,
-    pending: venueOwners.filter(p => p.status === 'pending').length,
-    active: venueOwners.filter(p => p.status === 'active').length,
-    inactive: venueOwners.filter(p => p.status === 'inactive').length,
+  const counts = {
+    pending:  owners.filter(p => p.status === 'pending').length,
+    active:   owners.filter(p => p.status === 'active').length,
+    inactive: owners.filter(p => p.status === 'inactive').length,
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-espresso flex items-center justify-center">
-      <div className="text-gold font-serif text-lg">Cargando...</div>
+    <div style={{ minHeight: '100vh', background: '#1A1512', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ color: '#C4975A', fontFamily: 'serif', fontSize: 16 }}>Cargando...</div>
     </div>
   )
 
@@ -168,11 +146,9 @@ export default function AdminPage() {
         <div className="topbar">
           <div className="topbar-title">Panel de administración</div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <a href="/admin/onboarding" className="btn btn-ghost" style={{ fontSize: 12 }}>
-              Ver onboardings →
-            </a>
-            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-              <UserPlus size={14} /> Nuevo usuario
+            <a href="/admin/onboarding" className="btn btn-ghost btn-sm">Ver onboardings →</a>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
+              <UserPlus size={13} /> Nuevo usuario
             </button>
           </div>
         </div>
@@ -182,50 +158,49 @@ export default function AdminPage() {
           {error   && <div className="alert alert-error">{error}</div>}
 
           {/* Stats */}
-          <div className="stats-grid" style={{ marginBottom: 20 }}>
+          <div className="stats-grid">
             <div className="stat-card accent">
-              <div className="stat-label">Total venues</div>
-              <div className="stat-value">{stats.total}</div>
+              <div className="stat-label">Total venue owners</div>
+              <div className="stat-value">{owners.length}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Pendientes</div>
-              <div className="stat-value" style={{ color: stats.pending > 0 ? 'var(--gold)' : undefined }}>{stats.pending}</div>
-              <div className={`stat-sub ${stats.pending > 0 ? 'warn' : ''}`}>{stats.pending > 0 ? 'Requieren acción' : 'Al día ✓'}</div>
+              <div className="stat-value" style={{ color: counts.pending > 0 ? 'var(--gold)' : undefined }}>{counts.pending}</div>
+              <div className={`stat-sub ${counts.pending > 0 ? 'warn' : ''}`}>{counts.pending > 0 ? 'Requieren acción' : 'Al día ✓'}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Activos</div>
-              <div className="stat-value">{stats.active}</div>
+              <div className="stat-value">{counts.active}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Venues en WP</div>
               <div className="stat-value">{wpVenues.length}</div>
+              <div className="stat-sub">{wpVenues.length > 0 ? 'Cargados correctamente' : 'Sin cargar'}</div>
             </div>
           </div>
 
           {/* Tabla */}
           <div className="card">
-            {/* Barra de búsqueda y filtros */}
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 12, alignItems: 'center' }}>
-              <div style={{ position: 'relative', flex: 1, maxWidth: 300 }}>
-                <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
+            {/* Toolbar */}
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+                <Search size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
                 <input
                   className="form-input"
-                  style={{ paddingLeft: 30, fontSize: 12 }}
-                  placeholder="Buscar por usuario o WP username..."
+                  style={{ paddingLeft: 28, fontSize: 12, padding: '7px 12px 7px 28px' }}
+                  placeholder="Buscar por ID o usuario WP..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                {(['all', 'pending', 'active', 'inactive'] as const).map(s => (
+                {[['all','Todos'], ['pending','Pendientes'], ['active','Activos'], ['inactive','Inactivos']].map(([k, label]) => (
                   <button
-                    key={s}
-                    onClick={() => setFilterStatus(s)}
-                    className={`btn ${filterStatus === s ? 'btn-primary' : 'btn-ghost'}`}
-                    style={{ fontSize: 11, padding: '5px 12px' }}
+                    key={k}
+                    onClick={() => setFilterStatus(k)}
+                    className={`btn btn-sm ${filterStatus === k ? 'btn-primary' : 'btn-ghost'}`}
                   >
-                    {s === 'all' ? 'Todos' : s === 'pending' ? 'Pendientes' : s === 'active' ? 'Activos' : 'Inactivos'}
-                    {s !== 'all' && <span style={{ marginLeft: 4, opacity: 0.7 }}>({stats[s]})</span>}
+                    {label}{k !== 'all' && ` (${counts[k as keyof typeof counts] ?? 0})`}
                   </button>
                 ))}
               </div>
@@ -245,39 +220,39 @@ export default function AdminPage() {
                 <tbody>
                   {filtered.length === 0 && (
                     <tr><td colSpan={5} style={{ textAlign: 'center', padding: 40, color: 'var(--warm-gray)' }}>
-                      {search || filterStatus !== 'all' ? 'No hay resultados para este filtro' : 'No hay venue owners registrados todavía'}
+                      {search || filterStatus !== 'all' ? 'Sin resultados para este filtro' : 'No hay venue owners registrados todavía'}
                     </td></tr>
                   )}
-                  {filtered.map(profile => {
-                    const venueName = getVenueName(profile.wp_venue_id)
-                    const isSaving = saving === profile.user_id
-                    const badgeClass = profile.status === 'active' ? 'badge-active' : profile.status === 'pending' ? 'badge-pending' : 'badge-inactive'
-                    const statusLabel = profile.status === 'active' ? 'Activo' : profile.status === 'pending' ? 'Pendiente' : 'Inactivo'
+                  {filtered.map(p => {
+                    const vName = getVenueName(p.wp_venue_id)
+                    const isSav = saving === p.user_id
+                    const badgeMap: Record<string, string> = { active: 'badge-active', pending: 'badge-pending', inactive: 'badge-inactive' }
+                    const labelMap: Record<string, string> = { active: 'Activo', pending: 'Pendiente', inactive: 'Inactivo' }
                     return (
-                      <tr key={profile.user_id}>
+                      <tr key={p.user_id}>
                         <td>
-                          <div style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--warm-gray)' }}>{profile.user_id.slice(0, 8)}...</div>
-                          {profile.wp_username && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>WP: {profile.wp_username}</div>}
-                          <div style={{ fontSize: 10, color: 'var(--stone)', marginTop: 2 }}>{new Date(profile.created_at).toLocaleDateString('es-ES')}</div>
+                          <div style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--charcoal)' }}>{p.user_id.slice(0, 8)}...</div>
+                          {p.wp_username && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>WP: {p.wp_username}</div>}
+                          <div style={{ fontSize: 10, color: 'var(--stone)', marginTop: 2 }}>{new Date(p.created_at).toLocaleDateString('es-ES')}</div>
                         </td>
-                        <td><span className={`badge ${badgeClass}`}>{statusLabel}</span></td>
+                        <td><span className={`badge ${badgeMap[p.status] || ''}`}>{labelMap[p.status] || p.status}</span></td>
                         <td>
-                          {venueName ? (
-                            <div>
-                              <div style={{ fontWeight: 500, fontSize: 13 }}>{venueName}</div>
-                              <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>ID: {profile.wp_venue_id}</div>
-                            </div>
-                          ) : <span style={{ color: 'var(--warm-gray)', fontSize: 12 }}>Sin asignar</span>}
+                          {vName
+                            ? <div><div style={{ fontSize: 13, fontWeight: 500 }}>{vName}</div><div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>ID: {p.wp_venue_id}</div></div>
+                            : <span style={{ color: 'var(--warm-gray)', fontSize: 12 }}>Sin asignar</span>
+                          }
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                             <select
                               className="form-input"
-                              style={{ fontSize: 12, padding: '5px 28px 5px 8px', maxWidth: 180 }}
-                              value={assignVenue[profile.user_id] || ''}
-                              onChange={e => setAssignVenue(prev => ({ ...prev, [profile.user_id]: e.target.value }))}
+                              style={{ fontSize: 12, padding: '5px 28px 5px 8px', maxWidth: 200, width: 'auto' }}
+                              value={assignVenue[p.user_id] || ''}
+                              onChange={e => setAssignVenue(prev => ({ ...prev, [p.user_id]: e.target.value }))}
                             >
-                              <option value="">Selecciona venue...</option>
+                              <option value="">
+                                {wpVenues.length === 0 ? 'Cargando venues...' : 'Selecciona venue...'}
+                              </option>
                               {wpVenues.map(v => (
                                 <option key={v.id} value={v.id}>
                                   {v.acf?.H1_Venue || v.title?.rendered} (#{v.id})
@@ -285,33 +260,30 @@ export default function AdminPage() {
                               ))}
                             </select>
                             <button
-                              className="btn btn-primary"
-                              style={{ fontSize: 11, padding: '5px 10px', whiteSpace: 'nowrap' }}
-                              disabled={isSaving || !assignVenue[profile.user_id]}
-                              onClick={() => handleAssignVenue(profile.user_id)}
+                              className="btn btn-primary btn-sm"
+                              disabled={isSav || !assignVenue[p.user_id]}
+                              onClick={() => handleAssign(p.user_id)}
                             >
-                              {isSaving ? '...' : 'Asignar'}
+                              {isSav ? '...' : 'Asignar'}
                             </button>
                           </div>
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button
-                              className={`btn ${profile.status === 'active' ? 'btn-danger' : 'btn-ghost'}`}
-                              style={{ fontSize: 11, padding: '4px 10px' }}
-                              disabled={saving === profile.user_id + '-status'}
-                              onClick={() => handleToggleStatus(profile.user_id, profile.status)}
+                              className={`btn btn-sm ${p.status === 'active' ? 'btn-danger' : 'btn-ghost'}`}
+                              disabled={saving === p.user_id + '-s'}
+                              onClick={() => handleToggle(p.user_id, p.status)}
                             >
-                              {profile.status === 'active' ? 'Desactivar' : 'Activar'}
+                              {p.status === 'active' ? 'Desactivar' : 'Activar'}
                             </button>
-                            {profile.status === 'pending' && (
+                            {p.status === 'pending' && (
                               <button
-                                className="btn btn-primary"
-                                style={{ fontSize: 11, padding: '4px 10px', whiteSpace: 'nowrap' }}
-                                disabled={isSaving}
-                                onClick={() => handleCreateVenue(profile.user_id)}
+                                className="btn btn-primary btn-sm"
+                                disabled={isSav}
+                                onClick={() => handleCreateVenue(p.user_id)}
                               >
-                                {isSaving ? '...' : 'Crear venue en WP'}
+                                {isSav ? '...' : 'Crear en WP'}
                               </button>
                             )}
                           </div>
@@ -326,16 +298,14 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Modal crear usuario */}
-      {showCreateModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 32, width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
-            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, marginBottom: 4 }}>Crear venue owner</div>
-            <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 24 }}>
-              También puedes crear usuarios desde <strong>Supabase → Authentication → Users → Add user</strong>
-            </div>
+      {/* Modal nuevo usuario */}
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Crear venue owner</div>
+            <div className="modal-sub">O créalo directamente en <strong>Supabase → Authentication → Users → Add user</strong></div>
             <div className="alert alert-info" style={{ fontSize: 12, marginBottom: 16 }}>
-              Tras crear el usuario tendrás que asignarle un venue desde la tabla.
+              Tras crear el usuario, asígnale un venue desde la tabla principal.
             </div>
             <div className="form-group">
               <label className="form-label">Email</label>
@@ -343,12 +313,12 @@ export default function AdminPage() {
             </div>
             <div className="form-group">
               <label className="form-label">Contraseña temporal</label>
-              <input className="form-input" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Mínimo 8 caracteres" />
+              <input className="form-input" type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Mínimo 8 caracteres" />
             </div>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 24 }}>
-              <button className="btn btn-ghost" onClick={() => setShowCreateModal(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={handleCreateUser as any} disabled={creatingUser}>
-                {creatingUser ? 'Creando...' : 'Crear usuario'}
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={() => { notify('Crea el usuario desde Supabase → Authentication → Add user', true); setShowModal(false) }}>
+                Ir a Supabase →
               </button>
             </div>
           </div>
