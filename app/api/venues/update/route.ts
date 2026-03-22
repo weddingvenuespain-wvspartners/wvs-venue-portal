@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     if (Object.keys(acf).length > 0) wpPayload.acf = acf
 
     const wpRes = await fetch(
-      `${WP_URL}/wp-json/wp/v2/wedding-venues/${profile.wp_venue_id}`,
+      `${WP_URL}/wp-json/wp/v2/venues/${profile.wp_venue_id}`,
       {
         method: 'POST',
         headers: {

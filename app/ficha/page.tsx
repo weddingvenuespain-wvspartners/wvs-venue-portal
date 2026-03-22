@@ -84,7 +84,7 @@ export default function FichaPage() {
 
         if (prof.wp_venue_id) {
           const res = await fetch(
-            `https://weddingvenuesspain.com/wp-json/wp/v2/wedding-venues/${prof.wp_venue_id}?acf_format=standard`,
+            `https://weddingvenuesspain.com/wp-json/wp/v2/venues/${prof.wp_venue_id}?acf_format=standard`,
             { cache: 'no-store' }
           )
           if (res.ok) {
