@@ -1,16 +1,25 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [mode, setMode] = useState<'login' | 'reset'>('login')
+  const [newPassword, setNewPassword] = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState('')
+  const [mode, setMode]         = useState<'login' | 'reset' | 'new_password'>('login')
   const [resetSent, setResetSent] = useState(false)
+
+  // Detectar token de recuperación en la URL
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash && hash.includes('type=recovery')) {
+      setMode('new_password')
+    }
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,10 +48,28 @@ export default function LoginPage() {
     setLoading(true)
     const supabase = createClient()
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/dashboard`
+      redirectTo: `${window.location.origin}/login`
     })
     setResetSent(true)
     setLoading(false)
+  }
+
+  const handleNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (newPassword.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres')
+      return
+    }
+    setLoading(true)
+    setError('')
+    const supabase = createClient()
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) {
+      setError('Error al actualizar la contraseña. El enlace puede haber expirado.')
+      setLoading(false)
+    } else {
+      router.push('/dashboard')
+    }
   }
 
   return (
@@ -53,7 +80,28 @@ export default function LoginPage() {
 
         {error && <div className="login-error">{error}</div>}
 
-        {mode === 'login' ? (
+        {/* Modo: establecer nueva contraseña */}
+        {mode === 'new_password' && (
+          <form onSubmit={handleNewPassword}>
+            <p style={{ color: 'var(--stone)', fontSize: '13px', marginBottom: '20px', textAlign: 'center' }}>
+              Introduce tu nueva contraseña.
+            </p>
+            <input
+              className="login-input"
+              type="password"
+              placeholder="Nueva contraseña (mín. 8 caracteres)"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              required
+            />
+            <button className="login-btn" type="submit" disabled={loading}>
+              {loading ? 'Guardando...' : 'Guardar contraseña'}
+            </button>
+          </form>
+        )}
+
+        {/* Modo: login normal */}
+        {mode === 'login' && (
           <form onSubmit={handleLogin}>
             <input
               className="login-input"
@@ -97,7 +145,10 @@ export default function LoginPage() {
               </button>
             </div>
           </form>
-        ) : (
+        )}
+
+        {/* Modo: pedir reset por email */}
+        {mode === 'reset' && (
           <form onSubmit={handleReset}>
             {resetSent ? (
               <div style={{ color: 'var(--stone)', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
