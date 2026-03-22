@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import { useAuth } from '@/lib/auth-context'
 import { ArrowLeft, Check, X, Building2, Plus } from 'lucide-react'
 
 type Onboarding = {
@@ -156,6 +157,7 @@ function CreateVenueModal({ wpVenues, onClose, onCreated }: {
 
 export default function AdminOnboardingPage() {
   const router = useRouter()
+  const { user, profile, loading: authLoading } = useAuth()
   const [loading, setLoading]         = useState(true)
   const [onboardings, setOnboardings] = useState<Onboarding[]>([])
   const [wpVenues, setWpVenues]       = useState<any[]>([])
@@ -173,7 +175,6 @@ export default function AdminOnboardingPage() {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
-      setUserEmail(session.user.email || '')
 
       const { data: me } = await supabase
         .from('venue_profiles').select('role').eq('user_id', session.user.id).single()
@@ -191,7 +192,7 @@ export default function AdminOnboardingPage() {
       setLoading(false)
     }
     init()
-  }, [router])
+  }, [user, profile, authLoading, router])
 
   const notify = (msg: string, isErr = false) => {
     isErr ? setError(msg) : setSuccess(msg)
@@ -258,7 +259,7 @@ export default function AdminOnboardingPage() {
 
   return (
     <div style={{ display: 'flex' }}>
-      <Sidebar venueName="Admin" userEmail={userEmail} />
+      <Sidebar />
       <div className="main-layout">
         <div className="topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

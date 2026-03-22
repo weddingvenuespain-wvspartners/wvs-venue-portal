@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import { useAuth } from '@/lib/auth-context'
 import { Search, UserPlus } from 'lucide-react'
 
 type Profile = {
@@ -17,10 +18,10 @@ type Profile = {
 
 export default function AdminPage() {
   const router = useRouter()
+  const { user, profile, loading: authLoading } = useAuth()
   const [loading, setLoading]     = useState(true)
   const [profiles, setProfiles]   = useState<Profile[]>([])
   const [wpVenues, setWpVenues]   = useState<any[]>([])
-  const [userEmail, setUserEmail] = useState('')
   const [saving, setSaving]       = useState<string | null>(null)
   const [success, setSuccess]     = useState('')
   const [error, setError]         = useState('')
@@ -36,7 +37,6 @@ export default function AdminPage() {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
-      setUserEmail(session.user.email || '')
 
       const { data: me } = await supabase
         .from('venue_profiles').select('role').eq('user_id', session.user.id).single()
@@ -63,7 +63,7 @@ export default function AdminPage() {
       setLoading(false)
     }
     init()
-  }, [router])
+  }, [user, profile, authLoading, router])
 
   const notify = (msg: string, isError = false) => {
     isError ? setError(msg) : setSuccess(msg)
@@ -141,7 +141,7 @@ export default function AdminPage() {
 
   return (
     <div style={{ display: 'flex' }}>
-      <Sidebar venueName="Admin" userEmail={userEmail} />
+      <Sidebar />
       <div className="main-layout">
         <div className="topbar">
           <div className="topbar-title">Panel de administración</div>
