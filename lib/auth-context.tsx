@@ -16,10 +16,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let mounted = true
     const supabase = createClient()
 
     // Cargar sesión inicial
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return
       if (session?.user) {
         setUser(session.user)
         const { data: prof } = await supabase
@@ -27,32 +29,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .select('*')
           .eq('user_id', session.user.id)
           .single()
-        setProfile(prof || null)
+        if (mounted) setProfile(prof)
       }
-      setLoading(false)
+      if (mounted) setLoading(false)
     })
 
-    // Escuchar cambios
+    // Escuchar cambios de sesión
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT') {
+      if (!mounted) return
+      if (session?.user) {
+        setUser(session.user)
+        const { data: prof } = await supabase
+          .from('venue_profiles')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single()
+        if (mounted) setProfile(prof)
+      } else {
         setUser(null)
         setProfile(null)
-        setLoading(false)
-        return
       }
-      if (session?.user) {
-        setUser(session.user)
-        const { data: prof } = await supabase
-          .from('venue_profiles')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .single()
-        setProfile(prof || null)
-      }
-      setLoading(false)
+      if (mounted) setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   return (
