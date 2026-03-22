@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (mounted) setLoading(false)
       })
       .catch((err) => {
-        console.error('Auth context initialization error:', err)
+        console.error('Auth context error:', err)
         if (mounted) setLoading(false)
       })
 
