@@ -4,12 +4,14 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import { Users, TrendingUp, AlertCircle, CheckCircle, ExternalLink, ArrowRight } from 'lucide-react'
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [venue, setVenue] = useState<any>(null)
-  const [leads, setLeads] = useState<any[]>([])
+  const [user, setUser]     = useState<any>(null)
+  const [venue, setVenue]   = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [leads, setLeads]   = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -17,23 +19,25 @@ export default function DashboardPage() {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
-
       setUser(session.user)
 
-      // Load venue profile linked to this user
-      const { data: profile } = await supabase
+      const { data: prof } = await supabase
         .from('venue_profiles')
         .select('*')
         .eq('user_id', session.user.id)
         .single()
 
-      if (profile) {
-        // Fetch venue data from WordPress
-        const res = await fetch(`https://weddingvenuesspain.com/wp-json/wp/v2/venues/${profile.wp_venue_id}?acf_format=standard`)
-        if (res.ok) setVenue(await res.json())
+      if (prof) {
+        setProfile(prof)
+        if (prof.wp_venue_id) {
+          const res = await fetch(
+            `https://weddingvenuesspain.com/wp-json/wp/v2/wedding-venues/${prof.wp_venue_id}?acf_format=standard`,
+            { cache: 'no-store' }
+          )
+          if (res.ok) setVenue(await res.json())
+        }
       }
 
-      // Load leads from Supabase
       const { data: leadsData } = await supabase
         .from('leads')
         .select('*')
@@ -48,81 +52,115 @@ export default function DashboardPage() {
   }, [router])
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1A1512' }}>
-      <div style={{ color: '#C4975A', fontFamily: 'serif', fontSize: '16px' }}>Cargando...</div>
+    <div className="min-h-screen bg-espresso flex items-center justify-center">
+      <div className="text-gold font-serif text-lg tracking-widest">Cargando...</div>
     </div>
   )
 
-  const venueName = venue?.title?.rendered || 'Mi Venue'
+  const venueName = venue?.acf?.H1_Venue || venue?.title?.rendered || 'Mi Venue'
+  const newLeads = leads.filter(l => l.status === 'new').length
+  const activeLeads = leads.filter(l => l.status !== 'booked' && l.status !== 'lost').length
+  const bookedLeads = leads.filter(l => l.status === 'booked').length
+
+  const statusColors: Record<string, string> = {
+    new: 'badge-new',
+    contacted: 'badge-active',
+    qualified: 'badge-active',
+    proposal: 'badge-pending',
+    booked: 'badge-active',
+    lost: 'badge-inactive',
+  }
+  const statusLabels: Record<string, string> = {
+    new: 'Nuevo', contacted: 'Contactado', qualified: 'Cualificado',
+    proposal: 'Propuesta', booked: 'Reservado', lost: 'Perdido',
+  }
 
   return (
-    <div style={{ display: 'flex' }}>
+    <div className="flex">
       <Sidebar venueName={venueName} userEmail={user?.email} />
       <div className="main-layout">
         <div className="topbar">
           <div className="topbar-title">Dashboard</div>
-          <Link href="/leads">
-            <button className="btn btn-primary">+ Nuevo contacto</button>
+          <Link href="/leads" className="btn btn-primary">
+            + Nuevo lead
           </Link>
         </div>
         <div className="page-content">
 
+          {/* Banner si no tiene ficha conectada */}
+          {!profile?.wp_venue_id && (
+            <div className="alert alert-warning mb-5">
+              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-medium">Tu ficha no está conectada. </span>
+                <Link href="/ficha" className="underline">Configúrala aquí →</Link>
+              </div>
+            </div>
+          )}
+
+          {/* Banner si tiene leads sin responder */}
+          {newLeads > 0 && (
+            <div className="alert alert-warning mb-5">
+              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-medium">{newLeads} {newLeads === 1 ? 'lead sin responder' : 'leads sin responder'}. </span>
+                <Link href="/leads" className="underline">Ver ahora →</Link>
+              </div>
+            </div>
+          )}
+
           {/* Stats */}
           <div className="stats-grid">
-            <div className="stat-card">
+            <div className="stat-card accent">
               <div className="stat-label">Leads este mes</div>
               <div className="stat-value">{leads.length}</div>
-              <div className="stat-sub">Desde tu ficha y otros canales</div>
+              <div className="stat-sub">Desde tu ficha y canales</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">En pipeline</div>
-              <div className="stat-value">{leads.filter(l => l.status !== 'done').length}</div>
+              <div className="stat-value">{activeLeads}</div>
               <div className="stat-sub">Activos ahora</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Sin responder</div>
-              <div className="stat-value">{leads.filter(l => l.status === 'new').length}</div>
-              <div className={leads.filter(l => l.status === 'new').length > 0 ? 'stat-sub warn' : 'stat-sub'}>
-                {leads.filter(l => l.status === 'new').length > 0 ? 'Pendientes' : 'Al día ✓'}
+              <div className="stat-value" style={{ color: newLeads > 0 ? 'var(--gold)' : undefined }}>{newLeads}</div>
+              <div className={`stat-sub ${newLeads > 0 ? 'warn' : ''}`}>
+                {newLeads > 0 ? 'Requieren atención' : 'Al día ✓'}
               </div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Confirmadas</div>
-              <div className="stat-value">{leads.filter(l => l.status === 'booked').length}</div>
+              <div className="stat-value">{bookedLeads}</div>
               <div className="stat-sub">Bodas reservadas</div>
             </div>
           </div>
 
-          <div className="two-col">
-            {/* Recent leads */}
+          {/* Grid: leads + venue */}
+          <div className="two-col" style={{ marginBottom: 16 }}>
+            {/* Últimos leads */}
             <div className="card">
               <div className="card-header">
                 <div className="card-title">Últimos leads</div>
-                <Link href="/leads" style={{ fontSize: '11px', color: 'var(--gold)' }}>Ver todos →</Link>
+                <Link href="/leads" style={{ fontSize: 11, color: 'var(--gold)' }}>Ver todos →</Link>
               </div>
               {leads.length === 0 ? (
-                <div className="card-body" style={{ color: 'var(--warm-gray)', fontSize: '13px', textAlign: 'center', padding: '30px' }}>
-                  Aún no tienes leads.<br/>
-                  <span style={{ fontSize: '11px' }}>Los leads de tu ficha aparecerán aquí automáticamente.</span>
+                <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 13 }}>
+                  <Users size={28} style={{ margin: '0 auto 10px', opacity: 0.3 }} />
+                  <div>Aún no tienes leads.</div>
+                  <div style={{ fontSize: 11, marginTop: 4 }}>Aparecerán aquí automáticamente desde tu ficha.</div>
                 </div>
               ) : (
-                <div style={{ padding: '6px 0' }}>
-                  {leads.map((lead: any) => (
-                    <div key={lead.id} style={{
-                      display: 'flex', alignItems: 'center', gap: '12px',
-                      padding: '10px 20px', borderBottom: '1px solid var(--ivory)'
-                    }}>
-                      <div style={{
-                        width: '8px', height: '8px', borderRadius: '50', flexShrink: 0,
-                        background: lead.status === 'new' ? 'var(--gold)' : lead.status === 'contacted' ? 'var(--sage)' : 'var(--stone)'
-                      }}/>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '13px', color: 'var(--charcoal)' }}>{lead.name}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--warm-gray)' }}>{lead.wedding_date || 'Sin fecha'}</div>
+                <div>
+                  {leads.map(lead => (
+                    <div key={lead.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 20px', borderBottom: '1px solid var(--ivory)' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: lead.status === 'new' ? 'var(--gold)' : lead.status === 'booked' ? '#22c55e' : 'var(--stone)' }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: 'var(--charcoal)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lead.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{lead.wedding_date || 'Sin fecha'} · {lead.guests ? `${lead.guests} invitados` : 'Sin especificar'}</div>
                       </div>
-                      <div style={{ fontSize: '10px', padding: '2px 8px', background: 'var(--ivory)', borderRadius: '10px', color: 'var(--warm-gray)' }}>
-                        {lead.source || 'Web'}
-                      </div>
+                      <span className={`badge ${statusColors[lead.status] || 'badge-inactive'}`}>
+                        {statusLabels[lead.status] || lead.status}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -133,7 +171,7 @@ export default function DashboardPage() {
             <div className="card">
               <div className="card-header">
                 <div className="card-title">Tu ficha en la web</div>
-                <Link href="/ficha" style={{ fontSize: '11px', color: 'var(--gold)' }}>Editar →</Link>
+                <Link href="/ficha" style={{ fontSize: 11, color: 'var(--gold)' }}>Editar →</Link>
               </div>
               <div className="card-body">
                 {venue ? (
@@ -142,28 +180,59 @@ export default function DashboardPage() {
                       <img
                         src={venue.acf.photo_gallery.section_2_image[0][0].full_image_url}
                         alt={venueName}
-                        style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '6px', marginBottom: '14px' }}
+                        style={{ width: '100%', height: 150, objectFit: 'cover', borderRadius: 6, marginBottom: 14 }}
                       />
                     )}
-                    <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '18px', marginBottom: '8px' }}>{venueName}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--warm-gray)', lineHeight: 1.6 }}
-                      dangerouslySetInnerHTML={{ __html: venue.excerpt?.rendered?.replace(/<[^>]*>/g, '').substring(0, 120) + '...' }}
-                    />
-                    <a
-                      href={venue.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ display: 'inline-block', marginTop: '12px', fontSize: '11px', color: 'var(--gold)', textDecoration: 'underline' }}
-                    >
-                      Ver en la web →
-                    </a>
+                    <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 19, marginBottom: 4, color: 'var(--espresso)' }}>{venueName}</div>
+                    {venue.acf?.location && (
+                      <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 10 }}>{venue.acf.location}</div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="badge badge-active">Publicada</span>
+                      <a href={venue.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                        Ver en la web <ExternalLink size={10} />
+                      </a>
+                    </div>
                   </>
                 ) : (
-                  <div style={{ color: 'var(--warm-gray)', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
-                    Conecta tu ficha para verla aquí.<br />
-                    <Link href="/ficha" style={{ color: 'var(--gold)', fontSize: '12px' }}>Ir a Mi ficha →</Link>
+                  <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--warm-gray)', fontSize: 13 }}>
+                    <div style={{ marginBottom: 8 }}>Sin ficha conectada</div>
+                    <Link href="/ficha" className="btn btn-ghost" style={{ fontSize: 12 }}>
+                      Configurar ficha →
+                    </Link>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* Acciones rápidas */}
+          <div className="card">
+            <div className="card-body" style={{ padding: '14px 20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                {[
+                  { href: '/leads', icon: <Users size={15} />, label: 'Añadir lead', sub: 'Registro manual' },
+                  { href: '/ficha', icon: <TrendingUp size={15} />, label: 'Editar ficha', sub: 'Info, fotos, precios' },
+                  { href: '/pipeline', icon: <CheckCircle size={15} />, label: 'Ver pipeline', sub: 'Gestionar estados' },
+                  ...(venue ? [{ href: venue.link, icon: <ExternalLink size={15} />, label: 'Ficha pública', sub: 'weddingvenuesspain.com', external: true }] : []),
+                ].map((item, i, arr) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                    <Link
+                      href={item.href}
+                      target={(item as any).external ? '_blank' : undefined}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, padding: '4px 0', textDecoration: 'none' }}
+                    >
+                      <div style={{ width: 32, height: 32, borderRadius: 6, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>
+                        {item.icon}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--charcoal)' }}>{item.label}</div>
+                        <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{item.sub}</div>
+                      </div>
+                    </Link>
+                    {i < arr.length - 1 && <div style={{ width: 1, height: 36, background: 'var(--ivory)', margin: '0 16px', flexShrink: 0 }} />}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
