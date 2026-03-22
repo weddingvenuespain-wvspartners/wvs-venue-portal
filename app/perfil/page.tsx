@@ -26,18 +26,13 @@ export default function PerfilPage() {
   const [hasWpCreds, setHasWpCreds] = useState(false)
 
   useEffect(() => {
-    const init = async () => {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
-
-      const { data: prof } = await supabase
-        .from('venue_profiles').select('*').eq('user_id', session.user.id).single()
-      if (prof) { setProfile(prof); setHasWpCreds(!!prof.wp_username) }
-      setLoading(false)
-    }
-    init()
-  }, [router])
+  if (authLoading) return
+  if (!user) { router.push('/login'); return }
+  if (profile) {
+    setHasWpCreds(!!profile.wp_username)
+  }
+  setLoading(false)
+}, [user, profile, authLoading, router])
 
   const notify = (msg: string, isErr = false) => {
     isErr ? setError(msg) : setSuccess(msg)
