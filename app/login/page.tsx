@@ -13,10 +13,20 @@ export default function LoginPage() {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const [success, setSuccess]   = useState('')
+  const [envStatus, setEnvStatus] = useState<string>('')
 
   useEffect(() => {
     const hash = window.location.hash
     if (hash && hash.includes('type=recovery')) setMode('new_password')
+    
+    // Diagnóstico de env vars visible en pantalla
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !key) {
+      setEnvStatus(`⚠️ Config error: URL=${url ? '✅' : '❌ MISSING'} KEY=${key ? '✅' : '❌ MISSING'}`)
+    } else {
+      setEnvStatus(`✅ ${url.replace('https://','').split('.')[0]}... key:${key.substring(0,20)}...`)
+    }
   }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -24,8 +34,18 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     try {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      
+      if (!url || !key) {
+        setError(`Error de configuración: las variables de entorno no están disponibles en el cliente. Haz Redeploy en Vercel.`)
+        setLoading(false)
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      
       if (error) {
         console.error('Login error:', error)
         if (error.message.includes('Invalid login credentials')) {
@@ -33,48 +53,35 @@ export default function LoginPage() {
         } else if (error.message.includes('Email not confirmed')) {
           setError('Confirma tu email antes de entrar. Revisa tu bandeja de entrada.')
         } else {
-          setError(error.message)
+          setError(`Error: ${error.message}`)
         }
         setLoading(false)
       } else if (data.session) {
-        // Usar window.location para forzar una navegación completa con las cookies ya guardadas
         window.location.href = '/dashboard'
       } else {
-        setError('No se pudo iniciar sesión. Inténtalo de nuevo.')
+        setError('Login OK pero sin sesión. Inténtalo de nuevo.')
         setLoading(false)
       }
     } catch (err: any) {
       console.error('Unexpected login error:', err)
-      setError('Error de conexión. Verifica tu internet e inténtalo de nuevo.')
+      setError(`Error inesperado: ${err?.message || 'desconocido'}`)
       setLoading(false)
     }
   }
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden')
-      return
-    }
-    if (password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres')
-      return
-    }
+    if (password !== confirmPassword) { setError('Las contraseñas no coinciden'); return }
+    if (password.length < 8) { setError('La contraseña debe tener al menos 8 caracteres'); return }
     setLoading(true)
     setError('')
     const supabase = createClient()
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
+      email, password,
       options: { emailRedirectTo: `${window.location.origin}/dashboard` }
     })
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      setSuccess('Cuenta creada. Revisa tu email para confirmar el registro.')
-      setLoading(false)
-    }
+    if (error) { setError(error.message); setLoading(false) }
+    else { setSuccess('Cuenta creada. Revisa tu email para confirmar el registro.'); setLoading(false) }
   }
 
   const handleReset = async (e: React.FormEvent) => {
@@ -91,20 +98,13 @@ export default function LoginPage() {
 
   const handleNewPassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (newPassword.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres')
-      return
-    }
+    if (newPassword.length < 8) { setError('La contraseña debe tener al menos 8 caracteres'); return }
     setLoading(true)
     setError('')
     const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) {
-      setError('Error al actualizar la contraseña. El enlace puede haber expirado.')
-      setLoading(false)
-    } else {
-      window.location.href = '/dashboard'
-    }
+    if (error) { setError('Error al actualizar la contraseña. El enlace puede haber expirado.'); setLoading(false) }
+    else { window.location.href = '/dashboard' }
   }
 
   const handleGoogle = async () => {
@@ -118,11 +118,22 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-box">
-        {/* Logo */}
         <div className="login-logo">Wedding Venues Spain</div>
         <div className="login-subtitle">Partner Portal</div>
 
-        {/* Alerts */}
+        {/* Diagnóstico de env vars — solo visible si hay problema */}
+        {envStatus && (
+          <div style={{
+            background: envStatus.startsWith('✅') ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.12)',
+            border: `1px solid ${envStatus.startsWith('✅') ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.3)'}`,
+            color: envStatus.startsWith('✅') ? '#86efac' : '#fca5a5',
+            borderRadius: 6, padding: '6px 10px', fontSize: 10,
+            marginBottom: 12, fontFamily: 'monospace', wordBreak: 'break-all'
+          }}>
+            {envStatus}
+          </div>
+        )}
+
         {error   && <div className="login-error">{error}</div>}
         {success && (
           <div style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)', color: '#86efac', borderRadius: 8, padding: '10px 14px', fontSize: 12, marginBottom: 16 }}>
@@ -130,29 +141,23 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Tabs login/signup */}
         {(mode === 'login' || mode === 'signup') && (
           <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 24 }}>
             {(['login', 'signup'] as Mode[]).map(m => (
-              <button
-                key={m}
-                onClick={() => { setMode(m); setError(''); setSuccess('') }}
+              <button key={m} onClick={() => { setMode(m); setError(''); setSuccess('') }}
                 style={{
                   flex: 1, padding: '8px 0', background: 'none', border: 'none',
                   color: mode === m ? '#C4975A' : 'rgba(255,255,255,0.3)',
                   fontSize: 12, fontWeight: mode === m ? 500 : 400,
                   borderBottom: `2px solid ${mode === m ? '#C4975A' : 'transparent'}`,
-                  cursor: 'pointer', marginBottom: -1, fontFamily: 'DM Sans, sans-serif',
-                  transition: 'all 0.15s'
-                }}
-              >
+                  cursor: 'pointer', marginBottom: -1, fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s'
+                }}>
                 {m === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
               </button>
             ))}
           </div>
         )}
 
-        {/* Login */}
         {mode === 'login' && (
           <form onSubmit={handleLogin}>
             <input className="login-input" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
@@ -179,7 +184,6 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* Signup */}
         {mode === 'signup' && (
           <form onSubmit={handleSignup}>
             <input className="login-input" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
@@ -201,7 +205,6 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* Reset password */}
         {mode === 'reset' && (
           <form onSubmit={handleReset}>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginBottom: 16, textAlign: 'center' }}>
@@ -220,7 +223,6 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* Nueva contraseña */}
         {mode === 'new_password' && (
           <form onSubmit={handleNewPassword}>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginBottom: 16, textAlign: 'center' }}>
