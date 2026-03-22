@@ -6,8 +6,7 @@ const WP_URL = process.env.NEXT_PUBLIC_WP_URL || 'https://weddingvenuesspain.com
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Verificar sesión
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -19,7 +18,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // 2. Obtener wp_token del usuario
     const { data: profile } = await supabase
       .from('venue_profiles')
       .select('wp_token, wp_venue_id')
@@ -30,7 +28,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Necesitas conectar tu cuenta de WordPress primero' }, { status: 403 })
     }
 
-    // 3. Leer el archivo del request (viene como FormData)
     const formData = await req.formData()
     const file = formData.get('file') as File | null
 
@@ -38,7 +35,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No se recibió ningún archivo' }, { status: 400 })
     }
 
-    // Validar tipo de archivo
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
@@ -47,16 +43,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Validar tamaño (máx 10MB)
-    const MAX_SIZE = 10 * 1024 * 1024
-    if (file.size > MAX_SIZE) {
+    if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json(
         { error: 'El archivo es demasiado grande. Máximo 10MB.' },
         { status: 400 }
       )
     }
 
-    // 4. Subir a WP Media Library
     const fileBuffer = await file.arrayBuffer()
 
     const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/media`, {
@@ -84,7 +77,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 5. Devolver el ID y URLs de la imagen subida
     return NextResponse.json({
       success: true,
       id: wpData.id,
@@ -97,11 +89,4 @@ export async function POST(req: NextRequest) {
     console.error('[/api/upload]', err)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
-}
-
-// Aumentar el límite de body para archivos grandes
-export const config = {
-  api: {
-    bodyParser: false,
-  },
 }
