@@ -13,7 +13,6 @@ type Tab = 'info' | 'descripcion' | 'precios' | 'ubicacion' | 'fotos'
 export default function FichaPage() {
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
-  const [user, setUser]       = useState<any>(null)
   const [venue, setVenue]     = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('info')
@@ -67,37 +66,28 @@ export default function FichaPage() {
 
   // ── Carga inicial ────────────────────────────────────────────────────────────
   useEffect(() => {
-    const init = async () => {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
+  if (authLoading) return
+  if (!user) { router.push('/login'); return }
 
-      const { data: prof } = await supabase
-        .from('venue_profiles')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single()
-
-      if (prof) {
-        setProfile(prof)
-        setHasWpCreds(!!prof.wp_username)
-
-        if (prof.wp_venue_id) {
-          const res = await fetch(
-            `https://weddingvenuesspain.com/wp-json/wp/v2/venues/${prof.wp_venue_id}?acf_format=standard`,
-            { cache: 'no-store' }
-          )
-          if (res.ok) {
-            const data = await res.json()
-            setVenue(data)
-            populateFields(data)
-          }
+  const load = async () => {
+    if (profile) {
+      setHasWpCreds(!!profile.wp_username)
+      if (profile.wp_venue_id) {
+        const res = await fetch(
+          `https://weddingvenuesspain.com/wp-json/wp/v2/venues/${profile.wp_venue_id}?acf_format=standard`,
+          { cache: 'no-store' }
+        )
+        if (res.ok) {
+          const data = await res.json()
+          setVenue(data)
+          populateFields(data)
         }
       }
-      setLoading(false)
     }
-    init()
-  }, [router])
+    setLoading(false)
+  }
+  load()
+}, [user, profile, authLoading, router])
 
   function populateFields(data: any) {
     const acf = data.acf || {}
