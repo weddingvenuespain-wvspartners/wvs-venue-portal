@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/wedding-venues`, {
+    const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/venues`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

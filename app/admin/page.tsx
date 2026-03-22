@@ -49,7 +49,7 @@ export default function AdminPage() {
       // Cargar venues de WP — post type correcto: wedding-venues
       try {
         const res = await fetch(
-          'https://weddingvenuesspain.com/wp-json/wp/v2/wedding-venues?per_page=100&acf_format=standard&_fields=id,title,acf,link',
+          'https://weddingvenuesspain.com/wp-json/wp/v2/venues?per_page=100&acf_format=standard&_fields=id,title,acf,link',
           { cache: 'no-store' }
         )
         if (res.ok) {
