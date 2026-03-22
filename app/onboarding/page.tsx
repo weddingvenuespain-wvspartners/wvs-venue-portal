@@ -114,7 +114,7 @@ export default function OnboardingPage() {
 
   if (submitted) return (
     <div style={{ display: 'flex' }}>
-      <Sidebar venueName="Mi Venue" userEmail={user?.email} />
+      <Sidebar />
       <div className="main-layout">
         <div className="topbar"><div className="topbar-title">Registro completado</div></div>
         <div className="page-content" style={{ maxWidth: 540, margin: '48px auto' }}>
@@ -142,7 +142,7 @@ export default function OnboardingPage() {
 
   return (
     <div style={{ display: 'flex' }}>
-      <Sidebar venueName="Mi Venue" userEmail={user?.email} />
+      <Sidebar />
       <div className="main-layout">
         <div className="topbar"><div className="topbar-title">Registra tu venue</div></div>
         <div className="page-content" style={{ maxWidth: 640, margin: '0 auto' }}>
