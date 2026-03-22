@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 
 interface SidebarProps {
@@ -11,6 +12,22 @@ interface SidebarProps {
 export default function Sidebar({ venueName = 'Mi Venue', userEmail = '' }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    const checkRole = async () => {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { data } = await supabase
+        .from('venue_profiles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .single()
+      setIsAdmin(data?.role === 'admin')
+    }
+    checkRole()
+  }, [])
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -78,6 +95,25 @@ export default function Sidebar({ venueName = 'Mi Venue', userEmail = '' }: Side
             {item.label}
           </Link>
         ))}
+
+        {isAdmin && (
+          <>
+            <div className="nav-section" style={{ marginTop: '8px' }}>Administración</div>
+            <Link href="/admin" className={`nav-item ${pathname === '/admin' ? 'active' : ''}`}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.2 3.2l1.4 1.4M11.4 11.4l1.4 1.4M3.2 12.8l1.4-1.4M11.4 4.6l1.4-1.4"/>
+              </svg>
+              Panel admin
+            </Link>
+            <Link href="/admin/onboarding" className={`nav-item ${pathname === '/admin/onboarding' ? 'active' : ''}`}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M8 8a3 3 0 100-6 3 3 0 000 6z"/><path d="M2 14s1-4 6-4 6 4 6 4"/>
+                <line x1="12" y1="5" x2="12" y2="9"/><line x1="10" y1="7" x2="14" y2="7"/>
+              </svg>
+              Nuevos venues
+            </Link>
+          </>
+        )}
       </nav>
 
       <div className="sidebar-footer">
