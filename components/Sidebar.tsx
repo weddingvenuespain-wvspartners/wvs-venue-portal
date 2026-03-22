@@ -1,37 +1,24 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 
-interface SidebarProps {
-  venueName?: string
-  userEmail?: string
-}
-
-export default function Sidebar({ venueName = 'Mi Venue', userEmail = '' }: SidebarProps) {
+export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const [isAdmin, setIsAdmin] = useState(false)
+  const { user, profile } = useAuth()
 
-  useEffect(() => {
-    const check = async () => {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      const { data } = await supabase.from('venue_profiles').select('role').eq('user_id', session.user.id).single()
-      setIsAdmin(data?.role === 'admin')
-    }
-    check()
-  }, [])
+  const isAdmin = profile?.role === 'admin'
+  const venueName = profile?.wp_venue_id ? 'Mi Venue' : 'Partner Portal'
+  const userEmail = user?.email || ''
+  const initials = userEmail.slice(0, 2).toUpperCase()
 
   const handleLogout = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/login')
   }
-
-  const initials = venueName.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'WV'
 
   const Icon = ({ d }: { d: string }) => (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -40,16 +27,16 @@ export default function Sidebar({ venueName = 'Mi Venue', userEmail = '' }: Side
   )
 
   const navItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: 'M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z' },
-    { href: '/ficha', label: 'Mi ficha', icon: 'M2 2h12v12H2zM5 6h6M5 9h4' },
+    { href: '/dashboard', label: 'Dashboard',  icon: 'M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z' },
+    { href: '/ficha',     label: 'Mi ficha',   icon: 'M2 2h12v12H2zM5 6h6M5 9h4' },
   ]
   const crmItems = [
-    { href: '/leads', label: 'Leads', icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4' },
-    { href: '/pipeline', label: 'Pipeline', icon: 'M1 3h3v10H1zM6 5h3v8H6zM11 1h3v12h-3z' },
-    { href: '/crm', label: 'Contactos', icon: 'M1 4h14v9H1zM5 4V3a3 3 0 016 0v1M1 8h14' },
+    { href: '/leads',    label: 'Leads',     icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4' },
+    { href: '/pipeline', label: 'Pipeline',  icon: 'M1 3h3v10H1zM6 5h3v8H6zM11 1h3v12h-3z' },
+    { href: '/crm',      label: 'Contactos', icon: 'M1 4h14v9H1zM5 4V3a3 3 0 016 0v1M1 8h14' },
   ]
   const adminItems = [
-    { href: '/admin', label: 'Panel admin', icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM8 1v2M8 13v2M1 8h2M13 8h2' },
+    { href: '/admin',            label: 'Panel admin',   icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM8 1v2M8 13v2M1 8h2M13 8h2' },
     { href: '/admin/onboarding', label: 'Nuevos venues', icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4M12 5v4M10 7h4' },
   ]
 
@@ -94,10 +81,10 @@ export default function Sidebar({ venueName = 'Mi Venue', userEmail = '' }: Side
           <div className="avatar">{initials}</div>
           <div style={{ minWidth: 0 }}>
             <div style={{ color: pathname === '/perfil' ? 'var(--gold)' : '#fff', fontSize: 12, fontWeight: 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {venueName}
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--warm-gray)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {userEmail}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+              {isAdmin ? 'Administrador' : 'Venue Owner'}
             </div>
           </div>
         </Link>
