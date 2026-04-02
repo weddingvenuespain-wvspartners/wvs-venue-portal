@@ -1,10 +1,14 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 
 type Mode = 'login' | 'signup' | 'reset' | 'new_password'
 
 export default function LoginPage() {
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [mode, setMode]         = useState<Mode>('login')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -13,6 +17,13 @@ export default function LoginPage() {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const [success, setSuccess]   = useState('')
+
+  // Cuando el auth-context confirme que hay usuario, navegar al dashboard
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push('/dashboard')
+    }
+  }, [user, authLoading, router])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -32,13 +43,12 @@ export default function LoginPage() {
       setLoading(false)
       return
     }
-    if (data.session) {
-      // Navegación dura — garantiza que el browser envía las cookies nuevas
-      window.location.replace('/dashboard')
-    } else {
+    if (!data.session) {
       setError('No se pudo iniciar sesión. Inténtalo de nuevo.')
       setLoading(false)
     }
+    // Si hay sesión: el useEffect que escucha user del auth-context navegará al dashboard
+    // No llamar router.push aquí — provoca race condition (dashboard monta antes de que user esté listo)
   }
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -74,7 +84,7 @@ export default function LoginPage() {
     const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) { setError(error.message); setLoading(false) }
-    else { window.location.replace('/dashboard') }
+    else { router.push('/dashboard') }
   }
 
   const handleGoogle = async () => {

@@ -4,6 +4,14 @@ import { cookies } from 'next/headers'
 
 const WP_URL = process.env.NEXT_PUBLIC_WP_URL || 'https://weddingvenuesspain.com'
 
+// Usamos credenciales admin del servidor — el venue nunca necesita conectar su WP
+function getAdminAuth() {
+  const user = process.env.WORDPRESS_ADMIN_USER
+  const pass = process.env.WORDPRESS_ADMIN_PASSWORD
+  if (!user || !pass) throw new Error('WP admin credentials not configured')
+  return 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64')
+}
+
 export async function POST(req: NextRequest) {
   try {
     const cookieStore = await cookies()
@@ -14,21 +22,16 @@ export async function POST(req: NextRequest) {
     )
 
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
+    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const { data: profile } = await supabase
       .from('venue_profiles')
-      .select('wp_venue_id, wp_token')
+      .select('wp_venue_id')
       .eq('user_id', session.user.id)
       .single()
 
     if (!profile?.wp_venue_id) {
       return NextResponse.json({ error: 'No tienes un venue asignado' }, { status: 403 })
-    }
-    if (!profile?.wp_token) {
-      return NextResponse.json({ error: 'Necesitas conectar tu cuenta de WordPress primero' }, { status: 403 })
     }
 
     const body = await req.json()
@@ -39,48 +42,33 @@ export async function POST(req: NextRequest) {
     if (body.excerpt !== undefined) wpPayload.excerpt = body.excerpt
 
     const acf: Record<string, any> = {}
-
     const acfFields = [
       'H1_Venue', 'location', 'Short_Description_of_Venue',
       'venue_starting_price', 'Capacity_of_Venue', 'accommodation', 'Min_Nights_of_Venue',
-      'h1_image', 'h2-Venue_and_mini_description', 'start_of_post_content',
+      'h1_image', 'vertical_photo', 'h2-Venue_and_mini_description', 'start_of_post_content',
       'h2_gallery', 'h2_gallery_copy', 'h2_gallery_copy2', 'h2_gallery_copy3',
       'h2_gallery_copy4', 'h2_gallery_copy5', 'h2_gallery_copy6', 'h2_gallery_copy7',
       'starting_price_breakdown1', 'starting_price_breakdown_text_area_1',
       'starting_price_breakdown_3', 'starting_price_breakdown_text_area_3',
       'Starting_Price_Breakdown_3_LunchDinner_text_area', 'starting_price_breakdown_text_area_5',
       'starting_price_breakdown_4', 'starting_price_breakdown_text_area_4',
+      'wvs_accommodation_help',
       'Specific_Location', 'Places_Nearby', 'Closest_Airport_to_Venue',
-      'section_2_image', 'end_gallery',
     ]
-
-    acfFields.forEach(field => {
-      if (body[field] !== undefined) acf[field] = body[field]
-    })
-
+    acfFields.forEach(f => { if (body[f] !== undefined) acf[f] = body[f] })
     if (Object.keys(acf).length > 0) wpPayload.acf = acf
 
-    const wpRes = await fetch(
-      `${WP_URL}/wp-json/wp/v2/venues/${profile.wp_venue_id}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${profile.wp_token}`,
-        },
-        body: JSON.stringify(wpPayload),
-      }
-    )
+    const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/venues/${profile.wp_venue_id}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': getAdminAuth(),
+      },
+      body: JSON.stringify(wpPayload),
+    })
 
     const wpData = await wpRes.json()
-
     if (!wpRes.ok) {
-      if (wpData.code === 'jwt_auth_invalid_token' || wpData.code === 'jwt_auth_expired') {
-        return NextResponse.json(
-          { error: 'token_expired', message: 'Tu sesión de WordPress ha expirado. Vuelve a conectar tu cuenta.' },
-          { status: 401 }
-        )
-      }
       return NextResponse.json(
         { error: 'wp_error', message: wpData.message || 'Error al guardar en WordPress' },
         { status: 500 }

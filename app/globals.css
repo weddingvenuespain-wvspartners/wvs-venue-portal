@@ -46,11 +46,12 @@
 }
 
 /* ── Sidebar ─────────────────────────────────────────── */
-.sidebar { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh; background: var(--espresso); display: flex; flex-direction: column; z-index: 100; overflow-y: auto; }
-.sidebar-logo { padding: 24px 20px 18px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.sidebar { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh; background: var(--espresso); display: flex; flex-direction: column; z-index: 100; overflow: hidden; }
+.sidebar-logo { padding: 24px 20px 18px; border-bottom: 1px solid rgba(255,255,255,0.07); flex-shrink: 0; }
 .sidebar-logo .brand { font-family: 'Cormorant Garamond', serif; font-size: 15px; color: var(--gold); letter-spacing: 0.06em; font-weight: 500; display: block; }
 .sidebar-logo .venue-name { font-size: 10px; color: var(--stone); margin-top: 3px; letter-spacing: 0.04em; display: block; }
-.sidebar-nav { padding: 12px 0; flex: 1; }
+.sidebar-nav { padding: 12px 0; flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.sidebar-nav::-webkit-scrollbar { display: none; }
 .nav-section { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--warm-gray); padding: 12px 20px 4px; }
 .nav-item { display: flex; align-items: center; gap: 9px; padding: 9px 20px; color: var(--stone); cursor: pointer; font-size: 12.5px; font-weight: 300; border-left: 2px solid transparent; transition: all 0.15s; text-decoration: none; }
 .nav-item:hover { color: #fff; background: rgba(255,255,255,0.04); }
@@ -66,7 +67,8 @@
 .page-content { padding: 24px 28px; flex: 1; max-width: 100%; }
 
 /* ── Cards ─────────────────────────────────────────────── */
-.card { background: #fff; border: 1px solid var(--ivory); border-radius: 10px; overflow: hidden; }
+.card { background: #fff; border: 1px solid var(--ivory); border-radius: 10px; overflow: hidden; transition: box-shadow 0.2s; }
+.card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
 .card-header { padding: 14px 20px 12px; border-bottom: 1px solid var(--ivory); display: flex; align-items: center; justify-content: space-between; }
 .card-title { font-size: 13px; font-weight: 500; color: var(--charcoal); }
 .card-body { padding: 18px 20px; }
@@ -167,8 +169,17 @@ table.data-table tr:hover td { background: #fafaf9; }
 .login-error { background: rgba(220,38,38,0.15); border: 1px solid rgba(220,38,38,0.3); color: #fca5a5; border-radius: 8px; padding: 10px 14px; font-size: 12px; margin-bottom: 14px; }
 
 /* ── Modal ──────────────────────────────────────────────── */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
-.modal { background: #fff; border-radius: 12px; padding: 28px 32px; width: 100%; max-width: 440px; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 24px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.modal { background: #fff; border-radius: 14px; width: 100%; max-width: 440px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; box-shadow: 0 24px 80px rgba(0,0,0,0.22); overflow: hidden; }
+.modal-header { flex-shrink: 0; padding: 24px 28px 16px; border-bottom: 1px solid var(--ivory); }
+.modal-body { flex: 1; overflow-y: auto; padding: 20px 28px; scrollbar-width: thin; scrollbar-color: var(--ivory) transparent; }
+.modal-footer { flex-shrink: 0; padding: 16px 28px; border-top: 1px solid var(--ivory); display: flex; gap: 10px; justify-content: flex-end; }
 .modal-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; color: var(--espresso); margin-bottom: 4px; }
-.modal-sub { font-size: 12px; color: var(--warm-gray); margin-bottom: 20px; }
-.modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--ivory); }
+.modal-sub { font-size: 12px; color: var(--warm-gray); margin-bottom: 0; }
+
+/* ── Rich text editor content styles ───────────────────────────────────────── */
+[contenteditable] p { margin: 0 0 4px 0; }
+[contenteditable] ul { margin: 4px 0; padding-left: 20px; list-style-type: disc; }
+[contenteditable] ol { margin: 4px 0; padding-left: 20px; list-style-type: decimal; }
+[contenteditable] li { margin: 2px 0; display: list-item; }
+[contenteditable] br { display: block; content: ''; margin: 0; }

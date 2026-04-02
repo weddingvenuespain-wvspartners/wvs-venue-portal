@@ -20,26 +20,48 @@ export default function DashboardPage() {
     if (!user) { router.push('/login'); return }
 
     const load = async () => {
-      const supabase = createClient()
+      console.log('🔵 load() start, profile:', profile?.wp_venue_id)
+      try {
+        const supabase = createClient()
 
-      if (profile?.wp_venue_id) {
-        const res = await fetch(
-          `https://weddingvenuesspain.com/wp-json/wp/v2/venues/${profile.wp_venue_id}?acf_format=standard`,
-          { cache: 'no-store' }
-        )
-        if (res.ok) setVenue(await res.json())
-      } else {
-        const { data: onb } = await supabase
-          .from('venue_onboarding').select('*').eq('user_id', user.id).single()
-        if (onb) setOnboarding(onb)
+        if (profile?.wp_venue_id) {
+          console.log('🔵 fetching WordPress venue...')
+          try {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 5000)
+            const res = await fetch(
+              `https://weddingvenuesspain.com/wp-json/wp/v2/venues/${profile.wp_venue_id}?acf_format=standard`,
+              { cache: 'no-store', signal: controller.signal }
+            )
+            clearTimeout(timeoutId)
+            if (res.ok) setVenue(await res.json())
+            console.log('🟢 WordPress venue loaded')
+          } catch (fetchErr) {
+            console.warn('⚠️ WordPress fetch failed:', fetchErr)
+          }
+        } else {
+          console.log('🔵 fetching onboarding...')
+          const { data: onb, error } = await supabase
+            .from('venue_onboarding').select('*').eq('user_id', user.id).single()
+          console.log('🟢 onboarding:', onb, error)
+          if (onb) setOnboarding(onb)
+        }
+
+        console.log('🔵 fetching leads...')
+        const { data: leadsData, error: leadsError } = await supabase
+          .from('leads').select('*').eq('user_id', user.id)
+          .order('created_at', { ascending: false }).limit(5)
+        console.log('🟢 leads:', leadsData, leadsError)
+        if (leadsData) setLeads(leadsData)
+
+      } catch (err) {
+        console.error('🔴 Error cargando dashboard:', err)
+      } finally {
+        console.log('🏁 setLoading(false)')
+        setLoading(false)
       }
-
-      const { data: leadsData } = await supabase
-        .from('leads').select('*').eq('user_id', user.id)
-        .order('created_at', { ascending: false }).limit(5)
-      if (leadsData) setLeads(leadsData)
-      setLoading(false)
     }
+
     load()
   }, [user, profile, authLoading, router])
 
@@ -57,16 +79,22 @@ export default function DashboardPage() {
 
   const venueName = venue?.acf?.H1_Venue || venue?.title?.rendered || 'Mi Venue'
   const newLeads = leads.filter(l => l.status === 'new').length
-  const activeLeads = leads.filter(l => !['booked','lost'].includes(l.status)).length
-  const bookedLeads = leads.filter(l => l.status === 'booked').length
+  const activeLeads = leads.filter(l => !['won','lost','booked'].includes(l.status)).length
+  const bookedLeads = leads.filter(l => l.status === 'won' || l.status === 'booked').length
 
   const statusColors: Record<string, string> = {
-    new: 'badge-new', contacted: 'badge-contacted', qualified: 'badge-active',
-    proposal: 'badge-quote', booked: 'badge-booked', lost: 'badge-inactive',
+    new: 'badge-new', contacted: 'badge-contacted',
+    proposal_sent: 'badge-quote', visit_scheduled: 'badge-visit',
+    budget_sent: 'badge-pending', won: 'badge-booked', lost: 'badge-inactive',
+    // legacy
+    qualified: 'badge-active', proposal: 'badge-quote', booked: 'badge-booked',
   }
   const statusLabels: Record<string, string> = {
-    new: 'Nuevo', contacted: 'Contactado', qualified: 'Cualificado',
-    proposal: 'Propuesta', booked: 'Reservado', lost: 'Perdido',
+    new: 'Nuevo', contacted: 'Contactado',
+    proposal_sent: 'Propuesta enviada', visit_scheduled: 'Visita agendada',
+    budget_sent: 'Presupuesto enviado', won: 'Ganado', lost: 'Perdido',
+    // legacy
+    qualified: 'Cualificado', proposal: 'Propuesta', booked: 'Reservado',
   }
 
   if (!profile?.wp_venue_id) {
@@ -147,9 +175,9 @@ export default function DashboardPage() {
               <div className="stat-sub">Desde tu ficha y canales</div>
             </div>
             <div className="stat-card">
-              <div className="stat-label">En pipeline</div>
+              <div className="stat-label">En seguimiento</div>
               <div className="stat-value">{activeLeads}</div>
-              <div className="stat-sub">Activos ahora</div>
+              <div className="stat-sub">Leads activos</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Sin responder</div>
@@ -162,6 +190,33 @@ export default function DashboardPage() {
               <div className="stat-sub">Bodas reservadas</div>
             </div>
           </div>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="card-body" style={{ padding: '14px 20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                {[
+                  { href: '/leads', icon: <Users size={15} />, label: 'Añadir lead', sub: 'Registro manual' },
+                  { href: '/calendario', icon: <CheckCircle size={15} />, label: 'Calendario', sub: 'Visitas y bodas' },
+                  { href: '/ficha', icon: <TrendingUp size={15} />, label: 'Editar ficha', sub: 'Info, fotos, precios' },
+                  ...(venue ? [{ href: venue.link, icon: <ExternalLink size={15} />, label: 'Ficha pública', sub: 'weddingvenuesspain.com', external: true }] : []),
+                ].map((item, i, arr) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                    <Link href={item.href} target={(item as any).external ? '_blank' : undefined}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, padding: '4px 0', textDecoration: 'none' }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 6, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>
+                        {item.icon}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--charcoal)' }}>{item.label}</div>
+                        <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{item.sub}</div>
+                      </div>
+                    </Link>
+                    {i < arr.length - 1 && <div style={{ width: 1, height: 36, background: 'var(--ivory)', margin: '0 16px', flexShrink: 0 }} />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div className="two-col" style={{ marginBottom: 16 }}>
             <div className="card">
               <div className="card-header">
@@ -203,32 +258,6 @@ export default function DashboardPage() {
                     Ver en la web <ExternalLink size={10} />
                   </a>
                 </div>
-              </div>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-body" style={{ padding: '14px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                {[
-                  { href: '/leads', icon: <Users size={15} />, label: 'Añadir lead', sub: 'Registro manual' },
-                  { href: '/ficha', icon: <TrendingUp size={15} />, label: 'Editar ficha', sub: 'Info, fotos, precios' },
-                  { href: '/pipeline', icon: <CheckCircle size={15} />, label: 'Ver pipeline', sub: 'Gestionar estados' },
-                  ...(venue ? [{ href: venue.link, icon: <ExternalLink size={15} />, label: 'Ficha pública', sub: 'weddingvenuesspain.com', external: true }] : []),
-                ].map((item, i, arr) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                    <Link href={item.href} target={(item as any).external ? '_blank' : undefined}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, padding: '4px 0', textDecoration: 'none' }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 6, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>
-                        {item.icon}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--charcoal)' }}>{item.label}</div>
-                        <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{item.sub}</div>
-                      </div>
-                    </Link>
-                    {i < arr.length - 1 && <div style={{ width: 1, height: 36, background: 'var(--ivory)', margin: '0 16px', flexShrink: 0 }} />}
-                  </div>
-                ))}
               </div>
             </div>
           </div>

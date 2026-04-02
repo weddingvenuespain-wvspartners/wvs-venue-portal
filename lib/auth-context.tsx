@@ -2,55 +2,96 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 
+type UserVenue = { id: string; wp_venue_id: number }
+
 type AuthContextType = {
   user: any
   profile: any
+  userVenues: UserVenue[]
   loading: boolean
 }
 
-const AuthContext = createContext<AuthContextType>({ user: null, profile: null, loading: true })
+const AuthContext = createContext<AuthContextType>({
+  user: null, profile: null, userVenues: [], loading: true,
+})
+
+async function fetchProfileAndVenues(userId: string) {
+  const supabase = createClient()
+
+  const [venuesResult, profileResult] = await Promise.all([
+    supabase.from('user_venues').select('id, wp_venue_id').eq('user_id', userId),
+    supabase.from('venue_profiles').select('*').eq('user_id', userId).maybeSingle(),
+  ])
+
+  const profile = profileResult.data ?? null
+
+  // Fetch active/trial subscription separately so errors don't block auth
+  if (profile) {
+    const subRes = await supabase
+      .from('venue_subscriptions')
+      .select('id, status, plan:venue_plans(id, name, display_name, permissions)')
+      .eq('user_id', userId)
+      .in('status', ['active', 'trial'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (subRes.error) {
+      // Log but don't block — user will get full access as fallback
+      console.warn('[auth] Could not fetch subscription:', subRes.error.message)
+    } else if (subRes.data) {
+      ;(profile as any).plan = subRes.data.plan
+    }
+    // If no subscription found, profile.plan stays undefined → usePlanFeatures returns FULL_ACCESS
+  }
+
+  return {
+    profile,
+    userVenues: venuesResult.data ?? [],
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser]       = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser]             = useState<any>(null)
+  const [profile, setProfile]       = useState<any>(null)
+  const [userVenues, setUserVenues] = useState<UserVenue[]>([])
+  const [loading, setLoading]       = useState(true)
 
   useEffect(() => {
     const supabase = createClient()
 
-    // Timeout de seguridad — si en 3s no hay respuesta, paramos de cargar
-    const timeout = setTimeout(() => setLoading(false), 3000)
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      clearTimeout(timeout)
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
-        // Intentar cargar perfil pero no bloquear si falla
-        try {
-          const { data: prof } = await supabase
-            .from('venue_profiles')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .single()
-          setProfile(prof ?? null)
-        } catch {
-          setProfile(null)
-        }
+        fetchProfileAndVenues(session.user.id).then(({ profile: p, userVenues: v }) => {
+          setProfile(p)
+          setUserVenues(v)
+          setLoading(false)
+        })
       } else {
-        setUser(null)
-        setProfile(null)
+        setLoading(false)
       }
-      setLoading(false)
     })
 
-    return () => {
-      clearTimeout(timeout)
-      subscription.unsubscribe()
-    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null); setProfile(null); setUserVenues([]); setLoading(false); return
+      }
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
+        setUser(session.user)
+        setTimeout(() => {
+          fetchProfileAndVenues(session.user.id).then(({ profile: p, userVenues: v }) => {
+            setProfile(p); setUserVenues(v); setLoading(false)
+          })
+        }, 0)
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading }}>
+    <AuthContext.Provider value={{ user, profile, userVenues, loading }}>
       {children}
     </AuthContext.Provider>
   )

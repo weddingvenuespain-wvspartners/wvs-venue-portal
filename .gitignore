@@ -32,6 +32,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Claude Code session history
+.claude/
+
+# WordPress integration snippets (may contain credentials)
+wordpress-snippet/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -4,171 +4,298 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
-import { ArrowLeft, Check, X, Building2, Plus } from 'lucide-react'
+import { ArrowLeft, Check, X, ExternalLink, ImageIcon } from 'lucide-react'
 
 type Onboarding = {
   id: string
   user_id: string
   name: string | null
-  description: string | null
-  short_bio: string | null
+  status: string
+  changes_status: string | null
+  admin_notes: string | null
+  submitted_at: string | null
+  reviewed_at: string | null
+  wp_post_id: number | null
+  ficha_data: Record<string, any> | null
+  changes_data: Record<string, any> | null
+  contact_email: string | null
+  contact_name: string | null
   city: string | null
   region: string | null
-  country: string | null
-  address: string | null
-  capacity_min: number | null
-  capacity_max: number | null
-  price_min: number | null
-  price_max: number | null
-  price_notes: string | null
-  accommodation: string | null
-  contact_name: string | null
-  contact_email: string | null
-  contact_phone: string | null
-  website: string | null
-  photo_urls: string[] | null
-  status: string
-  admin_notes: string | null
-  wp_post_id: number | null
-  submitted_at: string | null
-  created_at: string
 }
 
-// Modal para crear venue desde cero (sin onboarding del cliente)
-function CreateVenueModal({ wpVenues, onClose, onCreated }: {
-  wpVenues: any[]
-  onClose: () => void
-  onCreated: (msg: string) => void
-}) {
-  const [mode, setMode] = useState<'new' | 'assign'>('new')
-  const [saving, setSaving] = useState(false)
-  const [targetUserId, setTargetUserId] = useState('')
-  const [selectedVenueId, setSelectedVenueId] = useState('')
-  const [form, setForm] = useState({
-    name: '', description: '', short_bio: '', city: '', region: '',
-    country: 'Spain', address: '', capacity_max: '', price_min: '',
-    accommodation: '', contact_email: '', contact_phone: ''
-  })
+// ─── Full-info modal ───────────────────────────────────────────────────────────
 
-  const handleCreate = async () => {
-    if (!form.name) return
-    setSaving(true)
-    try {
-      const res = await fetch('/api/venues/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          target_user_id: targetUserId || undefined,
-          Capacity_of_Venue: form.capacity_max,
-          venue_starting_price: form.price_min,
-        })
-      })
-      const data = await res.json()
-      if (res.ok) {
-        onCreated(`Venue "${form.name}" creado en WordPress con ID ${data.wp_venue_id}`)
-        onClose()
-      } else {
-        onCreated(data.message || 'Error al crear el venue')
-      }
-    } catch { onCreated('Error de conexión') }
-    setSaving(false)
+function VenueModal({
+  onb,
+  adminNotes,
+  setAdminNotes,
+  saving,
+  onClose,
+  onApprove,
+  onReject,
+  onApproveChanges,
+  onRejectChanges,
+}: {
+  onb: Onboarding
+  adminNotes: string
+  setAdminNotes: (v: string) => void
+  saving: string | null
+  onClose: () => void
+  onApprove: (o: Onboarding) => void
+  onReject: (o: Onboarding) => void
+  onApproveChanges: (o: Onboarding) => void
+  onRejectChanges: (o: Onboarding) => void
+}) {
+  const data = onb.status === 'submitted'
+    ? onb.ficha_data
+    : onb.changes_status === 'submitted'
+      ? onb.changes_data
+      : onb.ficha_data
+
+  const isInitial  = onb.status === 'submitted'
+  const isChanges  = onb.status === 'approved' && onb.changes_status === 'submitted'
+  const isApproved = onb.status === 'approved' && (!onb.changes_status || ['approved','draft'].includes(onb.changes_status))
+
+  const FieldRow = ({ label, value }: { label: string; value?: string | number | boolean | null }) => {
+    if (value === null || value === undefined || value === '') return null
+    return (
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', color: 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 3 }}>{label}</div>
+        <div style={{ fontSize: 13, color: 'var(--charcoal)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{String(value)}</div>
+      </div>
+    )
   }
 
+  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--espresso)', letterSpacing: '.1em', textTransform: 'uppercase', paddingBottom: 8, borderBottom: '1px solid var(--ivory)', marginBottom: 14 }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 560, maxHeight: '80vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-        <div className="modal-title">Crear venue nuevo</div>
-        <div style={{ display: 'flex', gap: 8, margin: '16px 0' }}>
-          <button className={`btn btn-sm ${mode === 'new' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('new')}>
-            <Plus size={12} /> Crear en WordPress
-          </button>
-          <button className={`btn btn-sm ${mode === 'assign' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('assign')}>
-            <Building2 size={12} /> Asignar existente
-          </button>
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+      style={{ alignItems: 'flex-start', paddingTop: 40, paddingBottom: 40, overflowY: 'auto' }}
+    >
+      <div
+        className="modal"
+        onClick={e => e.stopPropagation()}
+        style={{ width: '100%', maxWidth: 860, maxHeight: 'none', overflow: 'visible' }}
+      >
+        <div style={{ padding: '24px 28px' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+          <div>
+            <div style={{ fontSize: 20, fontFamily: 'Cormorant Garamond, serif', fontWeight: 600, color: 'var(--espresso)' }}>
+              {data?.H1_Venue || onb.name || 'Sin nombre'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 3 }}>
+              {data?.location || onb.region || onb.city || '—'}
+              {onb.contact_email && <span style={{ marginLeft: 12 }}>✉ {onb.contact_email}</span>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {onb.wp_post_id && (
+              <a
+                href={`https://weddingvenuesspain.com/wp-admin/post.php?post=${onb.wp_post_id}&action=edit`}
+                target="_blank" rel="noopener noreferrer"
+                className="btn btn-ghost btn-sm"
+              >
+                <ExternalLink size={12} /> Ver en WP
+              </a>
+            )}
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}>
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        {mode === 'new' && (
-          <>
-            <div className="two-col">
-              <div className="form-group">
-                <label className="form-label">Nombre del venue *</label>
-                <input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Finca Son Term" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Ciudad</label>
-                <input className="form-input" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="Ej: Mallorca" />
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Descripción corta</label>
-              <textarea className="form-textarea" style={{ minHeight: 60 }} value={form.short_bio} onChange={e => setForm(f => ({ ...f, short_bio: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Descripción completa</label>
-              <textarea className="form-textarea" style={{ minHeight: 100 }} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-            </div>
-            <div className="two-col">
-              <div className="form-group">
-                <label className="form-label">Capacidad máx.</label>
-                <input className="form-input" type="number" value={form.capacity_max} onChange={e => setForm(f => ({ ...f, capacity_max: e.target.value }))} placeholder="200" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Precio menú desde</label>
-                <input className="form-input" value={form.price_min} onChange={e => setForm(f => ({ ...f, price_min: e.target.value }))} placeholder="Ej: desde 120€/persona" />
-              </div>
-            </div>
-            <div className="two-col">
-              <div className="form-group">
-                <label className="form-label">Email contacto</label>
-                <input className="form-input" type="email" value={form.contact_email} onChange={e => setForm(f => ({ ...f, contact_email: e.target.value }))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Teléfono</label>
-                <input className="form-input" value={form.contact_phone} onChange={e => setForm(f => ({ ...f, contact_phone: e.target.value }))} />
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Asignar a usuario (opcional — user_id de Supabase)</label>
-              <input className="form-input" value={targetUserId} onChange={e => setTargetUserId(e.target.value)} placeholder="uuid del usuario en Supabase" />
-              <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4 }}>Si lo dejas vacío, el venue se crea en WP sin asignar a ningún usuario del portal.</div>
-            </div>
-          </>
-        )}
-
-        {mode === 'assign' && (
-          <div className="alert alert-info">
-            Para asignar un venue existente a un usuario, usa el dropdown de la tabla principal del Panel Admin.
+        {/* Status badge */}
+        {isChanges && (
+          <div className="alert alert-info" style={{ fontSize: 12, marginBottom: 20 }}>
+            Este venue está publicado (WP #{onb.wp_post_id}). Está solicitando cambios en su ficha.
           </div>
         )}
 
-        <div className="modal-footer">
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          {mode === 'new' && (
-            <button className="btn btn-primary" onClick={handleCreate} disabled={saving || !form.name}>
-              {saving ? 'Creando...' : 'Crear en WordPress'}
-            </button>
+        {data ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
+
+            {/* LEFT COLUMN */}
+            <div>
+              <Section title="Información principal">
+                <FieldRow label="Nombre H1" value={data.H1_Venue} />
+                <FieldRow label="Región" value={data.location} />
+                <FieldRow label="Descripción corta" value={data.shortDesc} />
+                <FieldRow label="Capacidad" value={data.capacity} />
+              </Section>
+
+              <Section title="Descripción">
+                <FieldRow label="Mini título (H2)" value={data.miniDesc} />
+                <FieldRow label="Mini párrafo" value={data.miniParagraph} />
+                {data.postContent && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', color: 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 3 }}>Descripción completa</div>
+                    <div style={{ fontSize: 11, color: 'var(--charcoal)', fontFamily: 'monospace', background: 'var(--cream)', padding: '8px 10px', borderRadius: 6, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                      {data.postContent}
+                    </div>
+                  </div>
+                )}
+              </Section>
+
+              <Section title="Ubicación">
+                <FieldRow label="Ubicación específica" value={data.specificLocation} />
+                <FieldRow label="Lugares cercanos" value={data.placesNearby} />
+                <FieldRow label="Aeropuerto más cercano" value={data.closestAirport} />
+              </Section>
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div>
+              <Section title="Precios">
+                <FieldRow label="Precio símbolo" value={data.venuePrice} />
+                <FieldRow label="Menú desde" value={data.menuPrice} />
+                <FieldRow label="Venue fee" value={data.breakdown1} />
+                <FieldRow label="Venue fee — detalle" value={data.breakdown1text} />
+                <FieldRow label="Catering" value={data.breakdown3} />
+                <FieldRow label="Catering — detalle" value={data.breakdown3text} />
+                <FieldRow label="Alojamiento" value={data.accommodation} />
+                <FieldRow label="WVS ayuda alojamiento" value={data.wvsAccomHelp ? 'Sí' : null} />
+              </Section>
+
+              <Section title="Imágenes">
+                <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                  {data.heroImageUrl && (
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>HERO</div>
+                      <img src={data.heroImageUrl} alt="hero" style={{ width: 140, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--ivory)' }} />
+                    </div>
+                  )}
+                  {data.verticalPhotoUrl && (
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>VERTICAL</div>
+                      <img src={data.verticalPhotoUrl} alt="vertical" style={{ width: 60, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--ivory)' }} />
+                    </div>
+                  )}
+                </div>
+                {Array.isArray(data.gallery) && data.gallery.some(Boolean) && (
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 6 }}>GALERÍA ({data.gallery.filter(Boolean).length} fotos)</div>
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                      {data.gallery.filter(Boolean).map((img: any, i: number) =>
+                        img?.url
+                          ? <img key={i} src={img.url} alt="" style={{ width: 64, height: 46, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--ivory)' }} />
+                          : <div key={i} style={{ width: 64, height: 46, background: 'var(--cream)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ImageIcon size={16} color="var(--warm-gray)" /></div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Section>
+
+              {/* Reseñas */}
+              {Array.isArray(data.reviews) && data.reviews.some((r: any) => r?.couple_name) && (
+                <Section title={`Reseñas ${data.reviewsEnabled === false ? '(desactivadas)' : ''}`}>
+                  {data.reviews.filter((r: any) => r?.couple_name).map((r: any, i: number) => (
+                    <div key={i} style={{ marginBottom: 10, padding: '8px 10px', background: 'var(--cream)', borderRadius: 6 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{r.couple_name} <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>{r.country}</span></div>
+                      {r.text && <div style={{ fontSize: 11, color: 'var(--charcoal)', marginTop: 3, fontStyle: 'italic' }}>"{r.text}"</div>}
+                    </div>
+                  ))}
+                </Section>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: 'var(--warm-gray)', fontSize: 13, padding: '20px 0' }}>Sin datos de ficha disponibles.</div>
+        )}
+
+        {/* Admin notes + action buttons */}
+        <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 20, marginTop: 8 }}>
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <label className="form-label">Nota para el venue (obligatoria si rechazas)</label>
+            <textarea
+              className="form-textarea"
+              style={{ minHeight: 70 }}
+              value={adminNotes}
+              onChange={e => setAdminNotes(e.target.value)}
+              placeholder="Nota interna o motivo de rechazo..."
+            />
+          </div>
+
+          {isInitial && (
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                disabled={saving === onb.id}
+                onClick={() => onApprove(onb)}
+              >
+                <Check size={14} /> {saving === onb.id ? 'Publicando en WordPress...' : 'Aprobar y publicar en WordPress'}
+              </button>
+              <button
+                className="btn btn-danger"
+                disabled={saving === onb.id + '-reject'}
+                onClick={() => onReject(onb)}
+              >
+                <X size={14} /> Rechazar
+              </button>
+            </div>
+          )}
+
+          {isChanges && (
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                disabled={saving === onb.id + '-changes'}
+                onClick={() => onApproveChanges(onb)}
+              >
+                <Check size={14} /> {saving === onb.id + '-changes' ? 'Publicando cambios...' : 'Aprobar y publicar cambios'}
+              </button>
+              <button
+                className="btn btn-danger"
+                disabled={saving === onb.id + '-changes-reject'}
+                onClick={() => onRejectChanges(onb)}
+              >
+                <X size={14} /> Rechazar cambios
+              </button>
+            </div>
+          )}
+
+          {isApproved && (
+            <div className="alert alert-success" style={{ fontSize: 12 }}>
+              Publicado en WordPress (ID {onb.wp_post_id}) — sin cambios pendientes.
+            </div>
+          )}
+          {onb.status === 'rejected' && (
+            <div className="alert alert-error" style={{ fontSize: 12 }}>
+              Rechazado. {onb.admin_notes && `Motivo: ${onb.admin_notes}`}
+            </div>
           )}
         </div>
+        </div>{/* end padding wrapper */}
       </div>
     </div>
   )
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminOnboardingPage() {
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
   const [loading, setLoading]         = useState(true)
   const [onboardings, setOnboardings] = useState<Onboarding[]>([])
-  const [wpVenues, setWpVenues]       = useState<any[]>([])
-  const [userEmail, setUserEmail]     = useState('')
   const [saving, setSaving]           = useState<string | null>(null)
   const [success, setSuccess]         = useState('')
   const [error, setError]             = useState('')
   const [selected, setSelected]       = useState<Onboarding | null>(null)
   const [adminNotes, setAdminNotes]   = useState('')
-  const [filterStatus, setFilterStatus] = useState('submitted')
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [filterStatus, setFilterStatus] = useState('pending')
 
   useEffect(() => {
     const init = async () => {
@@ -183,12 +310,6 @@ export default function AdminOnboardingPage() {
       const { data: onbs } = await supabase
         .from('venue_onboarding').select('*').order('submitted_at', { ascending: false })
       if (onbs) setOnboardings(onbs)
-
-      try {
-        const res = await fetch('https://weddingvenuesspain.com/wp-json/wp/v2/venues?per_page=100&_fields=id,title,acf', { cache: 'no-store' })
-        if (res.ok) setWpVenues(await res.json())
-      } catch {}
-
       setLoading(false)
     }
     init()
@@ -199,56 +320,97 @@ export default function AdminOnboardingPage() {
     setTimeout(() => { setSuccess(''); setError('') }, 5000)
   }
 
+  const openVenue = (onb: Onboarding) => {
+    setSelected(onb)
+    setAdminNotes(onb.admin_notes || '')
+  }
+
   const handleApprove = async (onb: Onboarding) => {
     setSaving(onb.id)
     try {
-      const res = await fetch('/api/venues/create', {
+      const res = await fetch('/api/venues/apply-changes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ onboarding_user_id: onb.user_id })
+        body: JSON.stringify({ target_user_id: onb.user_id, is_initial: true }),
       })
       const data = await res.json()
       if (res.ok) {
-        notify(`Venue creado en WordPress — ID ${data.wp_venue_id}`)
+        notify('Venue aprobado y publicado en WordPress ✓')
         setOnboardings(prev => prev.map(o => o.id === onb.id ? { ...o, status: 'approved', wp_post_id: data.wp_venue_id } : o))
         setSelected(null)
       } else {
-        notify(data.message || 'Error al crear el venue', true)
+        notify(data.error || 'Error al publicar', true)
       }
     } catch { notify('Error de conexión', true) }
     setSaving(null)
   }
 
   const handleReject = async (onb: Onboarding) => {
-    if (!adminNotes) { notify('Añade una nota explicando el motivo del rechazo', true); return }
+    if (!adminNotes.trim()) { notify('Añade una nota explicando el motivo del rechazo', true); return }
     setSaving(onb.id + '-reject')
     const supabase = createClient()
     await supabase.from('venue_onboarding').update({
-      status: 'rejected',
-      admin_notes: adminNotes,
-      reviewed_at: new Date().toISOString()
+      status: 'rejected', admin_notes: adminNotes, reviewed_at: new Date().toISOString(),
     }).eq('id', onb.id)
     setOnboardings(prev => prev.map(o => o.id === onb.id ? { ...o, status: 'rejected', admin_notes: adminNotes } : o))
     notify('Solicitud rechazada')
-    setSelected(null)
-    setAdminNotes('')
+    setSelected(null); setAdminNotes('')
     setSaving(null)
   }
 
-  const filtered = onboardings.filter(o => filterStatus === 'all' || o.status === filterStatus)
-
-  const statusBadge: Record<string, { cls: string; label: string }> = {
-    draft:     { cls: 'badge-inactive', label: 'Borrador' },
-    submitted: { cls: 'badge-pending',  label: 'Pendiente revisión' },
-    approved:  { cls: 'badge-active',   label: 'Aprobado' },
-    rejected:  { cls: 'badge-inactive', label: 'Rechazado' },
+  const handleApproveChanges = async (onb: Onboarding) => {
+    setSaving(onb.id + '-changes')
+    try {
+      const res = await fetch('/api/venues/apply-changes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_user_id: onb.user_id, is_initial: false }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        notify('Cambios aprobados y publicados ✓')
+        setOnboardings(prev => prev.map(o => o.id === onb.id ? { ...o, changes_status: 'approved' } : o))
+        setSelected(null)
+      } else {
+        notify(data.error || 'Error al publicar cambios', true)
+      }
+    } catch { notify('Error de conexión', true) }
+    setSaving(null)
   }
 
-  const counts = {
-    submitted: onboardings.filter(o => o.status === 'submitted').length,
-    draft:     onboardings.filter(o => o.status === 'draft').length,
-    approved:  onboardings.filter(o => o.status === 'approved').length,
-    rejected:  onboardings.filter(o => o.status === 'rejected').length,
+  const handleRejectChanges = async (onb: Onboarding) => {
+    if (!adminNotes.trim()) { notify('Añade una nota explicando el motivo del rechazo', true); return }
+    setSaving(onb.id + '-changes-reject')
+    const supabase = createClient()
+    await supabase.from('venue_onboarding').update({
+      changes_status: 'rejected', admin_notes: adminNotes, reviewed_at: new Date().toISOString(),
+    }).eq('id', onb.id)
+    setOnboardings(prev => prev.map(o => o.id === onb.id ? { ...o, changes_status: 'rejected', admin_notes: adminNotes } : o))
+    notify('Cambios rechazados')
+    setSelected(null); setAdminNotes('')
+    setSaving(null)
+  }
+
+  const pendingInitial = onboardings.filter(o => o.status === 'submitted')
+  const pendingChanges = onboardings.filter(o => o.status === 'approved' && o.changes_status === 'submitted')
+  const allPending     = [...pendingInitial, ...pendingChanges]
+  const drafts         = onboardings.filter(o => o.status === 'draft' || !o.status)
+  const approved       = onboardings.filter(o => o.status === 'approved')
+  const rejected       = onboardings.filter(o => o.status === 'rejected')
+
+  const filtered =
+    filterStatus === 'pending'  ? allPending :
+    filterStatus === 'draft'    ? drafts :
+    filterStatus === 'approved' ? approved :
+    filterStatus === 'rejected' ? rejected :
+    onboardings
+
+  const getRowBadge = (onb: Onboarding) => {
+    if (onb.status === 'submitted') return { cls: 'badge-pending', label: 'Nueva solicitud' }
+    if (onb.status === 'approved' && onb.changes_status === 'submitted') return { cls: 'badge-pending', label: 'Cambios pendientes' }
+    if (onb.status === 'approved') return { cls: 'badge-active', label: 'Aprobado' }
+    if (onb.status === 'rejected') return { cls: 'badge-inactive', label: 'Rechazado' }
+    return { cls: 'badge-inactive', label: 'Borrador' }
   }
 
   if (loading) return (
@@ -263,174 +425,125 @@ export default function AdminOnboardingPage() {
       <div className="main-layout">
         <div className="topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <a href="/admin" className="btn btn-ghost btn-sm"><ArrowLeft size={13} /> Admin</a>
-            <div className="topbar-title">Nuevos venues</div>
+            <a href="/admin" className="btn btn-ghost btn-sm"><ArrowLeft size={13} /> CRM</a>
+            <div className="topbar-title">Solicitudes de venues</div>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
-            <Plus size={13} /> Crear venue
-          </button>
         </div>
 
         <div className="page-content">
-          {success && <div className="alert alert-success">{success}</div>}
-          {error   && <div className="alert alert-error">{error}</div>}
+          {success && <div className="alert alert-success" style={{ marginBottom: 16 }}>{success}</div>}
+          {error   && <div className="alert alert-error"   style={{ marginBottom: 16 }}>{error}</div>}
 
           {/* Stats */}
           <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }}>
             <div className="stat-card accent">
               <div className="stat-label">Pendientes revisión</div>
-              <div className="stat-value" style={{ color: counts.submitted > 0 ? 'var(--gold)' : undefined }}>{counts.submitted}</div>
-              <div className={`stat-sub ${counts.submitted > 0 ? 'warn' : ''}`}>{counts.submitted > 0 ? 'Requieren acción' : 'Al día ✓'}</div>
+              <div className="stat-value" style={{ color: allPending.length > 0 ? 'var(--gold)' : undefined }}>{allPending.length}</div>
+              <div className={`stat-sub ${allPending.length > 0 ? 'warn' : ''}`}>{allPending.length > 0 ? 'Requieren acción' : 'Al día ✓'}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">En borrador</div>
-              <div className="stat-value">{counts.draft}</div>
-              <div className="stat-sub">Rellenando formulario</div>
+              <div className="stat-value">{drafts.length}</div>
+              <div className="stat-sub">Rellenando ficha</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Aprobados</div>
-              <div className="stat-value">{counts.approved}</div>
+              <div className="stat-value">{approved.length}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Rechazados</div>
-              <div className="stat-value">{counts.rejected}</div>
+              <div className="stat-value">{rejected.length}</div>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16 }}>
-            {/* Lista */}
-            <div className="card">
-              <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {[['all','Todos'], ['submitted','Pendientes'], ['draft','Borradores'], ['approved','Aprobados'], ['rejected','Rechazados']].map(([k, label]) => (
-                  <button key={k} className={`btn btn-sm ${filterStatus === k ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setFilterStatus(k)}>
-                    {label}{k !== 'all' && ` (${counts[k as keyof typeof counts] ?? onboardings.length})`}
-                  </button>
-                ))}
-              </div>
-              <div className="table-wrapper">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Venue</th>
-                      <th>Ubicación</th>
-                      <th>Contacto</th>
-                      <th>Enviado</th>
-                      <th>Estado</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.length === 0 && (
-                      <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--warm-gray)' }}>
-                        {filterStatus === 'submitted' ? 'No hay solicitudes pendientes ✓' : 'No hay registros'}
-                      </td></tr>
-                    )}
-                    {filtered.map(onb => {
-                      const sb = statusBadge[onb.status] || { cls: 'badge-inactive', label: onb.status }
-                      return (
-                        <tr key={onb.id} style={{ cursor: 'pointer', background: selected?.id === onb.id ? 'var(--cream)' : undefined }}
-                          onClick={() => { setSelected(onb); setAdminNotes(onb.admin_notes || '') }}>
-                          <td>
-                            <div style={{ fontWeight: 500 }}>{onb.name || '—'}</div>
-                            {onb.short_bio && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{onb.short_bio.slice(0, 50)}...</div>}
-                          </td>
-                          <td style={{ fontSize: 12 }}>{[onb.city, onb.region].filter(Boolean).join(', ') || '—'}</td>
-                          <td style={{ fontSize: 12 }}>
-                            <div>{onb.contact_name || '—'}</div>
-                            {onb.contact_email && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{onb.contact_email}</div>}
-                          </td>
-                          <td style={{ fontSize: 11, color: 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
-                            {onb.submitted_at ? new Date(onb.submitted_at).toLocaleDateString('es-ES') : 'Sin enviar'}
-                          </td>
-                          <td><span className={`badge ${sb.cls}`}>{sb.label}</span></td>
-                          <td>
-                            {onb.wp_post_id && (
-                              <a href={`https://weddingvenuesspain.com/wp-admin/post.php?post=${onb.wp_post_id}&action=edit`}
-                                target="_blank" rel="noopener noreferrer"
-                                className="btn btn-ghost btn-sm" onClick={e => e.stopPropagation()}>
-                                Ver en WP →
-                              </a>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+          {/* Table */}
+          <div className="card">
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {([
+                ['pending',  `Pendientes (${allPending.length})`],
+                ['draft',    'Borradores'],
+                ['approved', 'Aprobados'],
+                ['rejected', 'Rechazados'],
+                ['all',      'Todos'],
+              ] as [string, string][]).map(([k, label]) => (
+                <button
+                  key={k}
+                  className={`btn btn-sm ${filterStatus === k ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setFilterStatus(k)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
-            {/* Panel de detalle */}
-            {selected && (
-              <div className="card" style={{ height: 'fit-content', position: 'sticky', top: 70 }}>
-                <div className="card-header">
-                  <div className="card-title">{selected.name || 'Sin nombre'}</div>
-                  <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}>
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="card-body" style={{ fontSize: 13 }}>
-
-                  {/* Info del venue */}
-                  <div style={{ marginBottom: 16 }}>
-                    {selected.city && <div style={{ marginBottom: 6 }}><span style={{ color: 'var(--warm-gray)', fontSize: 11 }}>UBICACIÓN</span><br />{[selected.city, selected.region, selected.country].filter(Boolean).join(', ')}</div>}
-                    {selected.capacity_max && <div style={{ marginBottom: 6 }}><span style={{ color: 'var(--warm-gray)', fontSize: 11 }}>CAPACIDAD</span><br />{selected.capacity_min ? `${selected.capacity_min}–` : ''}{selected.capacity_max} personas</div>}
-                    {(selected.price_min || selected.price_max) && <div style={{ marginBottom: 6 }}><span style={{ color: 'var(--warm-gray)', fontSize: 11 }}>PRECIO</span><br />{selected.price_min ? `desde ${selected.price_min}€` : ''}{selected.price_max ? ` hasta ${selected.price_max}€` : ''}</div>}
-                    {selected.contact_email && <div style={{ marginBottom: 6 }}><span style={{ color: 'var(--warm-gray)', fontSize: 11 }}>CONTACTO</span><br />{selected.contact_name}<br /><a href={`mailto:${selected.contact_email}`} style={{ color: 'var(--gold)' }}>{selected.contact_email}</a>{selected.contact_phone && <><br />{selected.contact_phone}</>}</div>}
-                    {selected.short_bio && <div style={{ marginBottom: 6 }}><span style={{ color: 'var(--warm-gray)', fontSize: 11 }}>DESCRIPCIÓN CORTA</span><br />{selected.short_bio}</div>}
-                    {selected.description && <div style={{ marginBottom: 6 }}><span style={{ color: 'var(--warm-gray)', fontSize: 11 }}>DESCRIPCIÓN</span><br /><div style={{ maxHeight: 100, overflowY: 'auto', fontSize: 12, color: 'var(--warm-gray)' }}>{selected.description}</div></div>}
-                  </div>
-
-                  {/* Notas admin */}
-                  <div className="form-group">
-                    <label className="form-label">Notas internas</label>
-                    <textarea className="form-textarea" style={{ minHeight: 60 }} value={adminNotes} onChange={e => setAdminNotes(e.target.value)} placeholder="Notas para el equipo o motivo de rechazo..." />
-                  </div>
-
-                  {/* Acciones */}
-                  {selected.status === 'submitted' && (
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        className="btn btn-primary"
-                        style={{ flex: 1 }}
-                        disabled={saving === selected.id}
-                        onClick={() => handleApprove(selected)}
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Venue</th>
+                    <th>Contacto</th>
+                    <th>WP ID</th>
+                    <th>Enviado</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: 40, color: 'var(--warm-gray)' }}>
+                        {filterStatus === 'pending' ? 'No hay solicitudes pendientes ✓' : 'No hay registros'}
+                      </td>
+                    </tr>
+                  )}
+                  {filtered.map(onb => {
+                    const badge  = getRowBadge(onb)
+                    const name   = onb.ficha_data?.H1_Venue || onb.name || '—'
+                    const region = onb.ficha_data?.location || onb.region || onb.city || '—'
+                    return (
+                      <tr
+                        key={onb.id}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => openVenue(onb)}
                       >
-                        <Check size={13} /> {saving === selected.id ? 'Creando...' : 'Aprobar y crear en WP'}
-                      </button>
-                      <button
-                        className="btn btn-danger"
-                        disabled={saving === selected.id + '-reject'}
-                        onClick={() => handleReject(selected)}
-                      >
-                        <X size={13} /> Rechazar
-                      </button>
-                    </div>
-                  )}
-
-                  {selected.status === 'approved' && selected.wp_post_id && (
-                    <div className="alert alert-success" style={{ fontSize: 12 }}>
-                      Venue creado en WordPress con ID {selected.wp_post_id}
-                    </div>
-                  )}
-
-                  {selected.status === 'rejected' && (
-                    <div className="alert alert-error" style={{ fontSize: 12 }}>
-                      Rechazado. {selected.admin_notes && `Motivo: ${selected.admin_notes}`}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+                        <td>
+                          <div style={{ fontWeight: 500 }}>{name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{region}</div>
+                        </td>
+                        <td style={{ fontSize: 12 }}>
+                          <div>{onb.contact_name || '—'}</div>
+                          {onb.contact_email && (
+                            <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{onb.contact_email}</div>
+                          )}
+                        </td>
+                        <td style={{ fontSize: 12, color: 'var(--warm-gray)' }}>
+                          {onb.wp_post_id ? `#${onb.wp_post_id}` : '—'}
+                        </td>
+                        <td style={{ fontSize: 11, color: 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
+                          {onb.submitted_at ? new Date(onb.submitted_at).toLocaleDateString('es-ES') : '—'}
+                        </td>
+                        <td><span className={`badge ${badge.cls}`}>{badge.label}</span></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
 
-      {showCreateModal && (
-        <CreateVenueModal
-          wpVenues={wpVenues}
-          onClose={() => setShowCreateModal(false)}
-          onCreated={msg => { notify(msg); setShowCreateModal(false) }}
+      {/* Full modal */}
+      {selected && (
+        <VenueModal
+          onb={selected}
+          adminNotes={adminNotes}
+          setAdminNotes={setAdminNotes}
+          saving={saving}
+          onClose={() => { setSelected(null); setAdminNotes('') }}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onApproveChanges={handleApproveChanges}
+          onRejectChanges={handleRejectChanges}
         />
       )}
     </div>
