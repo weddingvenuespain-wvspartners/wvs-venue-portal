@@ -45,11 +45,66 @@ type ContentSection =
   | 'map_info'
   | 'chat_settings'
 
+// ── Pricing model ────────────────────────────────────────────────────────────
+
+type PricingModel = 'all_inclusive' | 'venue_only' | 'semi_inclusive' | 'modular'
+
+type VenuePricingModel = {
+  id?: string
+  model: PricingModel
+  catering_policy?: 'included' | 'internal_preferred' | 'external_free' | 'external_mandatory'
+  notes?: string
+}
+
+const PRICING_MODELS: Array<{
+  value: PricingModel
+  icon: string
+  label: string
+  desc: string
+  priceUnit: string
+  tip: string
+}> = [
+  {
+    value: 'all_inclusive',
+    icon: '🎯',
+    label: 'Todo incluido',
+    desc: 'Precio/persona cubre espacio, catering, bebidas y coordinación.',
+    priceUnit: '€/persona',
+    tip: 'Cada paquete tiene precio por persona. Las inclusiones muestran todo lo que está en el precio.',
+  },
+  {
+    value: 'venue_only',
+    icon: '🏛️',
+    label: 'Solo espacio',
+    desc: 'Precio fijo por el alquiler. La pareja escoge caterer, decoración, etc. por separado.',
+    priceUnit: '€/evento',
+    tip: 'Los paquetes son tarifas de alquiler. Las exclusiones son tan importantes como las inclusiones.',
+  },
+  {
+    value: 'semi_inclusive',
+    icon: '🎨',
+    label: 'Semi-incluido',
+    desc: 'Espacio + algunos servicios propios (catering opcional o incluido). Libertad en el resto.',
+    priceUnit: '€ base + opcionales',
+    tip: 'Puedes mostrar un precio base del espacio y paquetes de catering por separado.',
+  },
+  {
+    value: 'modular',
+    icon: '🧩',
+    label: 'À la carte',
+    desc: 'La pareja construye su boda servicio a servicio desde un catálogo.',
+    priceUnit: '€/servicio',
+    tip: 'Usa "Servicios adicionales" para cada módulo. Los paquetes son bundles de módulos.',
+  },
+]
+
 type VenuePackage = {
   id: string
   name: string
   subtitle?: string
   price?: string
+  price_type?: 'per_person' | 'flat_fee' | 'from_price' | 'on_request'
+  is_recommended?: boolean
   min_guests?: number
   max_guests?: number
   description?: string
@@ -63,6 +118,7 @@ type VenueInclusion = {
   title: string
   description?: string
   emoji?: string
+  category?: 'espacio' | 'catering' | 'coordinacion' | 'decoracion' | 'alojamiento' | 'av_musica' | 'otros'
   sort_order: number
 }
 
@@ -389,11 +445,13 @@ export default function ComunicacionPage() {
     accommodation_info: VenueAccommodationInfo | null
     map_info: VenueMapInfo | null
     chat_settings: VenueChatSettings | null
+    pricing_model: VenuePricingModel | null
   }>({
     packages: [], zones: [], season_prices: [], inclusions: [], exclusions: [],
     faq: [], testimonials: [], collaborators: [], extra_services: [],
     countdown: null, menu_prices: [], budget_simulator: null, conditions: null, experience: null,
     video_default: null, techspecs: null, accommodation_info: null, map_info: null, chat_settings: null,
+    pricing_model: null,
   })
   const [loading, setLoading]             = useState(true)
 
@@ -438,6 +496,7 @@ export default function ComunicacionPage() {
       accommodation_info: rows.find(r => r.section === 'accommodation_info') ? { id: rows.find(r => r.section === 'accommodation_info').id, ...rows.find(r => r.section === 'accommodation_info').data } : null,
       map_info:          rows.find(r => r.section === 'map_info') ? { id: rows.find(r => r.section === 'map_info').id, ...rows.find(r => r.section === 'map_info').data } : null,
       chat_settings:     rows.find(r => r.section === 'chat_settings') ? { id: rows.find(r => r.section === 'chat_settings').id, ...rows.find(r => r.section === 'chat_settings').data } : null,
+      pricing_model:     rows.find(r => r.section === 'pricing_model') ? { id: rows.find(r => r.section === 'pricing_model').id, ...rows.find(r => r.section === 'pricing_model').data } : null,
     })
     setLoading(false)
   }
@@ -1719,12 +1778,28 @@ function ContentTab({ content, userId, onRefresh }: {
     accommodation_info: VenueAccommodationInfo | null
     map_info: VenueMapInfo | null
     chat_settings: VenueChatSettings | null
+    pricing_model: VenuePricingModel | null
   }
   userId: string
   onRefresh: () => void
 }) {
   const [openGroup, setOpenGroup] = useState<string | null>('prices')
   const toggle = (id: string) => setOpenGroup(g => g === id ? null : id)
+
+  // Save pricing model
+  const savePricingModel = async (model: PricingModel) => {
+    const supabase = createClient()
+    const payload = { user_id: userId, section: 'pricing_model', sort_order: 0, is_active: true, data: { model } }
+    if (content.pricing_model?.id) {
+      await supabase.from('venue_content').update(payload).eq('id', content.pricing_model.id)
+    } else {
+      await supabase.from('venue_content').insert(payload)
+    }
+    onRefresh()
+  }
+
+  const activeModel = content.pricing_model?.model
+  const modelCfg = PRICING_MODELS.find(m => m.value === activeModel)
 
   type AccordionGroup = {
     id: string
@@ -1740,11 +1815,11 @@ function ContentTab({ content, userId, onRefresh }: {
       id: 'prices',
       icon: '💰',
       title: '1. Precios y formatos',
-      desc: 'Paquetes, precio por menú y reglas de precio',
+      desc: activeModel ? `${modelCfg?.icon} ${modelCfg?.label} · ${modelCfg?.priceUnit}` : 'Paquetes, precio por menú y reglas de precio',
       count: content.packages.length + content.menu_prices.length + content.season_prices.length,
       body: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-          <PackagesEditor items={content.packages} userId={userId} onRefresh={onRefresh} />
+          <PackagesEditor items={content.packages} userId={userId} onRefresh={onRefresh} pricingModel={activeModel} />
           <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
             <MenuPriceEditor items={content.menu_prices} userId={userId} onRefresh={onRefresh} />
           </div>
@@ -1758,11 +1833,11 @@ function ContentTab({ content, userId, onRefresh }: {
       id: 'inclusions',
       icon: '✅',
       title: '2. Qué incluye y condiciones',
-      desc: 'Servicios incluidos, exclusiones y condiciones de reserva',
+      desc: activeModel === 'venue_only' ? '⚠️ Las exclusiones son igual de importantes que las inclusiones' : 'Servicios incluidos, exclusiones y condiciones de reserva',
       count: content.inclusions.length + content.exclusions.length + (content.conditions ? 1 : 0),
       body: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-          <InclusionsEditor items={content.inclusions} userId={userId} onRefresh={onRefresh} />
+          <InclusionsEditor items={content.inclusions} userId={userId} onRefresh={onRefresh} pricingModel={activeModel} />
           <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
             <ExclusionsEditor items={content.exclusions} userId={userId} onRefresh={onRefresh} />
           </div>
@@ -1876,6 +1951,51 @@ function ContentTab({ content, userId, onRefresh }: {
 
   return (
     <div>
+      {/* Pricing model selector */}
+      <div style={{ marginBottom: 20, border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 16 }}>⚙️</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>¿Cómo trabaja tu venue?</div>
+            <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Define tu modelo de precios para que el contenido se adapte correctamente</div>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 0 }}>
+          {PRICING_MODELS.map((m, i) => {
+            const active = activeModel === m.value
+            return (
+              <button
+                key={m.value}
+                onClick={() => savePricingModel(m.value)}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 18px',
+                  background: active ? '#fef9ec' : '#fff',
+                  border: 'none', borderRight: i % 2 === 0 ? '1px solid var(--ivory)' : 'none',
+                  borderBottom: i < 2 ? '1px solid var(--ivory)' : 'none',
+                  cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s',
+                }}
+              >
+                <span style={{ fontSize: 22, flexShrink: 0, marginTop: 1 }}>{m.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--espresso)' }}>{m.label}</span>
+                    {active && <span style={{ fontSize: 10, background: 'var(--gold)', color: '#fff', borderRadius: 8, padding: '1px 7px', fontWeight: 700 }}>✓ Activo</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.55 }}>{m.desc}</div>
+                  <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 4, fontWeight: 500 }}>Precio: {m.priceUnit}</div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        {activeModel && modelCfg && (
+          <div style={{ padding: '10px 20px', background: '#fef9ec', borderTop: '1px solid var(--ivory)', fontSize: 11, color: '#92400e', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <span style={{ flexShrink: 0 }}>💡</span>
+            <span>{modelCfg.tip}</span>
+          </div>
+        )}
+      </div>
+
       {/* Info banner */}
       <div style={{ padding: '12px 16px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, marginBottom: 20, fontSize: 12, color: '#0369a1', lineHeight: 1.7 }}>
         <strong>Configura una vez, se carga en cada propuesta.</strong> Puedes ajustar cualquier dato por pareja antes de enviar.
@@ -1929,13 +2049,28 @@ function ContentTab({ content, userId, onRefresh }: {
 
 // ── Content: Packages ─────────────────────────────────────────────────────────
 
-function PackagesEditor({ items, userId, onRefresh }: { items: VenuePackage[]; userId: string; onRefresh: () => void }) {
+const PRICE_TYPES: Array<{ value: VenuePackage['price_type']; label: string; placeholder: string; hint: string }> = [
+  { value: 'per_person',  label: '€ / persona', placeholder: 'Ej: 95',     hint: 'Precio por invitado — multiplica por nº de personas' },
+  { value: 'flat_fee',    label: '€ / evento',  placeholder: 'Ej: 6.500',  hint: 'Precio fijo por el evento completo independiente del número de invitados' },
+  { value: 'from_price',  label: 'desde €',     placeholder: 'Ej: 75',     hint: 'Precio de salida — el total depende de opciones elegidas' },
+  { value: 'on_request',  label: 'A consultar', placeholder: '',           hint: 'El precio se negocia caso a caso — no se muestra importe' },
+]
+
+function PackagesEditor({ items, userId, onRefresh, pricingModel }: { items: VenuePackage[]; userId: string; onRefresh: () => void; pricingModel?: PricingModel }) {
   const [editing, setEditing]   = useState<VenuePackage | null>(null)
   const [isNew,   setIsNew]     = useState(false)
   const [saving,  setSaving]    = useState(false)
 
+  // Default price_type based on pricing model
+  const defaultPriceType = (): VenuePackage['price_type'] => {
+    if (pricingModel === 'venue_only') return 'flat_fee'
+    if (pricingModel === 'all_inclusive') return 'per_person'
+    return 'per_person'
+  }
+
   const empty = (): Omit<VenuePackage, 'id'> => ({
-    name: '', subtitle: '', price: '', min_guests: undefined, max_guests: undefined,
+    name: '', subtitle: '', price: '', price_type: defaultPriceType(),
+    is_recommended: false, min_guests: undefined, max_guests: undefined,
     description: '', includes: [''], sort_order: items.length, is_active: true,
   })
   const [form, setForm] = useState<Omit<VenuePackage, 'id'>>(empty())
@@ -1943,7 +2078,7 @@ function PackagesEditor({ items, userId, onRefresh }: { items: VenuePackage[]; u
 
   const openNew = () => { setForm(empty()); setIsNew(true); setEditing(null) }
   const openEdit = (p: VenuePackage) => {
-    setForm({ name: p.name, subtitle: p.subtitle || '', price: p.price || '', min_guests: p.min_guests, max_guests: p.max_guests, description: p.description || '', includes: p.includes?.length ? p.includes : [''], sort_order: p.sort_order, is_active: p.is_active })
+    setForm({ name: p.name, subtitle: p.subtitle || '', price: p.price || '', price_type: p.price_type || defaultPriceType(), is_recommended: p.is_recommended || false, min_guests: p.min_guests, max_guests: p.max_guests, description: p.description || '', includes: p.includes?.length ? p.includes : [''], sort_order: p.sort_order, is_active: p.is_active })
     setEditing(p); setIsNew(false)
   }
 
@@ -1951,7 +2086,7 @@ function PackagesEditor({ items, userId, onRefresh }: { items: VenuePackage[]; u
     if (!form.name.trim()) return
     setSaving(true)
     const supabase = createClient()
-    const payload = { user_id: userId, section: 'package', sort_order: form.sort_order, is_active: form.is_active, data: { name: form.name, subtitle: form.subtitle, price: form.price, min_guests: form.min_guests, max_guests: form.max_guests, description: form.description, includes: form.includes.filter(Boolean) } }
+    const payload = { user_id: userId, section: 'package', sort_order: form.sort_order, is_active: form.is_active, data: { name: form.name, subtitle: form.subtitle, price: form.price, price_type: form.price_type, is_recommended: form.is_recommended, min_guests: form.min_guests, max_guests: form.max_guests, description: form.description, includes: form.includes.filter(Boolean) } }
     if (isNew) await supabase.from('venue_content').insert(payload)
     else if (editing) await supabase.from('venue_content').update(payload).eq('id', editing.id)
     setSaving(false); setIsNew(false); setEditing(null); onRefresh()
@@ -1997,10 +2132,38 @@ function PackagesEditor({ items, userId, onRefresh }: { items: VenuePackage[]; u
               <input className="form-input" value={form.subtitle || ''} onChange={e => setF('subtitle', e.target.value)} placeholder="Ej: Ideal para bodas íntimas" />
             </div>
           </div>
+          {/* Price type selector */}
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label className="form-label">Tipo de precio</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {PRICE_TYPES.map(pt => (
+                <button key={pt.value} type="button" onClick={() => setF('price_type', pt.value)}
+                  style={{ fontSize: 11, padding: '5px 12px', borderRadius: 20, cursor: 'pointer', fontWeight: 600,
+                    background: form.price_type === pt.value ? 'var(--gold)' : '#fff',
+                    color: form.price_type === pt.value ? '#fff' : 'var(--charcoal)',
+                    border: form.price_type === pt.value ? '1px solid var(--gold)' : '1px solid var(--ivory)',
+                  }}>
+                  {pt.label}
+                </button>
+              ))}
+            </div>
+            {form.price_type && (
+              <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 5 }}>
+                {PRICE_TYPES.find(p => p.value === form.price_type)?.hint}
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Precio</label>
-              <input className="form-input" value={form.price || ''} onChange={e => setF('price', e.target.value)} placeholder="Ej: desde 8.500€" />
+              <label className="form-label">
+                Precio {form.price_type === 'per_person' ? '(€/persona)' : form.price_type === 'flat_fee' ? '(€ total)' : form.price_type === 'on_request' ? '(no se muestra)' : '(€ desde)'}
+              </label>
+              <input className="form-input"
+                value={form.price || ''}
+                onChange={e => setF('price', e.target.value)}
+                placeholder={PRICE_TYPES.find(p => p.value === form.price_type)?.placeholder || 'Ej: 8.500'}
+                disabled={form.price_type === 'on_request'} />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Mín. invitados</label>
@@ -2009,6 +2172,19 @@ function PackagesEditor({ items, userId, onRefresh }: { items: VenuePackage[]; u
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Máx. invitados</label>
               <input className="form-input" type="number" value={form.max_guests || ''} onChange={e => setF('max_guests', e.target.value ? parseInt(e.target.value) : undefined)} placeholder="150" />
+            </div>
+          </div>
+
+          {/* is_recommended toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '10px 14px', background: 'var(--cream)', borderRadius: 8 }}>
+            <button type="button" onClick={() => setF('is_recommended', !form.is_recommended)}
+              style={{ width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', flexShrink: 0,
+                background: form.is_recommended ? 'var(--gold)' : '#d1d5db', position: 'relative', transition: 'background 0.2s' }}>
+              <span style={{ position: 'absolute', top: 2, left: form.is_recommended ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+            </button>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--espresso)' }}>Marcar como recomendado</div>
+              <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Aparece destacado con badge "⭐ Más elegido" en la propuesta</div>
             </div>
           </div>
           <div className="form-group" style={{ marginBottom: 12 }}>
@@ -2055,9 +2231,17 @@ function PackagesEditor({ items, userId, onRefresh }: { items: VenuePackage[]; u
             <div key={pkg.id} className="card" style={{ opacity: pkg.is_active ? 1 : 0.55 }}>
               <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)' }}>{pkg.name}</span>
-                    {pkg.price && <span style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 600 }}>{pkg.price}</span>}
+                    {pkg.is_recommended && <span style={{ fontSize: 10, background: 'var(--gold)', color: '#fff', borderRadius: 8, padding: '1px 8px', fontWeight: 700 }}>⭐ Recomendado</span>}
+                    {pkg.price_type === 'on_request'
+                      ? <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>A consultar</span>
+                      : pkg.price && (
+                          <span style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 600 }}>
+                            {pkg.price_type === 'per_person' ? `${pkg.price}€/pers.` : pkg.price_type === 'from_price' ? `desde ${pkg.price}€` : `${pkg.price}€`}
+                          </span>
+                        )
+                    }
                     {(pkg.min_guests || pkg.max_guests) && (
                       <span style={{ fontSize: 11, color: 'var(--warm-gray)', background: 'var(--cream)', padding: '1px 8px', borderRadius: 8 }}>
                         {pkg.min_guests && pkg.max_guests ? `${pkg.min_guests}–${pkg.max_guests} inv.` : pkg.max_guests ? `hasta ${pkg.max_guests} inv.` : `desde ${pkg.min_guests} inv.`}
@@ -2093,18 +2277,74 @@ function PackagesEditor({ items, userId, onRefresh }: { items: VenuePackage[]; u
 
 // ── Content: Inclusions ───────────────────────────────────────────────────────
 
-function InclusionsEditor({ items, userId, onRefresh }: { items: VenueInclusion[]; userId: string; onRefresh: () => void }) {
+const INCLUSION_CATEGORIES: Array<{ value: VenueInclusion['category']; label: string; emoji: string }> = [
+  { value: 'espacio',      label: 'Espacio',         emoji: '🏛️' },
+  { value: 'catering',     label: 'Catering',        emoji: '🍽️' },
+  { value: 'coordinacion', label: 'Coordinación',    emoji: '📋' },
+  { value: 'decoracion',   label: 'Decoración',      emoji: '💐' },
+  { value: 'alojamiento',  label: 'Alojamiento',     emoji: '🛏️' },
+  { value: 'av_musica',    label: 'AV y música',     emoji: '🎵' },
+  { value: 'otros',        label: 'Otros',            emoji: '✦' },
+]
+
+const ALL_COMMON_INCLUSIONS: Array<{ title: string; emoji: string; category: VenueInclusion['category']; models?: PricingModel[] }> = [
+  // Espacio
+  { title: 'Uso exclusivo de la finca',        emoji: '🔑', category: 'espacio' },
+  { title: 'Zona de ceremonia civil',           emoji: '💍', category: 'espacio' },
+  { title: 'Zona de cocktail',                  emoji: '🥂', category: 'espacio' },
+  { title: 'Salón para banquete',               emoji: '🏛️', category: 'espacio' },
+  { title: 'Zona outdoor / jardines',           emoji: '🌿', category: 'espacio' },
+  { title: 'Aparcamiento gratuito',             emoji: '🚗', category: 'espacio' },
+  { title: 'Acceso adaptado a movilidad',       emoji: '♿', category: 'espacio' },
+  { title: 'Montaje y desmontaje incluidos',    emoji: '🪑', category: 'espacio', models: ['venue_only','semi_inclusive'] },
+  // Catering
+  { title: 'Catering personalizado',            emoji: '🍽️', category: 'catering', models: ['all_inclusive','semi_inclusive'] },
+  { title: 'Menú de degustación previo',        emoji: '👨‍🍳', category: 'catering', models: ['all_inclusive','semi_inclusive'] },
+  { title: 'Barra libre de alcohol',            emoji: '🍾', category: 'catering', models: ['all_inclusive','semi_inclusive'] },
+  { title: 'Barra de cava y refrescos',         emoji: '🥂', category: 'catering', models: ['all_inclusive','semi_inclusive'] },
+  { title: 'Cena de bienvenida el día anterior',emoji: '🌙', category: 'catering' },
+  { title: 'Desayuno de novios',                emoji: '☀️', category: 'catering' },
+  { title: 'Opciones menú niños',               emoji: '👶', category: 'catering' },
+  { title: 'Opciones menú vegetariano/vegano',  emoji: '🥗', category: 'catering' },
+  { title: 'Torta nupcial incluida',            emoji: '🎂', category: 'catering' },
+  // Coordinación
+  { title: 'Coordinador de bodas el día del evento', emoji: '📋', category: 'coordinacion' },
+  { title: 'Reuniones de planificación previas', emoji: '🗓️', category: 'coordinacion' },
+  { title: 'Gestión de proveedores externos',   emoji: '🤝', category: 'coordinacion' },
+  { title: 'Coordinación de ceremonia',         emoji: '💒', category: 'coordinacion' },
+  // Decoración
+  { title: 'Decoración floral básica',          emoji: '💐', category: 'decoracion' },
+  { title: 'Centros de mesa',                   emoji: '🌸', category: 'decoracion' },
+  { title: 'Iluminación decorativa incluida',   emoji: '💡', category: 'decoracion' },
+  { title: 'Alfombra de entrada',               emoji: '🔴', category: 'decoracion' },
+  // Alojamiento
+  { title: 'Suite nupcial la noche de boda',   emoji: '🛏️', category: 'alojamiento' },
+  { title: 'Habitaciones para invitados',       emoji: '🏠', category: 'alojamiento' },
+  { title: 'Alojamiento para novios 2 noches', emoji: '🌙', category: 'alojamiento' },
+  // AV y música
+  { title: 'Equipo de sonido para ceremonia',   emoji: '🔊', category: 'av_musica' },
+  { title: 'Megafonía para salón de banquete',  emoji: '🎤', category: 'av_musica' },
+  { title: 'Proyector y pantalla',              emoji: '📽️', category: 'av_musica' },
+  { title: 'WiFi en todo el espacio',           emoji: '📡', category: 'av_musica' },
+  // Otros
+  { title: 'Fotomatón',                         emoji: '📸', category: 'otros' },
+  { title: 'Lista de proveedores recomendados', emoji: '📑', category: 'otros' },
+  { title: 'Transporte al aeropuerto',          emoji: '✈️', category: 'otros' },
+]
+
+function InclusionsEditor({ items, userId, onRefresh, pricingModel }: { items: VenueInclusion[]; userId: string; onRefresh: () => void; pricingModel?: PricingModel }) {
   const [editing, setEditing] = useState<VenueInclusion | null>(null)
   const [isNew,   setIsNew]   = useState(false)
   const [saving,  setSaving]  = useState(false)
+  const [filterCat, setFilterCat] = useState<VenueInclusion['category'] | 'all'>('all')
 
-  const empty = (): Omit<VenueInclusion, 'id'> => ({ title: '', description: '', emoji: '✓', sort_order: items.length })
+  const empty = (): Omit<VenueInclusion, 'id'> => ({ title: '', description: '', emoji: '✓', category: undefined, sort_order: items.length })
   const [form, setForm] = useState(empty())
   const setF = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
   const openNew  = () => { setForm(empty()); setIsNew(true); setEditing(null) }
   const openEdit = (item: VenueInclusion) => {
-    setForm({ title: item.title, description: item.description || '', emoji: item.emoji || '✓', sort_order: item.sort_order })
+    setForm({ title: item.title, description: item.description || '', emoji: item.emoji || '✓', category: item.category, sort_order: item.sort_order })
     setEditing(item); setIsNew(false)
   }
 
@@ -2112,7 +2352,7 @@ function InclusionsEditor({ items, userId, onRefresh }: { items: VenueInclusion[
     if (!form.title.trim()) return
     setSaving(true)
     const supabase = createClient()
-    const payload = { user_id: userId, section: 'inclusion', sort_order: form.sort_order, is_active: true, data: { title: form.title, description: form.description, emoji: form.emoji } }
+    const payload = { user_id: userId, section: 'inclusion', sort_order: form.sort_order, is_active: true, data: { title: form.title, description: form.description, emoji: form.emoji, category: form.category } }
     if (isNew) await supabase.from('venue_content').insert(payload)
     else if (editing) await supabase.from('venue_content').update(payload).eq('id', editing.id)
     setSaving(false); setIsNew(false); setEditing(null); onRefresh()
@@ -2124,16 +2364,12 @@ function InclusionsEditor({ items, userId, onRefresh }: { items: VenueInclusion[
     onRefresh()
   }
 
-  const COMMON_INCLUSIONS = [
-    { title: 'Catering personalizado', emoji: '🍽️' },
-    { title: 'Música y DJ', emoji: '🎵' },
-    { title: 'Decoración floral', emoji: '💐' },
-    { title: 'Coordinador de bodas', emoji: '📋' },
-    { title: 'Aparcamiento gratuito', emoji: '🚗' },
-    { title: 'Zona de ceremonia', emoji: '💍' },
-    { title: 'Suite nupcial', emoji: '🛏️' },
-    { title: 'Iluminación decorativa', emoji: '💡' },
-  ]
+  // Filter common inclusions: exclude already added, filter by model if relevant
+  const COMMON_INCLUSIONS = ALL_COMMON_INCLUSIONS.filter(ci => {
+    if (items.some(i => i.title === ci.title)) return false
+    if (pricingModel === 'venue_only' && ci.models && !ci.models.includes('venue_only')) return false
+    return true
+  })
 
   return (
     <div>
@@ -2145,19 +2381,33 @@ function InclusionsEditor({ items, userId, onRefresh }: { items: VenueInclusion[
         <button onClick={openNew} className="btn btn-primary btn-sm"><Plus size={12} /> Añadir</button>
       </div>
 
-      {/* Quick add from common */}
-      {!isNew && (
+      {/* Quick add — categorized */}
+      {!isNew && COMMON_INCLUSIONS.length > 0 && (
         <div style={{ marginBottom: 14, padding: '14px 16px', background: 'var(--cream)', borderRadius: 10, border: '1px dashed var(--gold)' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 10 }}>Selecciona los más comunes para añadir rápido:</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-            {COMMON_INCLUSIONS.filter(ci => !items.some(i => i.title === ci.title)).map(ci => (
-              <button key={ci.title} type="button" onClick={async () => {
-                await createClient().from('venue_content').insert({ user_id: userId, section: 'inclusion', sort_order: 0, is_active: true, data: { title: ci.title, description: '', emoji: ci.emoji } })
-                onRefresh()
-              }} style={{ fontSize: 12, padding: '5px 11px', borderRadius: 20, cursor: 'pointer', border: '1px solid var(--ivory)', background: '#fff', color: 'var(--charcoal)' }}>
-                {ci.emoji} {ci.title}
-              </button>
-            ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Añadir rápido:</div>
+            {/* Category filter */}
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              <button onClick={() => setFilterCat('all')} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, cursor: 'pointer', border: 'none', background: filterCat === 'all' ? 'var(--gold)' : '#e5e7eb', color: filterCat === 'all' ? '#fff' : 'var(--charcoal)' }}>Todo</button>
+              {INCLUSION_CATEGORIES.map(cat => (
+                <button key={cat.value} onClick={() => setFilterCat(cat.value as any)} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, cursor: 'pointer', border: 'none', background: filterCat === cat.value ? 'var(--gold)' : '#e5e7eb', color: filterCat === cat.value ? '#fff' : 'var(--charcoal)' }}>
+                  {cat.emoji} {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {COMMON_INCLUSIONS
+              .filter(ci => filterCat === 'all' || ci.category === filterCat)
+              .map(ci => (
+                <button key={ci.title} type="button" onClick={async () => {
+                  await createClient().from('venue_content').insert({ user_id: userId, section: 'inclusion', sort_order: items.length, is_active: true, data: { title: ci.title, description: '', emoji: ci.emoji, category: ci.category } })
+                  onRefresh()
+                }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', border: '1px solid var(--ivory)', background: '#fff', color: 'var(--charcoal)' }}>
+                  {ci.emoji} {ci.title}
+                </button>
+              ))
+            }
           </div>
         </div>
       )}
@@ -2179,6 +2429,22 @@ function InclusionsEditor({ items, userId, onRefresh }: { items: VenueInclusion[
               <input className="form-input" value={form.description || ''} onChange={e => setF('description', e.target.value)} placeholder="Ej: Menú degustación de 5 platos" />
             </div>
           </div>
+          {/* Category picker */}
+          <div className="form-group" style={{ marginBottom: 10 }}>
+            <label className="form-label">Categoría</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {INCLUSION_CATEGORIES.map(cat => (
+                <button key={cat.value} type="button" onClick={() => setF('category', cat.value)}
+                  style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', border: 'none',
+                    background: form.category === cat.value ? 'var(--gold)' : '#e5e7eb',
+                    color: form.category === cat.value ? '#fff' : 'var(--charcoal)',
+                    fontWeight: form.category === cat.value ? 600 : 400,
+                  }}>
+                  {cat.emoji} {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn btn-ghost btn-sm" onClick={() => { setIsNew(false); setEditing(null) }}>Cancelar</button>
             <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving || !form.title.trim()}>{saving ? 'Guardando...' : 'Guardar'}</button>
@@ -2186,27 +2452,52 @@ function InclusionsEditor({ items, userId, onRefresh }: { items: VenueInclusion[
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-        {items.map(item => (
-          <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#fff', border: '1px solid var(--ivory)', borderRadius: 8 }}>
-            <span style={{ fontSize: 20, flexShrink: 0 }}>{item.emoji || '✓'}</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)' }}>{item.title}</div>
-              {item.description && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{item.description}</div>}
-            </div>
-            <div style={{ display: 'flex', gap: 5 }}>
-              <button onClick={() => openEdit(item)} style={{ background: 'none', border: '1px solid var(--ivory)', borderRadius: 6, cursor: 'pointer', padding: '4px 8px', color: 'var(--charcoal)' }}><Pencil size={11} /></button>
-              <button onClick={() => handleDelete(item.id)} style={{ background: 'none', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer', padding: '4px 8px', color: '#dc2626' }}><Trash2 size={11} /></button>
-            </div>
-          </div>
-        ))}
-        {items.length === 0 && !isNew && (
-          <div className="card" style={{ padding: '30px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 12 }}>
-            <List size={28} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
-            <div>Añade los servicios incluidos en tu venue</div>
-          </div>
-        )}
-      </div>
+      {/* List grouped by category */}
+      {items.length === 0 && !isNew ? (
+        <div className="card" style={{ padding: '30px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 12 }}>
+          <List size={28} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
+          <div>Añade los servicios incluidos en tu venue</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Group by category */}
+          {(() => {
+            const grouped: Record<string, VenueInclusion[]> = {}
+            items.forEach(item => {
+              const cat = item.category || 'otros'
+              if (!grouped[cat]) grouped[cat] = []
+              grouped[cat].push(item)
+            })
+            return Object.entries(grouped).map(([cat, catItems]) => {
+              const catCfg = INCLUSION_CATEGORIES.find(c => c.value === cat)
+              return (
+                <div key={cat}>
+                  {catCfg && (
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span>{catCfg.emoji}</span> {catCfg.label}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {catItems.map(item => (
+                      <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px', background: '#fff', border: '1px solid var(--ivory)', borderRadius: 8 }}>
+                        <span style={{ fontSize: 18, flexShrink: 0 }}>{item.emoji || '✓'}</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)' }}>{item.title}</div>
+                          {item.description && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{item.description}</div>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 5 }}>
+                          <button onClick={() => openEdit(item)} style={{ background: 'none', border: '1px solid var(--ivory)', borderRadius: 6, cursor: 'pointer', padding: '4px 8px', color: 'var(--charcoal)' }}><Pencil size={11} /></button>
+                          <button onClick={() => handleDelete(item.id)} style={{ background: 'none', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer', padding: '4px 8px', color: '#dc2626' }}><Trash2 size={11} /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })
+          })()}
+        </div>
+      )}
     </div>
   )
 }
