@@ -690,6 +690,12 @@ function DayModal({
   const [showCreate,  setShowCreate]  = useState(false)
   const [localSaving, setLocalSaving] = useState(false)
 
+  // Post-save: leads afectados por fecha bloqueada/reservada
+  const [affectedLeads, setAffectedLeads] = useState<Lead[]>([])
+  const [showAffected,  setShowAffected]  = useState(false)
+  const [newDateFor,    setNewDateFor]    = useState<Record<string, string>>({})
+  const [affectedSaving, setAffectedSaving] = useState<Record<string, boolean>>({})
+
   // Lead pipeline status + visit date editing
   const [leadPipelineStatus, setLeadPipelineStatus] = useState<string>('')
   const [visitDate,          setVisitDate]          = useState<string>('')
@@ -773,6 +779,17 @@ function DayModal({
 
     const extraBlocks = affected.map(a => a.date)
     await onSave({ date, status, note: note.trim() || undefined, lead_id: leadId }, extraBlocks.length > 0 ? extraBlocks : undefined)
+
+    // Detectar leads afectados (otros leads con esta fecha que NO son el vinculado)
+    if (status === 'reservado' || status === 'bloqueado') {
+      const others = leadsOnDate.filter(l => l.id !== leadId && l.status !== 'lost' && l.status !== 'won')
+      if (others.length > 0) {
+        setAffectedLeads(others)
+        setShowAffected(true)
+        setLocalSaving(false)
+        return // no cierres el modal todavía
+      }
+    }
     setLocalSaving(false)
   }
 
@@ -831,15 +848,16 @@ function DayModal({
                       </div>
                       <span style={{ fontSize: 11, color: st.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{st.label}</span>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        {/* Only show Vincular if no other lead is linked, or this is the linked lead */}
-                        {(!leadId || isLinked) && !isPast && (
+                        {/* Vincular — visible para todos los leads; reemplaza el vinculado actual */}
+                        {!isPast && (
                           <button
                             onClick={() => { setLeadId(isLinked ? null : l.id); setExpandedLeadId(null) }}
+                            title={!isLinked && leadId ? 'Sustituirá al lead vinculado actual' : ''}
                             style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid', fontWeight: 500,
-                              borderColor: isLinked ? '#86efac' : 'var(--ivory)',
-                              background: isLinked ? '#dcfce7' : 'transparent',
-                              color: isLinked ? '#16a34a' : 'var(--charcoal)' }}>
-                            {isLinked ? '✓ Vinculado' : 'Vincular'}
+                              borderColor: isLinked ? '#86efac' : leadId ? '#fde68a' : 'var(--ivory)',
+                              background: isLinked ? '#dcfce7' : leadId ? '#fffbeb' : 'transparent',
+                              color: isLinked ? '#16a34a' : leadId ? '#92400e' : 'var(--charcoal)' }}>
+                            {isLinked ? '✓ Vinculado' : leadId ? '⇄ Cambiar' : 'Vincular'}
                           </button>
                         )}
                         <button
@@ -1231,6 +1249,80 @@ function DayModal({
           {isPast && !entry && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px', background: 'var(--cream)', borderRadius: 8, fontSize: 12, color: 'var(--warm-gray)' }}>
               <AlertCircle size={14} /> Esta fecha ya ha pasado.
+            </div>
+          )}
+
+          {/* Panel leads afectados tras reservar/bloquear */}
+          {showAffected && affectedLeads.length > 0 && (
+            <div style={{ marginTop: 8, padding: '16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertCircle size={14} /> {affectedLeads.length === 1 ? 'Hay 1 lead' : `Hay ${affectedLeads.length} leads`} más con esta fecha
+              </div>
+              <div style={{ fontSize: 12, color: '#78350f', marginBottom: 12 }}>
+                La fecha acaba de quedar {status}. ¿Qué quieres hacer con estos leads?
+              </div>
+              {affectedLeads.map(l => {
+                const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
+                const isSav = affectedSaving[l.id]
+                return (
+                  <div key={l.id} style={{ background: '#fff', border: '1px solid #fde68a', borderRadius: 8, padding: '12px', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <User size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{l.name}</div>
+                        {l.email && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{l.email}{l.phone ? ` · ${l.phone}` : ''}</div>}
+                      </div>
+                      <span style={{ fontSize: 11, color: st.color, fontWeight: 600 }}>{st.label}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <a href="/leads" style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <User size={10} /> Ver lead
+                      </a>
+                      <a href="/propuestas" style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <FileText size={10} /> Nueva propuesta
+                      </a>
+                      <button
+                        disabled={isSav}
+                        onClick={async () => {
+                          setAffectedSaving(s => ({ ...s, [l.id]: true }))
+                          await onUpdateLead(l.id, { status: 'lost' })
+                          setAffectedLeads(prev => prev.filter(x => x.id !== l.id))
+                          setAffectedSaving(s => ({ ...s, [l.id]: false }))
+                        }}
+                        style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid #fca5a5', color: '#dc2626', background: 'transparent', cursor: 'pointer' }}>
+                        {isSav ? '...' : '✗ Marcar perdido'}
+                      </button>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: '1 1 160px' }}>
+                        <input type="date" className="form-input" style={{ fontSize: 11, padding: '4px 8px', flex: 1 }}
+                          value={newDateFor[l.id] || ''}
+                          onChange={e => setNewDateFor(d => ({ ...d, [l.id]: e.target.value }))}
+                          placeholder="Nueva fecha" />
+                        {newDateFor[l.id] && (
+                          <button
+                            disabled={isSav}
+                            onClick={async () => {
+                              setAffectedSaving(s => ({ ...s, [l.id]: true }))
+                              await onUpdateLead(l.id, { wedding_date: newDateFor[l.id] })
+                              setAffectedLeads(prev => prev.filter(x => x.id !== l.id))
+                              setAffectedSaving(s => ({ ...s, [l.id]: false }))
+                            }}
+                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid #86efac', color: '#16a34a', background: '#f0fdf4', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            {isSav ? '...' : '✓ Guardar fecha'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              {affectedLeads.length === 0 && (
+                <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 500 }}>✓ Todos los leads gestionados</div>
+              )}
+              <button
+                onClick={() => { setShowAffected(false); onClose() }}
+                style={{ marginTop: 8, fontSize: 12, padding: '6px 16px', borderRadius: 6, background: 'var(--gold)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                Cerrar
+              </button>
             </div>
           )}
         </div>

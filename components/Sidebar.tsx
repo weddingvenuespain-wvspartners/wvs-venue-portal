@@ -17,6 +17,16 @@ export default function Sidebar() {
   const userEmail    = user?.email || ''
   const initials     = userEmail.slice(0, 2).toUpperCase()
 
+  // Badge: new leads count
+  const [newLeadsCount, setNewLeadsCount] = useState(0)
+  useEffect(() => {
+    if (!user || isAdmin) return
+    const supabase = createClient()
+    supabase.from('leads').select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id).eq('status', 'new')
+      .then(({ count }) => { if (count) setNewLeadsCount(count) })
+  }, [user?.id]) // eslint-disable-line
+
   const handleLogout = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -117,6 +127,16 @@ export default function Sidebar() {
                   style={{ paddingLeft: 20 }}
                 >
                   <Icon d={item.icon} /> {item.label}
+                  {item.href === '/leads' && newLeadsCount > 0 && (
+                    <span style={{
+                      marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
+                      background: '#ef4444', color: '#fff',
+                      fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '0 5px',
+                    }}>
+                      {newLeadsCount > 99 ? '99+' : newLeadsCount}
+                    </span>
+                  )}
                 </Link>
               )
             })}
@@ -177,16 +197,10 @@ export default function Sidebar() {
             <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8, lineHeight: 1.4 }}>
               Activa tu plan para continuar usando el portal.
             </div>
-            <div style={{ display: 'flex', gap: 5 }}>
-              <Link href="/perfil?tab=suscripcion"
-                style={{ flex: 1, padding: '5px 8px', borderRadius: 5, background: '#1d4ed8', color: '#fff', fontSize: 10, fontWeight: 600, textAlign: 'center', textDecoration: 'none', display: 'block' }}>
-                Básico
-              </Link>
-              <Link href="/perfil?tab=suscripcion"
-                style={{ flex: 1, padding: '5px 8px', borderRadius: 5, background: 'linear-gradient(135deg, #92400e, #b45309)', color: '#fef3c7', fontSize: 10, fontWeight: 600, textAlign: 'center', textDecoration: 'none', display: 'block' }}>
-                ✦ Premium
-              </Link>
-            </div>
+            <Link href="/perfil?tab=suscripcion"
+              style={{ display: 'block', padding: '6px 8px', borderRadius: 5, background: 'linear-gradient(135deg, #92400e, #b45309)', color: '#fef3c7', fontSize: 10, fontWeight: 600, textAlign: 'center', textDecoration: 'none' }}>
+              Activar mi plan →
+            </Link>
           </div>
         )}
 
