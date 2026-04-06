@@ -87,3 +87,8 @@ DROP TRIGGER IF EXISTS set_venue_subscriptions_updated_at ON venue_subscriptions
 CREATE TRIGGER set_venue_subscriptions_updated_at
   BEFORE UPDATE ON venue_subscriptions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ── 6. Feature overrides per venue (admin can override plan features individually) ──
+
+ALTER TABLE venue_profiles
+  ADD COLUMN IF NOT EXISTS features_override JSONB NOT NULL DEFAULT '{}'::jsonb;

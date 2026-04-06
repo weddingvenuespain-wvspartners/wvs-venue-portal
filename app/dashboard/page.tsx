@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
-import { Users, TrendingUp, CheckCircle, ExternalLink, AlertCircle, ClipboardList } from 'lucide-react'
+import { Users, TrendingUp, CheckCircle, ExternalLink, AlertCircle, ClipboardList, Building2, CreditCard, Clock, UserPlus, BarChart2 } from 'lucide-react'
 
 function Skeleton({ w, h, radius = 4 }: { w?: string | number; h?: number; radius?: number }) {
   return (
@@ -18,7 +18,211 @@ function Skeleton({ w, h, radius = 4 }: { w?: string | number; h?: number; radiu
   )
 }
 
-export default function DashboardPage() {
+// ─── Admin Dashboard ──────────────────────────────────────────────────────────
+function AdminDashboard() {
+  const [stats, setStats]   = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]   = useState('')
+
+  useEffect(() => {
+    fetch('/api/admin/stats')
+      .then(r => r.json())
+      .then(d => { setStats(d); setLoading(false) })
+      .catch(() => { setError('No se pudieron cargar las estadísticas'); setLoading(false) })
+  }, [])
+
+  const kpis = stats ? [
+    { label: 'Venues registrados', value: stats.total,   sub: 'Total en la plataforma',  color: 'var(--gold)',    icon: <Building2 size={18} /> },
+    { label: 'Suscripciones activas', value: stats.active, sub: 'Pagando actualmente',   color: '#22c55e',        icon: <CheckCircle size={18} /> },
+    { label: 'En período de trial',   value: stats.trial,  sub: stats.expiringSoon?.length > 0 ? `${stats.expiringSoon.length} expiran en 7d` : 'Probando la plataforma', color: '#f59e0b', icon: <Clock size={18} /> },
+    { label: 'Sin plan activo',       value: stats.noPlan, sub: 'Pendientes de activar', color: stats.noPlan > 0 ? '#ef4444' : 'var(--warm-gray)', icon: <AlertCircle size={18} /> },
+  ] : []
+
+  const SUB_BADGE: Record<string, string> = {
+    active: 'badge-active', trial: 'badge-pending', paused: 'badge-inactive',
+    cancelled: 'badge-inactive', expired: 'badge-inactive',
+  }
+  const SUB_LABEL: Record<string, string> = {
+    active: 'Activo', trial: 'Trial', paused: 'Pausado',
+    cancelled: 'Cancelado', expired: 'Expirado',
+  }
+
+  return (
+    <div style={{ display: 'flex' }}>
+      <Sidebar />
+      <div className="main-layout">
+        <div className="topbar">
+          <div>
+            <div className="topbar-title">Panel de Control</div>
+            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>Wedding Venues Spain — Visión general</div>
+          </div>
+          <Link href="/admin" className="btn btn-primary btn-sm">
+            <UserPlus size={13} /> Nuevo venue
+          </Link>
+        </div>
+
+        <div className="page-content">
+          {error && (
+            <div className="alert alert-warning" style={{ marginBottom: 16 }}>
+              <AlertCircle size={14} /> {error}
+            </div>
+          )}
+
+          {/* KPI Cards */}
+          <div className="stats-grid" style={{ marginBottom: 20 }}>
+            {loading ? [1,2,3,4].map(i => (
+              <div key={i} className="stat-card">
+                <Skeleton w="60%" h={10} /><Skeleton w="40%" h={28} radius={6} /><Skeleton w="70%" h={9} />
+              </div>
+            )) : kpis.map((k, i) => (
+              <div key={i} className={`stat-card ${i === 0 ? 'accent' : ''}`}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div className="stat-label">{k.label}</div>
+                  <div style={{ color: k.color, opacity: 0.7 }}>{k.icon}</div>
+                </div>
+                <div className="stat-value" style={{ color: k.color }}>{k.value}</div>
+                <div className="stat-sub" style={{ color: k.color === '#ef4444' && (k.value as number) > 0 ? '#ef4444' : undefined }}>{k.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Quick actions */}
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="card-body" style={{ padding: '14px 20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                {[
+                  { href: '/admin',            icon: <Users size={15} />,     label: 'CRM de venues',  sub: 'Gestionar usuarios'    },
+                  { href: '/admin/planes',      icon: <CreditCard size={15} />, label: 'Planes',        sub: 'Precios y funciones'   },
+                  { href: '/admin/onboarding',  icon: <ClipboardList size={15} />, label: 'Solicitudes', sub: 'Revisar registros'    },
+                  { href: '/estadisticas',      icon: <BarChart2 size={15} />, label: 'Estadísticas',   sub: 'Métricas globales'     },
+                ].map((item, i, arr) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                    <Link href={item.href}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, padding: '4px 0', textDecoration: 'none' }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 6, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>
+                        {item.icon}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--charcoal)' }}>{item.label}</div>
+                        <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{item.sub}</div>
+                      </div>
+                    </Link>
+                    {i < arr.length - 1 && <div style={{ width: 1, height: 36, background: 'var(--ivory)', margin: '0 12px', flexShrink: 0 }} />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="two-col" style={{ marginBottom: 16 }}>
+            {/* Trials expirando */}
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">⏳ Trials expirando</div>
+                <Link href="/admin" style={{ fontSize: 11, color: 'var(--gold)' }}>Ver todos →</Link>
+              </div>
+              {loading ? (
+                <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[1,2,3].map(i => <Skeleton key={i} h={36} radius={6} />)}
+                </div>
+              ) : !stats?.expiringSoon?.length ? (
+                <div style={{ padding: '28px 20px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 13 }}>
+                  <CheckCircle size={24} style={{ margin: '0 auto 8px', opacity: 0.3 }} />
+                  <div>Sin trials que expiren en los próximos 7 días</div>
+                </div>
+              ) : stats.expiringSoon.map((v: any) => (
+                <div key={v.user_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--ivory)' }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                    background: v.daysLeft <= 2 ? '#fee2e2' : '#fef9c3',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 700,
+                    color: v.daysLeft <= 2 ? '#dc2626' : '#92400e',
+                  }}>
+                    {v.daysLeft}d
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.email}</div>
+                  </div>
+                  <Link href="/admin" style={{ fontSize: 11, color: 'var(--gold)', whiteSpace: 'nowrap' }}>Activar →</Link>
+                </div>
+              ))}
+            </div>
+
+            {/* Últimas altas */}
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">🆕 Últimas altas</div>
+                <Link href="/admin" style={{ fontSize: 11, color: 'var(--gold)' }}>Ver todos →</Link>
+              </div>
+              {loading ? (
+                <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[1,2,3].map(i => <Skeleton key={i} h={36} radius={6} />)}
+                </div>
+              ) : !stats?.recentSignups?.length ? (
+                <div style={{ padding: '28px 20px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 13 }}>
+                  Aún no hay venues registrados
+                </div>
+              ) : stats.recentSignups.map((v: any) => (
+                <div key={v.user_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--ivory)' }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                    background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 13, fontWeight: 700, color: 'var(--gold)',
+                  }}>
+                    {(v.name?.[0] || v.email?.[0] || '?').toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                      {new Date(v.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                    </div>
+                  </div>
+                  {v.sub_status ? (
+                    <span className={`badge ${SUB_BADGE[v.sub_status] || 'badge-inactive'}`} style={{ fontSize: 10 }}>
+                      {SUB_LABEL[v.sub_status] || v.sub_status}
+                    </span>
+                  ) : (
+                    <span className="badge badge-inactive" style={{ fontSize: 10 }}>Sin plan</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Revenue summary */}
+          {stats && (stats.active > 0 || stats.trial > 0) && (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="card-header">
+                <div className="card-title">📊 Resumen de suscripciones</div>
+              </div>
+              <div className="card-body" style={{ padding: '16px 20px' }}>
+                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Activas', value: stats.active,  color: '#22c55e', bg: '#f0fdf4' },
+                    { label: 'Trial',   value: stats.trial,   color: '#f59e0b', bg: '#fffbeb' },
+                    { label: 'Pausadas', value: stats.paused, color: '#6b7280', bg: '#f9fafb' },
+                    { label: 'Sin plan', value: stats.noPlan, color: '#ef4444', bg: '#fef2f2' },
+                  ].map(item => (
+                    <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: item.bg, borderRadius: 8, flex: '1 1 120px' }}>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: item.color }}>{item.value}</div>
+                      <div style={{ fontSize: 12, color: item.color, fontWeight: 500 }}>{item.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
+    </div>
+  )
+}
+
+// ─── Venue Dashboard ──────────────────────────────────────────────────────────
+function VenueDashboard() {
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
   const [venue, setVenue]         = useState<any>(null)
@@ -33,19 +237,16 @@ export default function DashboardPage() {
 
     const supabase = createClient()
 
-    // Load leads immediately (fast — Supabase)
     supabase.from('leads').select('*').eq('user_id', user.id)
       .order('created_at', { ascending: false }).limit(5)
       .then(({ data }) => { if (data) setLeads(data); setLeadsLoaded(true) })
 
     if (profile?.wp_venue_id) {
-      // Check sessionStorage cache for instant render
       const cacheKey = `wvs_venue_${profile.wp_venue_id}`
       const cached = sessionStorage.getItem(cacheKey)
       if (cached) { try { setVenue(JSON.parse(cached)) } catch {} }
       else { setVenueLoading(true) }
 
-      // Always fetch fresh in background
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 6000)
       fetch(
@@ -62,8 +263,8 @@ export default function DashboardPage() {
     }
   }, [authLoading]) // eslint-disable-line
 
-  const venueName  = venue?.acf?.H1_Venue || venue?.title?.rendered || 'Mi Venue'
-  const newLeads   = leads.filter(l => l.status === 'new').length
+  const venueName   = venue?.acf?.H1_Venue || venue?.title?.rendered || 'Mi Venue'
+  const newLeads    = leads.filter(l => l.status === 'new').length
   const activeLeads = leads.filter(l => !['won','lost','booked'].includes(l.status)).length
   const bookedLeads = leads.filter(l => l.status === 'won' || l.status === 'booked').length
 
@@ -80,8 +281,6 @@ export default function DashboardPage() {
     qualified: 'Cualificado', proposal: 'Propuesta', booked: 'Reservado',
   }
 
-  // Show page structure immediately — no full loading screen
-  // Auth loading: show sidebar + skeleton content
   if (authLoading) return (
     <div style={{ display: 'flex' }}>
       <Sidebar />
@@ -91,15 +290,9 @@ export default function DashboardPage() {
           <div className="stats-grid" style={{ marginBottom: 16 }}>
             {[1,2,3,4].map(i => (
               <div key={i} className="stat-card">
-                <Skeleton w="60%" h={10} />
-                <Skeleton w="40%" h={28} radius={6} />
-                <Skeleton w="70%" h={9} />
+                <Skeleton w="60%" h={10} /><Skeleton w="40%" h={28} radius={6} /><Skeleton w="70%" h={9} />
               </div>
             ))}
-          </div>
-          <div className="two-col">
-            <div className="card"><div className="card-body" style={{ padding: 20 }}><Skeleton h={120} radius={6} /></div></div>
-            <div className="card"><div className="card-body" style={{ padding: 20 }}><Skeleton h={120} radius={6} /></div></div>
           </div>
         </div>
       </div>
@@ -107,7 +300,6 @@ export default function DashboardPage() {
     </div>
   )
 
-  // Not logged in
   if (!user) return null
 
   // No venue assigned yet
@@ -129,26 +321,18 @@ export default function DashboardPage() {
                   <ClipboardList size={36} style={{ color: 'var(--gold)', margin: '0 auto 16px' }} />
                   <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, marginBottom: 8 }}>Registra tu venue</div>
                   <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 24, lineHeight: 1.7 }}>
-                    Para aparecer en Wedding Venues Spain necesitamos la información de tu venue. Rellena el formulario y nuestro equipo lo revisará en 24-48 horas.
+                    Para aparecer en Wedding Venues Spain necesitamos la información de tu venue.
                   </div>
                   <Link href="/onboarding" className="btn btn-primary">Empezar registro →</Link>
-                  {onboarding?.status === 'draft' && (
-                    <div style={{ marginTop: 12, fontSize: 12, color: 'var(--warm-gray)' }}>Tienes un borrador guardado. Puedes continuar donde lo dejaste.</div>
-                  )}
                 </div>
               </div>
             ) : onbStatus === 'submitted' ? (
               <div className="card">
                 <div className="card-body" style={{ textAlign: 'center', padding: 40 }}>
-                  <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                    <AlertCircle size={22} style={{ color: '#92400e' }} />
-                  </div>
+                  <AlertCircle size={22} style={{ color: '#92400e', margin: '0 auto 16px' }} />
                   <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, marginBottom: 8 }}>Solicitud en revisión</div>
                   <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.7 }}>
-                    Hemos recibido la información de <strong>{onboarding.name}</strong>. Nuestro equipo la está revisando y te avisará en 24-48 horas.
-                  </div>
-                  <div style={{ marginTop: 20, fontSize: 11, color: 'var(--stone)' }}>
-                    Enviado el {new Date(onboarding.submitted_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    Hemos recibido la información de <strong>{onboarding.name}</strong>. Te avisaremos en 24-48 horas.
                   </div>
                 </div>
               </div>
@@ -183,7 +367,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Stats */}
           <div className="stats-grid">
             <div className="stat-card accent">
               <div className="stat-label">Leads este mes</div>
@@ -209,8 +392,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Quick actions */}
-          <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card" style={{ marginBottom: 16, marginTop: 16 }}>
             <div className="card-body" style={{ padding: '14px 20px' }}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 {[
@@ -238,7 +420,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="two-col" style={{ marginBottom: 16 }}>
-            {/* Leads list */}
             <div className="card">
               <div className="card-header">
                 <div className="card-title">Últimos leads</div>
@@ -252,7 +433,6 @@ export default function DashboardPage() {
                 <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 13 }}>
                   <Users size={28} style={{ margin: '0 auto 10px', opacity: 0.3 }} />
                   <div>Aún no tienes leads.</div>
-                  <div style={{ fontSize: 11, marginTop: 4 }}>Aparecerán aquí automáticamente desde tu ficha.</div>
                 </div>
               ) : leads.map(lead => (
                 <div key={lead.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 20px', borderBottom: '1px solid var(--ivory)' }}>
@@ -266,7 +446,6 @@ export default function DashboardPage() {
               ))}
             </div>
 
-            {/* Venue card */}
             <div className="card">
               <div className="card-header">
                 <div className="card-title">Tu ficha en la web</div>
@@ -275,9 +454,7 @@ export default function DashboardPage() {
               <div className="card-body">
                 {venueLoading && !venue ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <Skeleton h={140} radius={6} />
-                    <Skeleton w="70%" h={18} radius={4} />
-                    <Skeleton w="50%" h={12} radius={4} />
+                    <Skeleton h={140} radius={6} /><Skeleton w="70%" h={18} radius={4} /><Skeleton w="50%" h={12} radius={4} />
                   </div>
                 ) : venue ? (
                   <>
@@ -307,4 +484,37 @@ export default function DashboardPage() {
       <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
     </div>
   )
+}
+
+// ─── Page router ──────────────────────────────────────────────────────────────
+export default function DashboardPage() {
+  const { profile, loading } = useAuth()
+  const router = useRouter()
+  const { user } = useAuth()
+
+  useEffect(() => {
+    if (!loading && !user) router.push('/login')
+  }, [loading, user]) // eslint-disable-line
+
+  if (loading) return (
+    <div style={{ display: 'flex' }}>
+      <Sidebar />
+      <div className="main-layout">
+        <div className="topbar"><div className="topbar-title">Dashboard</div></div>
+        <div className="page-content">
+          <div className="stats-grid">
+            {[1,2,3,4].map(i => (
+              <div key={i} className="stat-card">
+                <Skeleton w="60%" h={10} /><Skeleton w="40%" h={28} radius={6} /><Skeleton w="70%" h={9} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
+    </div>
+  )
+
+  if (profile?.role === 'admin') return <AdminDashboard />
+  return <VenueDashboard />
 }

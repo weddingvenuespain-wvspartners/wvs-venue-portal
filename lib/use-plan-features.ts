@@ -28,7 +28,7 @@ const BASIC_FALLBACK: PlanFeatures = {
   propuestas:        false,
   propuestas_web:    false,
   comunicacion:      false,
-  estadisticas:      false,
+  estadisticas:      true,
 }
 
 /** Plan premium por defecto: acceso completo. */
@@ -74,6 +74,9 @@ export function usePlanFeatures(): PlanFeatures & {
   const planSlug = plan?.name ?? ''
   const planTier: 'basic' | 'premium' = (hasPlan && planSlug !== 'basic') ? 'premium' : 'basic'
 
+  // Priority 0: per-venue feature overrides set by admin (override everything)
+  const featureOverrides = (profile?.features_override ?? {}) as Partial<PlanFeatures>
+
   // Priority 1: explicit permissions stored in venue_plans.permissions (set from admin UI)
   const dbPermissions = (plan?.permissions ?? {}) as Partial<PlanFeatures>
   const hasExplicitPermissions = Object.keys(dbPermissions).length > 0
@@ -82,10 +85,13 @@ export function usePlanFeatures(): PlanFeatures & {
   // Note: trial users get the SAME features as their plan tier (not locked out during trial)
   const fallback: PlanFeatures = planTier === 'premium' ? PREMIUM_FALLBACK : BASIC_FALLBACK
 
-  // Merge: explicit DB permissions override fallback gaps
-  const resolved: PlanFeatures = hasExplicitPermissions
+  // Merge: plan permissions override fallback, then feature_overrides override everything
+  const baseMerge: PlanFeatures = hasExplicitPermissions
     ? { ...fallback, ...dbPermissions }
     : fallback
+  const resolved: PlanFeatures = Object.keys(featureOverrides).length > 0
+    ? { ...baseMerge, ...featureOverrides }
+    : baseMerge
 
   return {
     ...resolved,

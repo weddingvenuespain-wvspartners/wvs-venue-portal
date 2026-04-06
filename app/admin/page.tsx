@@ -33,6 +33,7 @@ type Profile = {
   // enriched from auth.users
   email: string | null
   last_sign_in_at: string | null
+  features_override?: Record<string, boolean | null>
 }
 
 type Plan = {
@@ -332,6 +333,20 @@ function UserPanel({
     admin_notes: profile.admin_notes || '',
     status:      profile.status      || 'pending',
   })
+
+  // Feature overrides — null = use plan default, true = force on, false = force off
+  type OverrideVal = true | false | null
+  const [featOverrides, setFeatOverrides] = useState<Record<string, OverrideVal>>(() => {
+    const fo = (profile as any).features_override ?? {}
+    return typeof fo === 'object' ? fo : {}
+  })
+  const setOverride = (key: string, val: OverrideVal) =>
+    setFeatOverrides(prev => {
+      const next = { ...prev }
+      if (val === null) delete next[key]
+      else next[key] = val
+      return next
+    })
   const [copied, setCopied] = useState(false)
   const copyEmail = () => {
     if (profile.email) {
@@ -707,9 +722,52 @@ function UserPanel({
                 onChange={e => setPForm(f => ({ ...f, admin_notes: e.target.value }))}
                 placeholder="Observaciones internas sobre este venue: forma de contacto preferida, acuerdos especiales, historial de incidencias..." />
 
+              {/* ── Funcionalidades ── */}
+              <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 14, marginTop: 4, marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Shield size={11} /> Funcionalidades
+                  <span style={{ fontSize: 9, fontWeight: 400, textTransform: 'none', color: '#b45309', marginLeft: 4 }}>
+                    (sobrescriben el plan — dejar en "Auto" para usar el plan)
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {([
+                    { key: 'ficha',             label: 'Editar ficha' },
+                    { key: 'leads',             label: 'Gestión de leads' },
+                    { key: 'calendario',        label: 'Calendario' },
+                    { key: 'propuestas',        label: 'Propuestas digitales' },
+                    { key: 'propuestas_web',    label: 'Web pública propuestas' },
+                    { key: 'comunicacion',      label: 'Tarifas y zonas' },
+                    { key: 'estadisticas',      label: 'Estadísticas' },
+                    { key: 'leads_export',      label: 'Exportar leads CSV' },
+                    { key: 'leads_date_filter', label: 'Filtro fechas leads' },
+                    { key: 'leads_new_only',    label: 'Solo leads nuevos ⚠️' },
+                  ] as { key: string; label: string }[]).map(({ key, label }) => {
+                    const val: OverrideVal = key in featOverrides ? featOverrides[key] as boolean : null
+                    return (
+                      <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: val === true ? '#f0fdf4' : val === false ? '#fef2f2' : 'var(--cream)', borderRadius: 6, gap: 6 }}>
+                        <span style={{ fontSize: 11, color: 'var(--charcoal)', flex: 1 }}>{label}</span>
+                        <select
+                          value={val === null ? 'auto' : val ? 'on' : 'off'}
+                          onChange={e => {
+                            const v = e.target.value
+                            setOverride(key, v === 'auto' ? null : v === 'on')
+                          }}
+                          style={{ fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid var(--ivory)', background: '#fff', color: val === true ? '#16a34a' : val === false ? '#dc2626' : 'var(--warm-gray)', cursor: 'pointer' }}
+                        >
+                          <option value="auto">Auto (plan)</option>
+                          <option value="on">✓ Activado</option>
+                          <option value="off">✗ Desactivado</option>
+                        </select>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button className="btn btn-primary" disabled={saving}
-                  onClick={() => onSaveProfile({ ...profile, ...pForm })}>
+                  onClick={() => onSaveProfile({ ...profile, ...pForm, features_override: featOverrides })}>
                   <Check size={13} /> {saving ? 'Guardando...' : 'Guardar perfil'}
                 </button>
               </div>

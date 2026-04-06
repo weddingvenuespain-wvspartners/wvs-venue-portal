@@ -29,37 +29,24 @@ export default function Sidebar() {
     </svg>
   )
 
-  const Chevron = ({ open }: { open: boolean }) => (
-    <svg
-      width="12" height="12" viewBox="0 0 16 16" fill="none"
-      stroke="currentColor" strokeWidth="2"
-      style={{ marginLeft: 'auto', transition: 'transform .2s', transform: open ? 'rotate(90deg)' : 'rotate(0deg)', flexShrink: 0 }}
-    >
-      <path d="M6 4l4 4-4 4" />
-    </svg>
-  )
-
   // ── Nav items ────────────────────────────────────────────────────────────────
 
   const venueItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/ficha',        label: isMultiVenue ? 'Mis fichas'    : 'Mi ficha',    icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                        feature: 'ficha'        },
-    { href: '/calendario',   label: isMultiVenue ? 'Calendarios'   : 'Calendario',  icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',          feature: 'calendario'   },
-    { href: '/leads',        label: 'Leads',                                         icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', feature: 'leads'       },
-    { href: '/propuestas',   label: isMultiVenue ? 'Mis propuestas': 'Propuestas',  icon: 'M2 2h12v10H2zM14 8l2 4M5 6h6M5 9h4',               feature: 'propuestas'   },
-    { href: '/comunicacion', label: 'Comunicación',                                  icon: 'M14 2H2v9h5l1 3 1-3h5V2zM5 6h6M5 9h3',             feature: 'comunicacion' },
+    { href: '/ficha',        label: isMultiVenue ? 'Mis fichas'     : 'Mi ficha',    icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
+    { href: '/calendario',   label: isMultiVenue ? 'Calendarios'    : 'Calendario',  icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
+    { href: '/leads',        label: 'Leads',                                          icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', feature: 'leads'        },
+    { href: '/propuestas',   label: isMultiVenue ? 'Mis propuestas' : 'Propuestas',  icon: 'M2 2h12v10H2zM14 8l2 4M5 6h6M5 9h4',                feature: 'propuestas'   },
+    { href: '/comunicacion', label: 'Comunicación',                                   icon: 'M14 2H2v9h5l1 3 1-3h5V2zM5 6h6M5 9h3',              feature: 'comunicacion' },
   ]
 
-  const generalItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/estadisticas', label: 'Estadísticas', icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z', feature: 'estadisticas' },
-    { href: '/facturas',     label: 'Facturas',     icon: 'M2 2h8l4 4v8H2V2zM10 2v4h4M5 8h6M5 11h4',            feature: 'ficha'        },
-  ]
+  const estadisticasItem = { href: '/estadisticas', label: 'Estadísticas', icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z', feature: 'estadisticas' as keyof PlanFeatures }
 
   const helpItems = [
     { href: '/guias', label: 'Centro de ayuda', icon: 'M8 1a7 7 0 100 14A7 7 0 008 1zM8 6v.5M8 9.5V11' },
   ]
 
-  const adminVenueItems = [
-    { href: '/admin',            label: 'CRM de venues',   icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM8 1v2M8 13v2M1 8h2M13 8h2' },
+  const adminItems = [
+    { href: '/admin',            label: 'CRM de venues',   icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4' },
     { href: '/admin/planes',     label: 'Planes',          icon: 'M1 4h14v8H1zM4 4V2M12 4V2M1 8h14' },
     { href: '/admin/onboarding', label: 'Solicitudes',     icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4M12 5v4M10 7h4' },
   ]
@@ -67,43 +54,56 @@ export default function Sidebar() {
   const isActive = (href: string) =>
     pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
 
-  const venueActive      = venueItems.some(i => isActive(i.href))
-  const adminVenueActive = adminVenueItems.some(i => isActive(i.href))
-
-  const [adminVenueOpen, setAdminVenueOpen] = useState(adminVenueActive)
-
-  useEffect(() => {
-    if (adminVenueActive) setAdminVenueOpen(true)
-  }, [pathname]) // eslint-disable-line
-
   return (
     <div className="sidebar">
       <div className="sidebar-logo">
         <span className="brand">Wedding Venues Spain</span>
-        <span className="venue-name">Partner Portal</span>
+        <span className="venue-name">{isAdmin ? 'Panel de Control' : 'Partner Portal'}</span>
       </div>
 
       <nav className="sidebar-nav">
 
-        {/* Dashboard */}
+        {/* Dashboard — siempre visible */}
         <div className="nav-section">General</div>
         <Link href="/dashboard" className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`}>
           <Icon d="M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z" /> Dashboard
         </Link>
 
-        {/* Mi Venue — always expanded (hidden for admins) */}
+        {/* ── ADMIN: Gestión siempre visible ── */}
+        {isAdmin && (
+          <>
+            <div className="nav-section" style={{ marginTop: 8 }}>Gestión</div>
+            {adminItems.map(item => (
+              <Link key={item.href} href={item.href}
+                className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
+              >
+                <Icon d={item.icon} /> {item.label}
+              </Link>
+            ))}
+
+            <div className="nav-section" style={{ marginTop: 8 }}>Ayuda</div>
+            {helpItems.map(item => (
+              <Link key={item.href} href={item.href}
+                className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
+              >
+                <Icon d={item.icon} /> {item.label}
+              </Link>
+            ))}
+          </>
+        )}
+
+        {/* ── VENUE: Secciones de venue ── */}
         {!isAdmin && (
           <>
-            <div className="nav-section" style={{ marginTop: 8 }}>
-              Mi Venue
-            </div>
+            {/* Mi Venue */}
+            <div className="nav-section" style={{ marginTop: 8 }}>Mi Venue</div>
             {venueItems.map(item => {
               const locked = !features[item.feature]
               if (locked) return (
                 <div
                   key={item.href}
                   className="nav-item"
-                  title="Funcionalidad Premium — actualiza tu plan para acceder"
+                  title="Funcionalidad no disponible en tu plan actual"
                   style={{ paddingLeft: 20, opacity: 0.38, cursor: 'not-allowed', userSelect: 'none' }}
                 >
                   <Icon d={item.icon} />
@@ -120,71 +120,41 @@ export default function Sidebar() {
                 </Link>
               )
             })}
-          </>
-        )}
 
-        {/* Estadísticas + Facturas */}
-        <div className="nav-section" style={{ marginTop: 8 }}>Datos</div>
-        {generalItems.map(item => {
-          const locked = !features[item.feature]
-          if (locked) return (
-            <div
-              key={item.href}
-              className="nav-item"
-              title="Funcionalidad Premium — actualiza tu plan para acceder"
-              style={{ opacity: 0.38, cursor: 'not-allowed', userSelect: 'none' }}
-            >
-              <Icon d={item.icon} /> {item.label}
-              <span style={{ marginLeft: 'auto', fontSize: 9 }}>PRO</span>
-            </div>
-          )
-          return (
-            <Link key={item.href} href={item.href}
-              className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
-            >
-              <Icon d={item.icon} /> {item.label}
-            </Link>
-          )
-        })}
+            {/* Datos */}
+            <div className="nav-section" style={{ marginTop: 8 }}>Datos</div>
+            {(() => {
+              const locked = !features[estadisticasItem.feature]
+              if (locked) return (
+                <div
+                  className="nav-item"
+                  title="Funcionalidad no disponible en tu plan actual"
+                  style={{ opacity: 0.38, cursor: 'not-allowed', userSelect: 'none' }}
+                >
+                  <Icon d={estadisticasItem.icon} /> {estadisticasItem.label}
+                  <span style={{ marginLeft: 'auto', fontSize: 9 }}>PRO</span>
+                </div>
+              )
+              return (
+                <Link href={estadisticasItem.href}
+                  className={`nav-item ${isActive(estadisticasItem.href) ? 'active' : ''}`}
+                >
+                  <Icon d={estadisticasItem.icon} /> {estadisticasItem.label}
+                </Link>
+              )
+            })()}
 
-        {/* Admin — Venues collapsible */}
-        {isAdmin && (
-          <>
-            <div className="nav-section" style={{ marginTop: 8 }}>
-              <button
-                onClick={() => setAdminVenueOpen(o => !o)}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: adminVenueActive ? 'var(--gold)' : 'var(--warm-gray)',
-                  fontSize: 10, fontWeight: 600, letterSpacing: '.08em',
-                  textTransform: 'uppercase', padding: 0,
-                }}
-              >
-                Venues
-                <Chevron open={adminVenueOpen} />
-              </button>
-            </div>
-            {adminVenueOpen && adminVenueItems.map(item => (
+            {/* Ayuda */}
+            <div className="nav-section" style={{ marginTop: 8 }}>Ayuda</div>
+            {helpItems.map(item => (
               <Link key={item.href} href={item.href}
                 className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
-                style={{ paddingLeft: 20 }}
               >
                 <Icon d={item.icon} /> {item.label}
               </Link>
             ))}
           </>
         )}
-
-        {/* Ayuda */}
-        <div className="nav-section" style={{ marginTop: 8 }}>Ayuda</div>
-        {helpItems.map(item => (
-          <Link key={item.href} href={item.href}
-            className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
-          >
-            <Icon d={item.icon} /> {item.label}
-          </Link>
-        ))}
 
       </nav>
 
@@ -225,7 +195,7 @@ export default function Sidebar() {
           <Link href="/perfil?tab=suscripcion"
             style={{ display: 'block', marginBottom: 10, padding: '9px 12px', borderRadius: 8, background: 'linear-gradient(135deg, #92400e 0%, #b45309 100%)', textDecoration: 'none' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#fcd34d', letterSpacing: '0.06em', marginBottom: 2 }}>✦ PASA A PREMIUM</div>
-            <div style={{ fontSize: 11, color: '#fef3c7', lineHeight: 1.4 }}>Propuestas, estadísticas, exportar leads y más.</div>
+            <div style={{ fontSize: 11, color: '#fef3c7', lineHeight: 1.4 }}>Propuestas, exportar leads y más.</div>
           </Link>
         )}
 
@@ -248,7 +218,7 @@ export default function Sidebar() {
               {userEmail}
             </div>
             <div style={{ fontSize: 10, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
-              {isAdmin ? 'Administrador' : 'Venue Owner'}
+              {isAdmin ? 'Administrador WVS' : 'Venue Owner'}
               {!isAdmin && (
                 <span style={{
                   background: !features.hasPlan
