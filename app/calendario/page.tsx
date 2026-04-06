@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import {
   ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
-  FileText, Calendar, Search, AlertCircle, Settings, Info
+  FileText, Calendar, Search, AlertCircle, Settings, Info, Trash2, RotateCcw
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ type Lead = {
   name: string
   email?: string
   phone?: string
+  whatsapp?: string
   wedding_date?: string
   wedding_date_to?: string
   wedding_date_ranges?: { from: string; to: string }[]
@@ -36,6 +37,8 @@ type Lead = {
   status: string
   budget?: string
   ceremony_type?: string
+  visit_date?: string
+  notes?: string
 }
 
 type DateRulePackage = {
@@ -72,8 +75,16 @@ const LEAD_STATUS: Record<string, { label: string; color: string }> = {
   proposal_sent:  { label: 'Propuesta enviada', color: '#f59e0b' },
   visit_scheduled:{ label: 'Visita agendada',  color: '#10b981' },
   budget_sent:    { label: 'Presupuesto',      color: '#6366f1' },
-  won:            { label: 'Ganado',           color: '#16a34a' },
+  won:            { label: 'Reservado',         color: '#16a34a' },
   lost:           { label: 'Perdido',          color: '#dc2626' },
+}
+
+const BUDGET_LABEL: Record<string, string> = {
+  sin_definir: 'Sin definir', menos_5k: '< 5.000 €', '5k_10k': '5.000–10.000 €',
+  '10k_20k': '10.000–20.000 €', '20k_40k': '20.000–40.000 €', mas_40k: '> 40.000 €',
+}
+const CEREMONY_LABEL: Record<string, string> = {
+  sin_definir: 'Sin definir', civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica', mixta: 'Mixta',
 }
 
 const MONTHS     = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -162,7 +173,7 @@ export default function CalendarioPage() {
 
     const [entriesRes, leadsRes, settingsRes] = await Promise.all([
       supabase.from('calendar_entries').select('*').eq('user_id', user!.id).gte('date', from).lte('date', to),
-      supabase.from('leads').select('id,name,email,phone,wedding_date,wedding_date_to,wedding_date_ranges,date_flexibility,wedding_year,wedding_month,guests,status,budget,ceremony_type').eq('user_id', user!.id).order('wedding_date', { ascending: true }),
+      supabase.from('leads').select('id,name,email,phone,whatsapp,wedding_date,wedding_date_to,wedding_date_ranges,date_flexibility,wedding_year,wedding_month,guests,status,budget,ceremony_type,visit_date,notes').eq('user_id', user!.id).order('wedding_date', { ascending: true }),
       supabase.from('venue_settings').select('date_rules').eq('user_id', user!.id).maybeSingle(),
     ])
 
@@ -632,6 +643,11 @@ export default function CalendarioPage() {
           onDelete={async () => { await saveEntry({ date: modalDate, status: 'libre' }); setModalDate(null) }}
           onClose={() => setModalDate(null)}
           onLeadCreated={async (lead) => { setLeads(prev => [lead, ...prev]) }}
+          onUpdateLead={async (leadId, fields) => {
+            const supabase = createClient()
+            await supabase.from('leads').update(fields).eq('id', leadId)
+            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, ...fields } : l))
+          }}
           userId={user!.id}
         />
       )}
@@ -651,7 +667,7 @@ export default function CalendarioPage() {
 
 function DayModal({
   date, entry, leadsOnDate, allLeads, leadsById, saving, dateRules,
-  onSave, onDelete, onClose, onLeadCreated, userId
+  onSave, onDelete, onClose, onLeadCreated, onUpdateLead, userId
 }: {
   date: string
   entry: Entry | null
@@ -664,18 +680,58 @@ function DayModal({
   onDelete: () => Promise<void>
   onClose: () => void
   onLeadCreated: (l: Lead) => Promise<void>
+  onUpdateLead: (leadId: string, fields: Partial<Lead>) => Promise<void>
   userId: string
 }) {
-  const [status,   setStatus]   = useState<Status>(entry?.status || 'libre')
-  const [note,     setNote]     = useState(entry?.note || '')
-  const [leadId,   setLeadId]   = useState<string | null>(entry?.lead_id || null)
-  const [search,   setSearch]   = useState('')
-  const [showCreate, setShowCreate] = useState(false)
+  const [status,      setStatus]      = useState<Status>(entry?.status || 'libre')
+  const [note,        setNote]        = useState(entry?.note || '')
+  const [leadId,      setLeadId]      = useState<string | null>(entry?.lead_id || null)
+  const [search,      setSearch]      = useState('')
+  const [showCreate,  setShowCreate]  = useState(false)
   const [localSaving, setLocalSaving] = useState(false)
+
+  // Lead pipeline status + visit date editing
+  const [leadPipelineStatus, setLeadPipelineStatus] = useState<string>('')
+  const [visitDate,          setVisitDate]          = useState<string>('')
+  // Scope: apply calendar entry status to just this date or all linked dates
+  const [scope, setScope] = useState<'this' | 'all'>('this')
+  // All calendar entries linked to this lead
+  const [leadEntries,        setLeadEntries]        = useState<Entry[]>([])
+  const [loadingLeadEntries, setLoadingLeadEntries] = useState(false)
+  // Dates to unlink the lead from
+  const [datesToUnlink, setDatesToUnlink] = useState<Set<string>>(new Set())
+  // Inline lead editing (in "Leads con esta fecha" list)
+  const [expandedLeadId,  setExpandedLeadId]  = useState<string | null>(null)
+  const [inlineEditForm,  setInlineEditForm]  = useState({ name: '', email: '', phone: '', guests: '', status: '' })
+  const [inlineEditSaving, setInlineEditSaving] = useState(false)
 
   const dt = new Date(date + 'T12:00:00')
   const isPast = date < new Date().toISOString().split('T')[0]
   const selectedLead = leadId ? leadsById[leadId] : null
+
+  // Sync pipeline status + visit date when lead changes
+  useEffect(() => {
+    setLeadPipelineStatus(selectedLead?.status || '')
+    setVisitDate(selectedLead?.visit_date || '')
+    setScope('this')
+    setDatesToUnlink(new Set())
+  }, [leadId])
+
+  // Fetch all calendar entries linked to this lead
+  useEffect(() => {
+    if (!leadId) { setLeadEntries([]); return }
+    setLoadingLeadEntries(true)
+    const supabase = createClient()
+    supabase.from('calendar_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('lead_id', leadId)
+      .order('date', { ascending: true })
+      .then(({ data }) => {
+        setLeadEntries(data || [])
+        setLoadingLeadEntries(false)
+      })
+  }, [leadId])
 
   const filteredLeads = allLeads.filter(l =>
     !search || l.name.toLowerCase().includes(search.toLowerCase()) || (l.email || '').toLowerCase().includes(search.toLowerCase())
@@ -686,6 +742,35 @@ function DayModal({
 
   const handleSave = async () => {
     setLocalSaving(true)
+    const supabase = createClient()
+
+    // Update lead fields if changed (status, visit_date)
+    if (selectedLead) {
+      const fields: Partial<Lead> = {}
+      if (leadPipelineStatus && leadPipelineStatus !== selectedLead.status) fields.status = leadPipelineStatus
+      if (visitDate !== (selectedLead.visit_date || '')) fields.visit_date = visitDate || undefined
+      if (Object.keys(fields).length > 0) await onUpdateLead(selectedLead.id, fields)
+    }
+
+    // Unlink lead from selected dates
+    if (datesToUnlink.size > 0) {
+      for (const d of datesToUnlink) {
+        const entryToUpdate = leadEntries.find(e => e.date === d)
+        if (entryToUpdate?.id) {
+          await supabase.from('calendar_entries').update({ lead_id: null }).eq('id', entryToUpdate.id)
+        }
+      }
+    }
+
+    // Apply calendar status to all linked dates if scope === 'all'
+    if (scope === 'all' && leadId && leadEntries.length > 0) {
+      for (const e of leadEntries) {
+        if (e.date !== date && e.id && !datesToUnlink.has(e.date)) {
+          await supabase.from('calendar_entries').update({ status }).eq('id', e.id)
+        }
+      }
+    }
+
     const extraBlocks = affected.map(a => a.date)
     await onSave({ date, status, note: note.trim() || undefined, lead_id: leadId }, extraBlocks.length > 0 ? extraBlocks : undefined)
     setLocalSaving(false)
@@ -717,7 +802,7 @@ function DayModal({
         </div>
 
         <div style={{ padding: '20px 24px' }}>
-          {/* Leads on this date (not yet linked) */}
+          {/* Leads on this date */}
           {leadsOnDate.length > 0 && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
@@ -725,31 +810,117 @@ function DayModal({
               </div>
               {leadsOnDate.map(l => {
                 const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
+                const isLinked = leadId === l.id
+                const isExpanded = expandedLeadId === l.id
                 return (
-                  <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--cream)', borderRadius: 8, marginBottom: 6 }}>
-                    <User size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{l.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
-                        {l.guests ? `${l.guests} invitados` : ''}
-                        {l.guests && l.budget ? ' · ' : ''}
-                        {l.budget ? l.budget.replace('_', ' ') : ''}
+                  <div key={l.id} style={{ marginBottom: 6 }}>
+                    {/* Lead row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                      background: isLinked ? '#f0fdf4' : 'var(--cream)',
+                      border: `1px solid ${isLinked ? '#86efac' : 'var(--ivory)'}`,
+                      borderRadius: isExpanded ? '8px 8px 0 0' : 8 }}>
+                      <User size={14} style={{ color: isLinked ? '#16a34a' : 'var(--warm-gray)', flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{l.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                          {l.guests ? `${l.guests} inv.` : ''}
+                          {l.guests && l.budget && l.budget !== 'sin_definir' ? ' · ' : ''}
+                          {l.budget && l.budget !== 'sin_definir' ? BUDGET_LABEL[l.budget] || l.budget : ''}
+                          {l.visit_date ? ` · Visita: ${new Date(l.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}` : ''}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 11, color: st.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{st.label}</span>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {/* Only show Vincular if no other lead is linked, or this is the linked lead */}
+                        {(!leadId || isLinked) && !isPast && (
+                          <button
+                            onClick={() => { setLeadId(isLinked ? null : l.id); setExpandedLeadId(null) }}
+                            style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid', fontWeight: 500,
+                              borderColor: isLinked ? '#86efac' : 'var(--ivory)',
+                              background: isLinked ? '#dcfce7' : 'transparent',
+                              color: isLinked ? '#16a34a' : 'var(--charcoal)' }}>
+                            {isLinked ? '✓ Vinculado' : 'Vincular'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            if (isExpanded) { setExpandedLeadId(null); return }
+                            setExpandedLeadId(l.id)
+                            setInlineEditForm({ name: l.name, email: l.email || '', phone: l.phone || '', guests: l.guests ? String(l.guests) : '', status: l.status })
+                          }}
+                          title="Editar lead"
+                          style={{ fontSize: 10, padding: '3px 7px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--ivory)', background: isExpanded ? 'var(--ivory)' : 'transparent', color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <FileText size={10} /> Editar
+                        </button>
                       </div>
                     </div>
-                    <span style={{ fontSize: 11, color: st.color, fontWeight: 600 }}>{st.label}</span>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button
-                        onClick={() => setLeadId(leadId === l.id ? null : l.id)}
-                        style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid', fontWeight: 500,
-                          borderColor: leadId === l.id ? 'var(--gold)' : 'var(--ivory)',
-                          background: leadId === l.id ? 'var(--gold)' : 'transparent',
-                          color: leadId === l.id ? '#fff' : 'var(--charcoal)' }}>
-                        {leadId === l.id ? '✓ Vinculado' : 'Vincular'}
-                      </button>
-                      <a href="/leads" style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <ExternalLink size={10} /> Ver
-                      </a>
-                    </div>
+
+                    {/* Inline edit panel */}
+                    {isExpanded && (
+                      <div style={{ padding: '14px 14px', background: '#fafafa', border: '1px solid var(--ivory)', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Nombre</div>
+                            <input className="form-input" style={{ fontSize: 12 }} value={inlineEditForm.name}
+                              onChange={e => setInlineEditForm(f => ({ ...f, name: e.target.value }))} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Invitados</div>
+                            <input className="form-input" style={{ fontSize: 12 }} type="number" value={inlineEditForm.guests}
+                              onChange={e => setInlineEditForm(f => ({ ...f, guests: e.target.value }))} placeholder="Nº" />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Teléfono</div>
+                            <input className="form-input" style={{ fontSize: 12 }} value={inlineEditForm.phone}
+                              onChange={e => setInlineEditForm(f => ({ ...f, phone: e.target.value }))} placeholder="+34 600 000 000" />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Email</div>
+                            <input className="form-input" style={{ fontSize: 12 }} type="email" value={inlineEditForm.email}
+                              onChange={e => setInlineEditForm(f => ({ ...f, email: e.target.value }))} />
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Estado del lead</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                            {Object.entries(LEAD_STATUS).map(([s, cfg]) => (
+                              <button key={s} onClick={() => setInlineEditForm(f => ({ ...f, status: s }))} style={{
+                                fontSize: 11, padding: '3px 9px', borderRadius: 20, cursor: 'pointer',
+                                border: `1px solid ${inlineEditForm.status === s ? cfg.color : 'var(--ivory)'}`,
+                                background: inlineEditForm.status === s ? `${cfg.color}18` : 'transparent',
+                                color: inlineEditForm.status === s ? cfg.color : 'var(--warm-gray)',
+                                fontWeight: inlineEditForm.status === s ? 600 : 400,
+                              }}>
+                                {cfg.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button className="btn btn-ghost" style={{ fontSize: 11, padding: '5px 12px' }}
+                            onClick={() => setExpandedLeadId(null)}>Cancelar</button>
+                          <button className="btn btn-primary" style={{ fontSize: 11, padding: '5px 12px' }}
+                            disabled={inlineEditSaving}
+                            onClick={async () => {
+                              setInlineEditSaving(true)
+                              const supabase = createClient()
+                              const fields: Partial<Lead> = {
+                                name: inlineEditForm.name,
+                                phone: inlineEditForm.phone || undefined,
+                                email: inlineEditForm.email || undefined,
+                                guests: inlineEditForm.guests ? Number(inlineEditForm.guests) : undefined,
+                                status: inlineEditForm.status,
+                              }
+                              await supabase.from('leads').update(fields).eq('id', l.id)
+                              await onUpdateLead(l.id, fields)
+                              setInlineEditSaving(false)
+                              setExpandedLeadId(null)
+                            }}>
+                            {inlineEditSaving ? 'Guardando...' : 'Guardar cambios'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -831,6 +1002,168 @@ function DayModal({
                     style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: '1px dashed var(--gold)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'center' }}>
                     <Plus size={13} /> Crear nuevo lead para esta fecha
                   </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Lead pipeline status editor */}
+          {selectedLead && !isPast && !showCreate && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Estado del lead</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {Object.entries(LEAD_STATUS).map(([s, cfg]) => (
+                  <button key={s} onClick={() => setLeadPipelineStatus(s)} style={{
+                    fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+                    border: `1px solid ${leadPipelineStatus === s ? cfg.color : 'var(--ivory)'}`,
+                    background: leadPipelineStatus === s ? `${cfg.color}18` : 'transparent',
+                    color: leadPipelineStatus === s ? cfg.color : 'var(--warm-gray)',
+                    fontWeight: leadPipelineStatus === s ? 600 : 400,
+                    transition: 'all 0.1s',
+                  }}>
+                    {cfg.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Scope selector: apply calendar entry status to just this date or all linked dates */}
+          {selectedLead && !isPast && !showCreate && status !== 'libre' && leadEntries.length > 1 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                Aplicar estado del calendario a
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {([['this', 'Solo esta fecha'], ['all', 'Todas las fechas del lead']] as const).map(([val, label]) => (
+                  <button key={val} onClick={() => setScope(val)} style={{
+                    flex: 1, padding: '7px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 11,
+                    border: `1px solid ${scope === val ? 'var(--gold)' : 'var(--ivory)'}`,
+                    background: scope === val ? '#fef9ec' : 'transparent',
+                    color: scope === val ? '#92400e' : 'var(--warm-gray)',
+                    fontWeight: scope === val ? 600 : 400,
+                    transition: 'all 0.1s',
+                  }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Visita programada */}
+          {selectedLead && !isPast && !showCreate && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                Visita programada
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <input
+                    className="form-input"
+                    type="date"
+                    value={visitDate}
+                    onChange={e => setVisitDate(e.target.value)}
+                    style={{ fontSize: 13 }}
+                  />
+                </div>
+                {visitDate && (
+                  <button onClick={() => setVisitDate('')}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              {visitDate && (
+                <div style={{ marginTop: 6, fontSize: 12, color: '#10b981', fontWeight: 500 }}>
+                  📅 {new Date(visitDate + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Boda reservada */}
+          {status === 'reservado' && !isPast && !showCreate && (
+            <div style={{ marginBottom: 20, padding: '14px 16px', background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#9d174d', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                🌸 Boda reservada
+              </div>
+              {selectedLead ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {[
+                    { label: 'Pareja', value: selectedLead.name },
+                    { label: 'Invitados', value: selectedLead.guests ? `${selectedLead.guests} personas` : '—' },
+                    { label: 'Presupuesto', value: BUDGET_LABEL[selectedLead.budget || ''] || selectedLead.budget || '—' },
+                    { label: 'Ceremonia', value: CEREMONY_LABEL[selectedLead.ceremony_type || ''] || selectedLead.ceremony_type || '—' },
+                    { label: 'Teléfono', value: selectedLead.phone || selectedLead.whatsapp || '—' },
+                    { label: 'Email', value: selectedLead.email || '—' },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <div style={{ fontSize: 10, color: '#be185d', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: 12, color: '#831843', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: '#be185d' }}>
+                  Vincula un lead para ver los detalles de la boda.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Linked dates manager */}
+          {selectedLead && !isPast && !showCreate && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                Fechas en el calendario
+              </div>
+              {loadingLeadEntries ? (
+                <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Cargando...</div>
+              ) : leadEntries.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--warm-gray)', padding: '4px 0' }}>Solo esta fecha vinculada</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {leadEntries.map(e => {
+                    const isThisDate = e.date === date
+                    const isUnlinking = datesToUnlink.has(e.date)
+                    const eCfg = STATUS_CFG[e.status as Status] || STATUS_CFG.libre
+                    return (
+                      <div key={e.date} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
+                        background: isUnlinking ? '#fef2f2' : isThisDate ? '#f0fdf4' : 'var(--cream)',
+                        border: `1px solid ${isUnlinking ? '#fca5a5' : isThisDate ? '#86efac' : 'var(--ivory)'}`,
+                        borderRadius: 8, opacity: isUnlinking ? 0.75 : 1,
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: isUnlinking ? '#9ca3af' : 'var(--charcoal)', textDecoration: isUnlinking ? 'line-through' : 'none' }}>
+                            {formatDateEs(e.date)}
+                          </span>
+                          {isThisDate && <span style={{ fontSize: 10, color: '#16a34a', marginLeft: 6, fontWeight: 500 }}>← esta fecha</span>}
+                        </div>
+                        <span style={{ fontSize: 10, background: eCfg.badge, color: eCfg.color, padding: '1px 6px', borderRadius: 10, fontWeight: 500 }}>
+                          {eCfg.label}
+                        </span>
+                        {!isThisDate && (
+                          <button
+                            onClick={() => setDatesToUnlink(prev => {
+                              const n = new Set(prev)
+                              if (n.has(e.date)) n.delete(e.date); else n.add(e.date)
+                              return n
+                            })}
+                            title={isUnlinking ? 'Restaurar' : 'Quitar lead de esta fecha'}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isUnlinking ? '#16a34a' : '#dc2626', padding: 2, display: 'flex', alignItems: 'center' }}>
+                            {isUnlinking ? <RotateCcw size={12} /> : <Trash2 size={12} />}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {datesToUnlink.size > 0 && (
+                    <div style={{ fontSize: 11, color: '#dc2626', padding: '2px 0' }}>
+                      Se quitará el lead de {datesToUnlink.size} fecha{datesToUnlink.size > 1 ? 's' : ''} al guardar.
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -41,3 +41,8 @@ wordpress-snippet/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Backup files — NEVER commit these (contain real user data)
+wvs-backup-*.json
+wvs-mis-datos-*.json
+backups/

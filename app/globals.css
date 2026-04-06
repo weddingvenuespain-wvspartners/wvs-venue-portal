@@ -183,3 +183,65 @@ table.data-table tr:hover td { background: #fafaf9; }
 [contenteditable] ol { margin: 4px 0; padding-left: 20px; list-style-type: decimal; }
 [contenteditable] li { margin: 2px 0; display: list-item; }
 [contenteditable] br { display: block; content: ''; margin: 0; }
+
+/* ── Skeleton shimmer animation ─────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Dark mode ──────────────────────────────────────────── */
+[data-theme="dark"] {
+  --espresso: #f1e9df;
+  --charcoal: #d4c5b0;
+  --warm-gray: #9a8878;
+  --stone: #6b5c50;
+  --cream: #1e1a16;
+  --ivory: #2a2520;
+  --parchment: #141210;
+  --sidebar-bg: #0d0b08;
+}
+[data-theme="dark"] body {
+  background: var(--parchment);
+  color: var(--espresso);
+}
+[data-theme="dark"] .card {
+  background: var(--cream);
+  border-color: var(--ivory);
+}
+[data-theme="dark"] .card-header {
+  background: var(--ivory);
+}
+[data-theme="dark"] .form-input,
+[data-theme="dark"] .form-input:focus {
+  background: var(--ivory);
+  color: var(--espresso);
+  border-color: var(--stone);
+}
+[data-theme="dark"] .topbar {
+  background: var(--cream);
+  border-color: var(--ivory);
+}
+[data-theme="dark"] .main-layout {
+  background: var(--parchment);
+}
+[data-theme="dark"] .nav-item {
+  color: var(--charcoal);
+}
+[data-theme="dark"] .nav-item:hover {
+  background: var(--ivory);
+}
+[data-theme="dark"] .nav-item.active {
+  background: var(--ivory);
+}
+[data-theme="dark"] .btn-ghost {
+  color: var(--charcoal);
+  border-color: var(--stone);
+}
+[data-theme="dark"] .btn-ghost:hover {
+  background: var(--ivory);
+}
+[data-theme="dark"] select option {
+  background: var(--cream);
+  color: var(--espresso);
+}

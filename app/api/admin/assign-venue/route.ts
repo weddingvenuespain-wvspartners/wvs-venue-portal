@@ -34,25 +34,38 @@ export async function POST(req: NextRequest) {
     const authClient = await requireAdmin(req)
     if (!authClient) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
-    const { user_id, wp_venue_id, plan_id, billing_cycle, price } = await req.json()
+    const { user_id, wp_venue_id, plan_id, billing_cycle, start_trial, trial_days } = await req.json()
     if (!user_id || !wp_venue_id)
       return NextResponse.json({ error: 'user_id y wp_venue_id son requeridos' }, { status: 400 })
 
     const svc = getServiceClient()
 
-    // 1. Create subscription if a plan was selected
+    // 1. Create subscription if plan selected AND trial explicitly requested
     let subId: string | null = null
-    if (plan_id) {
+    if (plan_id && start_trial) {
       const cycle = billing_cycle || 'yearly'
       const start = new Date().toISOString().slice(0, 10)
-      const renewalDate = new Date()
-      if (cycle === 'yearly')  renewalDate.setFullYear(renewalDate.getFullYear() + 1)
-      else                      renewalDate.setMonth(renewalDate.getMonth() + 1)
-      const renewal = renewalDate.toISOString().slice(0, 10)
+
+      // Use admin-provided trial_days; fallback to plan default
+      let days = parseInt(trial_days) || 0
+      if (!days) {
+        const { data: planData } = await svc
+          .from('venue_plans').select('trial_days').eq('id', plan_id).single()
+        days = planData?.trial_days ?? 14
+      }
+
+      const trialEnd = new Date()
+      trialEnd.setDate(trialEnd.getDate() + days)
 
       const { data: sub, error: subErr } = await svc
         .from('venue_subscriptions')
-        .insert({ user_id, plan_id, billing_cycle: cycle, status: 'trial', start_date: start, renewal_date: renewal, price_paid: price || null })
+        .insert({
+          user_id, plan_id, billing_cycle: cycle,
+          status: 'trial',
+          start_date: start,
+          trial_end_date: trialEnd.toISOString().slice(0, 10),
+          renewal_date: null,
+        })
         .select().single()
       if (subErr) console.error('[assign-venue] subscription insert error', subErr)
       subId = sub?.id || null

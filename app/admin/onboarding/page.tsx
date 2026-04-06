@@ -313,7 +313,7 @@ export default function AdminOnboardingPage() {
       setLoading(false)
     }
     init()
-  }, [user, profile, authLoading, router])
+  }, [authLoading]) // eslint-disable-line
 
   const notify = (msg: string, isErr = false) => {
     isErr ? setError(msg) : setSuccess(msg)

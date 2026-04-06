@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import {
   Plus, Search, X, Phone, Mail, MessageCircle,
-  Calendar, Users, ChevronRight, RotateCcw, CheckCircle,
+  Calendar, Users, ChevronLeft, ChevronRight, RotateCcw, CheckCircle,
   ExternalLink, Edit2, Trash2, Clock, Filter, FileText, Download
 } from 'lucide-react'
 
@@ -142,6 +142,44 @@ function urgencyColor(days: number | null) {
   return '#16a34a'
 }
 
+function formatDateLabel(ds: string): string {
+  if (!ds) return '—'
+  return new Date(ds + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function getLeadFirstDate(lead: any): string | null {
+  const flex = lead.date_flexibility || 'exact'
+  if (flex === 'exact' || flex === 'range') return lead.wedding_date || null
+  if (flex === 'multi_range') return lead.wedding_date_ranges?.[0]?.from || null
+  if (flex === 'month' && lead.wedding_year && lead.wedding_month)
+    return `${lead.wedding_year}-${pad(lead.wedding_month)}-01`
+  return null
+}
+
+function expandLeadDates(lead: any): string[] {
+  const flex = lead.date_flexibility || 'exact'
+  const addRange = (from: string, to: string): string[] => {
+    const result: string[] = []
+    const d = new Date(from + 'T12:00:00')
+    const end = new Date((to || from) + 'T12:00:00')
+    while (d <= end) { result.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 1) }
+    return result
+  }
+  if (flex === 'exact') return lead.wedding_date ? [lead.wedding_date] : []
+  if (flex === 'range' && lead.wedding_date)
+    return addRange(lead.wedding_date, lead.wedding_date_to || lead.wedding_date)
+  if (flex === 'multi_range')
+    return (lead.wedding_date_ranges || []).flatMap((r: any) => r.from ? addRange(r.from, r.to || r.from) : [])
+  return []
+}
+
+const CAL_AVAIL_CFG: Record<string, { bg: string; border: string; dot: string; label: string }> = {
+  libre:       { bg: '#fff',    border: '#e5e7eb', dot: '#d1fae5', label: 'Libre' },
+  negociacion: { bg: '#fef9ec', border: '#fde68a', dot: '#f59e0b', label: 'En negociación' },
+  reservado:   { bg: '#fdf2f8', border: '#fbcfe8', dot: '#ec4899', label: 'Reservado' },
+  bloqueado:   { bg: '#f3f4f6', border: '#d1d5db', dot: '#9ca3af', label: 'Bloqueado' },
+}
+
 const emptyForm = {
   name: '', email: '', phone: '', whatsapp: '',
   // flexible date fields
@@ -181,6 +219,8 @@ export default function LeadsPage() {
   const [form,       setForm]       = useState(emptyForm)
   const [saving,     setSaving]     = useState(false)
   const [toast,      setToast]      = useState('')
+  const [dateConfirmLead,   setDateConfirmLead]   = useState<any | null>(null)
+  const [dateConfirmStatus, setDateConfirmStatus] = useState<DbStatus | null>(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -255,6 +295,51 @@ export default function LeadsPage() {
       .find(([, ss]) => ss.includes(status))?.[0]
     if (newTab && newTab !== activeTab)
       showToast(`Lead movido a "${TABS.find(t => t.key === newTab)?.label}"`)
+  }
+
+  const triggerStatusChange = (lead: any, status: DbStatus) => {
+    if (['contacted', 'visit_scheduled', 'won'].includes(status)) {
+      setDateConfirmLead(lead)
+      setDateConfirmStatus(status)
+    } else {
+      moveToStatus(lead.id, status)
+    }
+  }
+
+  // Note: requires ALTER TABLE leads ADD COLUMN IF NOT EXISTS wedding_date_history JSONB DEFAULT '[]';
+  const handleDateConfirm = async (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean) => {
+    if (!dateConfirmLead || !dateConfirmStatus) return
+    const supabase = createClient()
+
+    const finalUpdates: any = { status: dateConfirmStatus, ...leadUpdates }
+    if (isVisit && calendarDates.length > 0) finalUpdates.visit_date = calendarDates[0]
+
+    const { data: updatedLead } = await supabase.from('leads')
+      .update(finalUpdates).eq('id', dateConfirmLead.id).select().single()
+
+    for (const d of calendarDates) {
+      const { data: existing } = await supabase.from('calendar_entries')
+        .select('id').eq('user_id', user!.id).eq('date', d).maybeSingle()
+      const entryPayload: any = {
+        status: calendarStatus,
+        lead_id: dateConfirmLead.id,
+        ...(isVisit ? { note: `Visita: ${dateConfirmLead.name}` } : {}),
+      }
+      if (existing?.id) {
+        await supabase.from('calendar_entries').update(entryPayload).eq('id', existing.id)
+      } else {
+        await supabase.from('calendar_entries').insert({ user_id: user!.id, date: d, ...entryPayload })
+      }
+    }
+
+    if (updatedLead) setLeads(prev => prev.map(l => l.id === dateConfirmLead.id ? updatedLead : l))
+    const newTab = (Object.entries(TAB_STATUSES) as [Tab, DbStatus[]][])
+      .find(([, ss]) => ss.includes(dateConfirmStatus))?.[0]
+    if (newTab && newTab !== activeTab)
+      showToast(`Lead movido a "${TABS.find(t => t.key === newTab)?.label}"`)
+    else showToast('Lead actualizado')
+    setDateConfirmLead(null)
+    setDateConfirmStatus(null)
   }
 
   const deleteLead = async (id: string) => {
@@ -480,7 +565,8 @@ export default function LeadsPage() {
                 {visibleLeads.map(lead => (
                   <LeadRow key={lead.id} lead={lead} tab={activeTab}
                     onMove={moveToStatus} onEdit={openEdit}
-                    onDelete={deleteLead} onDetail={setDetailLead} />
+                    onDelete={deleteLead} onDetail={setDetailLead}
+                    onDateConfirm={triggerStatusChange} />
                 ))}
               </div>
             )}
@@ -502,7 +588,8 @@ export default function LeadsPage() {
         <DetailDrawer lead={detailLead}
           tab={(Object.entries(TAB_STATUSES) as [Tab, DbStatus[]][]).find(([,ss]) => ss.includes(detailLead.status))?.[0] || 'new'}
           onClose={() => setDetailLead(null)}
-          onEdit={openEdit} onDelete={deleteLead} onMove={moveToStatus} />
+          onEdit={openEdit} onDelete={deleteLead} onMove={moveToStatus}
+          onDateConfirm={triggerStatusChange} />
       )}
 
       {showForm && (
@@ -510,17 +597,413 @@ export default function LeadsPage() {
           saving={saving} onSubmit={handleSubmit}
           onClose={() => { setShowForm(false); setEditLead(null) }} />
       )}
+
+      {dateConfirmLead && dateConfirmStatus && (
+        <DateConfirmModal
+          lead={dateConfirmLead}
+          targetStatus={dateConfirmStatus}
+          userId={user!.id}
+          allLeads={leads}
+          onConfirm={handleDateConfirm}
+          onClose={() => { setDateConfirmLead(null); setDateConfirmStatus(null) }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Date Confirm Modal ─────────────────────────────────────────────────────────
+function DateConfirmModal({
+  lead, targetStatus, userId, allLeads, onConfirm, onClose,
+}: {
+  lead: any
+  targetStatus: DbStatus
+  userId: string
+  allLeads: any[]
+  onConfirm: (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean) => Promise<void>
+  onClose: () => void
+}) {
+  const isVisitMode = targetStatus === 'visit_scheduled'
+  const isWonMode   = targetStatus === 'won'
+
+  const requestedDates = useMemo(() => expandLeadDates(lead), [lead])
+
+  // Build a map of date → count of OTHER leads who have that date requested
+  const dateLeadCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    allLeads.forEach(l => {
+      if (l.id === lead.id) return
+      expandLeadDates(l).forEach(d => {
+        counts[d] = (counts[d] || 0) + 1
+      })
+    })
+    return counts
+  }, [allLeads, lead.id])
+  const hasRequestedDates = requestedDates.length > 0
+
+  const firstDate = getLeadFirstDate(lead)
+  const initD = firstDate ? new Date(firstDate + 'T12:00:00') : new Date()
+  const [viewYear,  setViewYear]  = useState(initD.getFullYear())
+  const [viewMonth, setViewMonth] = useState(initD.getMonth())
+  // selectedDates = couple's confirmed dates (deselectable) + user-added alternatives
+  const [selectedDates, setSelectedDates] = useState<string[]>([])
+  const [calEntries,    setCalEntries]    = useState<Record<string, any>>({})
+  const [saving,        setSaving]        = useState(false)
+  // Prevent re-initialising selectedDates on month navigation
+  const isFirstLoad = { current: true }
+
+  // Load calendar entries. On first render also fetch all months with requested dates.
+  useEffect(() => {
+    const fetchEntries = async () => {
+      const supabase = createClient()
+      const monthsToLoad: string[] = [`${viewYear}-${pad(viewMonth + 1)}`]
+      if (isFirstLoad.current && !isVisitMode) {
+        requestedDates.forEach(d => {
+          const ym = d.slice(0, 7)
+          if (!monthsToLoad.includes(ym)) monthsToLoad.push(ym)
+        })
+      }
+      const newEntries: Record<string, any> = {}
+      for (const ym of monthsToLoad) {
+        const [y, m] = ym.split('-').map(Number)
+        const lastDay = new Date(y, m, 0).getDate()
+        const { data } = await supabase.from('calendar_entries')
+          .select('*').eq('user_id', userId)
+          .gte('date', `${ym}-01`).lte('date', `${ym}-${pad(lastDay)}`)
+        if (data) data.forEach((e: any) => { newEntries[e.date] = e })
+      }
+      // On first load: pre-select the couple's available requested dates
+      if (isFirstLoad.current && !isVisitMode) {
+        isFirstLoad.current = false
+        const available = requestedDates.filter(d => {
+          const s = newEntries[d]?.status
+          return s !== 'bloqueado' && s !== 'reservado'
+        })
+        setSelectedDates(available)
+      }
+      setCalEntries(prev => ({ ...prev, ...newEntries }))
+    }
+    fetchEntries()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewYear, viewMonth])
+
+  // Derived
+  const unavailableRequested = useMemo(
+    () => requestedDates.filter(d => calEntries[d]?.status === 'bloqueado' || calEntries[d]?.status === 'reservado'),
+    [requestedDates, calEntries]
+  )
+  const availableRequested = useMemo(
+    () => requestedDates.filter(d => !unavailableRequested.includes(d)),
+    [requestedDates, unavailableRequested]
+  )
+  // Dates the user added that weren't originally requested
+  const extraDates = useMemo(
+    () => selectedDates.filter(d => !requestedDates.includes(d)),
+    [selectedDates, requestedDates]
+  )
+
+  const toggleDate = (ds: string) => {
+    const s = calEntries[ds]?.status
+    if (s === 'bloqueado' || s === 'reservado') return
+    if (isVisitMode) {
+      setSelectedDates(prev => prev[0] === ds ? [] : [ds])
+    } else {
+      setSelectedDates(prev => prev.includes(ds) ? prev.filter(d => d !== ds) : [...prev, ds])
+    }
+  }
+
+  const handleConfirm = async () => {
+    setSaving(true)
+    const calStatus: 'negociacion' | 'reservado' = isWonMode ? 'reservado' : 'negociacion'
+    let leadUpdates: any = {}
+
+    if (!isVisitMode) {
+      const hasMissingRequested = availableRequested.some(d => !selectedDates.includes(d))
+      const hasChanges = extraDates.length > 0 || hasMissingRequested || unavailableRequested.length > 0
+
+      if (hasChanges) {
+        const oldSnapshot = {
+          changed_at: new Date().toISOString(),
+          date_flexibility: lead.date_flexibility || 'exact',
+          wedding_date: lead.wedding_date,
+          wedding_date_to: lead.wedding_date_to,
+          wedding_date_ranges: lead.wedding_date_ranges,
+          wedding_year: lead.wedding_year,
+          wedding_month: lead.wedding_month,
+        }
+        const history = [...(lead.wedding_date_history || []), oldSnapshot]
+
+        if (extraDates.length > 0 || hasMissingRequested) {
+          // Date fields changed — update them
+          const sorted = [...selectedDates].sort()
+          leadUpdates = sorted.length === 1
+            ? { date_flexibility: 'exact', wedding_date: sorted[0], wedding_date_to: null, wedding_date_ranges: null, wedding_year: null, wedding_month: null, wedding_date_history: history }
+            : sorted.length > 1
+              ? { date_flexibility: 'multi_range', wedding_date: null, wedding_date_to: null, wedding_date_ranges: sorted.map(d => ({ from: d, to: d })), wedding_year: null, wedding_month: null, wedding_date_history: history }
+              : { wedding_date_history: history }
+        } else {
+          // Only unavailable dates — keep date fields, just save history note
+          leadUpdates = { wedding_date_history: history }
+        }
+      }
+    }
+
+    await onConfirm(leadUpdates, selectedDates, calStatus, isVisitMode)
+    setSaving(false)
+  }
+
+  const lastDay  = new Date(viewYear, viewMonth + 1, 0).getDate()
+  let startDow   = new Date(viewYear, viewMonth, 1).getDay() - 1
+  if (startDow < 0) startDow = 6
+  const cells    = [...Array(startDow).fill(null), ...Array.from({ length: lastDay }, (_, i) => i + 1)]
+  const todayStr = todayIso()
+  const prevMonth = () => { if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) } else setViewMonth(m => m - 1) }
+  const nextMonth = () => { if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) } else setViewMonth(m => m + 1) }
+
+  const title = isVisitMode ? '🏛️ Agendar visita al venue'
+    : isWonMode ? '🎉 Confirmar boda · Reservar fechas'
+    : '💬 Verificar disponibilidad'
+  const canConfirm = !saving && (!isVisitMode || selectedDates.length > 0)
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 16 }}
+      onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.3)' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)' }}>{title}</div>
+            <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>{lead.name}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}><X size={18} /></button>
+        </div>
+
+        <div style={{ padding: '16px 24px' }}>
+
+          {/* Requested dates list (checkboxes) */}
+          {!isVisitMode && hasRequestedDates && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                Fechas solicitadas por la pareja
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {requestedDates.map(d => {
+                  const entryStatus = calEntries[d]?.status
+                  const isUnavailable = entryStatus === 'bloqueado' || entryStatus === 'reservado'
+                  const isChecked = selectedDates.includes(d)
+                  return (
+                    <div key={d}
+                      onClick={() => !isUnavailable && toggleDate(d)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+                        background: isUnavailable ? '#fef2f2' : isChecked ? '#f0fdf4' : 'var(--cream)',
+                        border: `1px solid ${isUnavailable ? '#fca5a5' : isChecked ? '#86efac' : 'var(--ivory)'}`,
+                        borderRadius: 8, cursor: isUnavailable ? 'not-allowed' : 'pointer',
+                      }}>
+                      {/* Checkbox */}
+                      <div style={{
+                        width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                        border: `2px solid ${isUnavailable ? '#fca5a5' : isChecked ? '#16a34a' : '#d1d5db'}`,
+                        background: isChecked && !isUnavailable ? '#16a34a' : isUnavailable ? '#fee2e2' : '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {isChecked && !isUnavailable && <span style={{ color: '#fff', fontSize: 11, lineHeight: 1, fontWeight: 700 }}>✓</span>}
+                        {isUnavailable && <span style={{ color: '#dc2626', fontSize: 9, lineHeight: 1, fontWeight: 700 }}>✕</span>}
+                      </div>
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: isUnavailable ? '#9ca3af' : 'var(--charcoal)', textDecoration: isUnavailable ? 'line-through' : 'none' }}>
+                        {formatDateLabel(d)}
+                      </span>
+                      {isUnavailable ? (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: 10 }}>
+                          {entryStatus === 'reservado' ? '🔒 Reservado' : '⛔ Bloqueado'}
+                        </span>
+                      ) : entryStatus === 'negociacion' ? (
+                        <span style={{ fontSize: 11, fontWeight: 500, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 10 }}>
+                          ⚠️ En negociación
+                        </span>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+              {unavailableRequested.length > 0 && (
+                <div style={{ marginTop: 7, fontSize: 11, color: '#6b7280', padding: '6px 10px', background: '#f9fafb', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  ℹ️ Las fechas no disponibles quedarán guardadas como opciones solicitadas sin confirmar.
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isVisitMode && !hasRequestedDates && (
+            <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fef9ec', border: '1px solid #fde68a', borderRadius: 8, fontSize: 12, color: '#92400e' }}>
+              Este lead no tiene fechas exactas. Selecciona fechas disponibles en el calendario.
+            </div>
+          )}
+
+          {/* Calendar section */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
+              {isVisitMode ? 'Seleccionar fecha de visita' : hasRequestedDates ? 'Añadir fechas alternativas' : 'Seleccionar fechas disponibles'}
+            </div>
+            {!isVisitMode && hasRequestedDates && (
+              <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 8 }}>
+                Haz click en cualquier fecha libre o en negociación para añadirla como alternativa adicional.
+              </div>
+            )}
+
+            <div style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden' }}>
+              {/* Month nav */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--cream)', borderBottom: '1px solid var(--ivory)' }}>
+                <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--charcoal)', padding: '2px 6px', borderRadius: 4 }}><ChevronLeft size={16} /></button>
+                <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 16, color: 'var(--espresso)', fontWeight: 500 }}>{MONTHS[viewMonth]} {viewYear}</span>
+                <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--charcoal)', padding: '2px 6px', borderRadius: 4 }}><ChevronRight size={16} /></button>
+              </div>
+              {/* Day headers */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '6px 8px 2px' }}>
+                {DAYS_SHORT.map((d, i) => (
+                  <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '0.05em', padding: '2px 0' }}>{d}</div>
+                ))}
+              </div>
+              {/* Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, padding: '2px 8px 10px' }}>
+                {cells.map((day, i) => {
+                  if (!day) return <div key={`e-${i}`} />
+                  const ds = `${viewYear}-${pad(viewMonth + 1)}-${pad(day)}`
+                  const entry = calEntries[ds]
+                  const entryStatus = entry?.status || 'libre'
+                  const cfg = CAL_AVAIL_CFG[entryStatus] || CAL_AVAIL_CFG.libre
+                  const isRequested   = requestedDates.includes(ds)
+                  const isSelected    = selectedDates.includes(ds)
+                  const isUnavailable = entryStatus === 'bloqueado' || entryStatus === 'reservado'
+                  const isToday       = ds === todayStr
+                  const isPast        = ds < todayStr
+                  const canClick      = !isPast && !isUnavailable
+                  const dow = (startDow + day - 1) % 7
+                  const isWeekend = dow >= 5
+                  const isExtra = isSelected && !isRequested
+                  const otherLeadCount = dateLeadCounts[ds] || 0
+
+                  return (
+                    <button key={ds} onClick={() => canClick && toggleDate(ds)}
+                      title={isUnavailable ? cfg.label : isRequested ? 'Fecha solicitada por la pareja' : otherLeadCount > 0 ? `${otherLeadCount} lead${otherLeadCount > 1 ? 's' : ''} interesado${otherLeadCount > 1 ? 's' : ''}` : ''}
+                      style={{
+                        minHeight: 38, border: '1.5px solid',
+                        borderColor: isSelected ? (isExtra ? '#3b82f6' : 'var(--gold)') : isRequested ? '#f59e0b' : isToday ? 'var(--gold)' : isWeekend && !isUnavailable ? '#e5d4c0' : cfg.border,
+                        borderRadius: 5,
+                        background: isSelected ? (isExtra ? '#eff6ff' : '#fef3c7') : cfg.bg,
+                        cursor: canClick ? 'pointer' : 'not-allowed',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                        opacity: isPast ? 0.3 : isUnavailable ? 0.65 : 1,
+                        position: 'relative', transition: 'all 0.1s',
+                      }} disabled={!canClick || isPast}>
+                      <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 400, color: isPast ? 'var(--stone)' : isUnavailable ? 'var(--warm-gray)' : isToday ? 'var(--gold)' : 'var(--charcoal)', lineHeight: 1 }}>{day}</span>
+                      {/* Status dot */}
+                      {entryStatus !== 'libre' && <div style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot }} />}
+                      {/* Unavailable indicator */}
+                      {isUnavailable && <span style={{ fontSize: 8, lineHeight: 1 }}>✕</span>}
+                      {/* Other leads count badge */}
+                      {otherLeadCount > 0 && !isUnavailable && !isPast && (
+                        <div style={{
+                          position: 'absolute', top: 2, left: 2,
+                          background: '#f97316', color: '#fff',
+                          fontSize: 8, fontWeight: 700, lineHeight: 1,
+                          minWidth: 13, height: 13, borderRadius: 7,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          padding: '0 2px',
+                        }}>
+                          {otherLeadCount > 9 ? '9+' : otherLeadCount}
+                        </div>
+                      )}
+                      {/* Selection indicator */}
+                      {isSelected && <div style={{ position: 'absolute', top: 2, right: 2, width: 6, height: 6, borderRadius: '50%', background: isExtra ? '#3b82f6' : 'var(--gold)' }} />}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+            {Object.entries(CAL_AVAIL_CFG).map(([key, cfg]) => (
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: cfg.bg, border: `1px solid ${cfg.border}` }} />
+                <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{cfg.label}</span>
+              </div>
+            ))}
+            {!isVisitMode && hasRequestedDates && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: '#fef3c7', border: '1.5px solid #f59e0b' }} />
+                <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Solicitada pareja</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} />
+              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Alternativa añadida</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ width: 13, height: 13, borderRadius: 7, background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>2</span>
+              </div>
+              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Otros leads interesados</span>
+            </div>
+          </div>
+
+          {/* Summary box */}
+          <div style={{ padding: '12px 14px', background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+            {isVisitMode ? (
+              selectedDates.length === 0
+                ? <span style={{ color: 'var(--warm-gray)' }}>Haz click en una fecha disponible para agendar la visita</span>
+                : <span style={{ color: '#16a34a', fontWeight: 500 }}>📅 Visita: {formatDateLabel(selectedDates[0])}</span>
+            ) : (
+              <>
+                {selectedDates.length > 0 ? (
+                  <div style={{ color: '#16a34a', fontWeight: 500 }}>
+                    ✓ {selectedDates.length} fecha{selectedDates.length > 1 ? 's' : ''} confirmada{selectedDates.length > 1 ? 's' : ''}
+                    {' · '}se marcarán como <strong>{isWonMode ? 'Reservado' : 'En negociación'}</strong> en el calendario
+                  </div>
+                ) : (
+                  <div style={{ color: 'var(--warm-gray)' }}>Sin fechas seleccionadas — el lead pasará a {isWonMode ? 'confirmado' : 'seguimiento'} sin entradas en el calendario</div>
+                )}
+                {unavailableRequested.length > 0 && (
+                  <div style={{ color: '#6b7280' }}>
+                    ℹ️ {unavailableRequested.length} fecha{unavailableRequested.length > 1 ? 's' : ''} no disponible{unavailableRequested.length > 1 ? 's' : ''} (guardadas como info): {unavailableRequested.map(d => formatDateLabel(d)).join(', ')}
+                  </div>
+                )}
+                {extraDates.length > 0 && (
+                  <div style={{ color: '#3b82f6' }}>
+                    + {extraDates.length} fecha{extraDates.length > 1 ? 's' : ''} alternativa{extraDates.length > 1 ? 's' : ''} añadida{extraDates.length > 1 ? 's' : ''}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" onClick={handleConfirm}
+            disabled={!canConfirm}
+            style={{ background: isWonMode ? '#16a34a' : undefined, opacity: !canConfirm ? 0.5 : 1 }}>
+            {saving ? 'Guardando...' : isVisitMode ? '📅 Confirmar visita' : isWonMode ? '🎉 Confirmar boda' : '✓ Pasar a seguimiento'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
 
 // ── Lead Row ───────────────────────────────────────────────────────────────────
-function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail }: {
+function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm }: {
   lead: any; tab: Tab
   onMove: (id: string, s: DbStatus) => void
   onEdit: (l: any) => void
   onDelete: (id: string) => void
   onDetail: (l: any) => void
+  onDateConfirm: (lead: any, s: DbStatus) => void
 }) {
 
   return (
@@ -608,7 +1091,7 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail }: {
 
         {/* Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 14px', borderLeft: '1px solid var(--ivory)', flexShrink: 0 }}>
-          <QuickActions lead={lead} tab={tab} onMove={onMove} onEdit={onEdit} onDelete={onDelete} />
+          <QuickActions lead={lead} tab={tab} onMove={onMove} onEdit={onEdit} onDelete={onDelete} onDateConfirm={onDateConfirm} />
         </div>
       </div>
     </div>
@@ -616,29 +1099,43 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail }: {
 }
 
 // ── Quick Actions ──────────────────────────────────────────────────────────────
-function QuickActions({ lead, tab, onMove, onEdit, onDelete }: {
+function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
   lead: any; tab: Tab
   onMove: (id: string, s: DbStatus) => void
   onEdit: (l: any) => void
   onDelete: (id: string) => void
+  onDateConfirm: (lead: any, s: DbStatus) => void
 }) {
+  const { propuestas: canProposal } = usePlanFeatures()
   const p: React.CSSProperties = { fontSize: 11, padding: '5px 11px', borderRadius: 6, cursor: 'pointer', border: 'none', fontWeight: 600, background: 'var(--gold)', color: '#fff', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }
   const g: React.CSSProperties = { fontSize: 11, padding: '5px 9px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }
   const d: React.CSSProperties = { fontSize: 11, padding: '5px 9px', borderRadius: 6, cursor: 'pointer', border: '1px solid #fca5a5', background: 'transparent', color: '#dc2626', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }
 
+  // Locked proposal button shown to basic users as a premium upsell hint
+  const LockedProposalBtn = ({ label }: { label: string }) => (
+    <span title="Disponible en plan Premium — actualiza para crear propuestas digitales"
+      style={{ ...g, cursor: 'not-allowed', opacity: 0.45, userSelect: 'none' }}>
+      <FileText size={11} /> {label} 🔒
+    </span>
+  )
+
   return (
     <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
       {tab === 'new' && (<>
-        <a href={`/propuestas?lead_id=${lead.id}&create=1`} style={{ ...p, textDecoration: 'none' }}><FileText size={11} /> Crear propuesta</a>
-        <button style={g} onClick={() => onMove(lead.id, 'contacted')}><ChevronRight size={11} /> En seguimiento</button>
+        {canProposal
+          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} style={{ ...p, textDecoration: 'none' }}><FileText size={11} /> Crear propuesta</a>
+          : <LockedProposalBtn label="Crear propuesta" />}
+        <button style={g} onClick={() => onDateConfirm(lead, 'contacted')}><ChevronRight size={11} /> En seguimiento</button>
         <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
         <button style={d} onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
       </>)}
 
       {tab === 'in_progress' && (<>
-        <a href={`/propuestas?lead_id=${lead.id}&create=1`} style={{ ...g, textDecoration: 'none' }}><FileText size={11} /> Propuesta</a>
-        <button style={p} onClick={() => onMove(lead.id, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
-        <button style={{ ...p, background: '#16a34a' }} onClick={() => onMove(lead.id, 'won')}>🎉 Confirmar boda</button>
+        {canProposal
+          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} style={{ ...g, textDecoration: 'none' }}><FileText size={11} /> Propuesta</a>
+          : <LockedProposalBtn label="Propuesta" />}
+        <button style={p} onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
+        <button style={{ ...p, background: '#16a34a' }} onClick={() => onDateConfirm(lead, 'won')}>🎉 Confirmar boda</button>
         {lead.status !== 'budget_sent' && <button style={g} onClick={() => onMove(lead.id, 'budget_sent')}>Presupuesto enviado</button>}
         <button style={g} onClick={() => onMove(lead.id, 'new')}><RotateCcw size={11} /> Nuevo</button>
         <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
@@ -646,7 +1143,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete }: {
       </>)}
 
       {tab === 'visit' && (<>
-        <button style={p} onClick={() => onMove(lead.id, 'won')}>🎉 Confirmar boda</button>
+        <button style={p} onClick={() => onDateConfirm(lead, 'won')}>🎉 Confirmar boda</button>
         <button style={g} onClick={() => onMove(lead.id, 'budget_sent')}>Enviar presupuesto</button>
         <button style={g} onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
         <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
@@ -654,7 +1151,9 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete }: {
       </>)}
 
       {tab === 'confirmed' && (<>
-        <a href="/propuestas" style={{ ...g, textDecoration: 'none' }}><ExternalLink size={11} /> Propuesta</a>
+        {canProposal
+          ? <a href="/propuestas" style={{ ...g, textDecoration: 'none' }}><ExternalLink size={11} /> Propuesta</a>
+          : <LockedProposalBtn label="Propuesta" />}
         <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
         <button style={d} onClick={() => onDelete(lead.id)}><Trash2 size={11} /></button>
       </>)}
@@ -670,11 +1169,13 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete }: {
 
 
 // ── Detail Drawer ──────────────────────────────────────────────────────────────
-function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove }: {
+function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConfirm }: {
   lead: any; tab: Tab
   onClose: () => void; onEdit: (l: any) => void
   onDelete: (id: string) => void; onMove: (id: string, s: DbStatus) => void
+  onDateConfirm: (lead: any, s: DbStatus) => void
 }) {
+  const { propuestas: canProposal } = usePlanFeatures()
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }} onClick={onClose}>
       <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 420, background: '#fff', boxShadow: '-8px 0 40px rgba(0,0,0,0.12)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
@@ -744,6 +1245,29 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove }: {
             </div>
           )}
 
+          {lead.wedding_date_history && lead.wedding_date_history.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                Fechas anteriores
+              </div>
+              {lead.wedding_date_history.map((h: any, idx: number) => (
+                <div key={idx} style={{ padding: '8px 12px', background: 'var(--cream)', borderRadius: 8, marginBottom: 4, fontSize: 12, borderLeft: '3px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--charcoal)' }}>
+                    {h.date_flexibility === 'exact' ? formatDateLabel(h.wedding_date || '')
+                     : h.date_flexibility === 'range' ? `${formatDateLabel(h.wedding_date || '')} – ${formatDateLabel(h.wedding_date_to || '')}`
+                     : h.date_flexibility === 'multi_range' ? `${(h.wedding_date_ranges || []).length} rangos`
+                     : `${MONTHS[(h.wedding_month || 1) - 1]} ${h.wedding_year || ''}`}
+                  </span>
+                  {h.changed_at && (
+                    <span style={{ fontSize: 10, color: 'var(--stone)' }}>
+                      {new Date(h.changed_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           <div style={{ fontSize: 11, color: 'var(--stone)' }}>
             <Clock size={11} style={{ display: 'inline', marginRight: 4 }} />
             Creado el {new Date(lead.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -757,7 +1281,13 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove }: {
               if (tabKey === tab) return null
               const tabInfo = TABS.find(t => t.key === tabKey)
               return (
-                <button key={tabKey} onClick={() => { onMove(lead.id, statuses[0]); onClose() }}
+                <button key={tabKey} onClick={() => {
+                  if (['contacted', 'visit_scheduled', 'won'].includes(statuses[0])) {
+                    onDateConfirm(lead, statuses[0]); onClose()
+                  } else {
+                    onMove(lead.id, statuses[0]); onClose()
+                  }
+                }}
                   style={{ fontSize: 12, padding: '5px 11px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 5 }}>
                   {tabInfo?.emoji} {tabInfo?.label}
                 </button>
@@ -765,10 +1295,17 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove }: {
             })}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <a href={`/propuestas?lead_id=${lead.id}&create=1`}
-              style={{ flex: 1, fontSize: 12, padding: '8px', borderRadius: 6, border: '1px solid var(--gold)', color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 500 }}>
-              <FileText size={12} /> Crear propuesta
-            </a>
+            {canProposal ? (
+              <a href={`/propuestas?lead_id=${lead.id}&create=1`}
+                style={{ flex: 1, fontSize: 12, padding: '8px', borderRadius: 6, border: '1px solid var(--gold)', color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 500 }}>
+                <FileText size={12} /> Crear propuesta
+              </a>
+            ) : (
+              <div title="Disponible en plan Premium"
+                style={{ flex: 1, fontSize: 12, padding: '8px', borderRadius: 6, border: '1px solid var(--ivory)', color: '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 500, cursor: 'not-allowed', userSelect: 'none' }}>
+                <FileText size={12} /> Crear propuesta 🔒
+              </div>
+            )}
             <button onClick={() => onDelete(lead.id)}
               style={{ fontSize: 12, padding: '8px 12px', borderRadius: 6, cursor: 'pointer', border: '1px solid #fca5a5', background: 'transparent', color: '#dc2626', display: 'flex', alignItems: 'center', gap: 5 }}>
               <Trash2 size={12} /> Eliminar

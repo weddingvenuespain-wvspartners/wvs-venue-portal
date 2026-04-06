@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 
 type UserVenue = { id: string; wp_venue_id: number }
@@ -9,10 +9,12 @@ type AuthContextType = {
   profile: any
   userVenues: UserVenue[]
   loading: boolean
+  refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null, profile: null, userVenues: [], loading: true,
+  refreshProfile: async () => {},
 })
 
 async function fetchProfileAndVenues(userId: string) {
@@ -25,11 +27,11 @@ async function fetchProfileAndVenues(userId: string) {
 
   const profile = profileResult.data ?? null
 
-  // Fetch active/trial subscription separately so errors don't block auth
+  // Fetch active/trial subscription — needed to determine plan features
   if (profile) {
     const subRes = await supabase
       .from('venue_subscriptions')
-      .select('id, status, plan:venue_plans(id, name, display_name, permissions)')
+      .select('id, status, trial_end_date, plan:venue_plans(id, name, display_name, permissions)')
       .eq('user_id', userId)
       .in('status', ['active', 'trial'])
       .order('created_at', { ascending: false })
@@ -37,12 +39,14 @@ async function fetchProfileAndVenues(userId: string) {
       .maybeSingle()
 
     if (subRes.error) {
-      // Log but don't block — user will get full access as fallback
       console.warn('[auth] Could not fetch subscription:', subRes.error.message)
+      // On error: leave profile.plan undefined → usePlanFeatures will use BASIC fallback
     } else if (subRes.data) {
-      ;(profile as any).plan = subRes.data.plan
+      ;(profile as any).plan               = subRes.data.plan
+      ;(profile as any).subscription_status = subRes.data.status          // 'active' | 'trial'
+      ;(profile as any).trial_end_date      = subRes.data.trial_end_date  // string | null
     }
-    // If no subscription found, profile.plan stays undefined → usePlanFeatures returns FULL_ACCESS
+    // No subscription found → profile.plan stays undefined → basic/restricted access
   }
 
   return {
@@ -57,41 +61,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userVenues, setUserVenues] = useState<UserVenue[]>([])
   const [loading, setLoading]       = useState(true)
 
+  // Track which user ID we already loaded to prevent duplicate fetches
+  const loadedUserIdRef = useRef<string | null>(null)
+
+  const loadForUser = async (u: any) => {
+    // Check session duration preference — sign out if expired
+    const expiry = typeof window !== 'undefined' ? localStorage.getItem('wvs_session_expiry') : null
+    if (expiry && Date.now() > parseInt(expiry)) {
+      const supabase = createClient()
+      localStorage.removeItem('wvs_session_expiry')
+      await supabase.auth.signOut()
+      setLoading(false)
+      return
+    }
+
+    // Skip if we already loaded for this exact user
+    if (u.id === loadedUserIdRef.current) return
+    loadedUserIdRef.current = u.id
+    setUser(u)
+    const { profile: p, userVenues: v } = await fetchProfileAndVenues(u.id)
+    setProfile(p)
+    setUserVenues(v)
+    setLoading(false)
+  }
+
+  // Manual refresh — call after admin changes a venue's plan
+  const refreshProfile = async () => {
+    if (!loadedUserIdRef.current) return
+    const { profile: p, userVenues: v } = await fetchProfileAndVenues(loadedUserIdRef.current)
+    setProfile(p)
+    setUserVenues(v)
+  }
+
   useEffect(() => {
     const supabase = createClient()
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user)
-        fetchProfileAndVenues(session.user.id).then(({ profile: p, userVenues: v }) => {
-          setProfile(p)
-          setUserVenues(v)
-          setLoading(false)
-        })
-      } else {
+    // Single source of truth: onAuthStateChange
+    // INITIAL_SESSION fires on startup (replaces the manual getSession() call)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        loadedUserIdRef.current = null
+        setUser(null); setProfile(null); setUserVenues([]); setLoading(false)
+        return
+      }
+      if (session?.user && (
+        event === 'INITIAL_SESSION' ||
+        event === 'SIGNED_IN' ||
+        event === 'USER_UPDATED'
+      )) {
+        loadForUser(session.user)
+        return
+      }
+      // INITIAL_SESSION with no session = not logged in
+      if (event === 'INITIAL_SESSION' && !session) {
         setLoading(false)
       }
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        setUser(null); setProfile(null); setUserVenues([]); setLoading(false); return
-      }
-      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
-        setUser(session.user)
-        setTimeout(() => {
-          fetchProfileAndVenues(session.user.id).then(({ profile: p, userVenues: v }) => {
-            setProfile(p); setUserVenues(v); setLoading(false)
-          })
-        }, 0)
-      }
-    })
-
     return () => subscription.unsubscribe()
-  }, [])
+  }, []) // eslint-disable-line
 
   return (
-    <AuthContext.Provider value={{ user, profile, userVenues, loading }}>
+    <AuthContext.Provider value={{ user, profile, userVenues, loading, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

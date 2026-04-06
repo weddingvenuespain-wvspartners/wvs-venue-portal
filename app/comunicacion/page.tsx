@@ -1,12 +1,12 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import {
   MessageCircle, Mail, FileText, Plus, Trash2, Send, X,
-  Copy, Check, Upload, Eye, Sparkles, ChevronDown, ChevronUp,
+  Copy, Check, Upload, Eye, Sparkles, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   AlertCircle, User, Search, Palette, Link2, ToggleLeft, ToggleRight,
   Pencil, Download, Star, Package, HelpCircle, Quote, List,
   GripVertical, ChevronsUpDown, Image as ImageIcon, Layers,
@@ -44,6 +44,10 @@ type ContentSection =
   | 'accommodation_info'
   | 'map_info'
   | 'chat_settings'
+  | 'caterer_recommendation'
+  | 'vendor_policy'
+  | 'payment_plan'
+  | 'display_config'
 
 // ── Pricing model ────────────────────────────────────────────────────────────
 
@@ -98,15 +102,49 @@ const PRICING_MODELS: Array<{
   },
 ]
 
+// Maps group id → relevance per pricing model
+type SectionRelevance = 'key' | 'optional' | 'na'
+const SECTION_RELEVANCE: Record<string, Partial<Record<PricingModel, SectionRelevance>>> = {
+  // Core groups — all 'key' by definition (only shown for their model)
+  prices:            { all_inclusive: 'key',      venue_only: 'key',      semi_inclusive: 'key',      modular: 'key'      },
+  menus:             { all_inclusive: 'key',                              semi_inclusive: 'key',      modular: 'optional' },
+  inclusions:        {                                                     semi_inclusive: 'key'                          },
+  extras:            { all_inclusive: 'key',      venue_only: 'key',      semi_inclusive: 'key',      modular: 'key'      },
+  booking:           { all_inclusive: 'key',      venue_only: 'key',      semi_inclusive: 'key',      modular: 'key'      },
+  // semi_inclusive / modular specific (venue_only pricing is all in group 1)
+  // semi_inclusive specific
+  flexible_services: {                                                     semi_inclusive: 'key'                           },
+  // modular specific
+  components:        {                                                                                 modular: 'key'      },
+  rules:             {                                                                                 modular: 'key'      },
+  // Secondary groups (always shown)
+  collaborators:     { all_inclusive: 'optional', venue_only: 'key',      semi_inclusive: 'key',      modular: 'optional' },
+  visual:            { all_inclusive: 'optional', venue_only: 'optional', semi_inclusive: 'optional', modular: 'optional' },
+  commercial:        { all_inclusive: 'optional', venue_only: 'optional', semi_inclusive: 'optional', modular: 'optional' },
+  venue_info:        { all_inclusive: 'optional', venue_only: 'key',      semi_inclusive: 'optional', modular: 'optional' },
+  tools_faq:         { all_inclusive: 'optional', venue_only: 'key',      semi_inclusive: 'optional', modular: 'optional' },
+}
+
+const RELEVANCE_BADGE: Record<SectionRelevance, { label: string; color: string; bg: string }> = {
+  key:      { label: '🔑 Clave',    color: '#92400e', bg: '#fef3c7' },
+  optional: { label: '⚪ Opcional', color: '#6b7280', bg: '#f3f4f6' },
+  na:       { label: '🚫 No aplica', color: '#9ca3af', bg: '#f9fafb' },
+}
+
 type VenuePackage = {
   id: string
   name: string
   subtitle?: string
+  tier?: 'basico' | 'estandar' | 'premium' | 'exclusivo' | 'lujo'
   price?: string
-  price_type?: 'per_person' | 'flat_fee' | 'from_price' | 'on_request'
+  price_type?: 'per_person' | 'flat_fee' | 'from_price' | 'on_request' | 'min_spend'
+  price_iva_included?: boolean
   is_recommended?: boolean
   min_guests?: number
   max_guests?: number
+  days_available?: string[]
+  event_hours?: number
+  music_curfew?: string
   description?: string
   includes: string[]
   sort_order: number
@@ -160,12 +198,23 @@ type VenueZone = {
   price?: string
   sort_order: number
   photos?: string[]
+  supplement_price?: string   // base_plus: extra cost for this optional zone
+  group_name?: string         // by_group: which selection group this zone belongs to
 }
 
 type VenueSeasonPrice = {
   id: string
   season: string
   label: string
+  // New date-range period fields (for venue_only primary pricing)
+  date_from?: string      // ISO "YYYY-MM-DD"
+  date_to?: string        // ISO "YYYY-MM-DD"
+  base_price?: string     // absolute price for this period (e.g. "5500")
+  price_unit?: 'per_day' | 'per_event'
+  zone_id?: string        // links period to a specific zone (venue_only by-zone pricing)
+  applicable_days?: string[]   // e.g. ['vie','sab','dom'] — empty/null = all days
+  includes_holidays?: boolean  // true = price also applies on public holidays
+  // Legacy adjustment fields
   date_range?: string
   price_modifier?: string
   notes?: string
@@ -222,6 +271,93 @@ type VenueConditions = {
   id: string
   title: string
   body: string
+}
+
+type VenueCatererRecommendation = {
+  id: string
+  name: string
+  category?: string
+  website?: string
+  phone?: string
+  notes?: string
+  sort_order: number
+}
+
+// ── Vendor policy ─────────────────────────────────────────────────────────────
+type VendorPolicyChoice = 'exclusive' | 'approved_list' | 'open'
+
+type VendorPolicy = {
+  id?: string
+  catering?: VendorPolicyChoice
+  dj_music?: VendorPolicyChoice
+  photography?: VendorPolicyChoice
+  decoration?: VendorPolicyChoice
+  coordinator?: VendorPolicyChoice
+  external_fee?: string   // e.g. "15% sobre presupuesto externo"
+  notes?: string
+}
+
+// ── Payment plan ─────────────────────────────────────────────────────────────
+type PaymentMilestone = {
+  id: string
+  label: string                       // e.g. "Señal de reserva"
+  amount_type: 'fixed' | 'percent'
+  amount: string                      // e.g. "3000" or "30"
+  trigger?: string                    // e.g. "Al firmar el contrato"
+}
+
+type VenuePaymentPlan = {
+  id?: string
+  milestones: PaymentMilestone[]
+  security_deposit?: string           // e.g. "1.500€ fianza"
+  cancellation_policy?: string
+}
+
+// ── Display config — toggles per section ─────────────────────────────────────
+type VenueDisplayConfig = {
+  id?: string
+  // Prices
+  prices_has_season?: boolean
+  prices_has_day_pricing?: boolean
+  prices_has_zone_pricing?: boolean
+  prices_has_min_spend?: boolean
+  prices_is_multiday?: boolean
+  venue_price_type?: 'full' | 'base_plus'
+  // Menus/catering
+  menus_active?: boolean
+  menus_has_children?: boolean
+  menus_has_vegan?: boolean
+  menus_has_tasting?: boolean
+  // Booking / conditions
+  booking_has_vendor_policy?: boolean
+  booking_has_payment_plan?: boolean
+  // Venue info
+  venue_has_accommodation?: boolean
+  venue_has_zones?: boolean
+  // Tools
+  tools_budget_sim?: boolean
+  tools_countdown?: boolean
+  tools_chat?: boolean
+}
+
+const DEFAULT_DISPLAY_CFG: VenueDisplayConfig = {
+  prices_has_season: false,
+  prices_has_day_pricing: false,
+  prices_has_zone_pricing: false,
+  prices_has_min_spend: false,
+  prices_is_multiday: false,
+  venue_price_type: 'full',
+  menus_active: true,
+  menus_has_children: false,
+  menus_has_vegan: false,
+  menus_has_tasting: false,
+  booking_has_vendor_policy: false,
+  booking_has_payment_plan: false,
+  venue_has_accommodation: false,
+  venue_has_zones: false,
+  tools_budget_sim: false,
+  tools_countdown: false,
+  tools_chat: false,
 }
 
 type Channel = 'whatsapp' | 'email' | 'both'
@@ -446,12 +582,17 @@ export default function ComunicacionPage() {
     map_info: VenueMapInfo | null
     chat_settings: VenueChatSettings | null
     pricing_model: VenuePricingModel | null
+    caterer_recommendations: VenueCatererRecommendation[]
+    vendor_policy: VendorPolicy | null
+    payment_plan: VenuePaymentPlan | null
+    display_config: VenueDisplayConfig | null
   }>({
     packages: [], zones: [], season_prices: [], inclusions: [], exclusions: [],
     faq: [], testimonials: [], collaborators: [], extra_services: [],
     countdown: null, menu_prices: [], budget_simulator: null, conditions: null, experience: null,
     video_default: null, techspecs: null, accommodation_info: null, map_info: null, chat_settings: null,
-    pricing_model: null,
+    pricing_model: null, caterer_recommendations: [],
+    vendor_policy: null, payment_plan: null, display_config: null,
   })
   const [loading, setLoading]             = useState(true)
 
@@ -496,7 +637,11 @@ export default function ComunicacionPage() {
       accommodation_info: rows.find(r => r.section === 'accommodation_info') ? { id: rows.find(r => r.section === 'accommodation_info').id, ...rows.find(r => r.section === 'accommodation_info').data } : null,
       map_info:          rows.find(r => r.section === 'map_info') ? { id: rows.find(r => r.section === 'map_info').id, ...rows.find(r => r.section === 'map_info').data } : null,
       chat_settings:     rows.find(r => r.section === 'chat_settings') ? { id: rows.find(r => r.section === 'chat_settings').id, ...rows.find(r => r.section === 'chat_settings').data } : null,
-      pricing_model:     rows.find(r => r.section === 'pricing_model') ? { id: rows.find(r => r.section === 'pricing_model').id, ...rows.find(r => r.section === 'pricing_model').data } : null,
+      pricing_model:            rows.find(r => r.section === 'pricing_model') ? { id: rows.find(r => r.section === 'pricing_model').id, ...rows.find(r => r.section === 'pricing_model').data } : null,
+      caterer_recommendations:  rows.filter(r => r.section === 'caterer_recommendation').map(r => ({ id: r.id, sort_order: r.sort_order, ...r.data })),
+      vendor_policy:            rows.find(r => r.section === 'vendor_policy') ? { id: rows.find(r => r.section === 'vendor_policy').id, ...rows.find(r => r.section === 'vendor_policy').data } : null,
+      payment_plan:             rows.find(r => r.section === 'payment_plan') ? { id: rows.find(r => r.section === 'payment_plan').id, ...rows.find(r => r.section === 'payment_plan').data } : null,
+      display_config:           rows.find(r => r.section === 'display_config') ? { id: rows.find(r => r.section === 'display_config').id, ...rows.find(r => r.section === 'display_config').data } : null,
     })
     setLoading(false)
   }
@@ -516,6 +661,25 @@ export default function ComunicacionPage() {
           <div style={{ color: 'var(--warm-gray)', fontSize: 13 }}>Cargando...</div>
         </div>
       </div>
+    </div>
+  )
+
+  // Basic plan guard — full page locked
+  if (!features.comunicacion) return (
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--cream)' }}>
+      <Sidebar />
+      <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+        <div style={{ textAlign: 'center', maxWidth: 420, padding: '0 24px' }}>
+          <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: 32 }}>✉️</div>
+          <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Cormorant Garamond, serif', marginBottom: 10 }}>Comunicación — Plan Premium</div>
+          <div style={{ fontSize: 14, color: 'var(--warm-gray)', lineHeight: 1.6, marginBottom: 24 }}>
+            Crea plantillas de mensajes, diseña tu web de propuesta y genera dossiers personalizados para cada pareja.
+          </div>
+          <a href="/perfil" style={{ display: 'inline-block', padding: '10px 24px', background: 'var(--gold)', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>
+            Actualizar plan →
+          </a>
+        </div>
+      </main>
     </div>
   )
 
@@ -1779,6 +1943,10 @@ function ContentTab({ content, userId, onRefresh }: {
     map_info: VenueMapInfo | null
     chat_settings: VenueChatSettings | null
     pricing_model: VenuePricingModel | null
+    caterer_recommendations: VenueCatererRecommendation[]
+    vendor_policy: VendorPolicy | null
+    payment_plan: VenuePaymentPlan | null
+    display_config: VenueDisplayConfig | null
   }
   userId: string
   onRefresh: () => void
@@ -1801,6 +1969,23 @@ function ContentTab({ content, userId, onRefresh }: {
   const activeModel = content.pricing_model?.model
   const modelCfg = PRICING_MODELS.find(m => m.value === activeModel)
 
+  // Merged display config: stored values merged with defaults
+  const dcfg: VenueDisplayConfig = { ...DEFAULT_DISPLAY_CFG, ...(content.display_config ?? {}) }
+
+  // Helper to persist a display_config toggle change
+  const saveDisplayCfg = async (patch: Partial<VenueDisplayConfig>) => {
+    const supabase = createClient()
+    const next = { ...dcfg, ...patch }
+    const { id, ...data } = next
+    const payload = { user_id: userId, section: 'display_config' as ContentSection, sort_order: 0, is_active: true, data }
+    if (content.display_config?.id) {
+      await supabase.from('venue_content').update(payload).eq('id', content.display_config.id)
+    } else {
+      await supabase.from('venue_content').insert(payload)
+    }
+    onRefresh()
+  }
+
   type AccordionGroup = {
     id: string
     icon: string
@@ -1810,62 +1995,453 @@ function ContentTab({ content, userId, onRefresh }: {
     body: React.ReactNode
   }
 
-  const groups: AccordionGroup[] = [
+  // ── Core groups: adapt entirely to the active pricing model ─────────────────
+  const coreGroups: AccordionGroup[] = activeModel === 'venue_only' ? [
+
+    // ── SOLO ESPACIO · 1. Tarifas de alquiler (wizard) ────────────────────────
     {
       id: 'prices',
       icon: '💰',
-      title: '1. Precios y formatos',
-      desc: activeModel ? `${modelCfg?.icon} ${modelCfg?.label} · ${modelCfg?.priceUnit}` : 'Paquetes, precio por menú y reglas de precio',
-      count: content.packages.length + content.menu_prices.length + content.season_prices.length,
+      title: '1. Tarifas de alquiler',
+      desc: dcfg.prices_has_zone_pricing
+        ? `Por zona · ${dcfg.prices_is_multiday ? 'multi-día' : 'día único'} · ${content.season_prices.filter(s => s.season === 'period').length} periodos`
+        : `Precio único · ${dcfg.prices_is_multiday ? 'multi-día' : 'día único'} · ${content.season_prices.filter(s => s.season === 'period').length} periodos`,
+      count: content.season_prices.filter(s => s.season === 'period').length + content.zones.length,
       body: (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-          <PackagesEditor items={content.packages} userId={userId} onRefresh={onRefresh} pricingModel={activeModel} />
-          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
-            <MenuPriceEditor items={content.menu_prices} userId={userId} onRefresh={onRefresh} />
-          </div>
-          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
-            <SeasonPricesEditor items={content.season_prices} userId={userId} onRefresh={onRefresh} />
-          </div>
-        </div>
+        <VenueRentalPricingWizard
+          dcfg={dcfg}
+          saveDisplayCfg={saveDisplayCfg}
+          zones={content.zones}
+          seasonPrices={content.season_prices}
+          userId={userId}
+          onRefresh={onRefresh}
+        />
       ),
     },
-    {
-      id: 'inclusions',
-      icon: '✅',
-      title: '2. Qué incluye y condiciones',
-      desc: activeModel === 'venue_only' ? '⚠️ Las exclusiones son igual de importantes que las inclusiones' : 'Servicios incluidos, exclusiones y condiciones de reserva',
-      count: content.inclusions.length + content.exclusions.length + (content.conditions ? 1 : 0),
-      body: (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-          <InclusionsEditor items={content.inclusions} userId={userId} onRefresh={onRefresh} pricingModel={activeModel} />
-          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
-            <ExclusionsEditor items={content.exclusions} userId={userId} onRefresh={onRefresh} />
-          </div>
-          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
-            <ConditionsEditor item={content.conditions} userId={userId} onRefresh={onRefresh} />
-          </div>
-        </div>
-      ),
-    },
+
+    // ── SOLO ESPACIO · 2. Extras ──────────────────────────────────────────────
     {
       id: 'extras',
       icon: '➕',
-      title: '3. Servicios y extras',
-      desc: 'Extras opcionales y colaboradores recomendados',
-      count: content.extra_services.length + content.collaborators.length,
+      title: '2. Extras',
+      desc: 'Catering · decoración · DJ · wedding planner — en "Solo Espacio" todo es extra',
+      count: content.extra_services.length + content.caterer_recommendations.length,
       body: (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, fontSize: 11, color: '#92400e', marginBottom: 16 }}>
+            ⚠️ En <strong>Solo Espacio</strong> todo lo que no sea el alquiler es un extra. Define los servicios que puedes ofrecer o recomendar — precio fijo (€) o por persona (€/pax).
+          </div>
           <ExtraServicesEditor items={content.extra_services} userId={userId} onRefresh={onRefresh} />
-          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
-            <CollaboratorsEditor items={content.collaborators} userId={userId} onRefresh={onRefresh} />
+          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28, marginTop: 28 }}>
+            <CaterersRecommendationEditor items={content.caterer_recommendations} userId={userId} onRefresh={onRefresh} />
+          </div>
+          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28, marginTop: 28 }}>
+            {content.exclusions.length === 0 && (
+              <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8, fontSize: 11, color: '#92400e' }}>
+                💡 Indica también qué <strong>no está incluido</strong> en el alquiler para que la pareja sepa qué gestionar por su cuenta.
+              </div>
+            )}
+            <ExclusionsEditor items={content.exclusions} userId={userId} onRefresh={onRefresh} />
           </div>
         </div>
       ),
+    },
+
+    // ── SOLO ESPACIO · 3. Condiciones ─────────────────────────────────────────
+    {
+      id: 'booking',
+      icon: '📄',
+      title: '3. Condiciones',
+      desc: 'Proveedores externos (MUY importante) · depósito · horarios · normas · cancelación',
+      count: (content.conditions ? 1 : 0) + (content.vendor_policy ? 1 : 0) + (content.payment_plan ? 1 : 0),
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 11, color: '#991b1b', marginBottom: 16 }}>
+            ⚠️ <strong>Fundamental para Solo Espacio:</strong> especifica qué proveedores externos están permitidos, si hay fee, y las normas de horario y ruido.
+          </div>
+          <SectionConfigPanel title="¿Qué incluir?">
+            <ConfigToggle label="Plan de pagos / Señales" hint="Hitos de pago, señal de reserva y plazos" value={dcfg.booking_has_payment_plan!} onChange={v => saveDisplayCfg({ booking_has_payment_plan: v })} />
+          </SectionConfigPanel>
+          <div style={{ paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 32 }}>
+            <VendorPolicyEditor item={content.vendor_policy} userId={userId} onRefresh={onRefresh} />
+            {dcfg.booking_has_payment_plan && (
+              <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
+                <PaymentPlanEditor item={content.payment_plan} userId={userId} onRefresh={onRefresh} />
+              </div>
+            )}
+            <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
+              <ConditionsEditor item={content.conditions} userId={userId} onRefresh={onRefresh} />
+            </div>
+          </div>
+        </div>
+      ),
+    },
+
+  ] : activeModel === 'semi_inclusive' ? [
+
+    // ── SEMI-INCLUIDO · 1. Precio base ────────────────────────────────────────
+    {
+      id: 'prices',
+      icon: '💰',
+      title: '1. Precio base',
+      desc: 'Opción A: precio/persona (espacio+catering) · Opción B: espacio fijo + catering variable',
+      count: content.packages.length + content.season_prices.length,
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#fef9ec', border: '1px solid #fde68a', borderRadius: 8, fontSize: 11, color: '#92400e', marginBottom: 16 }}>
+            💡 <strong>Elige tu modelo de precio:</strong> precio por persona (todo junto) o precio base del espacio + catering variable por persona.
+          </div>
+          <SectionConfigPanel title="Ajustes sobre el precio">
+            <ConfigToggle label="Precios por temporada" hint="Alta, media, baja…" value={dcfg.prices_has_season!} onChange={v => saveDisplayCfg({ prices_has_season: v })} />
+            <ConfigToggle label="Precios por día de semana" hint="Sábado premium, días festivos especiales…" value={dcfg.prices_has_day_pricing!} onChange={v => saveDisplayCfg({ prices_has_day_pricing: v })} />
+            <ConfigToggle label="Paquetes multi-día" hint="Wedding weekend, 2-3 noches incluidas en el paquete" value={dcfg.prices_is_multiday!} onChange={v => saveDisplayCfg({ prices_is_multiday: v })} />
+          </SectionConfigPanel>
+          <div style={{ paddingTop: 24 }}>
+            <PackagesEditor items={content.packages} userId={userId} onRefresh={onRefresh} pricingModel={activeModel} displayConfig={dcfg} />
+          </div>
+          {dcfg.prices_has_season && (
+            <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28, marginTop: 28 }}>
+              <SeasonPricesEditor items={content.season_prices} userId={userId} onRefresh={onRefresh} />
+            </div>
+          )}
+        </div>
+      ),
+    },
+
+    // ── SEMI-INCLUIDO · 2. Servicios incluidos ────────────────────────────────
+    {
+      id: 'inclusions',
+      icon: '📦',
+      title: '2. Servicios incluidos',
+      desc: 'Lo que SIEMPRE va en el precio — espacio, catering, bebidas, coordinación',
+      count: content.inclusions.length,
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: 11, color: '#166534', marginBottom: 16 }}>
+            💡 Estos servicios se mostrarán como <strong>"incluido"</strong> en la propuesta. Define exactamente qué entra en el precio para que no haya dudas.
+          </div>
+          <InclusionsEditor items={content.inclusions} userId={userId} onRefresh={onRefresh} pricingModel={activeModel} />
+        </div>
+      ),
+    },
+
+    // ── SEMI-INCLUIDO · 3. Menús y catering ──────────────────────────────────
+    {
+      id: 'menus',
+      icon: '🍽️',
+      title: '3. Menús',
+      desc: 'Tipos de menú · precio por comensal · qué incluye cada uno',
+      count: content.menu_prices.length,
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: 11, color: '#166534', marginBottom: 16 }}>
+            💡 Cada menú puede tener un precio diferente — la elección del menú modifica el precio base.
+          </div>
+          <SectionConfigPanel title="Opciones de catering">
+            <ConfigToggle label="Menú infantil disponible" hint="Precio especial para niños" value={dcfg.menus_has_children!} onChange={v => saveDisplayCfg({ menus_has_children: v })} />
+            <ConfigToggle label="Opción vegana / vegetariana" hint="Menú alternativo sin carne" value={dcfg.menus_has_vegan!} onChange={v => saveDisplayCfg({ menus_has_vegan: v })} />
+            <ConfigToggle label="Sesión de degustación" hint="El venue ofrece cita de prueba del menú" value={dcfg.menus_has_tasting!} onChange={v => saveDisplayCfg({ menus_has_tasting: v })} />
+          </SectionConfigPanel>
+          <div style={{ paddingTop: 24 }}>
+            <MenuPriceEditor items={content.menu_prices} userId={userId} onRefresh={onRefresh} />
+          </div>
+        </div>
+      ),
+    },
+
+    // ── SEMI-INCLUIDO · 4. Servicios flexibles (CLAVE) ────────────────────────
+    {
+      id: 'flexible_services',
+      icon: '🔓',
+      title: '4. Servicios flexibles',
+      desc: 'Decoración · DJ · fotografía — opcionales, del venue o proveedor externo',
+      count: (content.vendor_policy ? 1 : 0),
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8, fontSize: 11, color: '#5b21b6', marginBottom: 16 }}>
+            💡 <strong>La esencia del semi-incluido.</strong> Cada servicio puede ser ofrecido por el venue, permitir proveedor externo, o ambos. Define si hay un fee por traer proveedores propios.
+          </div>
+          <VendorPolicyEditor item={content.vendor_policy} userId={userId} onRefresh={onRefresh} />
+        </div>
+      ),
+    },
+
+    // ── SEMI-INCLUIDO · 5. Extras ─────────────────────────────────────────────
+    {
+      id: 'extras',
+      icon: '➕',
+      title: '5. Extras',
+      desc: 'Upgrades y mejoras opcionales que la pareja puede añadir al paquete',
+      count: content.extra_services.length,
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, fontSize: 11, color: '#1e40af', marginBottom: 16 }}>
+            💡 Servicios opcionales con precio fijo (€) o por persona (€/pax) que la pareja puede añadir a su paquete.
+          </div>
+          <ExtraServicesEditor items={content.extra_services} userId={userId} onRefresh={onRefresh} />
+        </div>
+      ),
+    },
+
+    // ── SEMI-INCLUIDO · 6. Condiciones ────────────────────────────────────────
+    {
+      id: 'booking',
+      icon: '📄',
+      title: '6. Condiciones',
+      desc: 'Proveedores externos permitidos · fee externo · depósito · cancelación',
+      count: (content.conditions ? 1 : 0) + (content.payment_plan ? 1 : 0),
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 11, color: '#991b1b', marginBottom: 16 }}>
+            ⚠️ <strong>Especifica claramente</strong> qué proveedores externos están permitidos y si hay un fee adicional por usarlos.
+          </div>
+          <SectionConfigPanel title="¿Qué incluir?">
+            <ConfigToggle label="Plan de pagos / Señales" hint="Hitos de pago, señal de reserva y plazos" value={dcfg.booking_has_payment_plan!} onChange={v => saveDisplayCfg({ booking_has_payment_plan: v })} />
+          </SectionConfigPanel>
+          <div style={{ paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 32 }}>
+            {dcfg.booking_has_payment_plan && (
+              <PaymentPlanEditor item={content.payment_plan} userId={userId} onRefresh={onRefresh} />
+            )}
+            <div style={{ borderTop: dcfg.booking_has_payment_plan ? '1px solid var(--ivory)' : 'none', paddingTop: dcfg.booking_has_payment_plan ? 28 : 0 }}>
+              <ConditionsEditor item={content.conditions} userId={userId} onRefresh={onRefresh} />
+            </div>
+          </div>
+        </div>
+      ),
+    },
+
+  ] : activeModel === 'modular' ? [
+
+    // ── À LA CARTE · 1. Base obligatoria ─────────────────────────────────────
+    {
+      id: 'prices',
+      icon: '🏛️',
+      title: '1. Base obligatoria',
+      desc: 'Alquiler del espacio o fee mínimo — el punto de partida de todo presupuesto',
+      count: content.packages.length,
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#fef9ec', border: '1px solid #fde68a', borderRadius: 8, fontSize: 11, color: '#92400e', marginBottom: 16 }}>
+            💡 Define el coste base del espacio o el gasto mínimo. Sobre esto se construye todo el presupuesto à la carte.
+          </div>
+          <SectionConfigPanel title="Restricciones del modelo">
+            <ConfigToggle label="Modelo de gasto mínimo (min. spend)" hint="La pareja debe alcanzar un importe mínimo total" value={dcfg.prices_has_min_spend!} onChange={v => saveDisplayCfg({ prices_has_min_spend: v })} />
+            <ConfigToggle label="Paquetes multi-día" hint="Wedding weekend, 2-3 noches incluidas" value={dcfg.prices_is_multiday!} onChange={v => saveDisplayCfg({ prices_is_multiday: v })} />
+          </SectionConfigPanel>
+          <div style={{ paddingTop: 24 }}>
+            <PackagesEditor items={content.packages} userId={userId} onRefresh={onRefresh} pricingModel={activeModel} displayConfig={dcfg} />
+          </div>
+        </div>
+      ),
+    },
+
+    // ── À LA CARTE · 2. Componentes ──────────────────────────────────────────
+    {
+      id: 'components',
+      icon: '🧩',
+      title: '2. Componentes',
+      desc: 'Catering · música · decoración · fotografía — cada bloque es seleccionable',
+      count: content.menu_prices.length + content.extra_services.length,
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, fontSize: 11, color: '#0369a1', marginBottom: 16 }}>
+            💡 Cada componente es un bloque seleccionable. La pareja construye su boda eligiendo los que quiere. Añade variantes (básico / premium) como opciones dentro de cada bloque.
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
+            🍽️ Catering (precios por persona)
+          </div>
+          <MenuPriceEditor items={content.menu_prices} userId={userId} onRefresh={onRefresh} />
+          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28, marginTop: 28 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
+              🎶 Música · 🌸 Decoración · 📸 Fotografía · otros módulos
+            </div>
+            <ExtraServicesEditor items={content.extra_services} userId={userId} onRefresh={onRefresh} />
+          </div>
+        </div>
+      ),
+    },
+
+    // ── À LA CARTE · 3. Reglas ────────────────────────────────────────────────
+    {
+      id: 'rules',
+      icon: '⚙️',
+      title: '3. Reglas',
+      desc: 'Mínimo de invitados · mínimo de gasto · combinaciones obligatorias',
+      count: content.season_prices.length,
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, fontSize: 11, color: '#9a3412', marginBottom: 16 }}>
+            💡 Define las reglas del modelo: mínimo de invitados, gasto mínimo por bloque, y combinaciones obligatorias (ej: si eliges catering → mínimo 80 pax). Documéntalas en condiciones.
+          </div>
+          <SeasonPricesEditor items={content.season_prices} userId={userId} onRefresh={onRefresh} />
+        </div>
+      ),
+    },
+
+    // ── À LA CARTE · 4. Condiciones ───────────────────────────────────────────
+    {
+      id: 'booking',
+      icon: '📄',
+      title: '4. Condiciones',
+      desc: 'Depósito · política de cancelación · normas generales del modelo',
+      count: (content.conditions ? 1 : 0) + (content.payment_plan ? 1 : 0) + (content.vendor_policy ? 1 : 0),
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <SectionConfigPanel title="¿Qué incluir?">
+            <ConfigToggle label="Política de proveedores externos" hint="¿Puede la pareja traer su propio caterer, DJ, fotógrafo?" value={dcfg.booking_has_vendor_policy!} onChange={v => saveDisplayCfg({ booking_has_vendor_policy: v })} />
+            <ConfigToggle label="Plan de pagos / Señales" hint="Hitos de pago, señal de reserva y plazos" value={dcfg.booking_has_payment_plan!} onChange={v => saveDisplayCfg({ booking_has_payment_plan: v })} />
+          </SectionConfigPanel>
+          <div style={{ paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 32 }}>
+            {dcfg.booking_has_vendor_policy && (
+              <VendorPolicyEditor item={content.vendor_policy} userId={userId} onRefresh={onRefresh} />
+            )}
+            {dcfg.booking_has_payment_plan && (
+              <div style={{ borderTop: dcfg.booking_has_vendor_policy ? '1px solid var(--ivory)' : 'none', paddingTop: dcfg.booking_has_vendor_policy ? 28 : 0 }}>
+                <PaymentPlanEditor item={content.payment_plan} userId={userId} onRefresh={onRefresh} />
+              </div>
+            )}
+            <div style={{ borderTop: (dcfg.booking_has_vendor_policy || dcfg.booking_has_payment_plan) ? '1px solid var(--ivory)' : 'none', paddingTop: (dcfg.booking_has_vendor_policy || dcfg.booking_has_payment_plan) ? 28 : 0 }}>
+              <ConditionsEditor item={content.conditions} userId={userId} onRefresh={onRefresh} />
+            </div>
+          </div>
+        </div>
+      ),
+    },
+
+  ] : [
+    // ── TODO INCLUIDO (default) ───────────────────────────────────────────────
+
+    // ── TODO INCLUIDO · 1. Precios (CORE) ────────────────────────────────────
+    {
+      id: 'prices',
+      icon: '💰',
+      title: '1. Precios',
+      desc: 'Precio/persona · mínimo de invitados · ajustes por temporada y día',
+      count: content.packages.length + content.season_prices.length,
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#fef9ec', border: '1px solid #fde68a', borderRadius: 8, fontSize: 11, color: '#92400e', marginBottom: 16 }}>
+            💡 <strong>El CORE del cálculo.</strong> Precio base + ajustes de temporada/día = precio final por persona. Los extras van en la sección 3.
+          </div>
+          <SectionConfigPanel title="Ajustes sobre el precio base">
+            <ConfigToggle label="Precios por temporada" hint="Alta, media, baja…" value={dcfg.prices_has_season!} onChange={v => saveDisplayCfg({ prices_has_season: v })} />
+            <ConfigToggle label="Precios por día de semana" hint="Sábado premium, días festivos especiales…" value={dcfg.prices_has_day_pricing!} onChange={v => saveDisplayCfg({ prices_has_day_pricing: v })} />
+            <ConfigToggle label="Paquetes multi-día" hint="Wedding weekend, 2-3 noches incluidas en el paquete" value={dcfg.prices_is_multiday!} onChange={v => saveDisplayCfg({ prices_is_multiday: v })} />
+          </SectionConfigPanel>
+          <div style={{ paddingTop: 24 }}>
+            <PackagesEditor items={content.packages} userId={userId} onRefresh={onRefresh} pricingModel={activeModel} displayConfig={dcfg} />
+          </div>
+          {dcfg.prices_has_season && (
+            <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28, marginTop: 28 }}>
+              <SeasonPricesEditor items={content.season_prices} userId={userId} onRefresh={onRefresh} />
+            </div>
+          )}
+        </div>
+      ),
+    },
+
+    // ── TODO INCLUIDO · 2. Menús ─────────────────────────────────────────────
+    {
+      id: 'menus',
+      icon: '🍽️',
+      title: '2. Menús',
+      desc: 'Tipos de menú · precio por comensal · qué incluye cada uno',
+      count: content.menu_prices.length + content.inclusions.length,
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: 11, color: '#166534', marginBottom: 16 }}>
+            💡 Cada menú puede tener un precio diferente — el menú elegido puede modificar el precio base del paquete.
+          </div>
+          <SectionConfigPanel title="Opciones de catering">
+            <ConfigToggle label="Menú infantil disponible" hint="Precio especial para niños" value={dcfg.menus_has_children!} onChange={v => saveDisplayCfg({ menus_has_children: v })} />
+            <ConfigToggle label="Opción vegana / vegetariana" hint="Menú alternativo sin carne" value={dcfg.menus_has_vegan!} onChange={v => saveDisplayCfg({ menus_has_vegan: v })} />
+            <ConfigToggle label="Sesión de degustación" hint="El venue ofrece cita de prueba del menú" value={dcfg.menus_has_tasting!} onChange={v => saveDisplayCfg({ menus_has_tasting: v })} />
+          </SectionConfigPanel>
+          <div style={{ paddingTop: 24 }}>
+            <MenuPriceEditor items={content.menu_prices} userId={userId} onRefresh={onRefresh} />
+          </div>
+          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28, marginTop: 28 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Qué incluye el paquete</div>
+            <InclusionsEditor items={content.inclusions} userId={userId} onRefresh={onRefresh} pricingModel={activeModel} />
+          </div>
+          {(dcfg.menus_has_children || dcfg.menus_has_vegan || dcfg.menus_has_tasting) && (
+            <div style={{ marginTop: 16, padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: 11, color: '#166534' }}>
+              {dcfg.menus_has_children && <div>✅ <strong>Menú infantil:</strong> añade una fila "Menú infantil" en los menús de arriba con su precio.</div>}
+              {dcfg.menus_has_vegan && <div>✅ <strong>Opción vegana:</strong> añade un menú específico o indícalo en las notas.</div>}
+              {dcfg.menus_has_tasting && <div>✅ <strong>Degustación:</strong> menciónala en las condiciones — cuándo se hace y si tiene coste.</div>}
+            </div>
+          )}
+        </div>
+      ),
+    },
+
+    // ── TODO INCLUIDO · 3. Extras (ÚNICO sitio) ───────────────────────────────
+    {
+      id: 'extras',
+      icon: '➕',
+      title: '3. Extras',
+      desc: 'Servicios opcionales que la pareja puede añadir — precio fijo (€) o por persona (€/pax)',
+      count: content.extra_services.length,
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, fontSize: 11, color: '#1e40af', marginBottom: 16 }}>
+            💡 <strong>ÚNICO sitio para servicios opcionales.</strong> No pongas extras dentro de los paquetes — todo lo opcional va aquí.
+          </div>
+          <ExtraServicesEditor items={content.extra_services} userId={userId} onRefresh={onRefresh} />
+        </div>
+      ),
+    },
+
+    // ── TODO INCLUIDO · 4. Condiciones ───────────────────────────────────────
+    {
+      id: 'booking',
+      icon: '📄',
+      title: '4. Condiciones',
+      desc: 'Depósito (%) · forma de pago · política de cancelación',
+      count: (content.conditions ? 1 : 0) + (content.vendor_policy ? 1 : 0) + (content.payment_plan ? 1 : 0),
+      body: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ padding: '10px 14px', background: '#fef9ec', border: '1px solid #fde68a', borderRadius: 8, fontSize: 11, color: '#92400e', marginBottom: 16 }}>
+            💡 Se inserta automáticamente en la propuesta. Define el depósito, el plan de pagos y la política de cancelación.
+          </div>
+          <SectionConfigPanel title="¿Qué incluir en esta sección?">
+            <ConfigToggle label="Política de proveedores externos" hint="¿Puede la pareja traer su propio caterer, DJ, fotógrafo?" value={dcfg.booking_has_vendor_policy!} onChange={v => saveDisplayCfg({ booking_has_vendor_policy: v })} />
+            <ConfigToggle label="Plan de pagos / Señales" hint="Hitos de pago, señal de reserva y plazos" value={dcfg.booking_has_payment_plan!} onChange={v => saveDisplayCfg({ booking_has_payment_plan: v })} />
+          </SectionConfigPanel>
+          <div style={{ paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 32 }}>
+            {dcfg.booking_has_vendor_policy && (
+              <VendorPolicyEditor item={content.vendor_policy} userId={userId} onRefresh={onRefresh} />
+            )}
+            {dcfg.booking_has_payment_plan && (
+              <div style={{ borderTop: dcfg.booking_has_vendor_policy ? '1px solid var(--ivory)' : 'none', paddingTop: dcfg.booking_has_vendor_policy ? 28 : 0 }}>
+                <PaymentPlanEditor item={content.payment_plan} userId={userId} onRefresh={onRefresh} />
+              </div>
+            )}
+            <div style={{ borderTop: (dcfg.booking_has_vendor_policy || dcfg.booking_has_payment_plan) ? '1px solid var(--ivory)' : 'none', paddingTop: (dcfg.booking_has_vendor_policy || dcfg.booking_has_payment_plan) ? 28 : 0 }}>
+              <ConditionsEditor item={content.conditions} userId={userId} onRefresh={onRefresh} />
+            </div>
+          </div>
+        </div>
+      ),
+    },
+  ]
+
+  // ── Secondary groups (always shown after the core groups) ─────────────────
+  const n = coreGroups.length + 1
+
+  const secondaryGroups: AccordionGroup[] = [
+    {
+      id: 'collaborators',
+      icon: '🤝',
+      title: `${n}. Colaboradores recomendados`,
+      desc: 'Fotógrafos, músicos, floristas y otros proveedores que el venue recomienda',
+      count: content.collaborators.length,
+      body: <CollaboratorsEditor items={content.collaborators} userId={userId} onRefresh={onRefresh} />,
     },
     {
       id: 'visual',
       icon: '📸',
-      title: '4. Contenido visual',
+      title: `${n + 1}. Contenido visual`,
       desc: 'Fotos destacadas, galería y vídeo',
       count: content.video_default?.url ? 1 : 0,
       body: (
@@ -1882,8 +2458,8 @@ function ContentTab({ content, userId, onRefresh }: {
     },
     {
       id: 'commercial',
-      icon: '💬',
-      title: '5. Contenido comercial',
+      icon: '✨',
+      title: `${n + 2}. La experiencia`,
       desc: 'Descripción de la experiencia y testimonios de parejas',
       count: (content.experience ? 1 : 0) + content.testimonials.length,
       body: (
@@ -1896,58 +2472,75 @@ function ContentTab({ content, userId, onRefresh }: {
       ),
     },
     {
-      id: 'faq',
-      icon: '❓',
-      title: '6. Preguntas frecuentes',
-      desc: 'Responde las dudas más habituales de las parejas',
-      count: content.faq.length,
-      body: <FaqEditor items={content.faq} userId={userId} onRefresh={onRefresh} />,
-    },
-    {
       id: 'venue_info',
-      icon: '📍',
-      title: '7. Información del venue',
+      icon: '🏛️',
+      title: `${n + 3}. El venue`,
       desc: 'Ficha técnica, zonas, alojamiento y ubicación',
-      count: (content.techspecs ? 1 : 0) + content.zones.length + (content.accommodation_info ? 1 : 0) + (content.map_info?.embed_url ? 1 : 0),
+      count: (content.techspecs ? 1 : 0) + (dcfg.venue_has_accommodation ? 1 : 0) + (content.map_info?.embed_url ? 1 : 0),
       body: (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-          <VenueTechspecsEditor item={content.techspecs} userId={userId} onRefresh={onRefresh} />
-          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
-            <ZonesEditor items={content.zones} userId={userId} onRefresh={onRefresh} />
-          </div>
-          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
-            <VenueAccommodationEditor item={content.accommodation_info} userId={userId} onRefresh={onRefresh} />
-          </div>
-          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
-            <VenueMapEditor item={content.map_info} userId={userId} onRefresh={onRefresh} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <SectionConfigPanel title="Secciones del venue">
+            {activeModel !== 'venue_only' && (
+              <ConfigToggle label="Zonas / espacios del venue" hint="Salones, jardines, terraza, capilla…" value={dcfg.venue_has_zones!} onChange={v => saveDisplayCfg({ venue_has_zones: v })} />
+            )}
+            <ConfigToggle label="Alojamiento en el venue" hint="Habitaciones propias o cabañas incluidas" value={dcfg.venue_has_accommodation!} onChange={v => saveDisplayCfg({ venue_has_accommodation: v })} />
+          </SectionConfigPanel>
+          <div style={{ paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 32 }}>
+            <VenueTechspecsEditor item={content.techspecs} userId={userId} onRefresh={onRefresh} />
+            {activeModel !== 'venue_only' && dcfg.venue_has_zones && (
+              <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
+                <ZonesEditor items={content.zones} userId={userId} onRefresh={onRefresh} />
+              </div>
+            )}
+            {dcfg.venue_has_accommodation && (
+              <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
+                <VenueAccommodationEditor item={content.accommodation_info} userId={userId} onRefresh={onRefresh} />
+              </div>
+            )}
+            <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
+              <VenueMapEditor item={content.map_info} userId={userId} onRefresh={onRefresh} />
+            </div>
           </div>
         </div>
       ),
     },
     {
-      id: 'tools',
+      id: 'tools_faq',
       icon: '🧮',
-      title: '8. Herramientas',
-      desc: 'Simulador de presupuesto y cuenta atrás',
-      count: (content.budget_simulator ? 1 : 0) + (content.countdown ? 1 : 0),
+      title: `${n + 4}. FAQ y herramientas`,
+      desc: 'Preguntas frecuentes, simulador, cuenta atrás y formulario de contacto',
+      count: content.faq.length + (dcfg.tools_budget_sim && content.budget_simulator ? 1 : 0) + (dcfg.tools_countdown && content.countdown ? 1 : 0) + (dcfg.tools_chat && content.chat_settings?.enabled ? 1 : 0),
       body: (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-          <BudgetSimulatorEditor item={content.budget_simulator} userId={userId} onRefresh={onRefresh} />
-          <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
-            <CountdownEditor item={content.countdown} userId={userId} onRefresh={onRefresh} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <SectionConfigPanel title="Herramientas interactivas">
+            <ConfigToggle label="Simulador de presupuesto" hint="Calculadora interactiva en la propuesta" value={dcfg.tools_budget_sim!} onChange={v => saveDisplayCfg({ tools_budget_sim: v })} />
+            <ConfigToggle label="Cuenta atrás" hint="Contador regresivo hasta la boda" value={dcfg.tools_countdown!} onChange={v => saveDisplayCfg({ tools_countdown: v })} />
+            <ConfigToggle label="Formulario de preguntas (chat)" hint="Las parejas pueden enviar preguntas desde la propuesta" value={dcfg.tools_chat!} onChange={v => saveDisplayCfg({ tools_chat: v })} />
+          </SectionConfigPanel>
+          <div style={{ paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 32 }}>
+            <FaqEditor items={content.faq} userId={userId} onRefresh={onRefresh} />
+            {dcfg.tools_budget_sim && (
+              <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
+                <BudgetSimulatorEditor item={content.budget_simulator} userId={userId} onRefresh={onRefresh} />
+              </div>
+            )}
+            {dcfg.tools_countdown && (
+              <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
+                <CountdownEditor item={content.countdown} userId={userId} onRefresh={onRefresh} />
+              </div>
+            )}
+            {dcfg.tools_chat && (
+              <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28 }}>
+                <VenueChatEditor item={content.chat_settings} userId={userId} onRefresh={onRefresh} />
+              </div>
+            )}
           </div>
         </div>
       ),
-    },
-    {
-      id: 'interaction',
-      icon: '💬',
-      title: '9. Interacción',
-      desc: 'Formulario de preguntas en la propuesta',
-      count: content.chat_settings?.enabled ? 1 : 0,
-      body: <VenueChatEditor item={content.chat_settings} userId={userId} onRefresh={onRefresh} />,
     },
   ]
+
+  const groups: AccordionGroup[] = [...coreGroups, ...secondaryGroups]
 
   return (
     <div>
@@ -2022,6 +2615,17 @@ function ContentTab({ content, userId, onRefresh }: {
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>{group.title}</div>
                   <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>{group.desc}</div>
                 </div>
+                {/* Relevance badge — only shown when a pricing model is active */}
+                {activeModel && (() => {
+                  const rel = SECTION_RELEVANCE[group.id]?.[activeModel]
+                  if (!rel) return null
+                  const badge = RELEVANCE_BADGE[rel]
+                  return (
+                    <span style={{ fontSize: 10, background: badge.bg, color: badge.color, borderRadius: 10, padding: '2px 8px', fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      {badge.label}
+                    </span>
+                  )
+                })()}
                 {group.count > 0 && (
                   <span style={{ fontSize: 10, background: isOpen ? 'var(--gold)' : 'var(--cream)', color: isOpen ? '#fff' : 'var(--warm-gray)', borderRadius: 10, padding: '2px 8px', fontWeight: 600, flexShrink: 0 }}>
                     {group.count}
@@ -2050,18 +2654,129 @@ function ContentTab({ content, userId, onRefresh }: {
 // ── Content: Packages ─────────────────────────────────────────────────────────
 
 const PRICE_TYPES: Array<{ value: VenuePackage['price_type']; label: string; placeholder: string; hint: string }> = [
-  { value: 'per_person',  label: '€ / persona', placeholder: 'Ej: 95',     hint: 'Precio por invitado — multiplica por nº de personas' },
-  { value: 'flat_fee',    label: '€ / evento',  placeholder: 'Ej: 6.500',  hint: 'Precio fijo por el evento completo independiente del número de invitados' },
-  { value: 'from_price',  label: 'desde €',     placeholder: 'Ej: 75',     hint: 'Precio de salida — el total depende de opciones elegidas' },
-  { value: 'on_request',  label: 'A consultar', placeholder: '',           hint: 'El precio se negocia caso a caso — no se muestra importe' },
+  { value: 'per_person',  label: '€ / persona',    placeholder: 'Ej: 95',      hint: 'Precio por invitado — multiplica por nº de personas' },
+  { value: 'flat_fee',    label: '€ / evento',     placeholder: 'Ej: 6.500',   hint: 'Precio fijo por el evento completo' },
+  { value: 'min_spend',   label: 'Gasto mínimo',   placeholder: 'Ej: 42.000',  hint: 'El cliente debe consumir al menos esta cantidad en F&B (ej: Son Bunyola, Cap Rocat)' },
+  { value: 'from_price',  label: 'desde €',        placeholder: 'Ej: 75',      hint: 'Precio de salida — el total depende de opciones elegidas' },
+  { value: 'on_request',  label: 'A consultar',    placeholder: '',            hint: 'El precio se negocia caso a caso — no se muestra importe' },
 ]
 
-function PackagesEditor({ items, userId, onRefresh, pricingModel }: { items: VenuePackage[]; userId: string; onRefresh: () => void; pricingModel?: PricingModel }) {
-  const [editing, setEditing]   = useState<VenuePackage | null>(null)
-  const [isNew,   setIsNew]     = useState(false)
-  const [saving,  setSaving]    = useState(false)
+const PACKAGE_TIERS: Array<{ value: NonNullable<VenuePackage['tier']>; label: string; color: string; bg: string }> = [
+  { value: 'basico',    label: 'Básico',    color: '#6b7280', bg: '#f3f4f6' },
+  { value: 'estandar',  label: 'Estándar',  color: '#0369a1', bg: '#e0f2fe' },
+  { value: 'premium',   label: 'Premium',   color: '#92400e', bg: '#fef3c7' },
+  { value: 'exclusivo', label: 'Exclusivo', color: '#7e22ce', bg: '#f3e8ff' },
+  { value: 'lujo',      label: 'Lujo',      color: '#166534', bg: '#dcfce7' },
+]
 
-  // Default price_type based on pricing model
+const WEEK_DAYS = [
+  { key: 'L', label: 'Lunes' },
+  { key: 'M', label: 'Martes' },
+  { key: 'X', label: 'Miércoles' },
+  { key: 'J', label: 'Jueves' },
+  { key: 'V', label: 'Viernes' },
+  { key: 'S', label: 'Sábado' },
+  { key: 'D', label: 'Dom/Fest.' },
+]
+
+// Quick-add inclusion chips grouped by category, based on real venue dossiers
+const PACKAGE_CHIPS: Array<{ cat: string; emoji: string; models?: PricingModel[]; items: string[] }> = [
+  {
+    cat: 'Aperitivo', emoji: '🥂',
+    models: ['all_inclusive', 'semi_inclusive', 'modular'],
+    items: [
+      'Cóctel de bienvenida (1h)', 'Cóctel de bienvenida (1.5h)',
+      '6 pinchos fríos y calientes', '8 pinchos fríos y calientes', '12 pinchos variados',
+      'Vino, cava, cerveza y refrescos', 'Vermouth y aperitivos',
+      'Barra libre durante el aperitivo', '2 cócteles de firma incluidos',
+    ],
+  },
+  {
+    cat: 'Cena', emoji: '🍽️',
+    models: ['all_inclusive', 'semi_inclusive', 'modular'],
+    items: [
+      'Servicio de mesa (sentado)', 'Cena tipo cóctel', 'Cena tipo buffet',
+      'Menú de 2 platos', 'Menú de 3 platos', 'Menú de 4 platos',
+      'Plato de arroz o fideuà', 'Tabla de quesos y embutidos',
+      'Vinos con la cena incluidos', 'Cava en el brindis',
+      'Café, infusiones y petit fours', 'Tarta de boda incluida',
+    ],
+  },
+  {
+    cat: 'Barra libre', emoji: '🎊',
+    items: [
+      'Barra libre 2h', 'Barra libre 3h', 'Barra libre 4h',
+      'Barra libre incluida en el precio',
+      'Barra libre con licores premium',
+    ],
+  },
+  {
+    cat: 'Madrugada', emoji: '🌙',
+    items: [
+      'Reposón de medianoche', 'Snack nocturno incluido',
+      'Barra libre hasta las 2h', 'Barra libre hasta las 4h',
+      'Sala de baile hasta las 4h',
+    ],
+  },
+  {
+    cat: 'Espacio', emoji: '🏛️',
+    items: [
+      'Uso exclusivo de la finca', 'Jardín exterior incluido',
+      'Parking gratuito', 'Suite nupcial para la pareja',
+      'Salón interior climatizado', 'Terraza panorámica',
+      'Piscina disponible para invitados', 'Capilla propia',
+      'Cocina disponible para catering externo', 'Zona de baile al aire libre',
+      'Pista de baile cubierta',
+    ],
+  },
+  {
+    cat: 'Decoración', emoji: '💐',
+    items: [
+      'Manteles y cubertería incluidos', 'Sillas Tiffany',
+      'Tarjetas de nombre para invitados', 'Menús impresos para cada invitado',
+      'Decoración floral de cortesía', 'Centros de mesa incluidos',
+      'Seating plan incluido', 'Números de mesa', 'Luces de ambiente',
+      'Alfombra y altar de ceremonia',
+    ],
+  },
+  {
+    cat: 'Coordinación', emoji: '👔',
+    items: [
+      'Coordinador/a el día del evento', 'Reuniones previas de planificación',
+      'Cata de menú incluida (2 personas)', 'Cata de menú incluida (4 personas)',
+      'Maître personalizado', 'Timeline personalizado del día',
+      'Gestión de proveedores externos', 'Recepción y asistencia a invitados',
+    ],
+  },
+  {
+    cat: 'Alojamiento', emoji: '🛏️',
+    items: [
+      'Suite nupcial la noche de bodas', 'Desayuno incluido para la pareja',
+      'Desayuno incluido para todos los huéspedes',
+      'Descuento en habitaciones para invitados (15%)',
+      'Habitación para preparativos todo el día',
+      'Checkout tardío para la pareja (14h)',
+      '2 noches de alojamiento incluidas',
+    ],
+  },
+  {
+    cat: 'Otros', emoji: '✨',
+    items: [
+      'Sistema de sonido básico', 'Menú infantil disponible',
+      'Menú vegano/vegetariano disponible',
+      'Menú especial para proveedores',
+      'Transporte incluido (lanzadera)',
+      'Servicio de aparcacoches',
+    ],
+  },
+]
+
+function PackagesEditor({ items, userId, onRefresh, pricingModel, displayConfig }: { items: VenuePackage[]; userId: string; onRefresh: () => void; pricingModel?: PricingModel; displayConfig?: VenueDisplayConfig }) {
+  const [editing, setEditing]     = useState<VenuePackage | null>(null)
+  const [isNew,   setIsNew]       = useState(false)
+  const [saving,  setSaving]      = useState(false)
+  const [chipCat, setChipCat]     = useState('Aperitivo')
+
   const defaultPriceType = (): VenuePackage['price_type'] => {
     if (pricingModel === 'venue_only') return 'flat_fee'
     if (pricingModel === 'all_inclusive') return 'per_person'
@@ -2069,24 +2784,45 @@ function PackagesEditor({ items, userId, onRefresh, pricingModel }: { items: Ven
   }
 
   const empty = (): Omit<VenuePackage, 'id'> => ({
-    name: '', subtitle: '', price: '', price_type: defaultPriceType(),
-    is_recommended: false, min_guests: undefined, max_guests: undefined,
-    description: '', includes: [''], sort_order: items.length, is_active: true,
+    name: '', subtitle: '', tier: undefined, price: '', price_type: defaultPriceType(),
+    price_iva_included: false, is_recommended: false,
+    min_guests: undefined, max_guests: undefined,
+    days_available: [], event_hours: undefined, music_curfew: '',
+    description: '', includes: [], sort_order: items.length, is_active: true,
   })
   const [form, setForm] = useState<Omit<VenuePackage, 'id'>>(empty())
   const setF = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
-  const openNew = () => { setForm(empty()); setIsNew(true); setEditing(null) }
+  const openNew = () => { setForm(empty()); setIsNew(true); setEditing(null); setChipCat('Aperitivo') }
   const openEdit = (p: VenuePackage) => {
-    setForm({ name: p.name, subtitle: p.subtitle || '', price: p.price || '', price_type: p.price_type || defaultPriceType(), is_recommended: p.is_recommended || false, min_guests: p.min_guests, max_guests: p.max_guests, description: p.description || '', includes: p.includes?.length ? p.includes : [''], sort_order: p.sort_order, is_active: p.is_active })
-    setEditing(p); setIsNew(false)
+    setForm({
+      name: p.name, subtitle: p.subtitle || '', tier: p.tier,
+      price: p.price || '', price_type: p.price_type || defaultPriceType(),
+      price_iva_included: p.price_iva_included || false,
+      is_recommended: p.is_recommended || false,
+      min_guests: p.min_guests, max_guests: p.max_guests,
+      days_available: p.days_available || [], event_hours: p.event_hours, music_curfew: p.music_curfew || '',
+      description: p.description || '',
+      includes: p.includes?.length ? p.includes : [],
+      sort_order: p.sort_order, is_active: p.is_active,
+    })
+    setEditing(p); setIsNew(false); setChipCat('Aperitivo')
   }
 
   const handleSave = async () => {
     if (!form.name.trim()) return
     setSaving(true)
     const supabase = createClient()
-    const payload = { user_id: userId, section: 'package', sort_order: form.sort_order, is_active: form.is_active, data: { name: form.name, subtitle: form.subtitle, price: form.price, price_type: form.price_type, is_recommended: form.is_recommended, min_guests: form.min_guests, max_guests: form.max_guests, description: form.description, includes: form.includes.filter(Boolean) } }
+    const payload = {
+      user_id: userId, section: 'package', sort_order: form.sort_order, is_active: form.is_active,
+      data: {
+        name: form.name, subtitle: form.subtitle, tier: form.tier,
+        price: form.price, price_type: form.price_type, price_iva_included: form.price_iva_included,
+        is_recommended: form.is_recommended, min_guests: form.min_guests, max_guests: form.max_guests,
+        days_available: form.days_available, event_hours: form.event_hours, music_curfew: form.music_curfew,
+        description: form.description, includes: form.includes.filter(Boolean),
+      },
+    }
     if (isNew) await supabase.from('venue_content').insert(payload)
     else if (editing) await supabase.from('venue_content').update(payload).eq('id', editing.id)
     setSaving(false); setIsNew(false); setEditing(null); onRefresh()
@@ -2099,71 +2835,138 @@ function PackagesEditor({ items, userId, onRefresh, pricingModel }: { items: Ven
     onRefresh()
   }
 
-  const updateInclude = (i: number, val: string) => {
-    const arr = [...form.includes]; arr[i] = val; setF('includes', arr)
+  const toggleDay = (day: string) => {
+    const days = form.days_available || []
+    setF('days_available', days.includes(day) ? days.filter(d => d !== day) : [...days, day])
   }
-  const addInclude    = () => setF('includes', [...form.includes, ''])
-  const removeInclude = (i: number) => setF('includes', form.includes.filter((_, j) => j !== i))
+
+  const toggleChip = (item: string) => {
+    const inc = form.includes || []
+    if (inc.includes(item)) setF('includes', inc.filter(x => x !== item))
+    else setF('includes', [...inc, item])
+  }
+
+  const removeInclude = (i: number) => setF('includes', (form.includes || []).filter((_, j) => j !== i))
+
+  // Chips filtered by current model
+  const visibleChips = PACKAGE_CHIPS.filter(c => !c.models || !pricingModel || c.models.includes(pricingModel))
+  const activeCatChips = visibleChips.find(c => c.cat === chipCat) || visibleChips[0]
+
+  // Display helpers
+  const priceLabel = (pkg: VenuePackage) => {
+    if (pkg.price_type === 'on_request') return 'A consultar'
+    if (!pkg.price) return ''
+    const suffix = pkg.price_iva_included ? ' (IVA inc.)' : ' + IVA'
+    if (pkg.price_type === 'per_person') return `${pkg.price}€/pers.${suffix}`
+    if (pkg.price_type === 'from_price') return `desde ${pkg.price}€${suffix}`
+    if (pkg.price_type === 'min_spend') return `G.mín. ${pkg.price}€${suffix}`
+    return `${pkg.price}€${suffix}`
+  }
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>Paquetes y precios</div>
-          <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Define los tiers que ofreces. Se muestran en la propuesta con posibilidad de ajustar por pareja.</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>
+            {pricingModel === 'venue_only' ? 'Tarifas de alquiler' : 'Paquetes y precios'}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>
+            {pricingModel === 'venue_only'
+              ? 'Define tus tarifas de alquiler del espacio. Se muestran en la propuesta.'
+              : 'Define los tiers que ofreces. Se muestran en la propuesta con posibilidad de ajustar por pareja.'}
+          </div>
         </div>
-        <button onClick={openNew} className="btn btn-primary btn-sm"><Plus size={12} /> Nuevo paquete</button>
+        <button onClick={openNew} className="btn btn-primary btn-sm">
+          <Plus size={12} /> {pricingModel === 'venue_only' ? 'Nueva tarifa' : 'Nuevo paquete'}
+        </button>
       </div>
 
-      {/* Form */}
+      {/* ── Form ── */}
       {(isNew || editing) && (
         <div className="card" style={{ padding: '20px', marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>{isNew ? 'Nuevo paquete' : `Editando: ${editing?.name}`}</div>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>
+              {isNew ? (pricingModel === 'venue_only' ? 'Nueva tarifa' : 'Nuevo paquete') : `Editando: ${editing?.name}`}
+            </div>
             <button onClick={() => { setIsNew(false); setEditing(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={16} /></button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Nombre del paquete *</label>
-              <input className="form-input" value={form.name} onChange={e => setF('name', e.target.value)} placeholder="Ej: Paquete Silver" />
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Subtítulo</label>
-              <input className="form-input" value={form.subtitle || ''} onChange={e => setF('subtitle', e.target.value)} placeholder="Ej: Ideal para bodas íntimas" />
-            </div>
-          </div>
-          {/* Price type selector */}
-          <div className="form-group" style={{ marginBottom: 12 }}>
-            <label className="form-label">Tipo de precio</label>
+
+          {/* Tier selector */}
+          <div style={{ marginBottom: 14 }}>
+            <label className="form-label">Nivel / Tier <span style={{ fontWeight: 400, color: 'var(--stone)' }}>(opcional)</span></label>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {PRICE_TYPES.map(pt => (
-                <button key={pt.value} type="button" onClick={() => setF('price_type', pt.value)}
-                  style={{ fontSize: 11, padding: '5px 12px', borderRadius: 20, cursor: 'pointer', fontWeight: 600,
-                    background: form.price_type === pt.value ? 'var(--gold)' : '#fff',
-                    color: form.price_type === pt.value ? '#fff' : 'var(--charcoal)',
-                    border: form.price_type === pt.value ? '1px solid var(--gold)' : '1px solid var(--ivory)',
+              {PACKAGE_TIERS.map(t => (
+                <button key={t.value} type="button" onClick={() => setF('tier', form.tier === t.value ? undefined : t.value)}
+                  style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, cursor: 'pointer', fontWeight: 600,
+                    background: form.tier === t.value ? t.bg : '#fff',
+                    color: form.tier === t.value ? t.color : 'var(--charcoal)',
+                    border: form.tier === t.value ? `1.5px solid ${t.color}` : '1px solid var(--ivory)',
                   }}>
-                  {pt.label}
+                  {t.label}
                 </button>
               ))}
             </div>
-            {form.price_type && (
-              <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 5 }}>
-                {PRICE_TYPES.find(p => p.value === form.price_type)?.hint}
-              </div>
-            )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+          {/* Name + Subtitle */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Nombre *</label>
+              <input className="form-input" value={form.name} onChange={e => setF('name', e.target.value)}
+                placeholder={pricingModel === 'venue_only' ? 'Ej: Tarifa fin de semana' : 'Ej: Paquete Silver'} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Subtítulo</label>
+              <input className="form-input" value={form.subtitle || ''} onChange={e => setF('subtitle', e.target.value)}
+                placeholder={pricingModel === 'venue_only' ? 'Ej: Viernes, Sábado y Domingo' : 'Ej: Ideal para bodas íntimas'} />
+            </div>
+          </div>
+
+          {/* Price type selector — simplified for all_inclusive */}
+          {pricingModel !== 'all_inclusive' && (
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label className="form-label">Tipo de precio</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {PRICE_TYPES.map(pt => (
+                  <button key={pt.value!} type="button" onClick={() => setF('price_type', pt.value)}
+                    style={{ fontSize: 11, padding: '5px 12px', borderRadius: 20, cursor: 'pointer', fontWeight: 600,
+                      background: form.price_type === pt.value ? 'var(--gold)' : '#fff',
+                      color: form.price_type === pt.value ? '#fff' : 'var(--charcoal)',
+                      border: form.price_type === pt.value ? '1px solid var(--gold)' : '1px solid var(--ivory)',
+                    }}>
+                    {pt.label}
+                  </button>
+                ))}
+              </div>
+              {form.price_type && <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 5 }}>
+                {PRICE_TYPES.find(p => p.value === form.price_type)?.hint}
+              </div>}
+            </div>
+          )}
+
+          {/* Price + IVA + guests */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr auto 1fr 1fr', gap: 10, marginBottom: 12, alignItems: 'end' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">
-                Precio {form.price_type === 'per_person' ? '(€/persona)' : form.price_type === 'flat_fee' ? '(€ total)' : form.price_type === 'on_request' ? '(no se muestra)' : '(€ desde)'}
+                {form.price_type === 'per_person' ? 'Precio (€/persona)' :
+                 form.price_type === 'flat_fee'   ? 'Precio total (€)' :
+                 form.price_type === 'min_spend'  ? 'Gasto mínimo (€)' :
+                 form.price_type === 'on_request' ? 'Precio (no se muestra)' : 'Precio (€ desde)'}
               </label>
-              <input className="form-input"
-                value={form.price || ''}
+              <input className="form-input" value={form.price || ''}
                 onChange={e => setF('price', e.target.value)}
                 placeholder={PRICE_TYPES.find(p => p.value === form.price_type)?.placeholder || 'Ej: 8.500'}
                 disabled={form.price_type === 'on_request'} />
+            </div>
+            <div style={{ paddingBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', border: '1px solid var(--ivory)', borderRadius: 8, cursor: 'pointer', background: form.price_iva_included ? '#f0fdf4' : '#fff', whiteSpace: 'nowrap' }}
+                onClick={() => setF('price_iva_included', !form.price_iva_included)}>
+                <span style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${form.price_iva_included ? '#16a34a' : '#d1d5db'}`, background: form.price_iva_included ? '#16a34a' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {form.price_iva_included && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
+                </span>
+                <span style={{ fontSize: 11, color: form.price_iva_included ? '#166534' : 'var(--warm-gray)', fontWeight: 500 }}>IVA inc.</span>
+              </div>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Mín. invitados</label>
@@ -2175,8 +2978,51 @@ function PackagesEditor({ items, userId, onRefresh, pricingModel }: { items: Ven
             </div>
           </div>
 
-          {/* is_recommended toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '10px 14px', background: 'var(--cream)', borderRadius: 8 }}>
+          {/* Days available */}
+          <div style={{ marginBottom: 12 }}>
+            <label className="form-label">Días disponibles <span style={{ fontWeight: 400, color: 'var(--stone)' }}>(deja vacío = todos los días)</span></label>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              {WEEK_DAYS.map(d => {
+                const active = (form.days_available || []).includes(d.key)
+                return (
+                  <button key={d.key} type="button" onClick={() => toggleDay(d.key)} title={d.label}
+                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 8, cursor: 'pointer', fontWeight: 600,
+                      background: active ? 'var(--espresso)' : '#fff',
+                      color: active ? '#fff' : 'var(--charcoal)',
+                      border: active ? '1px solid var(--espresso)' : '1px solid var(--ivory)',
+                    }}>
+                    {d.key}
+                  </button>
+                )
+              })}
+              {(form.days_available?.length ?? 0) > 0 && (
+                <button type="button" onClick={() => setF('days_available', [])}
+                  style={{ fontSize: 10, padding: '4px 8px', borderRadius: 8, cursor: 'pointer', background: 'none', border: '1px solid #fca5a5', color: '#dc2626' }}>
+                  ✕ Limpiar
+                </button>
+              )}
+            </div>
+            {(form.days_available?.length ?? 0) > 0 && (
+              <div style={{ fontSize: 10, color: '#92400e', marginTop: 4, background: '#fef3c7', padding: '3px 10px', borderRadius: 6, display: 'inline-block' }}>
+                ⚡ Solo disponible: {form.days_available!.map(d => WEEK_DAYS.find(w => w.key === d)?.label).join(', ')}
+              </div>
+            )}
+          </div>
+
+          {/* Event hours + music curfew (optional details) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Horas de evento <span style={{ fontWeight: 400, color: 'var(--stone)' }}>(opcional)</span></label>
+              <input className="form-input" type="number" value={form.event_hours || ''} onChange={e => setF('event_hours', e.target.value ? Number(e.target.value) : undefined)} placeholder="Ej: 7.5" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Cierre de música <span style={{ fontWeight: 400, color: 'var(--stone)' }}>(opcional)</span></label>
+              <input className="form-input" value={form.music_curfew || ''} onChange={e => setF('music_curfew', e.target.value)} placeholder="Ej: 23:00 exterior / 4:00 interior" />
+            </div>
+          </div>
+
+          {/* Recommended toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, padding: '10px 14px', background: 'var(--cream)', borderRadius: 8 }}>
             <button type="button" onClick={() => setF('is_recommended', !form.is_recommended)}
               style={{ width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', flexShrink: 0,
                 background: form.is_recommended ? 'var(--gold)' : '#d1d5db', position: 'relative', transition: 'background 0.2s' }}>
@@ -2187,88 +3033,148 @@ function PackagesEditor({ items, userId, onRefresh, pricingModel }: { items: Ven
               <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Aparece destacado con badge "⭐ Más elegido" en la propuesta</div>
             </div>
           </div>
-          <div className="form-group" style={{ marginBottom: 12 }}>
-            <label className="form-label">Descripción del paquete</label>
-            <textarea className="form-textarea" style={{ minHeight: 70 }} value={form.description || ''} onChange={e => setF('description', e.target.value)} placeholder="Descripción breve del paquete y qué lo hace especial..." />
-          </div>
+
+          {/* Description */}
           <div className="form-group" style={{ marginBottom: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <label className="form-label" style={{ marginBottom: 0 }}>Qué incluye (para este paquete)</label>
-              <button type="button" onClick={addInclude} style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Plus size={11} /> Añadir
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {form.includes.map((item, i) => (
-                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <span style={{ color: '#16a34a', fontSize: 14, flexShrink: 0 }}>✓</span>
-                  <input className="form-input" style={{ flex: 1 }} value={item} onChange={e => updateInclude(i, e.target.value)} placeholder="Ej: Catering con menú degustación" />
-                  {form.includes.length > 1 && (
-                    <button type="button" onClick={() => removeInclude(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: 2 }}><X size={12} /></button>
-                  )}
-                </div>
+            <label className="form-label">Descripción</label>
+            <textarea className="form-textarea" style={{ minHeight: 60 }} value={form.description || ''} onChange={e => setF('description', e.target.value)} placeholder="Descripción breve del paquete y qué lo hace especial..." />
+          </div>
+
+          {/* ── Qué incluye con chips ── */}
+          <div style={{ marginBottom: 14 }}>
+            <label className="form-label">Qué incluye</label>
+
+            {/* Category tabs */}
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
+              {visibleChips.map(c => (
+                <button key={c.cat} type="button" onClick={() => setChipCat(c.cat)}
+                  style={{ fontSize: 11, padding: '4px 10px', borderRadius: 8, cursor: 'pointer', fontWeight: chipCat === c.cat ? 700 : 400,
+                    background: chipCat === c.cat ? 'var(--espresso)' : 'var(--cream)',
+                    color: chipCat === c.cat ? '#fff' : 'var(--charcoal)',
+                    border: 'none',
+                  }}>
+                  {c.emoji} {c.cat}
+                </button>
               ))}
             </div>
+
+            {/* Chips for active category */}
+            {activeCatChips && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '12px', background: '#fafafa', borderRadius: 8, marginBottom: 10, border: '1px solid var(--ivory)' }}>
+                {activeCatChips.items.map(item => {
+                  const active = (form.includes || []).includes(item)
+                  return (
+                    <button key={item} type="button" onClick={() => toggleChip(item)}
+                      style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+                        background: active ? '#dcfce7' : '#fff',
+                        color: active ? '#166534' : 'var(--charcoal)',
+                        border: active ? '1px solid #86efac' : '1px solid var(--ivory)',
+                        fontWeight: active ? 600 : 400,
+                      }}>
+                      {active ? '✓ ' : '+ '}{item}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Selected items list */}
+            {(form.includes || []).length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {(form.includes || []).filter(Boolean).map((item, i) => (
+                  <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#166534', background: '#dcfce7', padding: '3px 8px', borderRadius: 8, border: '1px solid #86efac' }}>
+                    ✓ {item}
+                    <button type="button" onClick={() => removeInclude(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: 0, lineHeight: 1, fontSize: 12 }}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Manual add */}
+            <button type="button"
+              onClick={() => {
+                const val = prompt('Añadir elemento personalizado:')
+                if (val?.trim()) setF('includes', [...(form.includes || []), val.trim()])
+              }}
+              style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: '1px dashed var(--gold)', borderRadius: 8, cursor: 'pointer', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Plus size={11} /> Añadir elemento personalizado
+            </button>
           </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
             <button className="btn btn-ghost" onClick={() => { setIsNew(false); setEditing(null) }}>Cancelar</button>
-            <button className="btn btn-primary" onClick={handleSave} disabled={saving || !form.name.trim()}>{saving ? 'Guardando...' : 'Guardar paquete'}</button>
+            <button className="btn btn-primary" onClick={handleSave} disabled={saving || !form.name.trim()}>
+              {saving ? 'Guardando...' : pricingModel === 'venue_only' ? 'Guardar tarifa' : 'Guardar paquete'}
+            </button>
           </div>
         </div>
       )}
 
-      {/* Package cards */}
+      {/* ── Package cards ── */}
       {items.length === 0 && !isNew ? (
         <div className="card" style={{ padding: '36px 24px', textAlign: 'center' }}>
           <Package size={32} style={{ color: 'var(--gold)', margin: '0 auto 12px', opacity: 0.6 }} />
-          <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 18, marginBottom: 8 }}>Sin paquetes definidos</div>
+          <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 18, marginBottom: 8 }}>
+            {pricingModel === 'venue_only' ? 'Sin tarifas definidas' : 'Sin paquetes definidos'}
+          </div>
           <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 16 }}>Define tus paquetes una vez y se añadirán automáticamente a cada propuesta.</div>
-          <button onClick={openNew} className="btn btn-primary btn-sm"><Plus size={12} /> Crear primer paquete</button>
+          <button onClick={openNew} className="btn btn-primary btn-sm"><Plus size={12} /> {pricingModel === 'venue_only' ? 'Crear primera tarifa' : 'Crear primer paquete'}</button>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {items.map(pkg => (
-            <div key={pkg.id} className="card" style={{ opacity: pkg.is_active ? 1 : 0.55 }}>
-              <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)' }}>{pkg.name}</span>
-                    {pkg.is_recommended && <span style={{ fontSize: 10, background: 'var(--gold)', color: '#fff', borderRadius: 8, padding: '1px 8px', fontWeight: 700 }}>⭐ Recomendado</span>}
-                    {pkg.price_type === 'on_request'
-                      ? <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>A consultar</span>
-                      : pkg.price && (
-                          <span style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 600 }}>
-                            {pkg.price_type === 'per_person' ? `${pkg.price}€/pers.` : pkg.price_type === 'from_price' ? `desde ${pkg.price}€` : `${pkg.price}€`}
-                          </span>
-                        )
-                    }
-                    {(pkg.min_guests || pkg.max_guests) && (
-                      <span style={{ fontSize: 11, color: 'var(--warm-gray)', background: 'var(--cream)', padding: '1px 8px', borderRadius: 8 }}>
-                        {pkg.min_guests && pkg.max_guests ? `${pkg.min_guests}–${pkg.max_guests} inv.` : pkg.max_guests ? `hasta ${pkg.max_guests} inv.` : `desde ${pkg.min_guests} inv.`}
-                      </span>
+          {items.map(pkg => {
+            const tierCfg = PACKAGE_TIERS.find(t => t.value === pkg.tier)
+            return (
+              <div key={pkg.id} className="card" style={{ opacity: pkg.is_active ? 1 : 0.55 }}>
+                <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                      {tierCfg && (
+                        <span style={{ fontSize: 10, background: tierCfg.bg, color: tierCfg.color, borderRadius: 8, padding: '1px 8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {tierCfg.label}
+                        </span>
+                      )}
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)' }}>{pkg.name}</span>
+                      {pkg.is_recommended && <span style={{ fontSize: 10, background: 'var(--gold)', color: '#fff', borderRadius: 8, padding: '1px 8px', fontWeight: 700 }}>⭐ Recomendado</span>}
+                      <span style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 600 }}>{priceLabel(pkg)}</span>
+                      {(pkg.min_guests || pkg.max_guests) && (
+                        <span style={{ fontSize: 11, color: 'var(--warm-gray)', background: 'var(--cream)', padding: '1px 8px', borderRadius: 8 }}>
+                          {pkg.min_guests && pkg.max_guests ? `${pkg.min_guests}–${pkg.max_guests} inv.` : pkg.max_guests ? `hasta ${pkg.max_guests} inv.` : `desde ${pkg.min_guests} inv.`}
+                        </span>
+                      )}
+                    </div>
+                    {/* Days + curfew row */}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: pkg.subtitle || pkg.description ? 6 : 0 }}>
+                      {(pkg.days_available?.length ?? 0) > 0 && (
+                        <span style={{ fontSize: 10, background: '#1e293b', color: '#fff', padding: '1px 8px', borderRadius: 8 }}>
+                          📅 {pkg.days_available!.join(' · ')}
+                        </span>
+                      )}
+                      {pkg.event_hours && <span style={{ fontSize: 10, color: 'var(--warm-gray)', background: 'var(--cream)', padding: '1px 8px', borderRadius: 8 }}>⏱ {pkg.event_hours}h</span>}
+                      {pkg.music_curfew && <span style={{ fontSize: 10, color: 'var(--warm-gray)', background: 'var(--cream)', padding: '1px 8px', borderRadius: 8 }}>🎵 {pkg.music_curfew}</span>}
+                    </div>
+                    {pkg.subtitle && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 4 }}>{pkg.subtitle}</div>}
+                    {pkg.description && <div style={{ fontSize: 12, color: 'var(--charcoal)', marginBottom: 8, lineHeight: 1.5 }}>{pkg.description}</div>}
+                    {pkg.includes?.filter(Boolean).length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {pkg.includes.filter(Boolean).map((inc, i) => (
+                          <span key={i} style={{ fontSize: 10, color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: 8 }}>✓ {inc}</span>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {pkg.subtitle && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 6 }}>{pkg.subtitle}</div>}
-                  {pkg.description && <div style={{ fontSize: 12, color: 'var(--charcoal)', marginBottom: 8, lineHeight: 1.5 }}>{pkg.description}</div>}
-                  {pkg.includes?.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                      {pkg.includes.filter(Boolean).map((inc, i) => (
-                        <span key={i} style={{ fontSize: 11, color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: 8 }}>✓ {inc}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => openEdit(pkg)} style={{ fontSize: 11, padding: '5px 10px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--ivory)', background: '#fff', color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Pencil size={11} /> Editar
-                  </button>
-                  <button onClick={() => handleDelete(pkg.id)} style={{ fontSize: 11, padding: '5px 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid #fca5a5', background: '#fff', color: '#dc2626' }}>
-                    <Trash2 size={11} />
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button onClick={() => openEdit(pkg)} style={{ fontSize: 11, padding: '5px 10px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--ivory)', background: '#fff', color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Pencil size={11} /> Editar
+                    </button>
+                    <button onClick={() => handleDelete(pkg.id)} style={{ fontSize: 11, padding: '5px 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid #fca5a5', background: '#fff', color: '#dc2626' }}>
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -2795,13 +3701,13 @@ function ZonesEditor({ items, userId, onRefresh }: { items: VenueZone[]; userId:
   const [uploading,  setUploading]  = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
 
-  const empty = (): Omit<VenueZone, 'id'> => ({ name: '', description: '', capacity_min: undefined, capacity_max: undefined, price: '', sort_order: items.length, photos: [] })
+  const empty = (): Omit<VenueZone, 'id'> => ({ name: '', description: '', capacity_min: undefined, capacity_max: undefined, price: '', sort_order: items.length, photos: [], supplement_price: '', group_name: '' })
   const [form, setForm] = useState(empty())
   const setF = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
   const openNew  = () => { setForm(empty()); setIsNew(true); setEditing(null) }
   const openEdit = (item: VenueZone) => {
-    setForm({ name: item.name, description: item.description || '', capacity_min: item.capacity_min, capacity_max: item.capacity_max, price: item.price || '', sort_order: item.sort_order, photos: item.photos || [] })
+    setForm({ name: item.name, description: item.description || '', capacity_min: item.capacity_min, capacity_max: item.capacity_max, price: item.price || '', sort_order: item.sort_order, photos: item.photos || [], supplement_price: item.supplement_price || '', group_name: item.group_name || '' })
     setEditing(item); setIsNew(false)
   }
 
@@ -2809,7 +3715,10 @@ function ZonesEditor({ items, userId, onRefresh }: { items: VenueZone[]; userId:
     if (!form.name.trim()) return
     setSaving(true); setSaveError(null)
     const supabase = createClient()
-    const payload = { user_id: userId, section: 'zone', sort_order: form.sort_order, is_active: true, data: { name: form.name, description: form.description, capacity_min: form.capacity_min, capacity_max: form.capacity_max, price: form.price, photos: form.photos ?? [] } }
+    const zData: Record<string, any> = { name: form.name, description: form.description, capacity_min: form.capacity_min, capacity_max: form.capacity_max, price: form.price, photos: form.photos ?? [] }
+    if (form.supplement_price) zData.supplement_price = form.supplement_price
+    if (form.group_name) zData.group_name = form.group_name
+    const payload = { user_id: userId, section: 'zone', sort_order: form.sort_order, is_active: true, data: zData }
     let err = null
     if (isNew) { const r = await supabase.from('venue_content').insert(payload); err = r.error }
     else if (editing) { const r = await supabase.from('venue_content').update(payload).eq('id', editing.id); err = r.error }
@@ -2960,10 +3869,12 @@ function ZonesEditor({ items, userId, onRefresh }: { items: VenueZone[]; userId:
 // ── Content: Season Prices ────────────────────────────────────────────────────
 
 function SeasonPricesEditor({ items, userId, onRefresh }: { items: VenueSeasonPrice[]; userId: string; onRefresh: () => void }) {
+  // Skip period records (season === 'period') — those belong to VenuePricePeriodEditor
+  const adjustmentItems = items.filter(i => i.season !== 'period')
   const [editing, setEditing] = useState<VenueSeasonPrice | null>(null)
   const [isNew,   setIsNew]   = useState(false)
   const [saving,  setSaving]  = useState(false)
-  const empty = (): Omit<VenueSeasonPrice, 'id'> => ({ season: 'alta', label: '', date_range: '', price_modifier: '', notes: '', sort_order: items.length })
+  const empty = (): Omit<VenueSeasonPrice, 'id'> => ({ season: 'alta', label: '', date_range: '', price_modifier: '', notes: '', sort_order: adjustmentItems.length })
   const [form, setForm] = useState(empty())
   const setF = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
@@ -3039,7 +3950,7 @@ function SeasonPricesEditor({ items, userId, onRefresh }: { items: VenueSeasonPr
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {items.map(item => {
+        {adjustmentItems.map(item => {
           const cfg = SEASON_COLORS[item.season] || SEASON_COLORS['media']
           return (
             <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: '#fff', border: '1px solid var(--ivory)', borderRadius: 8 }}>
@@ -3059,10 +3970,815 @@ function SeasonPricesEditor({ items, userId, onRefresh }: { items: VenueSeasonPr
             </div>
           )
         })}
-        {items.length === 0 && !isNew && (
+        {adjustmentItems.length === 0 && !isNew && (
           <div className="card" style={{ padding: '30px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 12 }}>
             <Calendar size={28} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
             <div>Configura los precios según la temporada del año</div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Content: Venue Rental Pricing Wizard (for venue_only) ────────────────────
+
+function VenueRentalPricingWizard({ dcfg, saveDisplayCfg, zones, seasonPrices, userId, onRefresh }: {
+  dcfg: VenueDisplayConfig
+  saveDisplayCfg: (patch: Partial<VenueDisplayConfig>) => Promise<void>
+  zones: VenueZone[]
+  seasonPrices: VenueSeasonPrice[]
+  userId: string
+  onRefresh: () => void
+}) {
+  // Backward compat: any previously stored 'by_group' (or zone_pricing flag) maps to 'base_plus'
+  const priceType: 'full' | 'base_plus' = dcfg.venue_price_type === 'base_plus' ? 'base_plus' : 'full'
+  const isMultiDay = !!dcfg.prices_is_multiday
+
+  const [newZoneName,       setNewZoneName]       = useState('')
+  const [newZoneGroup,      setNewZoneGroup]       = useState('')
+  const [savingZone,        setSavingZone]         = useState(false)
+  const [editingZoneId,     setEditingZoneId]      = useState<string | null>(null)
+  const [editingSupplPrice, setEditingSupplPrice]  = useState('')
+  const [activeZoneTab,     setActiveZoneTab]      = useState<string | null | 'base'>('base')
+
+  const periodItems = seasonPrices.filter(s => s.season === 'period')
+
+  // All unique group names across zones (exclude empty → those are ungrouped)
+  const namedGroups = useMemo(() => {
+    const seen = new Set<string>()
+    zones.forEach(z => { if (z.group_name?.trim()) seen.add(z.group_name.trim()) })
+    return Array.from(seen)
+  }, [zones])
+
+  const ungroupedZones = zones.filter(z => !z.group_name?.trim())
+  const groupedZones   = namedGroups.map(g => ({ group: g, items: zones.filter(z => z.group_name?.trim() === g) }))
+
+  const saveZone = async () => {
+    if (!newZoneName.trim()) return
+    setSavingZone(true)
+    const supabase = createClient()
+    const zData: Record<string, any> = {
+      name: newZoneName.trim(), description: '',
+      capacity_min: null, capacity_max: null, price: '', photos: [],
+    }
+    if (newZoneGroup.trim()) zData.group_name = newZoneGroup.trim()
+    await supabase.from('venue_content').insert({
+      user_id: userId, section: 'zone', sort_order: zones.length, is_active: true, data: zData,
+    })
+    setNewZoneName('')
+    setNewZoneGroup('')
+    setSavingZone(false)
+    onRefresh()
+  }
+
+  const deleteZone = async (zoneId: string) => {
+    if (!confirm('¿Eliminar esta zona? También se borrarán sus periodos de tarifa.')) return
+    const supabase = createClient()
+    await supabase.from('venue_content').delete().eq('id', zoneId)
+    const zPeriodIds = periodItems.filter(p => p.zone_id === zoneId).map(p => p.id)
+    for (const pid of zPeriodIds) await supabase.from('venue_content').delete().eq('id', pid)
+    onRefresh()
+  }
+
+  const saveZoneSupplPrice = async (zone: VenueZone) => {
+    const { id, ...rest } = zone
+    await createClient().from('venue_content').update({
+      data: { ...rest, supplement_price: editingSupplPrice.trim() || null },
+    }).eq('id', id)
+    setEditingZoneId(null)
+    onRefresh()
+  }
+
+  // ── Visual helpers ──
+  const StepBadge = ({ n, done }: { n: number; done: boolean }) => (
+    <div style={{
+      width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+      background: done ? '#d1fae5' : 'var(--gold)',
+      color: done ? '#065f46' : '#fff',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 12, fontWeight: 700,
+    }}>
+      {done ? '✓' : n}
+    </div>
+  )
+
+  const OptionBtn = ({ active, onClick, icon, title, desc }: {
+    active: boolean; onClick: () => void; icon: string; title: string; desc: string
+  }) => (
+    <button onClick={onClick} style={{
+      padding: '16px 18px', borderRadius: 10, textAlign: 'left', cursor: 'pointer',
+      border: `2px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`,
+      background: active ? '#fef9ec' : '#fff', transition: 'all 0.15s',
+      display: 'flex', flexDirection: 'column', gap: 4,
+    }}>
+      <span style={{ fontSize: 22 }}>{icon}</span>
+      <div style={{ fontSize: 13, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--espresso)' }}>{title}</div>
+      <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5 }}>{desc}</div>
+      {active && <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', marginTop: 4 }}>✓ Seleccionado</div>}
+    </button>
+  )
+
+  const ZoneRow = ({ z }: { z: VenueZone }) => (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '10px 14px', borderRadius: 8,
+      border: '1px solid var(--ivory)', background: '#fafafa',
+    }}>
+      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--espresso)', flex: 1 }}>📍 {z.name}</span>
+      {editingZoneId === z.id ? (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input
+            className="form-input" style={{ width: 140, fontSize: 12 }}
+            value={editingSupplPrice}
+            onChange={e => setEditingSupplPrice(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') saveZoneSupplPrice(z); if (e.key === 'Escape') setEditingZoneId(null) }}
+            placeholder="ej: 800€"
+            autoFocus />
+          <button onClick={() => saveZoneSupplPrice(z)} className="btn btn-primary btn-sm" style={{ padding: '4px 10px', fontSize: 11 }}>Guardar</button>
+          <button onClick={() => setEditingZoneId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}><X size={12} /></button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{
+            fontSize: 12, fontWeight: z.supplement_price ? 600 : 400,
+            color: z.supplement_price ? '#059669' : '#9ca3af',
+            background: z.supplement_price ? '#d1fae5' : '#f3f4f6',
+            padding: '2px 8px', borderRadius: 12,
+          }}>
+            {z.supplement_price ? `+${z.supplement_price}` : 'Sin suplemento'}
+          </span>
+          <button onClick={() => { setEditingZoneId(z.id); setEditingSupplPrice(z.supplement_price || '') }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gold)', display: 'flex', alignItems: 'center' }}>
+            <Pencil size={12} />
+          </button>
+          <button onClick={() => deleteZone(z.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center' }}>
+            <X size={12} />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+
+  const stepMultiDay = priceType === 'full' ? 2 : 3
+  const stepPeriods  = priceType === 'full' ? 3 : 4
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+      {/* ── PASO 1: Tipo de precio ── */}
+      <div style={{ border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', background: '#fafafa', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <StepBadge n={1} done={true} />
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>¿Cómo está organizado el precio?</div>
+        </div>
+        <div style={{ padding: '16px 18px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <OptionBtn
+            active={priceType === 'full'}
+            onClick={() => saveDisplayCfg({ venue_price_type: 'full', prices_has_zone_pricing: false })}
+            icon="🏛️" title="Precio fijo"
+            desc="Un precio cubre el venue entero. La pareja alquila todo el espacio." />
+          <OptionBtn
+            active={priceType === 'base_plus'}
+            onClick={() => saveDisplayCfg({ venue_price_type: 'base_plus', prices_has_zone_pricing: false })}
+            icon="🏷️" title="Base + suplementos"
+            desc="Precio base del venue con upgrades opcionales de pago adicional por zona. Los grupos son opcionales." />
+        </div>
+      </div>
+
+      {/* ── PASO 2: Zonas con suplemento (base_plus) ── */}
+      {priceType === 'base_plus' && (
+        <div style={{ border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', background: '#fafafa', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <StepBadge n={2} done={zones.length > 0} />
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>Zonas opcionales con suplemento</div>
+            {zones.length > 0 && <span style={{ fontSize: 11, color: 'var(--warm-gray)', marginLeft: 'auto' }}>{zones.length} zona{zones.length !== 1 ? 's' : ''}{namedGroups.length > 0 ? ` · ${namedGroups.length} grupo${namedGroups.length !== 1 ? 's' : ''}` : ''}</span>}
+          </div>
+          <div style={{ padding: '16px 18px' }}>
+            <div style={{ marginBottom: 14, fontSize: 11, color: '#6b7280', lineHeight: 1.6 }}>
+              💡 Cada zona es un <strong>upgrade opcional</strong> con un coste adicional sobre el precio base.
+              Puedes <strong>agrupar zonas</strong> para indicar que la pareja debe escoger una de ellas (ej: grupo «Salón» → Salón A o Salón B).
+              Las zonas sin grupo se listan de forma independiente.
+            </div>
+
+            {/* Ungrouped zones */}
+            {ungroupedZones.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: namedGroups.length > 0 ? 14 : 0 }}>
+                {ungroupedZones.map(z => <ZoneRow key={z.id} z={z} />)}
+              </div>
+            )}
+
+            {/* Grouped zones */}
+            {groupedZones.map(({ group, items: gItems }) => (
+              <div key={group} style={{ marginBottom: 10, borderRadius: 8, border: '1px solid var(--ivory)', overflow: 'hidden' }}>
+                <div style={{ padding: '7px 12px', background: '#f3f4f6', fontSize: 11, fontWeight: 600, color: 'var(--espresso)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>📂 {group}</span>
+                  <span style={{ marginLeft: 'auto', fontWeight: 400, color: 'var(--warm-gray)', fontSize: 10 }}>elige una opción · {gItems.length} zonas</span>
+                </div>
+                <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {gItems.map(z => <ZoneRow key={z.id} z={z} />)}
+                </div>
+              </div>
+            ))}
+
+            {zones.length === 0 && (
+              <div style={{ marginBottom: 14, padding: '16px', background: '#f9fafb', border: '2px dashed var(--ivory)', borderRadius: 8, textAlign: 'center', fontSize: 11, color: 'var(--warm-gray)' }}>
+                Sin zonas todavía. Si no añades zonas, el precio base se aplica a todo el venue.
+              </div>
+            )}
+
+            {/* Add zone input */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', paddingTop: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: '1 1 160px' }}>
+                <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Zona / upgrade</label>
+                <input className="form-input" style={{ fontSize: 12 }}
+                  value={newZoneName} onChange={e => setNewZoneName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !savingZone && newZoneName.trim() && saveZone()}
+                  placeholder="Ej: Jardín privado, Salón A…" />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: '1 1 140px' }}>
+                <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Grupo (opcional)</label>
+                <input className="form-input" style={{ fontSize: 12 }}
+                  value={newZoneGroup} onChange={e => setNewZoneGroup(e.target.value)}
+                  placeholder="Ej: Salón, Jardín…"
+                  list="wizard-group-names" />
+                <datalist id="wizard-group-names">
+                  {namedGroups.map(g => <option key={g} value={g} />)}
+                </datalist>
+              </div>
+              <button onClick={saveZone} disabled={savingZone || !newZoneName.trim()} className="btn btn-primary btn-sm" style={{ flexShrink: 0 }}>
+                {savingZone ? '...' : <><Plus size={12} /> Añadir</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PASO 3 (o 2): Multi-día o día único ── */}
+      <div style={{ border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', background: '#fafafa', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <StepBadge n={stepMultiDay} done={true} />
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>¿Cómo se alquila el venue?</div>
+        </div>
+        <div style={{ padding: '16px 18px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <OptionBtn active={!isMultiDay} onClick={() => saveDisplayCfg({ prices_is_multiday: false })}
+            icon="📅" title="Día único"
+            desc="La boda se celebra en un solo día. Los precios son siempre por día (cada viernes, cada sábado…)." />
+          <OptionBtn active={isMultiDay} onClick={() => saveDisplayCfg({ prices_is_multiday: true })}
+            icon="🌙" title="Multi-día (wedding weekend)"
+            desc="La boda ocupa varios días. Puedes definir el precio por día o un precio total para toda la franja reservada." />
+        </div>
+      </div>
+
+      {/* ── PASO 4 (o 3): Periodos de tarifa ── */}
+      <div style={{ border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', background: '#fafafa', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <StepBadge n={stepPeriods} done={periodItems.length > 0} />
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>Periodos de tarifa</div>
+          {periodItems.length > 0 && (
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--warm-gray)' }}>
+              {periodItems.length} periodo{periodItems.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        <div style={{ padding: '16px 18px' }}>
+
+          {/* Zone / group scope tabs — only when base_plus with zones */}
+          {priceType === 'base_plus' && zones.length > 0 && (() => {
+            const curTab = activeZoneTab === 'base' || activeZoneTab === null ? 'base' : activeZoneTab
+            const baseCount = seasonPrices.filter(s => s.season === 'period' && !s.zone_id).length
+
+            const TabBtn = ({ id, label, count, icon }: { id: string | 'base'; label: string; count: number; icon?: string }) => {
+              const isAct = curTab === id
+              return (
+                <button onClick={() => setActiveZoneTab(id)} style={{
+                  padding: '8px 14px', background: 'none', border: 'none',
+                  borderBottom: `2px solid ${isAct ? 'var(--gold)' : 'transparent'}`,
+                  marginBottom: -2, cursor: 'pointer',
+                  color: isAct ? 'var(--espresso)' : 'var(--warm-gray)',
+                  fontSize: 12, fontWeight: isAct ? 600 : 400,
+                  display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.15s', whiteSpace: 'nowrap',
+                }}>
+                  {icon && <span>{icon}</span>}
+                  {label}
+                  {count > 0 && (
+                    <span style={{ fontSize: 10, borderRadius: 8, padding: '1px 5px', fontWeight: 600, background: isAct ? 'var(--gold)' : '#f3f4f6', color: isAct ? '#fff' : 'var(--warm-gray)' }}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              )
+            }
+
+            return (
+              <div style={{ marginBottom: 20 }}>
+                {/* Tab bar */}
+                <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--ivory)', flexWrap: 'wrap', marginBottom: 14 }}>
+                  <TabBtn id="base" label="Precio base" count={baseCount} icon="📋" />
+                  {/* Ungrouped zones */}
+                  {ungroupedZones.map(z => (
+                    <TabBtn key={z.id} id={z.id}
+                      label={z.name}
+                      count={seasonPrices.filter(s => s.season === 'period' && s.zone_id === z.id).length}
+                      icon="📍" />
+                  ))}
+                  {/* Grouped zones — show group name as visual separator */}
+                  {groupedZones.map(({ group, items: gItems }) => (
+                    <div key={group} style={{ display: 'flex', alignItems: 'stretch' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', padding: '0 6px', borderLeft: '1px solid var(--ivory)', marginLeft: 4 }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', writingMode: 'horizontal-tb' }}>
+                          {group}:
+                        </span>
+                      </div>
+                      {gItems.map(z => (
+                        <TabBtn key={z.id} id={z.id}
+                          label={z.name}
+                          count={seasonPrices.filter(s => s.season === 'period' && s.zone_id === z.id).length}
+                          icon="📍" />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Scope description */}
+                <div style={{ padding: '8px 12px', background: curTab === 'base' ? '#fef9ec' : '#f0f9ff', border: `1px solid ${curTab === 'base' ? '#fde68a' : '#bae6fd'}`, borderRadius: 8, fontSize: 11, color: curTab === 'base' ? '#92400e' : '#0369a1', marginBottom: 14 }}>
+                  {curTab === 'base'
+                    ? <span>💡 <strong>Precio base</strong> del venue. El suplemento de cada zona se añade sobre este precio.</span>
+                    : <span>💡 Periodos para <strong>{zones.find(z => z.id === curTab)?.name}</strong>. El suplemento de esta zona se suma al precio base del periodo correspondiente.</span>
+                  }
+                </div>
+              </div>
+            )
+          })()}
+
+          <VenuePricePeriodEditor
+            items={seasonPrices}
+            userId={userId}
+            onRefresh={onRefresh}
+            isMultiDay={isMultiDay}
+            zoneId={priceType === 'base_plus' && zones.length > 0 && activeZoneTab !== 'base'
+              ? (activeZoneTab || undefined) : undefined}
+          />
+        </div>
+      </div>
+
+      {/* Min. spend toggle */}
+      <div style={{ padding: '10px 16px', background: '#f9fafb', border: '1px solid var(--ivory)', borderRadius: 10 }}>
+        <ConfigToggle
+          label="Modelo de gasto mínimo (min. spend)"
+          hint="La pareja debe alcanzar un importe mínimo en F&B para poder reservar"
+          value={dcfg.prices_has_min_spend || false}
+          onChange={v => saveDisplayCfg({ prices_has_min_spend: v })}
+        />
+      </div>
+
+    </div>
+  )
+}
+
+// ── Content: Venue Price Period Calendar (for venue_only) ─────────────────────
+
+const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const MONTHS_FULL  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+const PERIOD_DAYS: { key: string; label: string; short: string }[] = [
+  { key: 'lun', label: 'Lunes',     short: 'L' },
+  { key: 'mar', label: 'Martes',    short: 'M' },
+  { key: 'mie', label: 'Miércoles', short: 'X' },
+  { key: 'jue', label: 'Jueves',    short: 'J' },
+  { key: 'vie', label: 'Viernes',   short: 'V' },
+  { key: 'sab', label: 'Sábado',    short: 'S' },
+  { key: 'dom', label: 'Domingo',   short: 'D' },
+]
+
+function VenuePricePeriodEditor({ items, userId, onRefresh, isMultiDay, zoneId }: {
+  items: VenueSeasonPrice[]
+  userId: string
+  onRefresh: () => void
+  isMultiDay: boolean
+  zoneId?: string   // if set → show/save only periods for this zone
+}) {
+  // Filter: season === 'period', with optional zone scope
+  const periodItems = items.filter(i => {
+    if (i.season !== 'period' || !i.date_from || !i.date_to) return false
+    if (zoneId !== undefined) return i.zone_id === zoneId
+    return !i.zone_id
+  })
+
+  const [editing,  setEditing]  = useState<VenueSeasonPrice | null>(null)
+  const [isNew,    setIsNew]    = useState(false)
+  const [saving,   setSaving]   = useState(false)
+  const [viewYear, setViewYear] = useState(new Date().getFullYear() + 1)
+
+  const emptyForm = () => ({
+    label: '',
+    date_from: `${viewYear}-01-01`,
+    date_to: `${viewYear}-12-31`,
+    base_price: '',
+    price_unit: 'per_day' as 'per_event' | 'per_day',  // always default per_day
+    notes: '',
+    applicable_days: [] as string[],
+    includes_holidays: false,
+  })
+  const [form, setForm] = useState(emptyForm())
+  const setF = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
+
+  const toggleDay = (key: string) => {
+    setForm(f => {
+      const days = f.applicable_days || []
+      return { ...f, applicable_days: days.includes(key) ? days.filter(d => d !== key) : [...days, key] }
+    })
+  }
+  const PD = PERIOD_DAYS
+
+  // Coverage map: "YYYY-MM" → list of periods that cover that month
+  const coverageMap = useMemo(() => {
+    const map: Record<string, VenueSeasonPrice[]> = {}
+    periodItems.forEach(p => {
+      if (!p.date_from || !p.date_to) return
+      const start = new Date(p.date_from + 'T12:00:00')
+      const end   = new Date(p.date_to   + 'T12:00:00')
+      const cur   = new Date(start.getFullYear(), start.getMonth(), 1)
+      const endM  = new Date(end.getFullYear(),   end.getMonth(),   1)
+      while (cur <= endM) {
+        const ym = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`
+        if (!map[ym]) map[ym] = []
+        map[ym].push(p)
+        cur.setMonth(cur.getMonth() + 1)
+      }
+    })
+    return map
+  }, [periodItems])
+
+  const yearMonths = Array.from({ length: 12 }, (_, i) => {
+    const ym      = `${viewYear}-${String(i + 1).padStart(2, '0')}`
+    const periods = coverageMap[ym] || []
+    return { month: i, ym, covered: periods.length > 0, overlap: periods.length > 1, periods }
+  })
+  const uncoveredMonths = yearMonths.filter(m => !m.covered)
+  const allCovered = uncoveredMonths.length === 0 && periodItems.length > 0
+
+  const handleSave = async () => {
+    if (!form.label.trim() || !form.date_from || !form.date_to || !form.base_price) return
+    if (form.date_from > form.date_to) return
+    setSaving(true)
+    const supabase = createClient()
+    // For día único, always per_day regardless of what form might say
+    const effectiveUnit = isMultiDay ? form.price_unit : 'per_day'
+    const data = {
+      season: 'period',
+      label: form.label,
+      date_from: form.date_from,
+      date_to: form.date_to,
+      base_price: form.base_price,
+      price_unit: effectiveUnit,
+      notes: form.notes,
+      zone_id: zoneId || null,
+      applicable_days: form.applicable_days.length > 0 ? form.applicable_days : null,
+      includes_holidays: form.includes_holidays || false,
+      // Legacy compat
+      date_range: `${form.date_from} – ${form.date_to}`,
+      price_modifier: form.base_price,
+    }
+    const payload = { user_id: userId, section: 'season_price' as const, sort_order: editing?.sort_order ?? periodItems.length, is_active: true, data }
+    if (isNew)    await supabase.from('venue_content').insert(payload)
+    else if (editing) await supabase.from('venue_content').update(payload).eq('id', editing.id)
+    setSaving(false); setIsNew(false); setEditing(null); onRefresh()
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Eliminar este periodo?')) return
+    await createClient().from('venue_content').delete().eq('id', id)
+    onRefresh()
+  }
+
+  const openEdit = (p: VenueSeasonPrice) => {
+    setForm({
+      label: p.label,
+      date_from: p.date_from || '',
+      date_to: p.date_to || '',
+      base_price: p.base_price || '',
+      price_unit: (p.price_unit || 'per_event'),
+      notes: p.notes || '',
+      applicable_days: p.applicable_days || [],
+      includes_holidays: p.includes_holidays || false,
+    })
+    setEditing(p); setIsNew(false)
+  }
+
+  const openNew = () => { setForm(emptyForm()); setIsNew(true); setEditing(null) }
+
+  const fmtDate = (d: string) => d ? new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+
+  return (
+    <div>
+
+      {/* ── Year-at-a-glance coverage calendar ── */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>Cobertura de tarifas</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button onClick={() => setViewYear(y => y - 1)} style={{ background: 'none', border: '1px solid var(--ivory)', borderRadius: 6, cursor: 'pointer', padding: '3px 8px', color: 'var(--charcoal)' }}>
+              <ChevronLeft size={14} />
+            </button>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', minWidth: 44, textAlign: 'center' }}>{viewYear}</span>
+            <button onClick={() => setViewYear(y => y + 1)} style={{ background: 'none', border: '1px solid var(--ivory)', borderRadius: 6, cursor: 'pointer', padding: '3px 8px', color: 'var(--charcoal)' }}>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* 6×2 month grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5 }}>
+          {yearMonths.map(({ month, periods, covered, overlap }) => {
+            const priceLabel = periods[0]?.base_price ? `${Number(periods[0].base_price).toLocaleString('es-ES')}€` : ''
+            return (
+              <div key={month}
+                title={covered ? periods.map((p: VenueSeasonPrice) => `${p.label}: ${p.base_price}€`).join(' | ') : 'Sin tarifa definida'}
+                style={{
+                  padding: '9px 6px 8px',
+                  borderRadius: 8,
+                  background: overlap ? '#fef3c7' : covered ? '#d1fae5' : '#fafafa',
+                  border: `1.5px solid ${overlap ? '#fcd34d' : covered ? '#6ee7b7' : '#e5e7eb'}`,
+                  textAlign: 'center',
+                }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: overlap ? '#92400e' : covered ? '#065f46' : '#9ca3af' }}>
+                  {MONTHS_SHORT[month]}
+                </div>
+                <div style={{ fontSize: 10, marginTop: 3, color: overlap ? '#d97706' : covered ? '#059669' : '#d1d5db', lineHeight: 1.2 }}>
+                  {overlap ? '⚠️ solapado' : covered ? priceLabel || '✓' : '—'}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Coverage status */}
+        {periodItems.length === 0 ? (
+          <div style={{ marginTop: 8, padding: '8px 12px', background: '#f9fafb', border: '1px solid var(--ivory)', borderRadius: 6, fontSize: 11, color: 'var(--warm-gray)' }}>
+            Añade al menos un periodo para ver la cobertura del año.
+          </div>
+        ) : allCovered ? (
+          <div style={{ marginTop: 8, padding: '8px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, fontSize: 11, color: '#166534', display: 'flex', alignItems: 'center', gap: 6 }}>
+            ✅ El año {viewYear} está completamente cubierto.
+          </div>
+        ) : (
+          <div style={{ marginTop: 8, padding: '8px 12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 6, fontSize: 11, color: '#92400e', display: 'flex', alignItems: 'center', gap: 6 }}>
+            ⚠️ Meses sin tarifa en {viewYear}: <strong>{uncoveredMonths.map(m => MONTHS_SHORT[m.month]).join(', ')}</strong>
+          </div>
+        )}
+
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
+          {[
+            { bg: '#d1fae5', border: '#6ee7b7', color: '#065f46', label: 'Cubierto' },
+            { bg: '#fafafa', border: '#e5e7eb', color: '#9ca3af', label: 'Sin tarifa' },
+            { bg: '#fef3c7', border: '#fcd34d', color: '#92400e', label: 'Periodos solapados' },
+          ].map(l => (
+            <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 10, height: 10, borderRadius: 3, background: l.bg, border: `1.5px solid ${l.border}` }} />
+              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{l.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Period list ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>Periodos de tarifa</div>
+          <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>
+            {isMultiDay ? 'Precio por evento completo (varios días)' : 'Precio por evento (un día)'}
+          </div>
+        </div>
+        <button onClick={openNew} className="btn btn-primary btn-sm"><Plus size={12} /> Añadir periodo</button>
+      </div>
+
+      {/* ── Add / Edit form ── */}
+      {(isNew || editing) && (
+        <div className="card" style={{ padding: 18, marginBottom: 14, border: '1px solid var(--gold)', background: '#fef9ec' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>{isNew ? 'Nuevo periodo' : 'Editar periodo'}</span>
+            <button onClick={() => { setIsNew(false); setEditing(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={14} /></button>
+          </div>
+
+          {/* Row 1: name + price + unit */}
+          <div style={{ display: 'grid', gridTemplateColumns: `1fr auto${isMultiDay ? ' auto' : ''}`, gap: 10, marginBottom: 10 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Nombre del periodo *</label>
+              <input className="form-input" value={form.label} onChange={e => setF('label', e.target.value)} placeholder="Ej: Temporada alta · Verano 2026" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Precio (€) *</label>
+              <input className="form-input" style={{ width: 110 }} type="number" value={form.base_price} onChange={e => setF('base_price', e.target.value)} placeholder="Ej: 5500" />
+            </div>
+            {/* Unit selector: only shown for multi-día */}
+            {isMultiDay && (
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Por</label>
+                <select className="form-input" style={{ width: 150 }} value={form.price_unit} onChange={e => setF('price_unit', e.target.value)}>
+                  <option value="per_day">Día</option>
+                  <option value="per_event">Evento completo</option>
+                </select>
+              </div>
+            )}
+          </div>
+          {/* For día único: show fixed "per_day" badge */}
+          {!isMultiDay && (
+            <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Precio aplicado:</span>
+              <span style={{ fontSize: 11, fontWeight: 600, background: '#f0fdf4', border: '1px solid #6ee7b7', color: '#065f46', padding: '2px 8px', borderRadius: 6 }}>
+                📅 Por día
+              </span>
+              <span style={{ fontSize: 10, color: '#9ca3af' }}>— en día único cada día se cobra por separado</span>
+            </div>
+          )}
+
+          {/* Row 2: date range */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Fecha inicio *</label>
+              <input className="form-input" type="date" value={form.date_from} onChange={e => setF('date_from', e.target.value)} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Fecha fin *</label>
+              <input className="form-input" type="date" value={form.date_to} onChange={e => setF('date_to', e.target.value)} min={form.date_from} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Notas (opcional)</label>
+              <input className="form-input" value={form.notes} onChange={e => setF('notes', e.target.value)} placeholder="Ej: Precio especial fin de semana" />
+            </div>
+          </div>
+
+          {/* Row 3: applicable days */}
+          <div style={{ marginBottom: 10 }}>
+            <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>
+              Días aplicables
+              <span style={{ fontWeight: 400, color: 'var(--warm-gray)', marginLeft: 6 }}>
+                {form.applicable_days.length === 0 ? '— todos los días' : `${form.applicable_days.length} día${form.applicable_days.length !== 1 ? 's' : ''} seleccionado${form.applicable_days.length !== 1 ? 's' : ''}`}
+              </span>
+            </label>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+              {/* All-days shortcut */}
+              <button
+                type="button"
+                onClick={() => setF('applicable_days', form.applicable_days.length === 7 ? [] : PD.map(d => d.key))}
+                style={{
+                  padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600,
+                  border: `1.5px solid ${form.applicable_days.length === 7 ? 'var(--gold)' : 'var(--ivory)'}`,
+                  background: form.applicable_days.length === 7 ? '#fef9ec' : '#f9fafb',
+                  color: form.applicable_days.length === 7 ? 'var(--gold)' : 'var(--warm-gray)',
+                }}>
+                Todos
+              </button>
+              <div style={{ width: 1, height: 20, background: 'var(--ivory)', margin: '0 2px' }} />
+              {PD.map(d => {
+                const active = form.applicable_days.includes(d.key)
+                return (
+                  <button key={d.key} type="button" onClick={() => toggleDay(d.key)} title={d.label}
+                    style={{
+                      width: 30, height: 30, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      border: `1.5px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`,
+                      background: active ? 'var(--gold)' : '#f9fafb',
+                      color: active ? '#fff' : 'var(--warm-gray)',
+                      transition: 'all 0.1s',
+                    }}>
+                    {d.short}
+                  </button>
+                )
+              })}
+              <div style={{ width: 1, height: 20, background: 'var(--ivory)', margin: '0 2px' }} />
+              {/* Festivos */}
+              <button type="button" onClick={() => setF('includes_holidays', !form.includes_holidays)}
+                style={{
+                  padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600,
+                  border: `1.5px solid ${form.includes_holidays ? '#f59e0b' : 'var(--ivory)'}`,
+                  background: form.includes_holidays ? '#fef3c7' : '#f9fafb',
+                  color: form.includes_holidays ? '#92400e' : 'var(--warm-gray)',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                🎉 Festivos
+              </button>
+            </div>
+            {form.applicable_days.length > 0 && (
+              <div style={{ marginTop: 5, fontSize: 10, color: 'var(--warm-gray)' }}>
+                {!isMultiDay
+                  ? <>El precio se aplica <strong style={{ color: 'var(--espresso)' }}>individualmente</strong> a cada: <strong style={{ color: 'var(--espresso)' }}>{form.applicable_days.map(k => PD.find(d => d.key === k)?.label).join(', ')}{form.includes_holidays ? ' y festivos' : ''}</strong></>
+                  : form.price_unit === 'per_event'
+                    ? <>El precio cubre el <strong style={{ color: 'var(--espresso)' }}>bloque completo</strong>: {form.applicable_days.map(k => PD.find(d => d.key === k)?.label).join(' + ')}{form.includes_holidays ? ' + festivos' : ''}</>
+                    : <>El precio aplica <strong style={{ color: 'var(--espresso)' }}>por día</strong> a cada: {form.applicable_days.map(k => PD.find(d => d.key === k)?.label).join(', ')}{form.includes_holidays ? ' y festivos' : ''}</>
+                }
+              </div>
+            )}
+          </div>
+
+          {form.date_from && form.date_to && form.date_from <= form.date_to && form.base_price && (() => {
+            const effectiveUnit = isMultiDay ? form.price_unit : 'per_day'
+            const dayNames = form.applicable_days.map(k => PD.find(d => d.key === k)?.label).filter(Boolean)
+            const dayShorts = form.applicable_days.map(k => PD.find(d => d.key === k)?.short).filter(Boolean)
+            const hasHols = form.includes_holidays
+            const price = Number(form.base_price).toLocaleString('es-ES')
+
+            let semanticText = ''
+            if (effectiveUnit === 'per_day') {
+              if (dayNames.length > 0) {
+                semanticText = `${price}€ cada ${dayNames.join(', ')}${hasHols ? ' y festivos' : ''} dentro del periodo`
+              } else {
+                semanticText = `${price}€ por cada día dentro del periodo`
+              }
+            } else {
+              // per_event (multi-día only)
+              if (dayNames.length > 0) {
+                semanticText = `${price}€ precio total · cubre ${dayShorts.join('+')}${hasHols ? '+fest.' : ''} como bloque`
+              } else {
+                semanticText = `${price}€ precio total por el evento completo`
+              }
+            }
+
+            return (
+              <div style={{ marginBottom: 10, padding: '8px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 6, fontSize: 11, color: '#0369a1', lineHeight: 1.5 }}>
+                <div>📅 {fmtDate(form.date_from)} → {fmtDate(form.date_to)}
+                  {form.applicable_days.length > 0 && <> &nbsp;·&nbsp; <strong>{dayShorts.join(' ')}{hasHols ? ' + fest.' : ''}</strong></>}
+                </div>
+                <div style={{ marginTop: 3, fontStyle: 'italic' }}>💶 {semanticText}</div>
+              </div>
+            )
+          })()}
+          {form.date_from && form.date_to && form.date_from > form.date_to && (
+            <div style={{ marginBottom: 10, padding: '6px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, fontSize: 11, color: '#dc2626' }}>
+              ⚠️ La fecha de fin debe ser posterior a la de inicio.
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setIsNew(false); setEditing(null) }}>Cancelar</button>
+            <button className="btn btn-primary btn-sm" onClick={handleSave}
+              disabled={saving || !form.label.trim() || !form.base_price || !form.date_from || !form.date_to || form.date_from > form.date_to}>
+              {saving ? 'Guardando...' : 'Guardar periodo'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Period items list ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {periodItems
+          .sort((a, b) => (a.date_from || '').localeCompare(b.date_from || ''))
+          .map(p => {
+            const isCurrent = viewYear.toString() >= (p.date_from || '').slice(0, 4) && viewYear.toString() <= (p.date_to || '').slice(0, 4)
+            return (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: '#fff', border: `1px solid ${isCurrent ? '#6ee7b7' : 'var(--ivory)'}`, borderRadius: 8 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 8, background: '#f0fdf4', border: '1px solid #6ee7b7', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ fontSize: 9, color: '#059669', fontWeight: 600, textTransform: 'uppercase' }}>desde</span>
+                  <span style={{ fontSize: 11, color: '#065f46', fontWeight: 700 }}>{p.date_from ? MONTHS_SHORT[new Date(p.date_from + 'T12:00:00').getMonth()] : '—'}</span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', marginBottom: 3 }}>{p.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span>📅 {fmtDate(p.date_from || '')} → {fmtDate(p.date_to || '')}</span>
+                    {p.notes && <span>· {p.notes}</span>}
+                  </div>
+                  {(p.applicable_days && p.applicable_days.length > 0 || p.includes_holidays) && (
+                    <div style={{ display: 'flex', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
+                      {(p.applicable_days || []).map(k => (
+                        <span key={k} style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'var(--gold)', color: '#fff' }}>
+                          {PD.find(d => d.key === k)?.short}
+                        </span>
+                      ))}
+                      {p.includes_holidays && (
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e' }}>
+                          🎉 Festivos
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Cormorant Garamond, serif' }}>
+                    {p.base_price ? `${Number(p.base_price).toLocaleString('es-ES')}€` : '—'}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+                    {p.price_unit === 'per_event' ? '/ evento completo' : '/ día'}
+                  </div>
+                  {p.price_unit === 'per_event' && p.applicable_days && p.applicable_days.length > 0 && (
+                    <div style={{ fontSize: 9, color: '#059669', marginTop: 1 }}>
+                      ({p.applicable_days.map(k => PERIOD_DAYS.find(d => d.key === k)?.short).join('+')} total)
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                  <button onClick={() => openEdit(p)} style={{ background: 'none', border: '1px solid var(--ivory)', borderRadius: 6, cursor: 'pointer', padding: '4px 8px' }}><Pencil size={11} /></button>
+                  <button onClick={() => handleDelete(p.id)} style={{ background: 'none', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer', padding: '4px 8px', color: '#dc2626' }}><Trash2 size={11} /></button>
+                </div>
+              </div>
+            )
+          })}
+        {periodItems.length === 0 && !isNew && (
+          <div style={{ padding: '32px 20px', textAlign: 'center', background: '#fafafa', border: '2px dashed var(--ivory)', borderRadius: 10 }}>
+            <Calendar size={28} style={{ color: 'var(--stone)', margin: '0 auto 10px', display: 'block' }} />
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', marginBottom: 4 }}>Sin periodos de tarifa</div>
+            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 14 }}>Añade un periodo por cada rango de fechas con precio diferente. El objetivo es cubrir el año completo.</div>
+            <button onClick={openNew} className="btn btn-primary btn-sm"><Plus size={12} /> Añadir primer periodo</button>
           </div>
         )}
       </div>
@@ -4170,6 +5886,408 @@ function VenueMapEditor({ item, userId, onRefresh }: { item: VenueMapInfo | null
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Guardando...' : item?.id ? 'Actualizar' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Content: Caterers Recommendation (venue_only model) ───────────────────────
+
+const CATERER_CATEGORIES = [
+  'Catering',
+  'Catering vegetariano / vegano',
+  'Catering internacional',
+  'Decoración y floristería',
+  'DJ / música en vivo',
+  'Fotografía y vídeo',
+  'Coordinación de bodas',
+  'Alquiler de menaje',
+  'Animación y espectáculos',
+  'Iluminación y AV',
+  'Pastelería',
+  'Otro',
+]
+
+function CaterersRecommendationEditor({ items, userId, onRefresh }: { items: VenueCatererRecommendation[]; userId: string; onRefresh: () => void }) {
+  const [editing, setEditing] = useState<VenueCatererRecommendation | null>(null)
+  const [isNew,   setIsNew]   = useState(false)
+  const [saving,  setSaving]  = useState(false)
+
+  const empty = (): Omit<VenueCatererRecommendation, 'id'> => ({
+    name: '', category: 'Catering', website: '', phone: '', notes: '', sort_order: items.length,
+  })
+  const [form, setForm] = useState(empty())
+  const setF = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
+
+  const openNew  = () => { setForm(empty()); setIsNew(true); setEditing(null) }
+  const openEdit = (item: VenueCatererRecommendation) => {
+    setForm({ name: item.name, category: item.category || 'Catering', website: item.website || '', phone: item.phone || '', notes: item.notes || '', sort_order: item.sort_order })
+    setEditing(item); setIsNew(false)
+  }
+
+  const handleSave = async () => {
+    if (!form.name.trim()) return
+    setSaving(true)
+    const supabase = createClient()
+    const payload = { user_id: userId, section: 'caterer_recommendation', sort_order: form.sort_order, is_active: true, data: { name: form.name, category: form.category, website: form.website, phone: form.phone, notes: form.notes } }
+    if (isNew) await supabase.from('venue_content').insert(payload)
+    else if (editing) await supabase.from('venue_content').update(payload).eq('id', editing.id)
+    setSaving(false); setIsNew(false); setEditing(null); onRefresh()
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Eliminar este proveedor?')) return
+    await createClient().from('venue_content').delete().eq('id', id)
+    onRefresh()
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>Caterers y proveedores recomendados</div>
+          <div style={{ fontSize: 12, color: 'var(--warm-gray)', maxWidth: 480 }}>
+            Lista de proveedores que avalas o con los que tienes acuerdo. Se muestra a las parejas para que puedan contactar directamente.
+          </div>
+        </div>
+        <button onClick={openNew} className="btn btn-primary btn-sm" style={{ flexShrink: 0 }}><Plus size={12} /> Añadir proveedor</button>
+      </div>
+
+      {(isNew || editing) && (
+        <div className="card" style={{ padding: '16px', marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>{isNew ? 'Nuevo proveedor' : 'Editar proveedor'}</span>
+            <button onClick={() => { setIsNew(false); setEditing(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={14} /></button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Nombre del proveedor *</label>
+              <input className="form-input" value={form.name} onChange={e => setF('name', e.target.value)} placeholder="Ej: Catering Mediterráneo BCN" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Categoría</label>
+              <select className="form-input" value={form.category || 'Catering'} onChange={e => setF('category', e.target.value)}>
+                {CATERER_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Web / Instagram</label>
+              <input className="form-input" value={form.website || ''} onChange={e => setF('website', e.target.value)} placeholder="https://..." />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Teléfono</label>
+              <input className="form-input" value={form.phone || ''} onChange={e => setF('phone', e.target.value)} placeholder="+34 600 000 000" />
+            </div>
+          </div>
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label className="form-label">Nota para la pareja (opcional)</label>
+            <input className="form-input" value={form.notes || ''} onChange={e => setF('notes', e.target.value)} placeholder="Ej: Trabajan con nosotros desde hace 5 años, precio preferente para nuestras bodas" />
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setIsNew(false); setEditing(null) }}>Cancelar</button>
+            <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving || !form.name.trim()}>{saving ? 'Guardando...' : 'Guardar'}</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {items.map(item => (
+          <div key={item.id} className="card" style={{ padding: '14px 16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', marginBottom: 2 }}>{item.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  {item.category && (
+                    <span style={{ fontSize: 10, background: 'var(--cream)', color: 'var(--warm-gray)', padding: '1px 7px', borderRadius: 8 }}>{item.category}</span>
+                  )}
+                  {item.phone && <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{item.phone}</span>}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                <button onClick={() => openEdit(item)} style={{ background: 'none', border: '1px solid var(--ivory)', borderRadius: 6, cursor: 'pointer', padding: '3px 7px' }}><Pencil size={11} /></button>
+                <button onClick={() => handleDelete(item.id)} style={{ background: 'none', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer', padding: '3px 7px', color: '#dc2626' }}><Trash2 size={11} /></button>
+              </div>
+            </div>
+            {item.website && (
+              <a href={item.website} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                <Link2 size={10} /> {item.website.replace(/^https?:\/\//, '')}
+              </a>
+            )}
+            {item.notes && <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5, fontStyle: 'italic' }}>"{item.notes}"</div>}
+          </div>
+        ))}
+        {items.length === 0 && !isNew && (
+          <div className="card" style={{ padding: '30px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 12, gridColumn: '1 / -1' }}>
+            <Users size={28} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
+            <div style={{ fontWeight: 500, marginBottom: 4 }}>Sin caterers recomendados todavía</div>
+            <div>Añade los proveedores con los que trabajáis o que recomendáis a las parejas</div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── UI Helper: ConfigToggle ───────────────────────────────────────────────────
+
+function ConfigToggle({ label, hint, value, onChange }: { label: string; hint?: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div
+      onClick={() => onChange(!value)}
+      style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0', cursor: 'pointer', userSelect: 'none' }}
+    >
+      <span style={{ color: value ? 'var(--gold)' : 'var(--stone)', marginTop: 1, flexShrink: 0 }}>
+        {value ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+      </span>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 500, color: value ? 'var(--espresso)' : 'var(--warm-gray)' }}>{label}</div>
+        {hint && <div style={{ fontSize: 11, color: 'var(--stone)', lineHeight: 1.4 }}>{hint}</div>}
+      </div>
+    </div>
+  )
+}
+
+// ── UI Helper: SectionConfigPanel ─────────────────────────────────────────────
+
+function SectionConfigPanel({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          padding: '9px 14px', background: open ? '#f9fafb' : '#fff',
+          border: 'none', cursor: 'pointer', textAlign: 'left',
+        }}
+      >
+        <span style={{ fontSize: 13 }}>⚙️</span>
+        <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--warm-gray)' }}>{title}</span>
+        {open ? <ChevronUp size={13} style={{ color: 'var(--stone)' }} /> : <ChevronDown size={13} style={{ color: 'var(--stone)' }} />}
+      </button>
+      {open && (
+        <div style={{ padding: '8px 14px 12px', background: '#f9fafb', borderTop: '1px solid #f3f4f6' }}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Content: Vendor Policy ────────────────────────────────────────────────────
+
+const VENDOR_POLICY_OPTIONS: Array<{ value: VendorPolicyChoice; label: string; desc: string; color: string; bg: string }> = [
+  { value: 'exclusive',     label: 'Exclusivo',        desc: 'Solo el proveedor del venue',          color: '#7e22ce', bg: '#f3e8ff' },
+  { value: 'approved_list', label: 'Lista aprobada',   desc: 'Solo proveedores de la lista del venue', color: '#0369a1', bg: '#e0f2fe' },
+  { value: 'open',          label: 'Libre',            desc: 'La pareja puede traer cualquier proveedor', color: '#166534', bg: '#dcfce7' },
+]
+
+const VENDOR_POLICY_CATEGORIES: Array<{ key: keyof VendorPolicy; label: string; emoji: string }> = [
+  { key: 'catering',     label: 'Catering',           emoji: '🍽️' },
+  { key: 'dj_music',     label: 'Música / DJ',        emoji: '🎵' },
+  { key: 'photography',  label: 'Fotografía / Video', emoji: '📷' },
+  { key: 'decoration',   label: 'Decoración / Flores', emoji: '💐' },
+  { key: 'coordinator',  label: 'Wedding planner',    emoji: '📋' },
+]
+
+function VendorPolicyEditor({ item, userId, onRefresh }: { item: VendorPolicy | null; userId: string; onRefresh: () => void }) {
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState<VendorPolicy>({
+    catering: item?.catering,
+    dj_music: item?.dj_music,
+    photography: item?.photography,
+    decoration: item?.decoration,
+    coordinator: item?.coordinator,
+    external_fee: item?.external_fee || '',
+    notes: item?.notes || '',
+  })
+  const setF = (k: keyof VendorPolicy, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  const handleSave = async () => {
+    setSaving(true)
+    const supabase = createClient()
+    const payload = { user_id: userId, section: 'vendor_policy', sort_order: 0, is_active: true, data: form }
+    if (item?.id) await supabase.from('venue_content').update(payload).eq('id', item.id)
+    else await supabase.from('venue_content').insert(payload)
+    setSaving(false); onRefresh()
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>Política de proveedores externos</div>
+        <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Define si la pareja puede contratar sus propios proveedores o deben usar los del venue.</div>
+      </div>
+      <div className="card" style={{ padding: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
+          {VENDOR_POLICY_CATEGORIES.map(cat => (
+            <div key={cat.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 160, fontSize: 12, fontWeight: 500, color: 'var(--espresso)', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <span>{cat.emoji}</span> {cat.label}
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {VENDOR_POLICY_OPTIONS.map(opt => {
+                  const active = form[cat.key] === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => setF(cat.key, opt.value)}
+                      style={{
+                        padding: '4px 10px', borderRadius: 8, border: '1px solid',
+                        borderColor: active ? opt.color : '#e5e7eb',
+                        background: active ? opt.bg : '#fff',
+                        color: active ? opt.color : 'var(--warm-gray)',
+                        fontSize: 11, fontWeight: active ? 600 : 400, cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+                <button
+                  onClick={() => setForm(f => { const n = { ...f }; delete n[cat.key]; return n })}
+                  style={{ padding: '4px 8px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: 'var(--stone)', fontSize: 11, cursor: 'pointer' }}
+                >
+                  —
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Fee proveedor externo (si aplica)</label>
+            <input className="form-input" value={form.external_fee || ''} onChange={e => setF('external_fee', e.target.value)} placeholder="Ej: 15% sobre presupuesto externo" />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Notas adicionales</label>
+            <input className="form-input" value={form.notes || ''} onChange={e => setF('notes', e.target.value)} placeholder="Ej: Los caterers externos deben estar homologados" />
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Guardando...' : item?.id ? 'Actualizar política' : 'Guardar política'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Content: Payment Plan ─────────────────────────────────────────────────────
+
+function PaymentPlanEditor({ item, userId, onRefresh }: { item: VenuePaymentPlan | null; userId: string; onRefresh: () => void }) {
+  const [saving, setSaving] = useState(false)
+  const blankMilestone = (): PaymentMilestone => ({ id: crypto.randomUUID(), label: '', amount_type: 'percent', amount: '', trigger: '' })
+  const [milestones, setMilestones] = useState<PaymentMilestone[]>(
+    item?.milestones?.length ? item.milestones : [
+      { id: crypto.randomUUID(), label: 'Señal de reserva', amount_type: 'percent', amount: '20', trigger: 'Al firmar el contrato' },
+      { id: crypto.randomUUID(), label: 'Segundo pago', amount_type: 'percent', amount: '30', trigger: '6 meses antes del evento' },
+      { id: crypto.randomUUID(), label: 'Pago final', amount_type: 'percent', amount: '50', trigger: '30 días antes del evento' },
+    ]
+  )
+  const [deposit,      setDeposit]      = useState(item?.security_deposit || '')
+  const [cancelPolicy, setCancelPolicy] = useState(item?.cancellation_policy || '')
+
+  const updateM = (id: string, k: keyof PaymentMilestone, v: string) =>
+    setMilestones(ms => ms.map(m => m.id === id ? { ...m, [k]: v } : m))
+  const removeM = (id: string) => setMilestones(ms => ms.filter(m => m.id !== id))
+  const addM    = () => setMilestones(ms => [...ms, blankMilestone()])
+
+  const handleSave = async () => {
+    setSaving(true)
+    const supabase = createClient()
+    const data = { milestones, security_deposit: deposit, cancellation_policy: cancelPolicy }
+    const payload = { user_id: userId, section: 'payment_plan', sort_order: 0, is_active: true, data }
+    if (item?.id) await supabase.from('venue_content').update(payload).eq('id', item.id)
+    else await supabase.from('venue_content').insert(payload)
+    setSaving(false); onRefresh()
+  }
+
+  const totalPct = milestones
+    .filter(m => m.amount_type === 'percent')
+    .reduce((s, m) => s + (parseFloat(m.amount) || 0), 0)
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>Plan de pagos</div>
+        <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Señales y plazos de pago que se muestran a las parejas en la propuesta.</div>
+      </div>
+      <div className="card" style={{ padding: '20px' }}>
+        {/* Milestones */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>Hitos de pago</span>
+            {milestones.filter(m => m.amount_type === 'percent').length > 0 && (
+              <span style={{ fontSize: 11, color: totalPct === 100 ? '#166534' : '#dc2626', fontWeight: 600, background: totalPct === 100 ? '#dcfce7' : '#fee2e2', padding: '2px 8px', borderRadius: 8 }}>
+                {totalPct}% {totalPct === 100 ? '✓ completo' : '≠ 100%'}
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {milestones.map((m, i) => (
+              <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 1fr auto', gap: 8, alignItems: 'center' }}>
+                <input
+                  className="form-input" style={{ fontSize: 12 }}
+                  placeholder={`Pago ${i + 1} (ej: Señal de reserva)`}
+                  value={m.label}
+                  onChange={e => updateM(m.id, 'label', e.target.value)}
+                />
+                <select
+                  className="form-input" style={{ fontSize: 12, padding: '6px 8px' }}
+                  value={m.amount_type}
+                  onChange={e => updateM(m.id, 'amount_type', e.target.value)}
+                >
+                  <option value="percent">%</option>
+                  <option value="fixed">€ fijo</option>
+                </select>
+                <input
+                  className="form-input" style={{ fontSize: 12 }}
+                  placeholder={m.amount_type === 'percent' ? '20' : '3000'}
+                  value={m.amount}
+                  onChange={e => updateM(m.id, 'amount', e.target.value)}
+                />
+                <input
+                  className="form-input" style={{ fontSize: 12 }}
+                  placeholder="Cuándo (ej: Al firmar el contrato)"
+                  value={m.trigger || ''}
+                  onChange={e => updateM(m.id, 'trigger', e.target.value)}
+                />
+                <button onClick={() => removeM(m.id)} style={{ background: 'none', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer', padding: '4px 7px', color: '#dc2626' }}>
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button onClick={addM} className="btn btn-ghost btn-sm" style={{ marginTop: 10 }}>
+            <Plus size={12} /> Añadir hito de pago
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Fianza / depósito de seguridad</label>
+            <input className="form-input" value={deposit} onChange={e => setDeposit(e.target.value)} placeholder="Ej: 1.500€ fianza reembolsable" />
+          </div>
+        </div>
+        <div className="form-group" style={{ marginBottom: 16 }}>
+          <label className="form-label">Política de cancelación</label>
+          <textarea
+            className="form-textarea" style={{ minHeight: 80, fontSize: 12 }}
+            value={cancelPolicy}
+            onChange={e => setCancelPolicy(e.target.value)}
+            placeholder="Ej: En caso de cancelación con menos de 6 meses de antelación, la señal no será reembolsable. Con más de 6 meses, se devuelve el 50%."
+          />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Guardando...' : item?.id ? 'Actualizar plan' : 'Guardar plan'}
           </button>
         </div>
       </div>
