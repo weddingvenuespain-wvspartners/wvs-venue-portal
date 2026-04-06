@@ -1,11 +1,11 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Palette, Upload, Trash2, AlertCircle, Lock } from 'lucide-react'
-import type { SectionsData } from '../proposal/[slug]/ProposalLanding'
+import type { SectionsData } from '@/lib/proposal-types'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 
@@ -159,7 +159,7 @@ const SECTION_LABELS: Record<string, string> = {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
-export default function PropuestasPage() {
+function PropuestasPageContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
@@ -1537,5 +1537,13 @@ export default function PropuestasPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function PropuestasPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <PropuestasPageContent />
+    </Suspense>
   )
 }
