@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
@@ -114,7 +114,7 @@ const navGroups: { group: string; items: { key: Section; label: string; icon: Re
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function PerfilPage() {
+function PerfilPageContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const { user, profile, loading: authLoading } = useAuth()
@@ -1696,5 +1696,13 @@ export default function PerfilPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function PerfilPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <PerfilPageContent />
+    </Suspense>
   )
 }
