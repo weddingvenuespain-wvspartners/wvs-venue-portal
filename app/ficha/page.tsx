@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
-import { ExternalLink, Save, Upload, X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Upload, X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react'
 
 type Tab = 'info' | 'descripcion' | 'precios' | 'ubicacion' | 'fotos' | 'resenas' | 'config'
 type VenuePriceMode = 'auto' | 'included' | 'none'
@@ -56,6 +56,7 @@ export default function FichaPage() {
   const [confirmSubmit, setConfirmSubmit]         = useState(false)
   const [validationErrors, setValidationErrors]   = useState<{ field: string; tab: Tab; msg: string }[]>([])
   const [isDirty, setIsDirty]       = useState(false)
+  const [dirtyTabs, setDirtyTabs]   = useState<Set<Tab>>(new Set())
   const [pendingNav, setPendingNav] = useState<string | null>(null)
   const [heroLocalPreview, setHeroLocalPreview]   = useState<string | null>(null)
   const [cropState, setCropState] = useState<{ file: File; aspect: number; onCrop: (blob: Blob) => void; maxPx?: number; quality?: number } | null>(null)
@@ -180,26 +181,40 @@ export default function FichaPage() {
     })
     if (wpVenueId) {
       setResolvedVenueWpId(wpVenueId)
+
+      const hasRealChanges = onb?.changes_data && typeof onb.changes_data === 'object' && Object.keys(onb.changes_data).length > 0
+      const hasSupabaseData = (hasRealChanges && ['draft', 'submitted', 'rejected'].includes(onb?.changes_status || ''))
+        || (onb?.ficha_data && typeof onb.ficha_data === 'object' && Object.keys(onb.ficha_data).length > 0)
+
+      if (hasSupabaseData) {
+        // Fast path: populate from Supabase immediately, fetch WP metadata in background
+        if (hasRealChanges && ['draft', 'submitted', 'rejected'].includes(onb?.changes_status || '')) {
+          console.log('[ficha:load] Fast path — using changes_data, status:', onb?.changes_status)
+          populateFromFichaData(onb!.changes_data)
+        } else {
+          console.log('[ficha:load] Fast path — using ficha_data from Supabase')
+          populateFromFichaData(onb!.ficha_data)
+        }
+        setLoading(false)
+        setIsDirty(false); setDirtyTabs(new Set())
+
+        // Load WP venue metadata in background (for external link, title, etc.)
+        fetch(`/api/venues/wp-venue?id=${wpVenueId}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => { if (data) setVenue(data) })
+          .catch(() => {})
+        return
+      }
+
+      // Slow path: no Supabase data yet — must wait for WP (first-time load)
       try {
-        // Use server-side proxy — tries custom WP endpoint first, falls back to standard
-        const res = await fetch(`/api/venues/wp-venue?id=${wpVenueId}`, { cache: 'no-store' })
+        console.log('[ficha:load] Slow path — fetching from WP')
+        const res = await fetch(`/api/venues/wp-venue?id=${wpVenueId}`)
         if (res.ok) {
           const data = await res.json()
           setVenue(data)
           console.log('[ficha:wp]', { _source: data._source, title: data.title?.rendered, acf_keys: Object.keys(data.acf || {}) })
-          // Only use saved changes_data if user has explicitly saved a draft/submitted/rejected
-          const hasRealChanges = onb?.changes_data && typeof onb.changes_data === 'object' && Object.keys(onb.changes_data).length > 0
-          if (hasRealChanges && ['draft', 'submitted', 'rejected'].includes(onb?.changes_status || '')) {
-            console.log('[ficha:load] Using saved changes_data, status:', onb?.changes_status)
-            populateFromFichaData(onb!.changes_data)
-          } else if (onb?.ficha_data && typeof onb.ficha_data === 'object' && Object.keys(onb.ficha_data).length > 0) {
-            // ficha_data is the portal source of truth — it includes fields WP doesn't store (e.g. venuePriceInput)
-            console.log('[ficha:load] Using ficha_data from Supabase')
-            populateFromFichaData(onb.ficha_data)
-          } else {
-            console.log('[ficha:load] No ficha_data — falling back to WP')
-            populateFromWp(data)
-          }
+          populateFromWp(data)
         } else {
           const err = await res.json().catch(() => ({}))
           console.error('[ficha:wp error]', err)
@@ -212,7 +227,7 @@ export default function FichaPage() {
       populateFromFichaData(onb.ficha_data)
     }
     setLoading(false)
-    setIsDirty(false) // mark clean after initial load
+    setIsDirty(false); setDirtyTabs(new Set()) // mark clean after initial load
   }
 
   function resolveImage(img: any): { id: number; url: string } | null {
@@ -275,7 +290,7 @@ export default function FichaPage() {
     setShortDesc(acf.Short_Description_of_Venue || stripHtml(data.excerpt?.rendered || '').slice(0, 200) || '')
     setCapacity(acf.Capacity_of_Venue || '')
     const mp = parseLegacyMenu(acf.venue_starting_price || '')
-    setMenuPriceValue(mp.value); setMenuPriceUnit(mp.unit)
+    setMenuPriceValue(mp.value); setMenuPriceUnit('person')
     setHeroImage(resolveImage(acf.h1_image))
 
     // Vertical photo: portal writes to `vertical_photo`, WP site uses `section_2_image` (Photo Gallery)
@@ -342,7 +357,7 @@ export default function FichaPage() {
     setShortDesc(d.shortDesc || '')
     setCapacity(d.capacity || '')
     setMenuPriceValue(d.menuPriceValue || '')
-    setMenuPriceUnit(d.menuPriceUnit || 'person')
+    setMenuPriceUnit('person')
     const heroUrl = d.heroImageUrl || ''
     if (heroUrl && !heroUrl.startsWith('blob:')) setHeroImage({ id: d.heroImageId || 0, url: heroUrl })
     const vertUrl = d.verticalPhotoUrl || ''
@@ -460,7 +475,7 @@ export default function FichaPage() {
       const res = await fetch('/api/venues/save-draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await res.json()
       if (!res.ok) { notify(data.error || 'Error al guardar', true); return false }
-      setIsDirty(false)
+      setIsDirty(false); setDirtyTabs(new Set())
       notify('Borrador guardado ✓'); return true
     } catch { notify('Error de conexión', true); return false }
     finally { setSaving(false) }
@@ -663,30 +678,13 @@ export default function FichaPage() {
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {venue && (
               <a href={venue.link} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
-                <ExternalLink size={13} /> Ver en la web
+                Ver en la web
               </a>
-            )}
-            {!isLocked && (
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={saveDraft}
-                disabled={saving || uploadingHero || uploadingVertical || uploadingPhoto}
-                title={(uploadingHero || uploadingVertical || uploadingPhoto) ? 'Espera a que termine de subirse la foto' : undefined}
-              >
-                <Save size={13} /> {saving ? 'Guardando...' : (uploadingHero || uploadingVertical || uploadingPhoto) ? 'Subiendo foto...' : 'Guardar borrador'}
-              </button>
-            )}
-            {!isLocked && !changesPending && (
-              <button className="btn btn-primary btn-sm" onClick={handleSubmitClick} disabled={submitting}>
-                <Send size={13} /> {submitting ? 'Enviando...' : isApproved ? 'Enviar cambios' : 'Enviar para revisión'}
-              </button>
             )}
           </div>
         </div>
 
-        <div className="page-content" onChange={() => { if (!loading) setIsDirty(true) }}>
-          {success && <div className="alert alert-success" style={{ marginBottom: 16 }}>{success}</div>}
-          {error   && <div className="alert alert-error"   style={{ marginBottom: 16 }}>{error}</div>}
+        <div className="page-content" style={{ paddingBottom: 80 }} onChange={() => { if (!loading) { setIsDirty(true); setDirtyTabs(prev => new Set(prev).add(activeTab)) } }}>
 
           {/* Multi-venue selector */}
           {userVenues.length > 1 && (
@@ -714,63 +712,63 @@ export default function FichaPage() {
           {/* Status banners */}
           {isLocked && <StatusBanner type="pending" title="Ficha en revisión" body="Nuestro equipo está revisando tu ficha. Te avisaremos por email cuando esté aprobada." />}
           {isRejected && <StatusBanner type="error" title="Solicitud no aprobada" body={onboarding?.admin_notes || 'Corrige los campos indicados y vuelve a enviar.'} />}
-          {isApproved && !changesPending && !changesRejected && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, marginBottom: 20 }}>
-              <CheckCircle size={16} style={{ color: '#16a34a' }} />
-              <div style={{ fontSize: 12, color: '#15803d' }}>
-                Tu ficha está publicada. Edita cualquier campo y envía los cambios para revisión.
-                {changesStatus === 'draft' && onboarding?.changes_data && <span style={{ marginLeft: 6, color: '#ca8a04', fontWeight: 500 }}>Tienes cambios sin enviar.</span>}
-              </div>
-            </div>
-          )}
           {changesPending && <StatusBanner type="pending" title="Cambios en revisión" body="Los cambios están siendo revisados. La versión actual sigue publicada." />}
           {changesRejected && <StatusBanner type="error" title="Cambios no aprobados" body={onboarding?.admin_notes || ''} />}
 
-          {/* Unsaved changes reminder */}
-          {isDirty && !isLocked && (
-            <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 14px', marginBottom: 8, fontSize: 12, color: '#92400e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <span>⚠ Tienes cambios sin guardar — guarda el borrador antes de salir</span>
-              <button className="btn btn-ghost btn-sm" onClick={saveDraft} disabled={saving} style={{ fontSize: 11, padding: '4px 10px', whiteSpace: 'nowrap' }}>Guardar ahora</button>
-            </div>
-          )}
-
-          <div className="tabs">
+          <div style={{ display: 'flex', gap: 4, marginBottom: 28, alignItems: 'center', position: 'sticky', top: 54, zIndex: 30, background: 'var(--cream)', paddingTop: 16, paddingBottom: 12, marginTop: -16 }}>
             {tabs.map(t => {
               const errCount = validationErrors.filter(e => e.tab === t.key).length
+              const isActive = activeTab === t.key
               return (
-                <div key={t.key} className={`tab ${activeTab === t.key ? 'active' : ''}`}
-                  style={{ position: 'relative' }}
+                <button key={t.key}
+                  style={{
+                    position: 'relative', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: isActive ? 600 : 400,
+                    cursor: 'pointer', border: 'none', transition: 'all 0.15s', fontFamily: 'DM Sans, sans-serif',
+                    background: isActive ? 'var(--gold)' : 'transparent',
+                    color: isActive ? '#fff' : 'var(--warm-gray)',
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                  }}
                   onClick={() => {
                     if (t.key !== activeTab && isDirty) {
                       autoSaveRef.current()
-                      setIsDirty(false)
                     }
                     setActiveTab(t.key)
                   }}>
                   {t.label}
+                  {dirtyTabs.has(t.key) && !isLocked && (
+                    <span className="dirty-tooltip-wrap" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'default', position: 'relative' }}>
+                      <AlertCircle size={12} style={{ color: isActive ? 'rgba(255,255,255,0.7)' : '#d97706', flexShrink: 0 }} />
+                      <span className="dirty-tooltip">Hay cambios que no se han guardado</span>
+                    </span>
+                  )}
                   {errCount > 0 && (
                     <span style={{
-                      position: 'absolute', top: 3, right: 4,
+                      position: 'absolute', top: -3, right: -3,
                       background: '#dc2626', color: '#fff',
-                      fontSize: 9, fontWeight: 700, lineHeight: 1,
+                      fontSize: 8, fontWeight: 700, lineHeight: 1,
                       borderRadius: '50%', width: 14, height: 14,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     }}>{errCount}</span>
                   )}
-                </div>
+                </button>
               )
             })}
           </div>
 
           {/* ── INFO PRINCIPAL ──────────────────────────────────────────── */}
           {activeTab === 'info' && (
-            <div className="card">
-              <div className="card-header"><div className="card-title">Información principal</div></div>
-              <div className="card-body">
+            <div>
+              {/* Section title */}
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--espresso)', letterSpacing: '-0.02em' }}>Información principal</div>
+                <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginTop: 6 }}>Gestiona los detalles básicos y la apariencia visual de tu venue.</div>
+              </div>
 
-                {/* Nombre + Región */}
-                <div className="two-col">
-                  <div className="form-group">
+              {/* Two-column layout */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 32, alignItems: 'start' }}>
+                {/* Left column */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>Nombre del venue</span>
                       <span style={{ fontSize: 11, fontWeight: 400, color: WC_COLORS(wcH1, 8) }}>{wcH1} / 8 palabras</span>
@@ -782,164 +780,173 @@ export default function FichaPage() {
                       disabled={isLocked} />
                     {wcH1 > 8 && <FieldError msg="Máximo 8 palabras." />}
                   </div>
-                  <div className="form-group">
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Región</label>
                     <select className="form-input" value={location} onChange={e => setLocation(e.target.value)} disabled={isLocked} style={{ borderColor: hasError('Región') ? ERR : undefined }}>
                       <option value="">Selecciona una región...</option>
                       {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
-                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4 }}>Las regiones disponibles las gestiona el equipo WVS.</div>
                   </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Descripción corta</span>
+                      <span style={{ fontSize: 11, fontWeight: 400, color: WC_COLORS(wcShort, 30) }}>{wcShort} / 30 palabras</span>
+                    </label>
+                    <div style={{ fontSize: 11, color: 'var(--stone)', marginBottom: 6, lineHeight: 1.6 }}>
+                      <em>"A tranquil haven in the heart of Mallorca, surrounded by olive groves and the majestic Serra de Tramuntana, offering unmatched charm and serenity."</em>
+                      <br />En pocas palabras, ¿cómo describirías tu venue? Evoca el lugar y la sensación.
+                    </div>
+                    <textarea className="form-textarea" style={{ minHeight: 100, borderColor: wcShort > 30 || hasError('Descripción corta') ? ERR : undefined }}
+                      value={shortDesc} onChange={e => setShortDesc(e.target.value)}
+                      placeholder="Máximo 30 palabras. Aparece debajo del nombre del venue."
+                      disabled={isLocked} />
+                    {wcShort > 30 && <FieldError msg="Supera las 30 palabras." />}
+                  </div>
+
                 </div>
 
-                {/* Descripción corta */}
-                <div className="form-group">
-                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Descripción corta</span>
-                    <span style={{ fontSize: 11, fontWeight: 400, color: WC_COLORS(wcShort, 30) }}>{wcShort} / 30 palabras</span>
-                  </label>
-                  <div style={{ fontSize: 11, color: 'var(--stone)', marginBottom: 6, lineHeight: 1.6 }}>
-                    <em>"A tranquil haven in the heart of Mallorca, surrounded by olive groves and the majestic Serra de Tramuntana, offering unmatched charm and serenity."</em>
-                    <br />En pocas palabras, ¿cómo describirías tu venue?
-                  </div>
-                  <textarea className="form-textarea" style={{ minHeight: 72, borderColor: wcShort > 30 || hasError('Descripción corta') ? ERR : undefined }}
-                    value={shortDesc} onChange={e => setShortDesc(e.target.value)}
-                    placeholder="Máximo 30 palabras. Aparece debajo del nombre del venue."
-                    disabled={isLocked} />
-                  {wcShort > 30 && <FieldError msg="Supera las 30 palabras." />}
-                </div>
-
-                {/* Imagen hero */}
-                <div className="form-group">
-                  <label className="form-label">Imagen de fondo (hero)</label>
-                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 8, lineHeight: 1.7, padding: '8px 12px', background: 'var(--cream)', borderRadius: 6 }}>
-                    📐 <strong>Tamaño recomendado:</strong> 1920 × 1080 px (16:9) · Mínimo 1280 × 720 px<br />
-                    📦 <strong>Peso máximo:</strong> 10 MB · Acepta JPG, PNG, WebP
-                  </div>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    {(heroImage?.url || heroLocalPreview) ? (
-                      <div style={{ position: 'relative', width: 200, height: 112, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
-                        <img src={heroImage?.url || heroLocalPreview!} alt="Hero" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        {uploadingHero && (
-                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <span style={{ color: '#fff', fontSize: 11, fontWeight: 500 }}>Subiendo...</span>
-                          </div>
-                        )}
-                        {!isLocked && heroImage && !uploadingHero && (
-                          <button onClick={() => { setHeroImage(null); setHeroLocalPreview(null) }} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 4, width: 22, height: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={12} /></button>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ width: 200, height: 112, borderRadius: 8, border: `2px dashed ${hasError('Imagen hero') ? ERR : 'var(--ivory)'}`, background: hasError('Imagen hero') ? '#fef2f2' : 'var(--cream)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0, gap: 4 }}>
-                        <Upload size={20} style={{ color: hasError('Imagen hero') ? ERR : 'var(--stone)' }} />
-                        <span style={{ fontSize: 11, color: hasError('Imagen hero') ? ERR : 'var(--warm-gray)' }}>Sin imagen</span>
-                      </div>
-                    )}
-                    {!isLocked && (
-                      <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
-                        <Upload size={13} /> {uploadingHero ? 'Subiendo...' : heroImage ? 'Cambiar imagen' : 'Subir imagen'}
-                        <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploadingHero}
-                          onChange={e => {
-                            const f = e.target.files?.[0]
-                            if (!f) return
-                            setCropState({
-                              file: f,
-                              aspect: 16 / 9,
-                              onCrop: async (blob) => {
-                                setCropState(null)
-                                const localUrl = URL.createObjectURL(blob)
-                                setHeroLocalPreview(localUrl)
-                                const cropped = new File([blob], 'hero.webp', { type: 'image/webp' })
-                                uploadImage(cropped, img => { setHeroImage(img); URL.revokeObjectURL(localUrl); setHeroLocalPreview(null) }, setUploadingHero, 'Imagen hero', () => { URL.revokeObjectURL(localUrl); setHeroLocalPreview(null) })
-                              },
-                            })
-                            e.target.value = ''
-                          }} />
-                      </label>
-                    )}
-                  </div>
-                </div>
-
-                {/* Capacidad + Menú */}
-                <div className="two-col">
-                  <div className="form-group">
+                {/* Right column */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Máximo nº de invitados</label>
                     <input className="form-input" type="number" min={0} value={capacity}
                       onChange={e => setCapacity(e.target.value)} placeholder="Ej: 200" disabled={isLocked}
                       style={{ borderColor: hasError('Nº de invitados') ? ERR : undefined }} />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Starting price del menú</label>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <div style={{ position: 'relative', flex: 1 }}>
-                        <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--warm-gray)', pointerEvents: 'none' }}>From</span>
-                        <input className="form-input" style={{ paddingLeft: 44, borderColor: hasError('Starting price del menú') ? ERR : undefined }} type="number" min={0} value={menuPriceValue}
-                          onChange={e => setMenuPriceValue(e.target.value)} placeholder="120" disabled={isLocked || menuPriceUnit === ''} />
-                      </div>
-                      <select className="form-input" style={{ width: 120 }} value={menuPriceUnit}
-                        onChange={e => setMenuPriceUnit(e.target.value as any)} disabled={isLocked}>
-                        <option value="person">€ / persona</option>
-                        <option value="day">€ / día</option>
-                        <option value="">— no mostrar</option>
-                      </select>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Precio base del menú</label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--warm-gray)', pointerEvents: 'none' }}>€</span>
+                      <input className="form-input" style={{ paddingLeft: 30, borderColor: hasError('Starting price del menú') ? ERR : undefined }} type="number" min={0} value={menuPriceValue}
+                        onChange={e => setMenuPriceValue(e.target.value)} placeholder="185.00" disabled={isLocked} />
                     </div>
-                    {menuPriceValue && menuPriceUnit && (
+                    {menuPriceValue && (
                       <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4 }}>
-                        Se mostrará: <strong>From {menuPriceValue}€ per {menuPriceUnit === 'person' ? 'person' : 'day'}</strong>
+                        Precio base por comensal (IVA no incluido)
                       </div>
                     )}
                   </div>
-                </div>
 
-                {/* Precio del venue */}
-                <div className="form-group">
-                  <label className="form-label">Precio del venue</label>
-                  {!isLocked && (
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-                      {(['auto', 'included', 'none'] as VenuePriceMode[]).map(m => (
-                        <button key={m} type="button" onClick={() => setVenuePriceMode(m)} style={{
-                          padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer', border: '1px solid',
-                          borderColor: venuePriceMode === m ? 'var(--gold)' : 'var(--ivory)',
-                          background: venuePriceMode === m ? 'var(--gold)' : 'transparent',
-                          color: venuePriceMode === m ? '#fff' : 'var(--charcoal)',
-                        }}>
-                          {m === 'auto' ? 'Precio ($/$$/$$$ automático)' : m === 'included' ? 'Included' : '— (no mostrar)'}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {venuePriceMode === 'auto' && (
-                    <>
-                      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                        <input className="form-input" style={{ maxWidth: 200, borderColor: hasError('Precio del venue') ? ERR : undefined }} type="number" min={0} value={venuePriceInput}
-                          onChange={e => setVenuePriceInput(e.target.value)} placeholder="Precio aprox. del venue (€)" disabled={isLocked} />
-                        {autoSymbol(venuePriceInput) ? (
-                          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--gold)', letterSpacing: 2 }}>{autoSymbol(venuePriceInput)}</div>
-                        ) : venuePriceSaved ? (
-                          <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Guardado: <strong style={{ color: 'var(--gold)' }}>{venuePriceSaved}</strong></div>
-                        ) : null}
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Precio del venue</label>
+                    {!isLocked && (
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                        {(['auto', 'included', 'none'] as VenuePriceMode[]).map(m => (
+                          <button key={m} type="button" onClick={() => setVenuePriceMode(m)} style={{
+                            padding: '7px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', border: '1px solid',
+                            borderColor: venuePriceMode === m ? 'var(--charcoal)' : 'var(--ivory)',
+                            background: venuePriceMode === m ? 'var(--charcoal)' : '#fff',
+                            color: venuePriceMode === m ? '#fff' : 'var(--charcoal)',
+                            fontWeight: venuePriceMode === m ? 500 : 400,
+                          }}>
+                            {m === 'auto' ? 'Precio ($/$$/$$$ automático)' : m === 'included' ? 'Incluido' : 'No mostrar'}
+                          </button>
+                        ))}
                       </div>
-                      <div style={{ marginTop: 8, fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.8 }}>
-                        <strong style={{ color: 'var(--gold)' }}>$</strong> = hasta 4.000€ &nbsp;·&nbsp;
-                        <strong style={{ color: 'var(--gold)' }}>$$</strong> = 4.000€ – 8.000€ &nbsp;·&nbsp;
-                        <strong style={{ color: 'var(--gold)' }}>$$$</strong> = más de 8.000€
+                    )}
+                    {venuePriceMode === 'auto' && (
+                      <div style={{ position: 'relative' }}>
+                        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--warm-gray)', pointerEvents: 'none' }}>€</span>
+                        <input className="form-input" style={{ paddingLeft: 30, borderColor: hasError('Precio del venue') ? ERR : undefined }} type="number" min={0} value={venuePriceInput}
+                          onChange={e => setVenuePriceInput(e.target.value)} placeholder="4,500.00" disabled={isLocked} />
                       </div>
-                    </>
-                  )}
-                  {venuePriceMode === 'included' && <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Se mostrará como <strong>Included</strong>.</div>}
-                  {venuePriceMode === 'none' && <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>No se mostrará ningún precio de venue.</div>}
+                    )}
+                    {venuePriceMode === 'included' && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>Se mostrará como <strong>Included</strong>.</div>}
+                    {venuePriceMode === 'none' && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>No se mostrará ningún precio de venue.</div>}
+                  </div>
                 </div>
-
               </div>
 
+              {/* Hero + Consejo — siempre alineados */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 32, marginTop: 28 }}>
+                {/* Imagen hero */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Imagen de fondo (hero)</label>
+                  <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: `1px solid ${hasError('Imagen hero') ? ERR : 'var(--ivory)'}`, background: 'var(--cream)' }}>
+                    {(heroImage?.url || heroLocalPreview) ? (
+                      <>
+                        <img src={heroImage?.url || heroLocalPreview!} alt="Hero" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+                        {uploadingHero && (
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ color: '#fff', fontSize: 12, fontWeight: 500 }}>Subiendo...</span>
+                          </div>
+                        )}
+                        {!isLocked && heroImage && !uploadingHero && (
+                          <button onClick={() => { setHeroImage(null); setHeroLocalPreview(null) }} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none', borderRadius: 6, width: 26, height: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} /></button>
+                        )}
+                      </>
+                    ) : (
+                      <label style={{ height: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: isLocked ? 'default' : 'pointer' }}>
+                        <Upload size={22} style={{ color: hasError('Imagen hero') ? ERR : 'var(--stone)' }} />
+                        <span style={{ fontSize: 11, color: hasError('Imagen hero') ? ERR : 'var(--warm-gray)' }}>Sube la foto principal (16:9)</span>
+                        {!isLocked && (
+                          <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploadingHero}
+                            onChange={e => {
+                              const f = e.target.files?.[0]
+                              if (!f) return
+                              setCropState({
+                                file: f,
+                                aspect: 16 / 9,
+                                onCrop: async (blob) => {
+                                  setCropState(null)
+                                  const localUrl = URL.createObjectURL(blob)
+                                  setHeroLocalPreview(localUrl)
+                                  const cropped = new File([blob], 'hero.webp', { type: 'image/webp' })
+                                  uploadImage(cropped, img => { setHeroImage(img); URL.revokeObjectURL(localUrl); setHeroLocalPreview(null) }, setUploadingHero, 'Imagen hero', () => { URL.revokeObjectURL(localUrl); setHeroLocalPreview(null) })
+                                },
+                              })
+                              e.target.value = ''
+                            }} />
+                        )}
+                      </label>
+                    )}
+                  </div>
+                  {!isLocked && heroImage && (
+                    <label style={{ display: 'inline-block', marginTop: 8, fontSize: 12, color: 'var(--gold)', cursor: 'pointer', fontWeight: 500 }}>
+                      Cambiar imagen
+                      <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploadingHero}
+                        onChange={e => {
+                          const f = e.target.files?.[0]
+                          if (!f) return
+                          setCropState({
+                            file: f,
+                            aspect: 16 / 9,
+                            onCrop: async (blob) => {
+                              setCropState(null)
+                              const localUrl = URL.createObjectURL(blob)
+                              setHeroLocalPreview(localUrl)
+                              const cropped = new File([blob], 'hero.webp', { type: 'image/webp' })
+                              uploadImage(cropped, img => { setHeroImage(img); URL.revokeObjectURL(localUrl); setHeroLocalPreview(null) }, setUploadingHero, 'Imagen hero', () => { URL.revokeObjectURL(localUrl); setHeroLocalPreview(null) })
+                            },
+                          })
+                          e.target.value = ''
+                        }} />
+                    </label>
+                  )}
+                </div>
+
+                {/* Consejo */}
+                <div style={{ padding: '20px 22px', background: 'var(--cream)', borderRadius: 10, alignSelf: 'start' }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, fontStyle: 'italic', color: 'var(--espresso)', marginBottom: 8 }}>Consejo</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--warm-gray)', lineHeight: 1.7 }}>
+                    Los venues con imágenes de alta resolución y descripciones que evocan sentimientos tienen un 40% más de tasa de conversión. Asegúrate de que el "Starting Price" sea competitivo para tu región.
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
           {/* ── DESCRIPCIÓN ─────────────────────────────────────────────── */}
           {activeTab === 'descripcion' && (
-            <div className="card">
-              <div className="card-header"><div className="card-title">Descripción del venue</div></div>
-              <div className="card-body">
+            <div className="card" style={{ border: '1px solid var(--ivory)', borderRadius: 12 }}>
+              <div style={{ padding: '24px 28px 18px' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--espresso)', letterSpacing: '-0.01em' }}>Descripción del venue</div>
+                <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>Textos que aparecen en tu ficha pública.</div>
+              </div>
+              <div style={{ padding: '0 28px 28px' }}>
 
                 {/* Mini título */}
                 <div className="form-group">
@@ -994,9 +1001,12 @@ export default function FichaPage() {
 
           {/* ── PRECIOS ──────────────────────────────────────────────────── */}
           {activeTab === 'precios' && (
-            <div className="card">
-              <div className="card-header"><div className="card-title">Precios</div></div>
-              <div className="card-body">
+            <div className="card" style={{ border: '1px solid var(--ivory)', borderRadius: 12 }}>
+              <div style={{ padding: '24px 28px 18px' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--espresso)', letterSpacing: '-0.01em' }}>Precios</div>
+                <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>Venue fee, catering y alojamiento.</div>
+              </div>
+              <div style={{ padding: '0 28px 28px' }}>
 
                 <SectionTitle>Venue fee</SectionTitle>
 
@@ -1140,9 +1150,12 @@ export default function FichaPage() {
 
           {/* ── UBICACIÓN ────────────────────────────────────────────────── */}
           {activeTab === 'ubicacion' && (
-            <div className="card">
-              <div className="card-header"><div className="card-title">Ubicación y acceso</div></div>
-              <div className="card-body">
+            <div className="card" style={{ border: '1px solid var(--ivory)', borderRadius: 12 }}>
+              <div style={{ padding: '24px 28px 18px' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--espresso)', letterSpacing: '-0.01em' }}>Ubicación y acceso</div>
+                <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>Dirección, lugares cercanos y aeropuerto.</div>
+              </div>
+              <div style={{ padding: '0 28px 28px' }}>
 
                 <div className="form-group">
                   <label className="form-label">Ubicación específica</label>
@@ -1187,17 +1200,17 @@ export default function FichaPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
               {/* Photo tip */}
-              <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, fontSize: 12, color: '#15803d', lineHeight: 1.7 }}>
-                <strong>📸 Acepta JPG, PNG o WebP.</strong> Tras seleccionar la foto podrás <strong>recortarla al ratio correcto</strong> antes de subirla — sin salir de la página.
+              <div style={{ padding: '12px 16px', background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 10, fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.7 }}>
+                Acepta JPG, PNG o WebP. Tras seleccionar la foto podrás <strong style={{ color: 'var(--charcoal)' }}>recortarla al ratio correcto</strong> antes de subirla.
               </div>
 
               {/* Foto vertical */}
-              <div className="card">
-                <div className="card-header">
-                  <div className="card-title">Foto vertical (retrato)</div>
-                  <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>800 × 1200 px (2:3) · .webp · Máx 1.5 MB</span>
+              <div className="card" style={{ border: '1px solid var(--ivory)', borderRadius: 12 }}>
+                <div style={{ padding: '24px 28px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--espresso)', letterSpacing: '-0.01em' }}>Foto vertical</div>
+                  <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>800 × 1200 px · 2:3 · .webp</span>
                 </div>
-                <div className="card-body">
+                <div style={{ padding: '0 28px 28px' }}>
                   <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
                     {verticalPhoto?.url ? (
                       <div style={{ position: 'relative', width: 120, height: 135, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
@@ -1213,7 +1226,7 @@ export default function FichaPage() {
                     {!isLocked && (
                       <div>
                         <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
-                          <Upload size={13} /> {uploadingVertical ? 'Subiendo...' : 'Subir foto'}
+                          {uploadingVertical ? 'Subiendo...' : 'Subir foto'}
                           <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploadingVertical}
                             onChange={e => {
                               const f = e.target.files?.[0]
@@ -1243,12 +1256,12 @@ export default function FichaPage() {
               </div>
 
               {/* Galería */}
-              <div className="card">
-                <div className="card-header">
-                  <div className="card-title">Galería (hasta 8 fotos)</div>
-                  <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Mín 1200 × 900 px (4:3) · .webp · Máx 2 MB por foto</span>
+              <div className="card" style={{ border: '1px solid var(--ivory)', borderRadius: 12 }}>
+                <div style={{ padding: '24px 28px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--espresso)', letterSpacing: '-0.01em' }}>Galería</div>
+                  <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>8 fotos · 4:3 · .webp · Máx 2 MB</span>
                 </div>
-                <div className="card-body">
+                <div style={{ padding: '0 28px 28px' }}>
                   {uploadingPhoto && <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--gold)' }}>{uploadMsg}</div>}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
                     {hGallery.map((photo, i) => (
@@ -1303,9 +1316,9 @@ export default function FichaPage() {
 
           {/* ── RESEÑAS ──────────────────────────────────────────────────── */}
           {activeTab === 'resenas' && (
-            <div className="card">
-              <div className="card-header">
-                <div className="card-title">Reseñas de parejas</div>
+            <div className="card" style={{ border: '1px solid var(--ivory)', borderRadius: 12 }}>
+              <div style={{ padding: '24px 28px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--espresso)', letterSpacing: '-0.01em' }}>Reseñas de parejas</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 12, color: reviewsEnabled ? 'var(--gold)' : 'var(--warm-gray)' }}>
                     {reviewsEnabled ? 'Activas' : 'Desactivadas'}
@@ -1316,7 +1329,7 @@ export default function FichaPage() {
                   </button>
                 </div>
               </div>
-              <div className="card-body">
+              <div style={{ padding: '0 28px 28px' }}>
                 <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 16, lineHeight: 1.7 }}>
                   {reviewsEnabled
                     ? <><strong style={{ color: 'var(--charcoal)' }}>Las 3 reseñas son obligatorias</strong> si las tienes activas. Si no quieres mostrarlas, desactívalas con el botón de arriba.</>
@@ -1375,9 +1388,12 @@ export default function FichaPage() {
           {/* Bottom buttons */}
           {/* ── CONFIGURACIÓN ────────────────────────────────────────── */}
           {activeTab === 'config' && (
-            <div className="card">
-              <div className="card-header"><div className="card-title">Configuración</div></div>
-              <div className="card-body">
+            <div className="card" style={{ border: '1px solid var(--ivory)', borderRadius: 12 }}>
+              <div style={{ padding: '24px 28px 18px' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--espresso)', letterSpacing: '-0.01em' }}>Configuración</div>
+                <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>Emails de contacto y ajustes de tu ficha.</div>
+              </div>
+              <div style={{ padding: '0 28px 28px' }}>
 
                 <div className="form-group">
                   <label className="form-label">Emails para recibir consultas</label>
@@ -1435,7 +1451,7 @@ export default function FichaPage() {
                       finally { setSavingConfig(false) }
                     }}
                   >
-                    <Save size={13} /> {savingConfig ? 'Guardando...' : 'Guardar'}
+                    {savingConfig ? 'Guardando...' : 'Guardar'}
                   </button>
                   <button
                     className="btn btn-ghost"
@@ -1451,13 +1467,14 @@ export default function FichaPage() {
           )}
 
           {!isLocked && activeTab !== 'config' && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8, paddingTop: 8 }}>
+            <div style={{ position: 'fixed', bottom: 0, left: 'var(--sidebar-w)', right: 0, display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 28px', borderTop: '1px solid var(--ivory)', background: '#fff', zIndex: 40 }}>
               <button className="btn btn-ghost" onClick={saveDraft} disabled={saving}>
-                <Save size={13} /> {saving ? 'Guardando...' : 'Guardar borrador'}
+                {saving ? 'Guardando...' : 'Guardar borrador'}
               </button>
               {!changesPending && (
-                <button className="btn btn-primary" onClick={handleSubmitClick} disabled={submitting}>
-                  <Send size={13} /> {submitting ? 'Enviando...' : isApproved ? 'Enviar cambios para revisión' : 'Enviar para revisión'}
+                <button className="btn btn-primary" onClick={handleSubmitClick} disabled={submitting || !isDirty}
+                  style={{ opacity: !isDirty && !submitting ? 0.5 : 1 }}>
+                  {submitting ? 'Enviando...' : isApproved ? 'Enviar cambios para revisión' : 'Enviar para revisión'}
                 </button>
               )}
             </div>
@@ -1465,6 +1482,21 @@ export default function FichaPage() {
 
         </div>
       </div>
+
+      {/* ── Toast notification ────────────────────────────────── */}
+      {(success || error) && (
+        <div style={{
+          position: 'fixed', bottom: 80, right: 28, zIndex: 5000,
+          padding: '12px 20px', borderRadius: 10,
+          background: success ? '#15803d' : '#dc2626',
+          color: '#fff', fontSize: 13, fontWeight: 500,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+          display: 'flex', alignItems: 'center', gap: 8,
+          animation: 'toast-in 0.25s ease-out',
+        }}>
+          {success || error}
+        </div>
+      )}
 
       {/* ── Unsaved-changes navigation warning ──────────────────── */}
       {pendingNav && (
@@ -1481,7 +1513,7 @@ export default function FichaPage() {
                 disabled={saving}
                 onClick={async () => {
                   const saved = await saveDraft()
-                  if (saved) { const dest = pendingNav; setPendingNav(null); setIsDirty(false); router.push(dest) }
+                  if (saved) { const dest = pendingNav; setPendingNav(null); setIsDirty(false); setDirtyTabs(new Set()); router.push(dest) }
                 }}
               >
                 {saving ? 'Guardando...' : '💾 Guardar borrador y continuar'}
@@ -1489,7 +1521,7 @@ export default function FichaPage() {
               <button
                 className="btn btn-ghost"
                 style={{ justifyContent: 'center', color: '#b91c1c' }}
-                onClick={() => { const dest = pendingNav; setPendingNav(null); setIsDirty(false); router.push(dest) }}
+                onClick={() => { const dest = pendingNav; setPendingNav(null); setIsDirty(false); setDirtyTabs(new Set()); router.push(dest) }}
               >
                 Descartar cambios y salir
               </button>
@@ -1801,10 +1833,10 @@ function RichTextEditor({ value, onChange, disabled, style, minHeight = 300, com
 // ── Helpers components ────────────────────────────────────────────────────────
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 14, marginTop: 4 }}>{children}</div>
+  return <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--espresso)', marginBottom: 16, marginTop: 4, letterSpacing: '-0.01em' }}>{children}</div>
 }
 function Divider() {
-  return <div style={{ borderTop: '1px solid var(--ivory)', margin: '24px 0' }} />
+  return <div style={{ borderTop: '1px solid var(--ivory)', margin: '28px 0' }} />
 }
 function FieldError({ msg }: { msg: string }) {
   return <div style={{ fontSize: 11, color: '#c0392b', marginTop: 4 }}>{msg}</div>
