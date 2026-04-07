@@ -779,6 +779,9 @@ export default function FichaPage() {
                       style={{ borderColor: wcH1 > 8 || hasError('Nombre del venue') ? ERR : undefined }}
                       disabled={isLocked} />
                     {wcH1 > 8 && <FieldError msg="Máximo 8 palabras." />}
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 5, lineHeight: 1.4 }}>
+                      ⚠ El nombre forma parte del slug (URL) de la página. Si lo cambias, cambiará la URL del venue en WeddingVenuesSpain.com.
+                    </div>
                   </div>
 
                   <div className="form-group" style={{ marginBottom: 0 }}>

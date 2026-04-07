@@ -327,6 +327,13 @@ export default function AdminOnboardingPage() {
   const [adminNotes, setAdminNotes]   = useState('')
   const [filterStatus, setFilterStatus] = useState('pending')
 
+  const fetchOnboardings = async () => {
+    const supabase = createClient()
+    const { data: onbs } = await supabase
+      .from('venue_onboarding').select('*').order('submitted_at', { ascending: false })
+    if (onbs) setOnboardings(onbs)
+  }
+
   useEffect(() => {
     const init = async () => {
       const supabase = createClient()
@@ -337,13 +344,17 @@ export default function AdminOnboardingPage() {
         .from('venue_profiles').select('role').eq('user_id', session.user.id).single()
       if (me?.role !== 'admin') { router.push('/dashboard'); return }
 
-      const { data: onbs } = await supabase
-        .from('venue_onboarding').select('*').order('submitted_at', { ascending: false })
-      if (onbs) setOnboardings(onbs)
+      await fetchOnboardings()
       setLoading(false)
     }
     init()
   }, [authLoading]) // eslint-disable-line
+
+  // Auto-refresh every 30s to catch new submissions from venues
+  useEffect(() => {
+    const interval = setInterval(fetchOnboardings, 30_000)
+    return () => clearInterval(interval)
+  }, []) // eslint-disable-line
 
   const notify = (msg: string, isErr = false) => {
     isErr ? setError(msg) : setSuccess(msg)
@@ -368,6 +379,7 @@ export default function AdminOnboardingPage() {
         notify('Venue aprobado y publicado en WordPress ✓')
         setOnboardings(prev => prev.map(o => o.id === onb.id ? { ...o, status: 'approved', wp_post_id: data.wp_venue_id } : o))
         setSelected(null)
+        window.dispatchEvent(new CustomEvent('wvs-pending-refresh'))
       } else {
         notify(data.error || 'Error al publicar', true)
       }
@@ -386,6 +398,7 @@ export default function AdminOnboardingPage() {
     notify('Solicitud rechazada')
     setSelected(null); setAdminNotes('')
     setSaving(null)
+    window.dispatchEvent(new CustomEvent('wvs-pending-refresh'))
   }
 
   const handleApproveChanges = async (onb: Onboarding) => {
@@ -401,6 +414,7 @@ export default function AdminOnboardingPage() {
         notify('Cambios aprobados y publicados ✓')
         setOnboardings(prev => prev.map(o => o.id === onb.id ? { ...o, changes_status: 'approved' } : o))
         setSelected(null)
+        window.dispatchEvent(new CustomEvent('wvs-pending-refresh'))
       } else {
         notify(data.error || 'Error al publicar cambios', true)
       }
@@ -419,6 +433,7 @@ export default function AdminOnboardingPage() {
     notify('Cambios rechazados')
     setSelected(null); setAdminNotes('')
     setSaving(null)
+    window.dispatchEvent(new CustomEvent('wvs-pending-refresh'))
   }
 
   const pendingInitial = onboardings.filter(o => o.status === 'submitted')

@@ -29,7 +29,8 @@ export async function POST(req: NextRequest) {
     if (status !== undefined)        update.status        = status
     if (changes_data !== undefined)  update.changes_data  = changes_data
     if (changes_status !== undefined) update.changes_status = changes_status
-    if (status === 'submitted')      update.submitted_at  = new Date().toISOString()
+    if (status === 'submitted' || changes_status === 'submitted')
+      update.submitted_at = new Date().toISOString()
 
     // Keep name in sync for admin display
     if (ficha_data?.H1_Venue) update.name = ficha_data.H1_Venue

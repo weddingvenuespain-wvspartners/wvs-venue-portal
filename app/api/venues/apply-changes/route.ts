@@ -104,11 +104,11 @@ function buildWpPayload(d: Record<string, any>) {
   if (d.wvsAccomHelp) {
     accommodationWp = 'Request'
   } else if (d.accommodation === 'yes') {
-    accommodationWp = 'Included'
+    accommodationWp = 'yes'
   } else if (d.accommodation === 'optional') {
     accommodationWp = 'Request'
   } else if (d.accommodation === 'no') {
-    accommodationWp = '-'
+    accommodationWp = 'no'
   }
 
   // Accommodation breakdown (starting_price_breakdown_4)

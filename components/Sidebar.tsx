@@ -29,13 +29,20 @@ export default function Sidebar() {
 
   // Badge: pending onboarding requests (admin only)
   const [pendingOnboardingCount, setPendingOnboardingCount] = useState(0)
-  useEffect(() => {
+  const fetchPendingOnboarding = () => {
     if (!user || !isAdmin) return
     const supabase = createClient()
-    // Count rows where initial submission is pending OR changes are pending
     supabase.from('venue_onboarding').select('id', { count: 'exact', head: true })
       .or('status.eq.submitted,changes_status.eq.submitted')
-      .then(({ count }) => { if (count) setPendingOnboardingCount(count) })
+      .then(({ count }) => setPendingOnboardingCount(count ?? 0))
+  }
+  useEffect(() => {
+    fetchPendingOnboarding()
+  }, [user?.id, isAdmin]) // eslint-disable-line
+  // Re-fetch when admin processes a request (dispatched from admin onboarding page)
+  useEffect(() => {
+    window.addEventListener('wvs-pending-refresh', fetchPendingOnboarding)
+    return () => window.removeEventListener('wvs-pending-refresh', fetchPendingOnboarding)
   }, [user?.id, isAdmin]) // eslint-disable-line
 
   const handleLogout = async () => {
