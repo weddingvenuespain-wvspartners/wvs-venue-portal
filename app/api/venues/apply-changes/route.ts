@@ -170,6 +170,16 @@ function buildWpPayload(d: Record<string, any>) {
       Closest_Airport_to_Venue:        d.closestAirport || '',
       reviews_enabled:                 d.reviewsEnabled ? 1 : 0,
       reviews:                         Array.isArray(d.reviews) ? d.reviews : [],
+      // Individual testimonial fields — WP template reads these directly
+      testimonial_1:         (d.reviews?.[0]?.text        || ''),
+      testimonial_name_1:    (d.reviews?.[0]?.couple_name || ''),
+      testimonial_country_1: (d.reviews?.[0]?.country     || ''),
+      testimonial_2:         (d.reviews?.[1]?.text        || ''),
+      testimonial_name_2:    (d.reviews?.[1]?.couple_name || ''),
+      testimonial_country_2: (d.reviews?.[1]?.country     || ''),
+      testimonial_3:         (d.reviews?.[2]?.text        || ''),
+      testimonial_name_3:    (d.reviews?.[2]?.couple_name || ''),
+      testimonial_country_3: (d.reviews?.[2]?.country     || ''),
       ...galleryAcf,
     }
   }
