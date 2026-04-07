@@ -11,8 +11,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["DM Sans", "system-ui", "sans-serif"],
-        serif: ["Cormorant Garamond", "Georgia", "serif"],
+        sans: ["Manrope", "system-ui", "sans-serif"],
+        serif: ["Manrope", "Georgia", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",

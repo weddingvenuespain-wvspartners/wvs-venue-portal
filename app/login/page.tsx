@@ -117,7 +117,7 @@ export default function LoginPage() {
                   color: mode === m ? '#C4975A' : 'rgba(255,255,255,0.3)',
                   fontSize: 12, fontWeight: mode === m ? 500 : 400,
                   borderBottom: `2px solid ${mode === m ? '#C4975A' : 'transparent'}`,
-                  cursor: 'pointer', marginBottom: -1, fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s'
+                  cursor: 'pointer', marginBottom: -1, fontFamily: 'Manrope, sans-serif', transition: 'all 0.15s'
                 }}>
                 {m === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
               </button>
@@ -144,7 +144,7 @@ export default function LoginPage() {
             </button>
             <div style={{ textAlign: 'center', marginTop: 16 }}>
               <button type="button" onClick={() => { setMode('reset'); setError(''); setSuccess('') }}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'DM Sans, sans-serif' }}>
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'Manrope, sans-serif' }}>
                 ¿Olvidaste tu contraseña?
               </button>
             </div>
@@ -173,7 +173,7 @@ export default function LoginPage() {
             </button>
             <div style={{ textAlign: 'center', marginTop: 16 }}>
               <button type="button" onClick={() => { setMode('login'); setError(''); setSuccess('') }}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'DM Sans, sans-serif' }}>
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'Manrope, sans-serif' }}>
                 ← Volver al login
               </button>
             </div>

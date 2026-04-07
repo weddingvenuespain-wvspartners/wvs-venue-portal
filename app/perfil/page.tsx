@@ -12,6 +12,7 @@ import {
   Star, Zap, Clock, Receipt, LogOut, Globe, HelpCircle,
   Download, Shield, BarChart2, Mail, ExternalLink,
   ChevronRight, AlertTriangle, Database, FileText,
+  CircleCheckBig, BookOpen, Video, MessageCircle,
 } from 'lucide-react'
 
 type Section = 'perfil' | 'seguridad' | 'preferencias' | 'privacidad' | 'plan' | 'facturacion' | 'notificaciones' | 'soporte'
@@ -772,7 +773,7 @@ function PerfilPageContent() {
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9', fontFamily: 'Cormorant Garamond, serif' }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9', fontFamily: 'Manrope, sans-serif' }}>
                             Verificación en dos pasos
                           </div>
                           {(mfaFactors.length > 0 || mfaStep === 'done') && (
@@ -1231,7 +1232,7 @@ function PerfilPageContent() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                         <Clock size={16} style={{ color: '#fcd34d' }} />
-                        <span style={{ fontSize: 14, fontWeight: 600, color: '#f8fafc', fontFamily: 'Cormorant Garamond, serif' }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#f8fafc', fontFamily: 'Manrope, sans-serif' }}>
                           Período de prueba activo
                         </span>
                         {features.trialDaysLeft !== null && (
@@ -1278,7 +1279,7 @@ function PerfilPageContent() {
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                               {features.planTier === 'premium' && <Star size={14} style={{ color: '#b45309' }} />}
-                              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Cormorant Garamond, serif' }}>
+                              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Manrope, sans-serif' }}>
                                 {features.planName || (features.planTier === 'premium' ? 'Plan Premium' : 'Plan Básico')}
                               </div>
                             </div>
@@ -1429,7 +1430,7 @@ function PerfilPageContent() {
                             {stat.icon}
                           </div>
                           <div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--espresso)', fontFamily: 'Cormorant Garamond, serif', lineHeight: 1 }}>
+                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--espresso)', fontFamily: 'Manrope, sans-serif', lineHeight: 1 }}>
                               {stat.value === null ? '—' : stat.value}
                             </div>
                             <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{stat.label}</div>
@@ -1586,7 +1587,7 @@ function PerfilPageContent() {
                           <Mail size={18} style={{ color: '#b45309' }} />
                         </div>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Cormorant Garamond, serif', marginBottom: 4 }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Manrope, sans-serif', marginBottom: 4 }}>
                             ¿Tienes alguna duda?
                           </div>
                           <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.6, marginBottom: 14 }}>
@@ -1639,7 +1640,7 @@ function PerfilPageContent() {
                             { date: '01 dic 2024', status: 'Mantenimiento programado completado', desc: 'Portal y API' },
                           ].map((item, i) => (
                             <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0', borderBottom: i < 2 ? '1px solid var(--ivory)' : 'none' }}>
-                              <span style={{ fontSize: 13, flexShrink: 0 }}>✅</span>
+                              <CircleCheckBig size={13} style={{ flexShrink: 0, color: '#22c55e' }} />
                               <div>
                                 <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--charcoal)' }}>{item.status}</div>
                                 <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>
@@ -1657,9 +1658,9 @@ function PerfilPageContent() {
                   <Section title="Recursos útiles">
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                       {[
-                        { icon: '📖', label: 'Guía de inicio',    hint: 'Empieza aquí', href: '/guias', available: true },
-                        { icon: '🎬', label: 'Video tutoriales',  hint: 'Aprende rápido', href: '#', available: false },
-                        { icon: '💬', label: 'Comunidad',         hint: 'Conecta con venues', href: '#', available: false },
+                        { icon: <BookOpen size={22} />, label: 'Guía de inicio',    hint: 'Empieza aquí', href: '/guias', available: true },
+                        { icon: <Video size={22} />, label: 'Video tutoriales',  hint: 'Aprende rápido', href: '#', available: false },
+                        { icon: <MessageCircle size={22} />, label: 'Comunidad',         hint: 'Conecta con venues', href: '#', available: false },
                       ].map(resource => (
                         <div
                           key={resource.label}
@@ -1672,7 +1673,7 @@ function PerfilPageContent() {
                             textAlign: 'center',
                           }}
                         >
-                          <div style={{ fontSize: 22, marginBottom: 6 }}>{resource.icon}</div>
+                          <div style={{ marginBottom: 6, color: 'var(--charcoal)' }}>{resource.icon}</div>
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 3 }}>{resource.label}</div>
                           <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 8 }}>{resource.hint}</div>
                           {!resource.available && <ComingSoonBadge />}

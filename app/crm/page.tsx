@@ -75,7 +75,7 @@ export default function CrmPage() {
 
   const filtered = filter === 'all' ? leads : leads.filter(l => l.status === filter)
 
-  if (loading) return <div style={{ minHeight: '100vh', background: '#1A1512', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ color: '#C4975A', fontFamily: 'serif' }}>Cargando...</div></div>
+  if (loading) return <div style={{ minHeight: '100vh', background: '#1A1512', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ color: '#C4975A',  }}>Cargando...</div></div>
 
   return (
     <div style={{ display: 'flex' }}>

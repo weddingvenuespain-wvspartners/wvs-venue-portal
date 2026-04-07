@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { usePlanFeatures, type PlanFeatures } from '@/lib/use-plan-features'
+import { Hourglass } from 'lucide-react'
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -209,25 +210,28 @@ export default function Sidebar() {
       <div className="sidebar-footer">
         {/* ── Trial banner ── */}
         {!isAdmin && features.isTrial && (
-          <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 8, background: '#1e293b', border: '1px solid #334155' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#fcd34d', letterSpacing: '0.06em' }}>⏳ TRIAL</span>
-              {features.trialDaysLeft !== null && (
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
-                  background: features.trialDaysLeft <= 3 ? '#7f1d1d' : features.trialDaysLeft <= 7 ? '#78350f' : '#1e3a5f',
-                  color: features.trialDaysLeft <= 3 ? '#fca5a5' : features.trialDaysLeft <= 7 ? '#fcd34d' : '#93c5fd',
-                }}>
-                  {features.trialDaysLeft > 0 ? `${features.trialDaysLeft}d restantes` : 'Expirado'}
-                </span>
-              )}
+          <div style={{ marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+              <Hourglass size={12} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.08em' }}>PERIODO DE PRUEBA</span>
             </div>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8, lineHeight: 1.4 }}>
-              Activa tu plan para continuar usando el portal.
+            {features.trialDaysLeft !== null && (
+              <div style={{ marginBottom: 8 }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+                  background: features.trialDaysLeft <= 3 ? 'rgba(220,38,38,0.15)' : 'rgba(196,151,90,0.12)',
+                  color: features.trialDaysLeft <= 3 ? '#fca5a5' : 'var(--gold)',
+                }}>
+                  {features.trialDaysLeft > 0 ? `${features.trialDaysLeft} días restantes` : 'Expirado'}
+                </span>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--stone)', marginBottom: 10, lineHeight: 1.5 }}>
+              Activa tu plan para seguir usando el portal.
             </div>
             <Link href="/perfil?tab=suscripcion"
-              style={{ display: 'block', padding: '6px 8px', borderRadius: 5, background: 'linear-gradient(135deg, #92400e, #b45309)', color: '#fef3c7', fontSize: 10, fontWeight: 600, textAlign: 'center', textDecoration: 'none' }}>
-              Activar mi plan →
+              style={{ display: 'block', padding: '8px 12px', borderRadius: 8, background: 'var(--gold)', color: '#fff', fontSize: 11, fontWeight: 600, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.02em' }}>
+              Activar plan
             </Link>
           </div>
         )}
@@ -235,9 +239,9 @@ export default function Sidebar() {
         {/* ── Basic → Premium upgrade banner ── */}
         {!isAdmin && !features.isTrial && features.hasPlan && features.planTier === 'basic' && (
           <Link href="/perfil?tab=suscripcion"
-            style={{ display: 'block', marginBottom: 10, padding: '9px 12px', borderRadius: 8, background: 'linear-gradient(135deg, #92400e 0%, #b45309 100%)', textDecoration: 'none' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#fcd34d', letterSpacing: '0.06em', marginBottom: 2 }}>✦ PASA A PREMIUM</div>
-            <div style={{ fontSize: 11, color: '#fef3c7', lineHeight: 1.4 }}>Propuestas, exportar leads y más.</div>
+            style={{ display: 'block', marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)', textDecoration: 'none' }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 4 }}>PASA A PREMIUM</div>
+            <div style={{ fontSize: 11, color: 'var(--stone)', lineHeight: 1.5 }}>Propuestas, exportar leads y más.</div>
           </Link>
         )}
 

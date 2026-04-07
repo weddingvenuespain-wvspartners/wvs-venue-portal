@@ -61,7 +61,7 @@ export default function EstadisticasPage() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#1A1512', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#C4975A', fontFamily: 'serif' }}>Cargando...</div>
+      <div style={{ color: '#C4975A' }}>Cargando...</div>
     </div>
   )
 

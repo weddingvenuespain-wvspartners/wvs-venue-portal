@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
-import { Users, TrendingUp, CheckCircle, ExternalLink, AlertCircle, ClipboardList, Building2, CreditCard, Clock, UserPlus, BarChart2 } from 'lucide-react'
+import { Users, TrendingUp, CheckCircle, ExternalLink, AlertCircle, ClipboardList, Building2, CreditCard, Clock, UserPlus, BarChart2, Hourglass, UserRoundPlus } from 'lucide-react'
 
 function Skeleton({ w, h, radius = 4 }: { w?: string | number; h?: number; radius?: number }) {
   return (
@@ -118,7 +118,7 @@ function AdminDashboard() {
             {/* Trials expirando */}
             <div className="card">
               <div className="card-header">
-                <div className="card-title">⏳ Trials expirando</div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Hourglass size={14} /> Trials expirando</div>
                 <Link href="/admin" style={{ fontSize: 11, color: 'var(--gold)' }}>Ver todos →</Link>
               </div>
               {loading ? (
@@ -153,7 +153,7 @@ function AdminDashboard() {
             {/* Últimas altas */}
             <div className="card">
               <div className="card-header">
-                <div className="card-title">🆕 Últimas altas</div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><UserRoundPlus size={14} /> Últimas altas</div>
                 <Link href="/admin" style={{ fontSize: 11, color: 'var(--gold)' }}>Ver todos →</Link>
               </div>
               {loading ? (
@@ -195,7 +195,7 @@ function AdminDashboard() {
           {stats && (stats.active > 0 || stats.trial > 0) && (
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-header">
-                <div className="card-title">📊 Resumen de suscripciones</div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><BarChart2 size={14} /> Resumen de suscripciones</div>
               </div>
               <div className="card-body" style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
@@ -312,14 +312,14 @@ function VenueDashboard() {
           <div className="topbar"><div className="topbar-title">Bienvenido</div></div>
           <div className="page-content" style={{ maxWidth: 600, margin: '0 auto', paddingTop: 48 }}>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
-              <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 28, color: 'var(--espresso)', marginBottom: 8 }}>Wedding Venues Spain</div>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 500, letterSpacing: '0.01em', color: 'var(--espresso)', marginBottom: 8 }}>Wedding Venues Spain</div>
               <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Partner Portal</div>
             </div>
             {!onboarding || onbStatus === 'draft' ? (
               <div className="card">
                 <div className="card-body" style={{ textAlign: 'center', padding: 40 }}>
                   <ClipboardList size={36} style={{ color: 'var(--gold)', margin: '0 auto 16px' }} />
-                  <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, marginBottom: 8 }}>Registra tu venue</div>
+                  <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Registra tu venue</div>
                   <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 24, lineHeight: 1.7 }}>
                     Para aparecer en Wedding Venues Spain necesitamos la información de tu venue.
                   </div>
@@ -330,7 +330,7 @@ function VenueDashboard() {
               <div className="card">
                 <div className="card-body" style={{ textAlign: 'center', padding: 40 }}>
                   <AlertCircle size={22} style={{ color: '#92400e', margin: '0 auto 16px' }} />
-                  <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, marginBottom: 8 }}>Solicitud en revisión</div>
+                  <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Solicitud en revisión</div>
                   <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.7 }}>
                     Hemos recibido la información de <strong>{onboarding.name}</strong>. Te avisaremos en 24-48 horas.
                   </div>
@@ -339,7 +339,7 @@ function VenueDashboard() {
             ) : onbStatus === 'rejected' ? (
               <div className="card">
                 <div className="card-body" style={{ textAlign: 'center', padding: 40 }}>
-                  <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, marginBottom: 8, color: 'var(--rose)' }}>Solicitud no aprobada</div>
+                  <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, marginBottom: 8, color: 'var(--rose)' }}>Solicitud no aprobada</div>
                   {onboarding.admin_notes && <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 20 }}>{onboarding.admin_notes}</div>}
                   <Link href="/onboarding" className="btn btn-primary">Volver a intentarlo →</Link>
                 </div>
@@ -462,7 +462,7 @@ function VenueDashboard() {
                       <img src={venue.acf.photo_gallery.section_2_image[0][0].full_image_url} alt={venueName}
                         style={{ width: '100%', height: 150, objectFit: 'cover', borderRadius: 6, marginBottom: 14 }} />
                     )}
-                    <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 19, marginBottom: 4 }}>{venueName}</div>
+                    <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 17, fontWeight: 600, marginBottom: 4 }}>{venueName}</div>
                     {venue?.acf?.location && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 10 }}>{venue.acf.location}</div>}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className="badge badge-active">Publicada</span>

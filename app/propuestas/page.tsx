@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
-import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Palette, Upload, Trash2, AlertCircle, Lock } from 'lucide-react'
+import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Palette, Upload, Trash2, AlertCircle, Lock, Zap, Sparkles, ClipboardList, MessageCircle, Target } from 'lucide-react'
 import type { SectionsData } from '@/lib/proposal-types'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import { usePlanFeatures } from '@/lib/use-plan-features'
@@ -529,7 +529,7 @@ function PropuestasPageContent() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#1A1512', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#C4975A', fontFamily: 'serif' }}>Cargando...</div>
+      <div style={{ color: '#C4975A' }}>Cargando...</div>
     </div>
   )
 
@@ -541,7 +541,7 @@ function PropuestasPageContent() {
           <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
             <Lock size={32} style={{ color: 'var(--gold)', opacity: 0.7 }} />
           </div>
-          <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 26, color: 'var(--espresso)', marginBottom: 12 }}>Propuestas personalizadas</div>
+          <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 500, letterSpacing: '0.01em', color: 'var(--espresso)', marginBottom: 12 }}>Propuestas personalizadas</div>
           <div style={{ fontSize: 14, color: 'var(--warm-gray)', lineHeight: 1.7, marginBottom: 28 }}>
             Crea landings únicas para cada pareja con tu branding, precios y secciones personalizadas.<br />
             Disponible en el plan <strong>Premium</strong>.
@@ -861,11 +861,11 @@ function PropuestasPageContent() {
                     <label className="form-label">Diseño de la landing</label>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       {([
-                        { id: 1, icon: '⚡', name: 'Impacto Directo',      desc: 'Dark luxury · precio visible · CTA al frente' },
-                        { id: 2, icon: '✨', name: 'Emoción Primero',       desc: 'Cream editorial · galería arriba · emotivo' },
-                        { id: 3, icon: '📋', name: 'Todo Claro',            desc: 'Sidebar + índice · estructurado · analítico' },
-                        { id: 4, icon: '💬', name: 'Social Proof',          desc: 'Stats + testimonios al inicio · confianza' },
-                        { id: 5, icon: '🎯', name: 'Minimalista / Urgencia', desc: 'Post-visita · limpio · CTA muy prominente' },
+                        { id: 1, icon: <Zap size={18} />, name: 'Impacto Directo',      desc: 'Dark luxury · precio visible · CTA al frente' },
+                        { id: 2, icon: <Sparkles size={18} />, name: 'Emoción Primero',       desc: 'Cream editorial · galería arriba · emotivo' },
+                        { id: 3, icon: <ClipboardList size={18} />, name: 'Todo Claro',            desc: 'Sidebar + índice · estructurado · analítico' },
+                        { id: 4, icon: <MessageCircle size={18} />, name: 'Social Proof',          desc: 'Stats + testimonios al inicio · confianza' },
+                        { id: 5, icon: <Target size={18} />, name: 'Minimalista / Urgencia', desc: 'Post-visita · limpio · CTA muy prominente' },
                       ] as const).map(tpl => {
                         const active = (sections.visual_template_id ?? 1) === tpl.id
                         return (

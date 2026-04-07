@@ -112,7 +112,7 @@ function VenueModal({
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
-            <div style={{ fontSize: 20, fontFamily: 'Cormorant Garamond, serif', fontWeight: 600, color: 'var(--espresso)' }}>
+            <div style={{ fontSize: 20, fontFamily: 'Manrope, sans-serif', fontWeight: 600, color: 'var(--espresso)' }}>
               {data?.H1_Venue || onb.name || 'Sin nombre'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 3 }}>
@@ -460,7 +460,7 @@ export default function AdminOnboardingPage() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#1A1512', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#C4975A', fontFamily: 'serif' }}>Cargando...</div>
+      <div style={{ color: '#C4975A' }}>Cargando...</div>
     </div>
   )
 

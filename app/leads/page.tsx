@@ -8,7 +8,9 @@ import { usePlanFeatures } from '@/lib/use-plan-features'
 import {
   Plus, Search, X, Phone, Mail, MessageCircle,
   Calendar, Users, ChevronLeft, ChevronRight, RotateCcw, CheckCircle,
-  ExternalLink, Edit2, Trash2, Clock, Filter, FileText, Download
+  ExternalLink, Edit2, Trash2, Clock, Filter, FileText, Download,
+  AlertTriangle, PartyPopper, Snowflake, Sparkles, Eye, Landmark, XCircle,
+  Sprout, Sun, Leaf, Zap, LockKeyhole, OctagonAlert,
 } from 'lucide-react'
 
 // ── Types & config ─────────────────────────────────────────────────────────────
@@ -23,12 +25,12 @@ const TAB_STATUSES: Record<Tab, DbStatus[]> = {
   lost:        ['lost'],
 }
 
-const TABS: { key: Tab; label: string; emoji: string }[] = [
-  { key: 'new',         label: 'Nuevos',          emoji: '✨' },
-  { key: 'in_progress', label: 'En seguimiento',  emoji: '💬' },
-  { key: 'visit',       label: 'Visita agendada', emoji: '🏛️' },
-  { key: 'confirmed',   label: 'Confirmados',     emoji: '🎉' },
-  { key: 'lost',        label: 'Perdidos',        emoji: '❌' },
+const TABS: { key: Tab; label: string; emoji: React.ReactNode }[] = [
+  { key: 'new',         label: 'Nuevos',          emoji: <Sparkles size={13} /> },
+  { key: 'in_progress', label: 'En seguimiento',  emoji: <Eye size={13} /> },
+  { key: 'visit',       label: 'Visita agendada', emoji: <Landmark size={13} /> },
+  { key: 'confirmed',   label: 'Confirmados',     emoji: <PartyPopper size={13} /> },
+  { key: 'lost',        label: 'Perdidos',        emoji: <XCircle size={13} /> },
 ]
 
 const SUB_STATUS_LABEL: Record<DbStatus, string> = {
@@ -58,11 +60,11 @@ const DATE_FLEX_OPTS = [
   { value: 'season',       label: 'Estación'        },
   { value: 'flexible',     label: 'Flexible'        },
 ]
-const SEASONS = [
-  { value: 'spring', label: 'Primavera', emoji: '🌱' },
-  { value: 'summer', label: 'Verano',    emoji: '☀️' },
-  { value: 'autumn', label: 'Otoño',     emoji: '🍂' },
-  { value: 'winter', label: 'Invierno',  emoji: '❄️' },
+const SEASONS: { value: string; label: string; emoji: React.ReactNode }[] = [
+  { value: 'spring', label: 'Primavera', emoji: <Sprout size={13} /> },
+  { value: 'summer', label: 'Verano',    emoji: <Sun size={13} /> },
+  { value: 'autumn', label: 'Otoño',     emoji: <Leaf size={13} /> },
+  { value: 'winter', label: 'Invierno',  emoji: <Snowflake size={13} /> },
 ]
 const YEAR_OPTS = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() + i)
 
@@ -73,7 +75,7 @@ function todayIso() {
 }
 
 // Format the lead date for display
-function formatLeadDate(lead: any): { line1: string; line2?: string; color?: string } {
+function formatLeadDate(lead: any): { line1: string; line2?: React.ReactNode; color?: string } {
   const flex = lead.date_flexibility || 'exact'
   const fmtShort = (d: string) => d ? new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
   const fmtNoYear = (d: string) => d ? new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : '?'
@@ -99,7 +101,7 @@ function formatLeadDate(lead: any): { line1: string; line2?: string; color?: str
       if (!lead.wedding_date) return { line1: 'Sin fecha', color: 'var(--stone)' }
       const days = Math.ceil((new Date(lead.wedding_date + 'T12:00:00').getTime() - Date.now()) / 86400000)
       const color = days < 0 ? 'var(--warm-gray)' : days < 60 ? '#dc2626' : days < 120 ? '#d97706' : '#16a34a'
-      return { line1: fmtShort(lead.wedding_date), line2: days > 0 ? `${days < 60 ? '⚡ ' : ''}${days} días` : undefined, color }
+      return { line1: fmtShort(lead.wedding_date), line2: days > 0 ? <>{days < 60 ? <><Zap size={11} style={{ display: 'inline', verticalAlign: 'middle' }} />{' '}</> : ''}{days} días</> : undefined, color }
   }
 }
 
@@ -449,7 +451,7 @@ export default function LeadsPage() {
           {/* Plan restriction notice */}
           {features.leads_new_only && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, marginBottom: 16, fontSize: 12, color: '#1e40af' }}>
-              <span>ℹ️</span>
+              <AlertTriangle size={12} style={{ color: 'var(--warm-gray)' }} />
               <span>Tu plan <strong>{features.planName}</strong> muestra únicamente los leads nuevos recibidos. <a href="/perfil" style={{ color: '#1e40af', fontWeight: 600 }}>Actualiza tu plan</a> para acceder a todo el CRM de leads.</span>
             </div>
           )}
@@ -463,11 +465,11 @@ export default function LeadsPage() {
                 return (
                   <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
                     padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 13, fontWeight: isActive ? 600 : 400,
+                    fontSize: 13, fontWeight: 500,
                     color: isActive ? 'var(--espresso)' : 'var(--warm-gray)',
                     borderBottom: isActive ? '2px solid var(--gold)' : '2px solid transparent',
                     marginBottom: -1, display: 'flex', alignItems: 'center', gap: 6,
-                    transition: 'all 0.15s', whiteSpace: 'nowrap',
+                    transition: 'color 0.15s, border-color 0.15s', whiteSpace: 'nowrap',
                   }}>
                     <span>{tab.emoji}</span>
                     <span>{tab.label}</span>
@@ -527,7 +529,7 @@ export default function LeadsPage() {
               {/* Source filter */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontWeight: 500 }}>Fuente:</span>
-                <select className="form-input" style={{ padding: '4px 8px', fontSize: 12, width: 'auto' }}
+                <select className="form-input" style={{ width: 'auto' }}
                   value={filterSrc} onChange={e => setFilterSrc(e.target.value)}>
                   <option value="all">Todas</option>
                   {Object.entries(SOURCE_LABEL).map(([v,l]) => <option key={v} value={v}>{l}</option>)}
@@ -537,7 +539,7 @@ export default function LeadsPage() {
               {/* Budget filter */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontWeight: 500 }}>Presupuesto:</span>
-                <select className="form-input" style={{ padding: '4px 8px', fontSize: 12, width: 'auto' }}
+                <select className="form-input" style={{ width: 'auto' }}
                   value={filterBudget} onChange={e => setFilterBudget(e.target.value)}>
                   <option value="all">Todos</option>
                   {Object.entries(BUDGET_LABEL).filter(([v]) => v !== 'sin_definir').map(([v,l]) =>
@@ -760,9 +762,9 @@ function DateConfirmModal({
   const prevMonth = () => { if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) } else setViewMonth(m => m - 1) }
   const nextMonth = () => { if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) } else setViewMonth(m => m + 1) }
 
-  const title = isVisitMode ? '🏛️ Agendar visita al venue'
-    : isWonMode ? '🎉 Confirmar boda · Reservar fechas'
-    : '💬 Verificar disponibilidad'
+  const title = isVisitMode ? <><Landmark size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Agendar visita al venue</>
+    : isWonMode ? <><PartyPopper size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Confirmar boda · Reservar fechas</>
+    : <><Eye size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Verificar disponibilidad</>
   const canConfirm = !saving && (!isVisitMode || selectedDates.length > 0)
 
   return (
@@ -774,7 +776,7 @@ function DateConfirmModal({
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)' }}>{title}</div>
+            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)' }}>{title}</div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>{lead.name}</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}><X size={18} /></button>
@@ -817,11 +819,11 @@ function DateConfirmModal({
                       </span>
                       {isUnavailable ? (
                         <span style={{ fontSize: 11, fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: 10 }}>
-                          {entryStatus === 'reservado' ? '🔒 Reservado' : '⛔ Bloqueado'}
+                          {entryStatus === 'reservado' ? <><LockKeyhole size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Reservado</> : <><OctagonAlert size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Bloqueado</>}
                         </span>
                       ) : entryStatus === 'negociacion' ? (
                         <span style={{ fontSize: 11, fontWeight: 500, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 10 }}>
-                          ⚠️ En negociación
+                          <AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> En negociación
                         </span>
                       ) : null}
                     </div>
@@ -830,7 +832,7 @@ function DateConfirmModal({
               </div>
               {unavailableRequested.length > 0 && (
                 <div style={{ marginTop: 7, fontSize: 11, color: '#6b7280', padding: '6px 10px', background: '#f9fafb', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  ℹ️ Las fechas no disponibles quedarán guardadas como opciones solicitadas sin confirmar.
+                  <AlertTriangle size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Las fechas no disponibles quedarán guardadas como opciones solicitadas sin confirmar.
                 </div>
               )}
             </div>
@@ -857,7 +859,7 @@ function DateConfirmModal({
               {/* Month nav */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--cream)', borderBottom: '1px solid var(--ivory)' }}>
                 <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--charcoal)', padding: '2px 6px', borderRadius: 4 }}><ChevronLeft size={16} /></button>
-                <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 16, color: 'var(--espresso)', fontWeight: 500 }}>{MONTHS[viewMonth]} {viewYear}</span>
+                <span style={{ fontSize: 16, color: 'var(--espresso)', fontWeight: 600 }}>{MONTHS[viewMonth]} {viewYear}</span>
                 <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--charcoal)', padding: '2px 6px', borderRadius: 4 }}><ChevronRight size={16} /></button>
               </div>
               {/* Day headers */}
@@ -956,7 +958,7 @@ function DateConfirmModal({
             {isVisitMode ? (
               selectedDates.length === 0
                 ? <span style={{ color: 'var(--warm-gray)' }}>Haz click en una fecha disponible para agendar la visita</span>
-                : <span style={{ color: '#16a34a', fontWeight: 500 }}>📅 Visita: {formatDateLabel(selectedDates[0])}</span>
+                : <span style={{ color: '#16a34a', fontWeight: 500 }}><Calendar size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Visita: {formatDateLabel(selectedDates[0])}</span>
             ) : (
               <>
                 {selectedDates.length > 0 ? (
@@ -969,7 +971,7 @@ function DateConfirmModal({
                 )}
                 {unavailableRequested.length > 0 && (
                   <div style={{ color: '#6b7280' }}>
-                    ℹ️ {unavailableRequested.length} fecha{unavailableRequested.length > 1 ? 's' : ''} no disponible{unavailableRequested.length > 1 ? 's' : ''} (guardadas como info): {unavailableRequested.map(d => formatDateLabel(d)).join(', ')}
+                    <AlertTriangle size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> {unavailableRequested.length} fecha{unavailableRequested.length > 1 ? 's' : ''} no disponible{unavailableRequested.length > 1 ? 's' : ''} (guardadas como info): {unavailableRequested.map(d => formatDateLabel(d)).join(', ')}
                   </div>
                 )}
                 {extraDates.length > 0 && (
@@ -988,7 +990,7 @@ function DateConfirmModal({
           <button className="btn btn-primary" onClick={handleConfirm}
             disabled={!canConfirm}
             style={{ background: isWonMode ? '#16a34a' : undefined, opacity: !canConfirm ? 0.5 : 1 }}>
-            {saving ? 'Guardando...' : isVisitMode ? '📅 Confirmar visita' : isWonMode ? '🎉 Confirmar boda' : '✓ Pasar a seguimiento'}
+            {saving ? 'Guardando...' : isVisitMode ? <><Calendar size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Confirmar visita</> : isWonMode ? <><PartyPopper size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Confirmar boda</> : '✓ Pasar a seguimiento'}
           </button>
         </div>
       </div>
@@ -1051,7 +1053,7 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm 
             })()}
             {tab === 'visit' && lead.visit_date && (
               <div style={{ fontSize: 11, color: '#3b82f6', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                🏛️ {new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                <Landmark size={11} /> {new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
               </div>
             )}
           </div>
@@ -1115,7 +1117,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
   const LockedProposalBtn = ({ label }: { label: string }) => (
     <span title="Disponible en plan Premium — actualiza para crear propuestas digitales"
       style={{ ...g, cursor: 'not-allowed', opacity: 0.45, userSelect: 'none' }}>
-      <FileText size={11} /> {label} 🔒
+      <FileText size={11} /> {label} <LockKeyhole size={11} />
     </span>
   )
 
@@ -1135,7 +1137,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
           ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} style={{ ...g, textDecoration: 'none' }}><FileText size={11} /> Propuesta</a>
           : <LockedProposalBtn label="Propuesta" />}
         <button style={p} onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
-        <button style={{ ...p, background: '#16a34a' }} onClick={() => onDateConfirm(lead, 'won')}>🎉 Confirmar boda</button>
+        <button style={{ ...p, background: '#16a34a' }} onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
         {lead.status !== 'budget_sent' && <button style={g} onClick={() => onMove(lead.id, 'budget_sent')}>Presupuesto enviado</button>}
         <button style={g} onClick={() => onMove(lead.id, 'new')}><RotateCcw size={11} /> Nuevo</button>
         <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
@@ -1143,7 +1145,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
       </>)}
 
       {tab === 'visit' && (<>
-        <button style={p} onClick={() => onDateConfirm(lead, 'won')}>🎉 Confirmar boda</button>
+        <button style={p} onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
         <button style={g} onClick={() => onMove(lead.id, 'budget_sent')}>Enviar presupuesto</button>
         <button style={g} onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
         <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
@@ -1182,7 +1184,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
         onClick={e => e.stopPropagation()}>
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 22, color: 'var(--espresso)' }}>{lead.name}</div>
+            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, fontWeight: 600, color: 'var(--espresso)' }}>{lead.name}</div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>
               {SUB_STATUS_LABEL[lead.status as DbStatus]} · {SOURCE_LABEL[lead.source] || lead.source}
             </div>
@@ -1203,7 +1205,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
             <InfoBlock icon={<Calendar size={13} />} label="Fecha de boda"
               value={line1} sub={line2} subColor={color} />
             {lead.visit_date && (
-              <InfoBlock icon={<span style={{ fontSize: 13 }}>🏛️</span>} label="Fecha de visita"
+              <InfoBlock icon={<Landmark size={13} />} label="Fecha de visita"
                 value={new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })} />
             )}
             <InfoBlock icon={<Users size={13} />} label="Invitados" value={lead.guests ? `${lead.guests} personas` : '—'} />
@@ -1303,7 +1305,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
             ) : (
               <div title="Disponible en plan Premium"
                 style={{ flex: 1, fontSize: 12, padding: '8px', borderRadius: 6, border: '1px solid var(--ivory)', color: '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 500, cursor: 'not-allowed', userSelect: 'none' }}>
-                <FileText size={12} /> Crear propuesta 🔒
+                <FileText size={12} /> Crear propuesta <LockKeyhole size={12} />
               </div>
             )}
             <button onClick={() => onDelete(lead.id)}
@@ -1318,7 +1320,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
 }
 
 // ── Info Block ─────────────────────────────────────────────────────────────────
-function InfoBlock({ icon, label, value, sub, subColor }: { icon: React.ReactNode; label: string; value: string; sub?: string; subColor?: string }) {
+function InfoBlock({ icon, label, value, sub, subColor }: { icon: React.ReactNode; label: string; value: string; sub?: React.ReactNode; subColor?: string }) {
   return (
     <div style={{ background: 'var(--cream)', borderRadius: 8, padding: '10px 12px' }}>
       <div style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -1345,7 +1347,6 @@ function EmptyState({ tab, search, hidePast, onClear, onNew }: {
   const isFiltered = search || hidePast
   return (
     <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--warm-gray)' }}>
-      <div style={{ fontSize: 36, marginBottom: 12 }}>{TABS.find(t => t.key === tab)?.emoji}</div>
       <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 6 }}>
         {isFiltered ? 'Sin resultados con los filtros actuales' : title}
       </div>
@@ -1475,7 +1476,7 @@ function LeadFormModal({ form, setForm, isEdit, saving, onSubmit, onClose }: {
 
               {form.date_flexibility === 'flexible' && (
                 <div style={{ padding: '10px 14px', background: 'var(--cream)', borderRadius: 8, fontSize: 13, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>🗓️</span> Sin fecha definida — la pareja es flexible
+                  <Calendar size={16} /> Sin fecha definida — la pareja es flexible
                 </div>
               )}
             </div>

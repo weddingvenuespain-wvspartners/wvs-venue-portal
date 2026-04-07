@@ -8,7 +8,8 @@ import {
   Search, Plus, X, Check, Edit2, ExternalLink, RefreshCw,
   AlertTriangle, CreditCard, UserPlus, Mail, Building2, History,
   Phone, Globe, MapPin, User, Calendar, Clock, Shield, StickyNote,
-  Copy, CheckCircle,
+  Copy, CheckCircle, Settings, Landmark, Lightbulb, ClipboardList,
+  Ban, CircleCheckBig, ArrowLeftRight, RotateCcw, FileText, OctagonAlert,
 } from 'lucide-react'
 import { type BillingCycle, advanceDateByMonths, cancelDeadline, daysUntil } from '@/lib/billing-types'
 
@@ -117,11 +118,11 @@ function trialDaysLeft(end: string | null): number | null {
   return Math.ceil((new Date(end).getTime() - Date.now()) / 86400000)
 }
 
-function trialBadge(days: number | null) {
+function trialBadge(days: number | null): { label: React.ReactNode; color: string; bg: string } | null {
   if (days === null) return null
   if (days < 0)  return { label: 'Trial expirado',       color: '#c0392b', bg: '#fff5f5' }
-  if (days <= 3) return { label: `⚠️ ${days}d restantes`, color: '#c0392b', bg: '#fff5f5' }
-  if (days <= 7) return { label: `⏰ ${days}d restantes`, color: '#b45309', bg: '#fffbeb' }
+  if (days <= 3) return { label: <><AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> {days}d restantes</>, color: '#c0392b', bg: '#fff5f5' }
+  if (days <= 7) return { label: <><Clock size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> {days}d restantes</>, color: '#b45309', bg: '#fffbeb' }
   return           { label: `${days}d de trial`,          color: '#6b7280', bg: '#f9fafb' }
 }
 
@@ -472,12 +473,12 @@ function UserPanel({
                 background: 'var(--cream)', border: '2px solid var(--ivory)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 20, fontWeight: 700, color: 'var(--gold)',
-                fontFamily: 'Cormorant Garamond, serif',
+                fontFamily: 'Manrope, sans-serif',
               }}>
                 {(profile.first_name?.[0] || profile.email?.[0] || '?').toUpperCase()}
               </div>
               <div>
-              <div style={{ fontSize: 18, fontFamily: 'Cormorant Garamond, serif', fontWeight: 600, color: 'var(--espresso)' }}>
+              <div style={{ fontSize: 18, fontFamily: 'Manrope, sans-serif', fontWeight: 600, color: 'var(--espresso)' }}>
                 {displayName}
               </div>
               {/* Email + phone quick links */}
@@ -514,7 +515,7 @@ function UserPanel({
                     color:      !subPlan.is_active ? '#c0392b' : subPlan.name === 'basic' ? '#0369a1' : '#92400e',
                     padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700,
                   }}>
-                    {planLabel(subPlan)}{!subPlan.is_active ? ' ⚠️' : ''}
+                    {planLabel(subPlan)}{!subPlan.is_active ? <> <AlertTriangle size={9} style={{ display: 'inline', verticalAlign: 'middle' }} /></> : ''}
                   </span>
                 )}
                 {activeSub?.status === 'trial' && badge && (
@@ -546,7 +547,7 @@ function UserPanel({
                 <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>
                   {activeSub.status === 'trial'
                     ? (daysLeft !== null && daysLeft < 0
-                        ? '⚠️ Trial expirado'
+                        ? <><AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Trial expirado</>
                         : activeSub.trial_end_date
                           ? `Trial hasta ${new Date(activeSub.trial_end_date).toLocaleDateString('es-ES')} (${daysLeft}d)`
                           : 'Trial activo · sin fecha de fin')
@@ -618,7 +619,7 @@ function UserPanel({
                       <Shield size={10} /> Rol
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--espresso)' }}>
-                      {profile.role === 'admin' ? '⚙️ Administrador' : '🏛️ Venue owner'}
+                      {profile.role === 'admin' ? <><Settings size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Administrador</> : <><Landmark size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Venue owner</>}
                     </div>
                   </div>
                   <div>
@@ -741,8 +742,8 @@ function UserPanel({
                     { key: 'estadisticas',      label: 'Estadísticas' },
                     { key: 'leads_export',      label: 'Exportar leads CSV' },
                     { key: 'leads_date_filter', label: 'Filtro fechas leads' },
-                    { key: 'leads_new_only',    label: 'Solo leads nuevos ⚠️' },
-                  ] as { key: string; label: string }[]).map(({ key, label }) => {
+                    { key: 'leads_new_only',    label: <><span>Solo leads nuevos</span> <AlertTriangle size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /></> },
+                  ] as { key: string; label: React.ReactNode }[]).map(({ key, label }) => {
                     const val: OverrideVal = key in featOverrides ? featOverrides[key] as boolean : null
                     return (
                       <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: val === true ? '#f0fdf4' : val === false ? '#fef2f2' : 'var(--cream)', borderRadius: 6, gap: 6 }}>
@@ -782,7 +783,7 @@ function UserPanel({
                   Sin venues de WordPress asignados todavía.
                   {!activeSub && (
                     <div style={{ marginTop: 6, fontSize: 12, color: '#b45309' }}>
-                      💡 Si el venue aún no tiene publicación en WordPress, puedes asignarlo más tarde una vez aprobado el onboarding.
+                      <Lightbulb size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Si el venue aún no tiene publicación en WordPress, puedes asignarlo más tarde una vez aprobado el onboarding.
                     </div>
                   )}
                 </div>
@@ -841,7 +842,7 @@ function UserPanel({
                   </select>
                   {wpVenues.length === 0 && (
                     <div style={{ fontSize: 11, color: '#b45309', marginTop: 4 }}>
-                      ⚠️ Si el venue aún no está en WordPress, aprueba primero el onboarding para que se publique.
+                      <AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Si el venue aún no está en WordPress, aprueba primero el onboarding para que se publique.
                     </div>
                   )}
                 </div>
@@ -918,7 +919,7 @@ function UserPanel({
               {activeSub && subPlan && !subPlan.is_active && (
                 <div style={{ background: '#fffbeb', border: '2px solid #fcd34d', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 7 }}>
-                    ⚠️ Plan «{planLabel(subPlan)}» desactivado — migración pendiente
+                    <AlertTriangle size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Plan «{planLabel(subPlan)}» desactivado — migración pendiente
                   </div>
 
                   {/* Current cycle end info */}
@@ -927,7 +928,7 @@ function UserPanel({
                       <div style={{ fontSize: 10, fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>
                         {activeSub.status === 'trial' ? 'Fin del trial' : 'Fin del ciclo actual'}
                       </div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#92400e', fontFamily: 'Cormorant Garamond, serif' }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#92400e', fontFamily: 'Manrope, sans-serif' }}>
                         {(() => {
                           const d = activeSub.status === 'trial' ? activeSub.trial_end_date : activeSub.renewal_date
                           return d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'
@@ -1047,7 +1048,7 @@ function UserPanel({
               {activeSub?.status === 'active' && activeCycle ? (
                 <div style={{ background: '#f0f9ff', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12 }}>
                   <div style={{ fontWeight: 600, color: '#0369a1', marginBottom: 4 }}>
-                    📋 {activeCycle.label}
+                    <ClipboardList size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> {activeCycle.label}
                     {commitMonths > 0 ? ` · Compromiso ${commitMonths} meses` : ' · Sin permanencia'}
                   </div>
                   <div style={{ color: '#0369a1' }}>
@@ -1133,13 +1134,13 @@ function UserPanel({
                 {/* Trial end — solo si status=trial */}
                 {subForm.status === 'trial' && (
                   <div className="form-group" style={{ background: '#fffbeb', padding: '10px 12px', borderRadius: 8, border: '1px solid #fcd34d' }}>
-                    <label className="form-label" style={{ color: '#92400e' }}>⏰ Fin del trial</label>
+                    <label className="form-label" style={{ color: '#92400e', display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={12} /> Fin del trial</label>
                     <input className="form-input" type="date" value={subForm.trial_end_date}
                       onChange={e => setSubForm(f => ({ ...f, trial_end_date: e.target.value }))} />
                     {subForm.trial_end_date && (() => {
                       const d = trialDaysLeft(subForm.trial_end_date)
                       return <div style={{ fontSize: 10, color: '#b45309', marginTop: 3 }}>
-                        {d === null ? '' : d < 0 ? '⚠️ Ya ha expirado' : `${d} días desde hoy`}
+                        {d === null ? '' : d < 0 ? <><AlertTriangle size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> Ya ha expirado</> : `${d} días desde hoy`}
                       </div>
                     })()}
                   </div>
@@ -1149,7 +1150,7 @@ function UserPanel({
                 {subForm.status === 'active' && (
                   <div className="form-group">
                     <label className="form-label">
-                      {subForm.cancel_at_period_end ? '📅 Fecha de fin de servicio' : 'Próxima renovación / cobro'}
+                      {subForm.cancel_at_period_end ? <><Calendar size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Fecha de fin de servicio</> : 'Próxima renovación / cobro'}
                     </label>
                     <input className="form-input" type="date" value={subForm.renewal_date}
                       onChange={e => setSubForm(f => ({ ...f, renewal_date: e.target.value }))} />
@@ -1164,7 +1165,7 @@ function UserPanel({
                     })()}
                     {subForm.cancel_at_period_end && subForm.renewal_date && (
                       <div style={{ fontSize: 10, color: '#c0392b', marginTop: 3 }}>
-                        ⛔ El acceso se revocará el {new Date(subForm.renewal_date).toLocaleDateString('es-ES')} y no se renovará
+                        <OctagonAlert size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> El acceso se revocará el {new Date(subForm.renewal_date).toLocaleDateString('es-ES')} y no se renovará
                       </div>
                     )}
                   </div>
@@ -1228,7 +1229,7 @@ function UserPanel({
                   </label>
                   {subForm.cancel_at_period_end && subForm.renewal_date && activeCycle && (
                     <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#c0392b', marginTop: 8 }}>
-                      ⛔ Fin de servicio: <strong>{new Date(subForm.renewal_date).toLocaleDateString('es-ES')}</strong>
+                      <OctagonAlert size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Fin de servicio: <strong>{new Date(subForm.renewal_date).toLocaleDateString('es-ES')}</strong>
                       {activeSub?.renewal_date && (
                         <> · Aviso cancelación: <strong>
                           {new Date(cancelDeadline(subForm.renewal_date, activeCycle.cancel_notice_days)).toLocaleDateString('es-ES')}
@@ -1292,14 +1293,14 @@ function UserPanel({
                     const plan = plans.find(p => p.id === ev.plan_id)
                     const cycle = plan?.billing_cycles?.find(c => c.id === ev.billing_cycle)
                     const icon = {
-                      payment:      { emoji: '💳', bg: '#f0fdf4', border: '#bbf7d0', color: '#16a34a' },
-                      trial_started:{ emoji: '⏰', bg: '#fffbeb', border: '#fcd34d', color: '#b45309' },
-                      activated:    { emoji: '✅', bg: '#f0fdf4', border: '#bbf7d0', color: '#16a34a' },
-                      plan_changed: { emoji: '🔄', bg: '#f0f9ff', border: '#bae6fd', color: '#0369a1' },
-                      cancelled:    { emoji: '🚫', bg: '#fff5f5', border: '#fecaca', color: '#c0392b' },
-                      reactivated:  { emoji: '🔁', bg: '#fef9ec', border: '#fde68a', color: '#92400e' },
-                      note:         { emoji: '📝', bg: '#f9fafb', border: 'var(--ivory)', color: 'var(--warm-gray)' },
-                    }[ev.event_type] ?? { emoji: '•', bg: '#f9fafb', border: 'var(--ivory)', color: 'var(--warm-gray)' }
+                      payment:      { emoji: <CreditCard size={13} />, bg: '#f0fdf4', border: '#bbf7d0', color: '#16a34a' },
+                      trial_started:{ emoji: <Clock size={13} />, bg: '#fffbeb', border: '#fcd34d', color: '#b45309' },
+                      activated:    { emoji: <CircleCheckBig size={13} />, bg: '#f0fdf4', border: '#bbf7d0', color: '#16a34a' },
+                      plan_changed: { emoji: <ArrowLeftRight size={13} />, bg: '#f0f9ff', border: '#bae6fd', color: '#0369a1' },
+                      cancelled:    { emoji: <Ban size={13} />, bg: '#fff5f5', border: '#fecaca', color: '#c0392b' },
+                      reactivated:  { emoji: <RotateCcw size={13} />, bg: '#fef9ec', border: '#fde68a', color: '#92400e' },
+                      note:         { emoji: <FileText size={13} />, bg: '#f9fafb', border: 'var(--ivory)', color: 'var(--warm-gray)' },
+                    }[ev.event_type] ?? { emoji: <>&#8226;</>, bg: '#f9fafb', border: 'var(--ivory)', color: 'var(--warm-gray)' }
 
                     const eventLabel = {
                       payment:      'Pago registrado',
@@ -1669,7 +1670,7 @@ export default function AdminPage() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#1A1512', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#C4975A', fontFamily: 'serif', fontSize: 16 }}>Cargando...</div>
+      <div style={{ color: '#C4975A' }}>Cargando...</div>
     </div>
   )
 
@@ -1733,7 +1734,7 @@ export default function AdminPage() {
             <div className="stat-card" style={{ cursor: subCounts.expiring > 0 ? 'pointer' : undefined }}
               onClick={() => subCounts.expiring > 0 && setFilterPlan('expiring')}>
               <div className="stat-label" style={{ color: subCounts.expiring > 0 ? '#c0392b' : undefined }}>
-                {subCounts.expiring > 0 ? '⚠️ ' : ''}Expiran pronto
+                {subCounts.expiring > 0 ? <><AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />{' '}</> : ''}Expiran pronto
               </div>
               <div className="stat-value" style={{ color: subCounts.expiring > 0 ? '#c0392b' : undefined }}>{subCounts.expiring}</div>
               <div className="stat-sub">En menos de 7 días</div>
@@ -1813,7 +1814,7 @@ export default function AdminPage() {
                               border: `2px solid ${p.status === 'active' ? '#fde68a' : '#e5e7eb'}`,
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               fontSize: 12, fontWeight: 700, color: p.status === 'active' ? '#92400e' : '#9ca3af',
-                              fontFamily: 'Cormorant Garamond, serif',
+                              fontFamily: 'Manrope, sans-serif',
                             }}>
                               {(p.first_name?.[0] || p.email?.[0] || '?').toUpperCase()}
                             </div>
@@ -1868,7 +1869,7 @@ export default function AdminPage() {
                                 <span style={{ fontSize: 12, fontWeight: 500 }}>{planLabel(info.plan)}</span>
                                 {!info.plan.is_active && (
                                   <span style={{ background: '#fee2e2', color: '#c0392b', padding: '1px 5px', borderRadius: 3, fontSize: 9, fontWeight: 700 }}>
-                                    INACTIVO ⚠️
+                                    INACTIVO <AlertTriangle size={9} style={{ display: 'inline', verticalAlign: 'middle' }} />
                                   </span>
                                 )}
                               </div>

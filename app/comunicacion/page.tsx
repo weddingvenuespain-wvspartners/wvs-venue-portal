@@ -11,7 +11,8 @@ import {
   Pencil, Download, Star, Package, HelpCircle, Quote, List,
   GripVertical, ChevronsUpDown, Image as ImageIcon, Layers,
   MapPin, Calendar, XCircle, Images, Users, Timer, UtensilsCrossed,
-  Calculator, ScrollText, Ban, Lock
+  Calculator, ScrollText, Ban, Lock,
+  AlertTriangle, Camera, Flower2, Music, Snowflake
 } from 'lucide-react'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import { usePlanFeatures } from '@/lib/use-plan-features'
@@ -671,7 +672,7 @@ export default function ComunicacionPage() {
       <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
         <div style={{ textAlign: 'center', maxWidth: 420, padding: '0 24px' }}>
           <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: 32 }}>✉️</div>
-          <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Cormorant Garamond, serif', marginBottom: 10 }}>Comunicación — Plan Premium</div>
+          <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Manrope, sans-serif', marginBottom: 10 }}>Comunicación — Plan Premium</div>
           <div style={{ fontSize: 14, color: 'var(--warm-gray)', lineHeight: 1.6, marginBottom: 24 }}>
             Crea plantillas de mensajes, diseña tu web de propuesta y genera dossiers personalizados para cada pareja.
           </div>
@@ -733,7 +734,7 @@ export default function ComunicacionPage() {
                 <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                   <Lock size={28} style={{ color: 'var(--gold)', opacity: 0.7 }} />
                 </div>
-                <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 22, color: 'var(--espresso)', marginBottom: 10 }}>Web de propuesta</div>
+                <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, color: 'var(--espresso)', marginBottom: 10 }}>Web de propuesta</div>
                 <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.7, marginBottom: 20 }}>
                   Crea plantillas de propuesta personalizadas con tu branding, secciones y contenido.<br />
                   Disponible en el plan <strong>Premium</strong>.
@@ -903,7 +904,7 @@ function MessagesTab({ templates, leads, userId, onRefresh }: {
       {(isNew || selected) ? (
         <div className="card">
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 18, color: 'var(--espresso)' }}>
+            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, color: 'var(--espresso)' }}>
               {isNew ? 'Nueva plantilla' : 'Editar plantilla'}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -992,7 +993,7 @@ function MessagesTab({ templates, leads, userId, onRefresh }: {
       ) : (
         <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
           <MessageCircle size={36} style={{ color: 'var(--gold)', margin: '0 auto 16px', opacity: 0.6 }} />
-          <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, marginBottom: 8, color: 'var(--espresso)' }}>Plantillas de mensajes</div>
+          <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, marginBottom: 8, color: 'var(--espresso)' }}>Plantillas de mensajes</div>
           <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 24, maxWidth: 360, margin: '0 auto 24px', lineHeight: 1.7 }}>
             Crea plantillas con variables dinámicas para enviar por WhatsApp o email con un solo click.
           </div>
@@ -1066,7 +1067,7 @@ function SendMsgModal({ template, leads, onClose }: {
         onClick={e => e.stopPropagation()}>
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 19, color: 'var(--espresso)' }}>Enviar: {template.name}</div>
+            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 19, color: 'var(--espresso)' }}>Enviar: {template.name}</div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2 }}>Selecciona un lead para personalizar el mensaje</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={18} /></button>
@@ -1347,9 +1348,9 @@ function ProposalTab({ templates, userId, content, onRefresh }: {
       {/* Sub-tab bar */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'var(--cream)', borderRadius: 8, padding: 4, width: 'fit-content' }}>
         {([
-          { key: 'design',  label: '🎨 Plantilla y diseño',      desc: 'Estructura, secciones y CTA de la propuesta web' },
-          { key: 'content', label: '📦 Contenido de la propuesta', desc: 'Paquetes, FAQ, testimonios y más' },
-        ] as const).map(st => (
+          { key: 'design' as const,  label: <>🎨 Plantilla y diseño</>,      desc: 'Estructura, secciones y CTA de la propuesta web' },
+          { key: 'content' as const, label: <><Package size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Contenido de la propuesta</>, desc: 'Paquetes, FAQ, testimonios y más' },
+        ]).map(st => (
           <button key={st.key} onClick={() => setSubTab(st.key)} style={{
             padding: '7px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500,
             background: subTab === st.key ? '#fff' : 'transparent',
@@ -1384,7 +1385,7 @@ function ProposalTab({ templates, userId, content, onRefresh }: {
           {templates.length === 0 ? (
             <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
               <Eye size={36} style={{ color: 'var(--gold)', margin: '0 auto 16px', opacity: 0.6 }} />
-              <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, marginBottom: 8 }}>Sin plantillas de propuesta</div>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, marginBottom: 8 }}>Sin plantillas de propuesta</div>
               <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 20 }}>Crea una plantilla para personalizar qué verán las parejas cuando abran su propuesta.</div>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
                 <button onClick={openNew} className="btn btn-primary"><Plus size={13} /> Crear plantilla</button>
@@ -1884,7 +1885,7 @@ function ProposalTab({ templates, userId, content, onRefresh }: {
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 10 }}>Vista previa</div>
                 <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--ivory)' }}>
                   <div style={{ height: 60, background: `linear-gradient(135deg, ${form.accent_color}22, ${form.accent_color}44)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: 13, fontFamily: 'Cormorant Garamond, serif', color: form.accent_color, fontWeight: 600 }}>{form.header_text}</span>
+                    <span style={{ fontSize: 13, fontFamily: 'Manrope, sans-serif', color: form.accent_color, fontWeight: 600 }}>{form.header_text}</span>
                   </div>
                   <div style={{ padding: '10px 12px', background: '#fafafa' }}>
                     {form.sections.map(s => {
@@ -1988,7 +1989,7 @@ function ContentTab({ content, userId, onRefresh }: {
 
   type AccordionGroup = {
     id: string
-    icon: string
+    icon: React.ReactNode
     title: string
     desc: string
     count: number
@@ -2029,7 +2030,7 @@ function ContentTab({ content, userId, onRefresh }: {
       body: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           <div style={{ padding: '10px 14px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, fontSize: 11, color: '#92400e', marginBottom: 16 }}>
-            ⚠️ En <strong>Solo Espacio</strong> todo lo que no sea el alquiler es un extra. Define los servicios que puedes ofrecer o recomendar — precio fijo (€) o por persona (€/pax).
+            <AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> En <strong>Solo Espacio</strong> todo lo que no sea el alquiler es un extra. Define los servicios que puedes ofrecer o recomendar — precio fijo (€) o por persona (€/pax).
           </div>
           <ExtraServicesEditor items={content.extra_services} userId={userId} onRefresh={onRefresh} />
           <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28, marginTop: 28 }}>
@@ -2057,7 +2058,7 @@ function ContentTab({ content, userId, onRefresh }: {
       body: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 11, color: '#991b1b', marginBottom: 16 }}>
-            ⚠️ <strong>Fundamental para Solo Espacio:</strong> especifica qué proveedores externos están permitidos, si hay fee, y las normas de horario y ruido.
+            <AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> <strong>Fundamental para Solo Espacio:</strong> especifica qué proveedores externos están permitidos, si hay fee, y las normas de horario y ruido.
           </div>
           <SectionConfigPanel title="¿Qué incluir?">
             <ConfigToggle label="Plan de pagos / Señales" hint="Hitos de pago, señal de reserva y plazos" value={dcfg.booking_has_payment_plan!} onChange={v => saveDisplayCfg({ booking_has_payment_plan: v })} />
@@ -2111,7 +2112,7 @@ function ContentTab({ content, userId, onRefresh }: {
     // ── SEMI-INCLUIDO · 2. Servicios incluidos ────────────────────────────────
     {
       id: 'inclusions',
-      icon: '📦',
+      icon: <Package size={20} />,
       title: '2. Servicios incluidos',
       desc: 'Lo que SIEMPRE va en el precio — espacio, catering, bebidas, coordinación',
       count: content.inclusions.length,
@@ -2193,7 +2194,7 @@ function ContentTab({ content, userId, onRefresh }: {
       body: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 11, color: '#991b1b', marginBottom: 16 }}>
-            ⚠️ <strong>Especifica claramente</strong> qué proveedores externos están permitidos y si hay un fee adicional por usarlos.
+            <AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> <strong>Especifica claramente</strong> qué proveedores externos están permitidos y si hay un fee adicional por usarlos.
           </div>
           <SectionConfigPanel title="¿Qué incluir?">
             <ConfigToggle label="Plan de pagos / Señales" hint="Hitos de pago, señal de reserva y plazos" value={dcfg.booking_has_payment_plan!} onChange={v => saveDisplayCfg({ booking_has_payment_plan: v })} />
@@ -2253,7 +2254,7 @@ function ContentTab({ content, userId, onRefresh }: {
           <MenuPriceEditor items={content.menu_prices} userId={userId} onRefresh={onRefresh} />
           <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 28, marginTop: 28 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
-              🎶 Música · 🌸 Decoración · 📸 Fotografía · otros módulos
+              <Music size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Música · <Flower2 size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Decoración · <Camera size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Fotografía · otros módulos
             </div>
             <ExtraServicesEditor items={content.extra_services} userId={userId} onRefresh={onRefresh} />
           </div>
@@ -2440,7 +2441,7 @@ function ContentTab({ content, userId, onRefresh }: {
     },
     {
       id: 'visual',
-      icon: '📸',
+      icon: <Camera size={20} />,
       title: `${n + 1}. Contenido visual`,
       desc: 'Fotos destacadas, galería y vídeo',
       count: content.video_default?.url ? 1 : 0,
@@ -3114,7 +3115,7 @@ function PackagesEditor({ items, userId, onRefresh, pricingModel, displayConfig 
       {items.length === 0 && !isNew ? (
         <div className="card" style={{ padding: '36px 24px', textAlign: 'center' }}>
           <Package size={32} style={{ color: 'var(--gold)', margin: '0 auto 12px', opacity: 0.6 }} />
-          <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 18, marginBottom: 8 }}>
+          <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, marginBottom: 8 }}>
             {pricingModel === 'venue_only' ? 'Sin tarifas definidas' : 'Sin paquetes definidos'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 16 }}>Define tus paquetes una vez y se añadirán automáticamente a cada propuesta.</div>
@@ -3147,7 +3148,7 @@ function PackagesEditor({ items, userId, onRefresh, pricingModel, displayConfig 
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: pkg.subtitle || pkg.description ? 6 : 0 }}>
                       {(pkg.days_available?.length ?? 0) > 0 && (
                         <span style={{ fontSize: 10, background: '#1e293b', color: '#fff', padding: '1px 8px', borderRadius: 8 }}>
-                          📅 {pkg.days_available!.join(' · ')}
+                          <Calendar size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {pkg.days_available!.join(' · ')}
                         </span>
                       )}
                       {pkg.event_hours && <span style={{ fontSize: 10, color: 'var(--warm-gray)', background: 'var(--cream)', padding: '1px 8px', borderRadius: 8 }}>⏱ {pkg.event_hours}h</span>}
@@ -3892,10 +3893,10 @@ function SeasonPricesEditor({ items, userId, onRefresh }: { items: VenueSeasonPr
   }
   const handleDelete = async (id: string) => { if (!confirm('¿Eliminar?')) return; await createClient().from('venue_content').delete().eq('id', id); onRefresh() }
 
-  const SEASON_COLORS: Record<string, { bg: string; color: string; label: string }> = {
+  const SEASON_COLORS: Record<string, { bg: string; color: string; label: React.ReactNode }> = {
     alta:  { bg: '#fef3c7', color: '#92400e', label: '🔥 Temporada alta' },
     media: { bg: '#dbeafe', color: '#1e40af', label: '🌤 Temporada media' },
-    baja:  { bg: '#dcfce7', color: '#166534', label: '❄️ Temporada baja' },
+    baja:  { bg: '#dcfce7', color: '#166534', label: <><Snowflake size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Temporada baja</> },
   }
 
   return (
@@ -4064,7 +4065,7 @@ function VenueRentalPricingWizard({ dcfg, saveDisplayCfg, zones, seasonPrices, u
   )
 
   const OptionBtn = ({ active, onClick, icon, title, desc }: {
-    active: boolean; onClick: () => void; icon: string; title: string; desc: string
+    active: boolean; onClick: () => void; icon: React.ReactNode; title: string; desc: string
   }) => (
     <button onClick={onClick} style={{
       padding: '16px 18px', borderRadius: 10, textAlign: 'left', cursor: 'pointer',
@@ -4095,7 +4096,7 @@ function VenueRentalPricingWizard({ dcfg, saveDisplayCfg, zones, seasonPrices, u
             onKeyDown={e => { if (e.key === 'Enter') saveZoneSupplPrice(z); if (e.key === 'Escape') setEditingZoneId(null) }}
             placeholder="ej: 800€"
             autoFocus />
-          <button onClick={() => saveZoneSupplPrice(z)} className="btn btn-primary btn-sm" style={{ padding: '4px 10px', fontSize: 11 }}>Guardar</button>
+          <button onClick={() => saveZoneSupplPrice(z)} className="btn btn-primary btn-sm" >Guardar</button>
           <button onClick={() => setEditingZoneId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}><X size={12} /></button>
         </div>
       ) : (
@@ -4222,7 +4223,7 @@ function VenueRentalPricingWizard({ dcfg, saveDisplayCfg, zones, seasonPrices, u
         </div>
         <div style={{ padding: '16px 18px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <OptionBtn active={!isMultiDay} onClick={() => saveDisplayCfg({ prices_is_multiday: false })}
-            icon="📅" title="Día único"
+            icon={<Calendar size={22} />} title="Día único"
             desc="La boda se celebra en un solo día. Los precios son siempre por día (cada viernes, cada sábado…)." />
           <OptionBtn active={isMultiDay} onClick={() => saveDisplayCfg({ prices_is_multiday: true })}
             icon="🌙" title="Multi-día (wedding weekend)"
@@ -4506,7 +4507,7 @@ function VenuePricePeriodEditor({ items, userId, onRefresh, isMultiDay, zoneId }
                   {MONTHS_SHORT[month]}
                 </div>
                 <div style={{ fontSize: 10, marginTop: 3, color: overlap ? '#d97706' : covered ? '#059669' : '#d1d5db', lineHeight: 1.2 }}>
-                  {overlap ? '⚠️ solapado' : covered ? priceLabel || '✓' : '—'}
+                  {overlap ? <><AlertTriangle size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> solapado</> : covered ? priceLabel || '✓' : '—'}
                 </div>
               </div>
             )
@@ -4524,7 +4525,7 @@ function VenuePricePeriodEditor({ items, userId, onRefresh, isMultiDay, zoneId }
           </div>
         ) : (
           <div style={{ marginTop: 8, padding: '8px 12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 6, fontSize: 11, color: '#92400e', display: 'flex', alignItems: 'center', gap: 6 }}>
-            ⚠️ Meses sin tarifa en {viewYear}: <strong>{uncoveredMonths.map(m => MONTHS_SHORT[m.month]).join(', ')}</strong>
+            <AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Meses sin tarifa en {viewYear}: <strong>{uncoveredMonths.map(m => MONTHS_SHORT[m.month]).join(', ')}</strong>
           </div>
         )}
 
@@ -4588,7 +4589,7 @@ function VenuePricePeriodEditor({ items, userId, onRefresh, isMultiDay, zoneId }
             <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Precio aplicado:</span>
               <span style={{ fontSize: 11, fontWeight: 600, background: '#f0fdf4', border: '1px solid #6ee7b7', color: '#065f46', padding: '2px 8px', borderRadius: 6 }}>
-                📅 Por día
+                <Calendar size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Por día
               </span>
               <span style={{ fontSize: 10, color: '#9ca3af' }}>— en día único cada día se cobra por separado</span>
             </div>
@@ -4697,7 +4698,7 @@ function VenuePricePeriodEditor({ items, userId, onRefresh, isMultiDay, zoneId }
 
             return (
               <div style={{ marginBottom: 10, padding: '8px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 6, fontSize: 11, color: '#0369a1', lineHeight: 1.5 }}>
-                <div>📅 {fmtDate(form.date_from)} → {fmtDate(form.date_to)}
+                <div><Calendar size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> {fmtDate(form.date_from)} → {fmtDate(form.date_to)}
                   {form.applicable_days.length > 0 && <> &nbsp;·&nbsp; <strong>{dayShorts.join(' ')}{hasHols ? ' + fest.' : ''}</strong></>}
                 </div>
                 <div style={{ marginTop: 3, fontStyle: 'italic' }}>💶 {semanticText}</div>
@@ -4706,7 +4707,7 @@ function VenuePricePeriodEditor({ items, userId, onRefresh, isMultiDay, zoneId }
           })()}
           {form.date_from && form.date_to && form.date_from > form.date_to && (
             <div style={{ marginBottom: 10, padding: '6px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, fontSize: 11, color: '#dc2626' }}>
-              ⚠️ La fecha de fin debe ser posterior a la de inicio.
+              <AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> La fecha de fin debe ser posterior a la de inicio.
             </div>
           )}
 
@@ -4735,7 +4736,7 @@ function VenuePricePeriodEditor({ items, userId, onRefresh, isMultiDay, zoneId }
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', marginBottom: 3 }}>{p.label}</div>
                   <div style={{ fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span>📅 {fmtDate(p.date_from || '')} → {fmtDate(p.date_to || '')}</span>
+                    <span><Calendar size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> {fmtDate(p.date_from || '')} → {fmtDate(p.date_to || '')}</span>
                     {p.notes && <span>· {p.notes}</span>}
                   </div>
                   {(p.applicable_days && p.applicable_days.length > 0 || p.includes_holidays) && (
@@ -4754,7 +4755,7 @@ function VenuePricePeriodEditor({ items, userId, onRefresh, isMultiDay, zoneId }
                   )}
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Cormorant Garamond, serif' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Manrope, sans-serif' }}>
                     {p.base_price ? `${Number(p.base_price).toLocaleString('es-ES')}€` : '—'}
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
@@ -4892,7 +4893,7 @@ function PhotosPlaceholder({ type }: { type: 'hero' | 'gallery' }) {
       </div>
       <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
         {isHero ? <ImageIcon size={36} style={{ color: 'var(--gold)', margin: '0 auto 16px', opacity: 0.6 }} /> : <Images size={36} style={{ color: 'var(--gold)', margin: '0 auto 16px', opacity: 0.6 }} />}
-        <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 18, marginBottom: 8, color: 'var(--espresso)' }}>{isHero ? 'Fotos principales' : 'Galería de fotos'}</div>
+        <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, marginBottom: 8, color: 'var(--espresso)' }}>{isHero ? 'Fotos principales' : 'Galería de fotos'}</div>
         <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 16, maxWidth: 360, margin: '0 auto 20px', lineHeight: 1.7 }}>
           La gestión de fotos se realiza desde <strong>Mi ficha</strong>. Allí puedes subir, organizar y destacar las imágenes de tu venue.
         </div>
@@ -5336,7 +5337,7 @@ function BudgetSimulatorEditor({ item, userId, onRefresh }: { item: VenueBudgetS
             </div>
             <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>Total estimado</span>
-              <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Cormorant Garamond, serif' }}>{total.toLocaleString('es-ES')}€</span>
+              <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Manrope, sans-serif' }}>{total.toLocaleString('es-ES')}€</span>
             </div>
             {form.notes && <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 8, lineHeight: 1.5 }}>* {form.notes}</div>}
           </div>
@@ -5524,7 +5525,7 @@ function DossierTab({ dossiers, leads, userId, onRefresh }: {
       {dossiers.length === 0 && !showAdd ? (
         <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
           <FileText size={36} style={{ color: 'var(--gold)', margin: '0 auto 16px', opacity: 0.6 }} />
-          <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, marginBottom: 8 }}>Sin dossiers</div>
+          <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, marginBottom: 8 }}>Sin dossiers</div>
           <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 20 }}>Sube tu dossier en PDF para enviarlo rápidamente a las parejas interesadas.</div>
           <button onClick={() => setShowAdd(true)} className="btn btn-primary"><Plus size={13} /> Añadir dossier</button>
         </div>
@@ -5615,7 +5616,7 @@ function SendDossierModal({ dossier, leads, onClose }: {
         onClick={e => e.stopPropagation()}>
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 19, color: 'var(--espresso)' }}>Enviar dossier</div>
+            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 19, color: 'var(--espresso)' }}>Enviar dossier</div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2 }}>{dossier.name}</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={18} /></button>
@@ -6240,7 +6241,7 @@ function PaymentPlanEditor({ item, userId, onRefresh }: { item: VenuePaymentPlan
                   onChange={e => updateM(m.id, 'label', e.target.value)}
                 />
                 <select
-                  className="form-input" style={{ fontSize: 12, padding: '6px 8px' }}
+                  className="form-input" 
                   value={m.amount_type}
                   onChange={e => updateM(m.id, 'amount_type', e.target.value)}
                 >

@@ -50,7 +50,7 @@ export const GOOGLE_FONTS: GoogleFont[] = [
   { label: 'Nunito',             value: '"Nunito", sans-serif',                        googleName: 'Nunito:ital,wght@0,300;0,400;1,300',                            category: 'sans',    desc: 'Redondeada y suave' },
   { label: 'Poppins',            value: '"Poppins", sans-serif',                       googleName: 'Poppins:ital,wght@0,300;0,400;1,300',                           category: 'sans',    desc: 'Limpia y contemporánea' },
   { label: 'Quicksand',          value: '"Quicksand", sans-serif',                     googleName: 'Quicksand:wght@300;400;600',                                    category: 'sans',    desc: 'Suave y moderna' },
-  { label: 'DM Sans',            value: '"DM Sans", sans-serif',                       googleName: 'DM+Sans:ital,wght@0,300;0,400;1,300',                           category: 'sans',    desc: 'Minimalista y fresca' },
+  { label: 'Manrope',            value: '"Manrope", sans-serif',                       googleName: 'DM+Sans:ital,wght@0,300;0,400;1,300',                           category: 'sans',    desc: 'Minimalista y fresca' },
   { label: 'Sin serifa (sistema)', value: '-apple-system, Helvetica, sans-serif',      googleName: null,                                                             category: 'sans',    desc: 'Rápida, sin descarga' },
 ]
 

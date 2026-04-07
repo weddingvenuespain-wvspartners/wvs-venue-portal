@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import {
   ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
-  FileText, Calendar, Search, AlertCircle, Settings, Info, Trash2, RotateCcw
+  FileText, Calendar, Search, AlertCircle, Settings, Info, Trash2, RotateCcw, Flower2
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -375,7 +375,7 @@ export default function CalendarioPage() {
                 <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>
                   {bulkStart ? 'Haz click en otra fecha para seleccionar el rango' : `${bulkDates.size} fechas seleccionadas`}
                 </span>
-                <select className="form-input" style={{ padding: '5px 8px', fontSize: 12, width: 'auto' }}
+                <select className="form-input" style={{ width: 'auto' }}
                   value={bulkStatus} onChange={e => setBulkStatus(e.target.value as Status)}>
                   <option value="negociacion">En negociación</option>
                   <option value="reservado">Reservado</option>
@@ -412,7 +412,7 @@ export default function CalendarioPage() {
               { value: null, label: isHighSeason ? 'Alta temporada' : 'Temporada baja', color: 'var(--warm-gray)', text: isHighSeason ? 'May – Oct' : 'Nov – Abr' },
             ].map((s, i) => (
               <div key={i} style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, padding: '20px 22px' }}>
-                <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 36, fontWeight: 500, color: s.color, lineHeight: 1, marginBottom: 8 }}>
+                <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 36, fontWeight: 500, color: s.color, lineHeight: 1, marginBottom: 8 }}>
                   {s.value !== null ? String(s.value).padStart(2, '0') : s.text}
                 </div>
                 <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>
@@ -428,11 +428,11 @@ export default function CalendarioPage() {
               {/* Calendar header */}
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 26, color: 'var(--espresso)', fontWeight: 400 }}>
+                  <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, color: 'var(--espresso)', fontWeight: 500, letterSpacing: '0.01em' }}>
                     {MONTHS[month]} {year}
                   </span>
                   <button onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()) }}
-                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'Manrope, sans-serif' }}>
                     Hoy
                   </button>
                 </div>
@@ -504,7 +504,7 @@ export default function CalendarioPage() {
                           <span style={{
                             fontSize: 15, fontWeight: isToday ? 700 : 500, lineHeight: 1,
                             color: isPast ? 'var(--stone)' : isToday ? 'var(--gold)' : 'var(--charcoal)',
-                            fontFamily: 'DM Sans, sans-serif',
+                            fontFamily: 'Manrope, sans-serif',
                           }}>
                             {day}
                           </span>
@@ -818,7 +818,7 @@ function DayModal({
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)', textTransform: 'capitalize' }}>
+            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)', textTransform: 'capitalize' }}>
               {dt.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
             {isPast && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 3 }}>Fecha pasada · solo lectura</div>}
@@ -923,9 +923,9 @@ function DayModal({
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                          <button className="btn btn-ghost" style={{ fontSize: 11, padding: '5px 12px' }}
+                          <button className="btn btn-ghost" 
                             onClick={() => setExpandedLeadId(null)}>Cancelar</button>
-                          <button className="btn btn-primary" style={{ fontSize: 11, padding: '5px 12px' }}
+                          <button className="btn btn-primary" 
                             disabled={inlineEditSaving}
                             onClick={async () => {
                               setInlineEditSaving(true)
@@ -1102,7 +1102,7 @@ function DayModal({
               </div>
               {visitDate && (
                 <div style={{ marginTop: 6, fontSize: 12, color: '#10b981', fontWeight: 500 }}>
-                  📅 {new Date(visitDate + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  <Calendar size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> {new Date(visitDate + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 </div>
               )}
             </div>
@@ -1112,7 +1112,7 @@ function DayModal({
           {status === 'reservado' && !isPast && !showCreate && (
             <div style={{ marginBottom: 20, padding: '14px 16px', background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#9d174d', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-                🌸 Boda reservada
+                <Flower2 size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Boda reservada
               </div>
               {selectedLead ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -1227,7 +1227,7 @@ function DayModal({
                 ))}
               </div>
               <div style={{ marginTop: 8, fontSize: 11, color: '#92400e' }}>
-                Puedes cambiar estas reglas en ⚙️ Reglas del topbar.
+                Puedes cambiar estas reglas en Reglas (en el topbar).
               </div>
             </div>
           )}
@@ -1415,7 +1415,7 @@ function DateRulesModal({ rules, onSave, onClose }: {
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)' }}>Reglas de fechas</div>
+            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)' }}>Reglas de fechas</div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2 }}>Cómo se bloquean los días al reservar una fecha</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}><X size={18} /></button>
@@ -1484,7 +1484,7 @@ function DateRulesModal({ rules, onSave, onClose }: {
                       </span>
                     ))}
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: '#fce7f3', color: '#9d174d', fontWeight: 700 }}>
-                      📅 Boda
+                      <Calendar size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Boda
                     </span>
                     {form.type === 'overnight' && (
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: '#fce7f3', color: '#9d174d' }}>
@@ -1536,28 +1536,28 @@ function DateRulesModal({ rules, onSave, onClose }: {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
                     <div>
                       <label className="form-label" style={{ fontSize: 10 }}>Día inicio</label>
-                      <select className="form-input" style={{ fontSize: 12, padding: '5px 8px' }}
+                      <select className="form-input" 
                         value={pkg.anchor_dow} onChange={e => updatePkg(i, 'anchor_dow', parseInt(e.target.value))}>
                         {DOW_NAMES.map((d, idx) => <option key={idx} value={idx}>{d}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="form-label" style={{ fontSize: 10 }}>Nº días</label>
-                      <select className="form-input" style={{ fontSize: 12, padding: '5px 8px' }}
+                      <select className="form-input" 
                         value={pkg.span_days} onChange={e => updatePkg(i, 'span_days', parseInt(e.target.value))}>
                         {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="form-label" style={{ fontSize: 10 }}>Días antes</label>
-                      <select className="form-input" style={{ fontSize: 12, padding: '5px 8px' }}
+                      <select className="form-input" 
                         value={pkg.days_before} onChange={e => updatePkg(i, 'days_before', parseInt(e.target.value))}>
                         {[0,1,2,3].map(n => <option key={n} value={n}>{n}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="form-label" style={{ fontSize: 10 }}>Días después</label>
-                      <select className="form-input" style={{ fontSize: 12, padding: '5px 8px' }}
+                      <select className="form-input" 
                         value={pkg.days_after} onChange={e => updatePkg(i, 'days_after', parseInt(e.target.value))}>
                         {[0,1,2,3].map(n => <option key={n} value={n}>{n}</option>)}
                       </select>

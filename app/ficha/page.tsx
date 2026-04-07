@@ -635,7 +635,7 @@ export default function FichaPage() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: 'var(--gold)', fontFamily: 'Cormorant Garamond, serif' }}>Cargando...</div>
+      <div style={{ color: 'var(--gold)' }}>Cargando...</div>
     </div>
   )
 
@@ -756,19 +756,13 @@ export default function FichaPage() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 4, marginBottom: 28, alignItems: 'center', position: 'sticky', top: 54, zIndex: 30, background: 'var(--cream)', paddingTop: 16, paddingBottom: 12, marginTop: -16 }}>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 28, alignItems: 'center', position: 'sticky', top: 50, zIndex: 30, background: 'var(--cream)', paddingTop: 16, paddingBottom: 12, marginTop: -16 }}>
             {tabs.map(t => {
               const errCount = validationErrors.filter(e => e.tab === t.key).length
               const isActive = activeTab === t.key
               return (
                 <button key={t.key}
-                  style={{
-                    position: 'relative', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: isActive ? 600 : 400,
-                    cursor: 'pointer', border: 'none', transition: 'all 0.15s', fontFamily: 'DM Sans, sans-serif',
-                    background: isActive ? 'var(--gold)' : 'transparent',
-                    color: isActive ? '#fff' : 'var(--warm-gray)',
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                  }}
+                  className={`ficha-tab ${isActive ? 'active' : ''}`}
                   onClick={() => {
                     if (t.key !== activeTab && isDirty) {
                       autoSaveRef.current()
@@ -778,7 +772,7 @@ export default function FichaPage() {
                   {t.label}
                   {dirtyTabs.has(t.key) && !isLocked && (
                     <span className="dirty-tooltip-wrap" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'default', position: 'relative' }}>
-                      <AlertCircle size={12} style={{ color: isActive ? 'rgba(255,255,255,0.7)' : '#d97706', flexShrink: 0 }} />
+                      <AlertCircle size={12} style={{ color: 'currentColor', opacity: 0.7, flexShrink: 0 }} />
                       <span className="dirty-tooltip">Hay cambios que no se han guardado</span>
                     </span>
                   )}
@@ -892,11 +886,16 @@ export default function FichaPage() {
                       </div>
                     )}
                     {venuePriceMode === 'auto' && (
-                      <div style={{ position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--warm-gray)', pointerEvents: 'none' }}>€</span>
-                        <input className="form-input" style={{ paddingLeft: 30, borderColor: hasError('Precio del venue') ? ERR : undefined }} type="number" min={0} value={venuePriceInput}
-                          onChange={e => setVenuePriceInput(e.target.value)} placeholder="4,500.00" disabled={isLocked} />
-                      </div>
+                      <>
+                        <div style={{ position: 'relative' }}>
+                          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--warm-gray)', pointerEvents: 'none' }}>€</span>
+                          <input className="form-input" style={{ paddingLeft: 30, borderColor: hasError('Precio del venue') ? ERR : undefined }} type="number" min={0} value={venuePriceInput}
+                            onChange={e => setVenuePriceInput(e.target.value)} placeholder="4,500.00" disabled={isLocked} />
+                        </div>
+                        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.8 }}>
+                          <strong style={{ color: 'var(--gold)' }}>$</strong> hasta 4.000€ · <strong style={{ color: 'var(--gold)' }}>$$</strong> 4.000–8.000€ · <strong style={{ color: 'var(--gold)' }}>$$$</strong> más de 8.000€
+                        </div>
+                      </>
                     )}
                     {venuePriceMode === 'included' && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>Se mostrará como <strong>Included</strong>.</div>}
                     {venuePriceMode === 'none' && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>No se mostrará ningún precio de venue.</div>}
@@ -1567,36 +1566,31 @@ export default function FichaPage() {
       {/* ── Unsaved-changes navigation warning ──────────────────── */}
       {pendingNav && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 14, padding: 28, maxWidth: 380, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
-            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 22, color: 'var(--espresso)', marginBottom: 8 }}>Cambios sin guardar</div>
-            <div style={{ fontSize: 13, color: 'var(--charcoal)', marginBottom: 24, lineHeight: 1.6 }}>
-              Tienes cambios que no has guardado todavía. ¿Qué quieres hacer?
+          <div style={{ background: '#fff', borderRadius: 14, padding: '24px 28px', maxWidth: 380, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', position: 'relative' }}>
+            <button onClick={() => setPendingNav(null)}
+              style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}>
+              <X size={18} />
+            </button>
+            <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--espresso)', marginBottom: 6 }}>Cambios sin guardar</div>
+            <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 24, lineHeight: 1.6 }}>
+              Tienes cambios que no has guardado todavía.
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => { const dest = pendingNav; setPendingNav(null); setIsDirty(false); setDirtyTabs(new Set()); router.push(dest) }}
+              >
+                Descartar cambios
+              </button>
               <button
                 className="btn btn-primary"
-                style={{ justifyContent: 'center' }}
                 disabled={saving}
                 onClick={async () => {
                   const saved = await saveDraft()
                   if (saved) { const dest = pendingNav; setPendingNav(null); setIsDirty(false); setDirtyTabs(new Set()); router.push(dest) }
                 }}
               >
-                {saving ? 'Guardando...' : '💾 Guardar borrador y continuar'}
-              </button>
-              <button
-                className="btn btn-ghost"
-                style={{ justifyContent: 'center', color: '#b91c1c' }}
-                onClick={() => { const dest = pendingNav; setPendingNav(null); setIsDirty(false); setDirtyTabs(new Set()); router.push(dest) }}
-              >
-                Descartar cambios y salir
-              </button>
-              <button
-                className="btn btn-ghost"
-                style={{ justifyContent: 'center' }}
-                onClick={() => setPendingNav(null)}
-              >
-                Cancelar — seguir editando
+                {saving ? 'Guardando...' : 'Guardar y continuar'}
               </button>
             </div>
           </div>
@@ -1621,7 +1615,7 @@ export default function FichaPage() {
           onClick={() => setConfirmSubmit(false)}>
           <div style={{ background: '#fff', borderRadius: 12, padding: 32, maxWidth: 420, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 22, color: 'var(--espresso)', marginBottom: 12 }}>
+            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, fontWeight: 600, color: 'var(--espresso)', marginBottom: 12 }}>
               {isApproved ? '¿Enviar cambios para revisión?' : '¿Enviar ficha para revisión?'}
             </div>
             <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.8, marginBottom: 24 }}>
@@ -1754,7 +1748,7 @@ function CropModal({ file, aspect, onCrop, onClose, maxPx = 3000, quality = 0.92
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       onClick={onClose}>
       <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px 24px', maxWidth: '95vw', width: dispW ? dispW + 48 : 'auto' }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)', marginBottom: 2 }}>Ajustar recorte</div>
+        <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)', marginBottom: 2 }}>Ajustar recorte</div>
         <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 12 }}>Arrastra el recuadro para seleccionar el área · usa el slider para cambiar el tamaño</div>
 
         {/* Image + crop overlay */}

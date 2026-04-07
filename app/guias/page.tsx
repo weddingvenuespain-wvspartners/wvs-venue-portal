@@ -3,11 +3,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import Sidebar from '@/components/Sidebar'
-import { Search, ChevronDown, ChevronUp, Clock } from 'lucide-react'
+import { Search, ChevronDown, ChevronUp, Clock, User, Link2, BarChart3, Download, Building2, Upload, FileText, Palette, Mail, CreditCard, Star, ArrowUpCircle } from 'lucide-react'
 
 type Guide = {
   id: string
-  icon: string
+  icon: React.ReactNode
   title: string
   description: string
   readTime: string
@@ -19,7 +19,7 @@ const guides: Guide[] = [
   // Primeros pasos
   {
     id: 'configura-perfil',
-    icon: '👤',
+    icon: <User size={18} />,
     title: 'Configura tu perfil',
     description: 'Aprende a completar tu perfil profesional para que sea más atractivo y aumentes tu visibilidad.',
     readTime: '3 min',
@@ -32,7 +32,7 @@ En la sección de preferencias puedes configurar tu zona horaria (recomendamos E
   },
   {
     id: 'conecta-ficha',
-    icon: '🔗',
+    icon: <Link2 size={18} />,
     title: 'Conecta tu ficha del venue',
     description: 'Vincula tu perfil de WordPress con el portal para recibir leads directamente desde tu ficha.',
     readTime: '4 min',
@@ -45,7 +45,7 @@ Si aún no tienes ficha o necesitas que te asignen el ID, contacta con tu gestor
   },
   {
     id: 'entiende-dashboard',
-    icon: '📊',
+    icon: <BarChart3 size={18} />,
     title: 'Entiende el dashboard',
     description: 'Una visión general de las métricas más importantes para gestionar tu venue de forma eficiente.',
     readTime: '5 min',
@@ -60,7 +60,7 @@ El bloque de leads recientes te muestra las últimas solicitudes ordenadas por f
   // Leads
   {
     id: 'como-recibir-leads',
-    icon: '📥',
+    icon: <Download size={18} />,
     title: 'Cómo recibir leads',
     description: 'Descubre cómo llegan los leads a tu portal y qué puedes hacer para recibir más consultas.',
     readTime: '4 min',
@@ -73,7 +73,7 @@ Otro factor importante es la velocidad de respuesta. Los leads con respuesta en 
   },
   {
     id: 'gestiona-pipeline',
-    icon: '🏗',
+    icon: <Building2 size={18} />,
     title: 'Gestiona el pipeline',
     description: 'Aprende a mover leads por el pipeline para mantener un seguimiento efectivo de cada consulta.',
     readTime: '5 min',
@@ -86,7 +86,7 @@ Para una gestión eficiente, intenta procesar los leads en el mismo día que lle
   },
   {
     id: 'exportar-leads',
-    icon: '📤',
+    icon: <Upload size={18} />,
     title: 'Exportar leads a Excel',
     description: 'Exporta tu base de leads en formato CSV para análisis externos o integración con tu CRM.',
     readTime: '2 min',
@@ -101,7 +101,7 @@ Puedes usar esta exportación para hacer análisis de tendencias (fechas de boda
   // Propuestas
   {
     id: 'primera-propuesta',
-    icon: '📝',
+    icon: <FileText size={18} />,
     title: 'Crea tu primera propuesta',
     description: 'Paso a paso para crear una propuesta personalizada impactante para una pareja concreta.',
     readTime: '6 min',
@@ -114,7 +114,7 @@ El contenido más importante es la sección de presentación: escribe en primera
   },
   {
     id: 'personaliza-diseno',
-    icon: '🎨',
+    icon: <Palette size={18} />,
     title: 'Personaliza el diseño',
     description: 'Ajusta los colores, tipografías y estructura de tus propuestas para reflejar la identidad de tu venue.',
     readTime: '4 min',
@@ -127,7 +127,7 @@ Las fotos son clave. Incluye al menos 5-8 imágenes de alta calidad que muestren
   },
   {
     id: 'envia-cliente',
-    icon: '✉️',
+    icon: <Mail size={18} />,
     title: 'Envía al cliente',
     description: 'Aprende a enviar la propuesta, hacer seguimiento y gestionar las respuestas de los clientes.',
     readTime: '3 min',
@@ -142,7 +142,7 @@ Si la pareja tiene preguntas, puede escribirte directamente desde el chat integr
   // Suscripción
   {
     id: 'diferencias-planes',
-    icon: '⭐',
+    icon: <Star size={18} />,
     title: 'Diferencias entre planes',
     description: 'Compara el plan Básico y Premium para saber qué funcionalidades incluye cada uno.',
     readTime: '3 min',
@@ -155,7 +155,7 @@ El plan Premium añade las funcionalidades más avanzadas: propuestas personaliz
   },
   {
     id: 'actualizar-plan',
-    icon: '⬆️',
+    icon: <ArrowUpCircle size={18} />,
     title: 'Cómo actualizar tu plan',
     description: 'Pasos para solicitar el upgrade de Básico a Premium a través de tu gestor.',
     readTime: '2 min',
@@ -168,7 +168,7 @@ Tu gestor te confirmará las condiciones del plan, el precio y la forma de pago 
   },
   {
     id: 'gestion-facturacion',
-    icon: '💳',
+    icon: <CreditCard size={18} />,
     title: 'Gestiona tu facturación',
     description: 'Dónde encontrar tu historial de pagos y cómo gestionar tu método de pago.',
     readTime: '2 min',
@@ -342,7 +342,7 @@ export default function GuiasPage() {
 
           {filtered.length === 0 && (
             <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--warm-gray)' }}>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
+              <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }}><Search size={32} style={{ color: 'var(--warm-gray)' }} /></div>
               <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>No se encontraron guías</div>
               <div style={{ fontSize: 12 }}>Intenta con otro término de búsqueda</div>
             </div>
@@ -356,7 +356,7 @@ export default function GuiasPage() {
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
           }}>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#92400e', fontFamily: 'Cormorant Garamond, serif', marginBottom: 4 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>
                 ¿No encuentras lo que buscas?
               </div>
               <div style={{ fontSize: 13, color: '#b45309' }}>

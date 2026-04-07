@@ -5,7 +5,7 @@ export default function CookiesPage() {
     borderBottom: '1px solid #ede8df',
   }
   const headingStyle: React.CSSProperties = {
-    fontFamily: 'Cormorant Garamond, serif',
+    fontFamily: 'Manrope, sans-serif',
     fontSize: 20,
     fontWeight: 600,
     color: '#3b2a1a',
@@ -58,7 +58,7 @@ export default function CookiesPage() {
         <a href="/dashboard" style={{ fontSize: 12, color: '#c9a84c', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 20 }}>
           ← Volver al portal
         </a>
-        <h1 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 36, fontWeight: 600, color: '#3b2a1a', marginBottom: 8, lineHeight: 1.2 }}>
+        <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 500, letterSpacing: '0.01em', color: '#3b2a1a', marginBottom: 8, lineHeight: 1.2 }}>
           Política de Cookies
         </h1>
         <p style={{ fontSize: 13, color: '#8c7b6b' }}>

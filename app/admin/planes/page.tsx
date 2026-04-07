@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
-import { Plus, Edit2, ToggleLeft, ToggleRight, ArrowLeft, Trash2, Check, X, Eye, EyeOff, Users, AlertTriangle } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, ArrowLeft, Trash2, Check, X, Eye, EyeOff, Users, AlertTriangle, Clock, Landmark as LandmarkIcon, ClipboardList, Search } from 'lucide-react'
 import type { PlanFeatures } from '@/lib/use-plan-features'
 import { type BillingCycle, EMPTY_CYCLE, CYCLE_PRESETS } from '@/lib/billing-types'
 
@@ -297,7 +297,7 @@ export default function PlanesPage() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#1A1512', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#C4975A', fontFamily: 'serif' }}>Cargando...</div>
+      <div style={{ color: '#C4975A' }}>Cargando...</div>
     </div>
   )
 
@@ -337,7 +337,7 @@ export default function PlanesPage() {
                   <div className="card-body">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                       <div>
-                        <div style={{ fontSize: 17, fontWeight: 600, fontFamily: 'Cormorant Garamond, serif', color: 'var(--espresso)' }}>
+                        <div style={{ fontSize: 17, fontWeight: 600, fontFamily: 'Manrope, sans-serif', color: 'var(--espresso)' }}>
                           {plan.display_name || plan.name}
                         </div>
                         <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontFamily: 'monospace', marginTop: 1 }}>slug: {plan.name}</div>
@@ -374,7 +374,7 @@ export default function PlanesPage() {
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           {cycles.map(c => (
                             <div key={c.id} style={{ background: 'var(--cream)', borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 80 }}>
-                              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Cormorant Garamond, serif' }}>{c.price}€</div>
+                              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Manrope, sans-serif' }}>{c.price}€</div>
                               <div style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{c.label}</div>
                               {c.commitment_months > 0 && (
                                 <div style={{ fontSize: 9, color: 'var(--warm-gray)', marginTop: 2 }}>{c.commitment_months}m mín.</div>
@@ -387,8 +387,8 @@ export default function PlanesPage() {
 
                     {/* Trial */}
                     <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 12 }}>
-                      ⏰ Trial: <strong>{plan.trial_days ?? 14} días</strong>
-                      &nbsp;·&nbsp; 🏦 Domiciliación SEPA
+                      <Clock size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Trial: <strong>{plan.trial_days ?? 14} días</strong>
+                      &nbsp;·&nbsp; <LandmarkIcon size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Domiciliación SEPA
                       &nbsp;·&nbsp; Preaviso: <strong>{cycles[0]?.cancel_notice_days ?? 15} días</strong>
                     </div>
 
@@ -630,7 +630,7 @@ export default function PlanesPage() {
             <div className="modal-body">
               <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 6 }}>
-                  ⚠️ {deactivateWarning.subscriber_count} suscriptor{deactivateWarning.subscriber_count !== 1 ? 'es' : ''} activo{deactivateWarning.subscriber_count !== 1 ? 's' : ''} en «{deactivateWarning.display_name || deactivateWarning.name}»
+                  <AlertTriangle size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> {deactivateWarning.subscriber_count} suscriptor{deactivateWarning.subscriber_count !== 1 ? 'es' : ''} activo{deactivateWarning.subscriber_count !== 1 ? 's' : ''} en «{deactivateWarning.display_name || deactivateWarning.name}»
                 </div>
                 <ul style={{ fontSize: 12, color: '#92400e', margin: '6px 0 0', paddingLeft: 18, lineHeight: 1.8 }}>
                   <li>Los suscriptores <strong>continúan activos hasta que acabe su ciclo</strong></li>
@@ -642,7 +642,7 @@ export default function PlanesPage() {
               {/* Step-by-step migration guide */}
               <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 8 }}>
-                  📋 Cómo migrar los suscriptores (paso a paso)
+                  <ClipboardList size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Cómo migrar los suscriptores (paso a paso)
                 </div>
                 <ol style={{ fontSize: 12, color: '#0369a1', paddingLeft: 18, lineHeight: 2, margin: 0 }}>
                   <li>Desactiva este plan (botón de abajo)</li>
@@ -660,7 +660,7 @@ export default function PlanesPage() {
                 rel="noopener noreferrer"
                 className="btn btn-ghost btn-sm"
                 style={{ fontSize: 12, width: '100%', justifyContent: 'center', marginBottom: 4 }}>
-                🔍 Ver los {deactivateWarning.subscriber_count} venue{deactivateWarning.subscriber_count !== 1 ? 's' : ''} afectado{deactivateWarning.subscriber_count !== 1 ? 's' : ''} en el CRM →
+                <Search size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Ver los {deactivateWarning.subscriber_count} venue{deactivateWarning.subscriber_count !== 1 ? 's' : ''} afectado{deactivateWarning.subscriber_count !== 1 ? 's' : ''} en el CRM →
               </a>
             </div>
             <div className="modal-footer">
