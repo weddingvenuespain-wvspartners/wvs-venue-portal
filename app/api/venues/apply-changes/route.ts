@@ -13,10 +13,24 @@ function getServiceClient() {
   )
 }
 
-function getWvsToken() {
+// Build WordPress auth headers.
+// Priority 1: custom WVS token (X-WVS-Token), if configured.
+// Priority 2: WordPress Basic Auth using WORDPRESS_ADMIN_USER + WORDPRESS_ADMIN_PASSWORD.
+function getWpHeaders(): Record<string, string> {
   const token = process.env.WVS_REST_TOKEN
-  if (!token) throw new Error('WVS_REST_TOKEN not configured')
-  return token
+  if (token) {
+    return { 'Content-Type': 'application/json', 'X-WVS-Token': token }
+  }
+  const user = process.env.WORDPRESS_ADMIN_USER
+  const pass = process.env.WORDPRESS_ADMIN_PASSWORD
+  if (user && pass) {
+    const encoded = Buffer.from(`${user}:${pass}`).toString('base64')
+    return { 'Content-Type': 'application/json', 'Authorization': `Basic ${encoded}` }
+  }
+  throw new Error(
+    'No WordPress authentication configured. ' +
+    'Add WVS_REST_TOKEN or WORDPRESS_ADMIN_USER + WORDPRESS_ADMIN_PASSWORD to Vercel Environment Variables.'
+  )
 }
 
 // Remove dangerous HTML tags and attributes before sending to WordPress
@@ -174,9 +188,8 @@ export async function POST(req: NextRequest) {
     const fichaData = is_initial ? onb.ficha_data : onb.changes_data
     if (!fichaData) return NextResponse.json({ error: 'Sin datos de ficha' }, { status: 400 })
 
-    const wvsToken = getWvsToken()
     const wpPayload = buildWpPayload(fichaData)
-    const wvsHeaders = { 'Content-Type': 'application/json', 'X-WVS-Token': wvsToken }
+    const wvsHeaders = getWpHeaders()
 
     let wpRes: Response
     let resolvedWpId: number | null = null
