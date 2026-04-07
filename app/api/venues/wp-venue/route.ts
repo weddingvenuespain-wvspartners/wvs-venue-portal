@@ -11,43 +11,45 @@ function getAdminAuth() {
 
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
-  if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+  if (!id || !/^\d+$/.test(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
-  // 1. Try the custom WVS endpoint first — returns ALL ACF fields via get_field()
-  //    Requires: add the wvs-venue-endpoint.php snippet to your WordPress site
-  try {
-    const customRes = await fetch(`${WP_URL}/wp-json/wvs/v1/venue/${id}`, {
-      cache: 'no-store',
-      next: { revalidate: 0 },
-    })
-    if (customRes.ok) {
-      const data = await customRes.json()
-      // Custom endpoint returns acf at top level — perfect
-      return NextResponse.json({ ...data, _source: 'custom' })
-    }
-  } catch {
-    // Custom endpoint not installed yet — fall through to standard
-  }
-
-  // 2. Fall back to standard WP REST endpoint
   const auth = getAdminAuth()
   const headers: Record<string, string> = {}
   if (auth) headers['Authorization'] = auth
+
+  // Fire both endpoints in parallel — prefer custom, fall back to standard
+  const customPromise = fetch(`${WP_URL}/wp-json/wvs/v1/venue/${id}`, {
+    next: { revalidate: 300 },
+  }).then(async res => {
+    if (!res.ok) throw new Error('custom endpoint failed')
+    const data = await res.json()
+    return { ...data, _source: 'custom' as const }
+  })
+
+  const standardPromise = fetch(
+    `${WP_URL}/wp-json/wp/v2/venues/${id}?acf_format=standard`,
+    { headers, next: { revalidate: 300 } },
+  ).then(async res => {
+    if (!res.ok) throw new Error(`WP error ${res.status}`)
+    const data = await res.json()
+    return { ...data, _source: 'standard' as const }
+  })
+
   try {
-    const wpRes = await fetch(
-      `${WP_URL}/wp-json/wp/v2/venues/${id}?acf_format=standard`,
-      { headers, cache: 'no-store' }
-    )
-    if (!wpRes.ok) {
-      const err = await wpRes.json().catch(() => ({}))
-      return NextResponse.json(
-        { error: `WP error ${wpRes.status}: ${err.message || 'unknown'}` },
-        { status: wpRes.status }
-      )
+    const [customResult, standardResult] = await Promise.allSettled([customPromise, standardPromise])
+
+    if (customResult.status === 'fulfilled') {
+      return NextResponse.json(customResult.value)
     }
-    const data = await wpRes.json()
-    return NextResponse.json({ ...data, _source: 'standard' })
-  } catch (e) {
+    if (standardResult.status === 'fulfilled') {
+      return NextResponse.json(standardResult.value)
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to reach WordPress' },
+      { status: 502 },
+    )
+  } catch {
     return NextResponse.json({ error: 'Failed to reach WordPress' }, { status: 502 })
   }
 }

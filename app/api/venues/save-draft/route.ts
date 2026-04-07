@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       .from('venue_onboarding')
       .upsert(update, { onConflict: 'user_id' })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) { console.error('[save-draft] DB error:', error.message); return NextResponse.json({ error: 'Error al guardar' }, { status: 500 }) }
     return NextResponse.json({ success: true })
 
   } catch (err) {

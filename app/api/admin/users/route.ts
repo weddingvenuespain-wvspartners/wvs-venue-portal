@@ -54,7 +54,7 @@ export async function GET() {
     return NextResponse.json({ profiles: enriched })
   } catch (err: any) {
     console.error('[/api/admin/users]', err)
-    return NextResponse.json({ error: err.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
 
@@ -93,6 +93,6 @@ export async function PATCH(req: NextRequest) {
     if (error) throw error
     return NextResponse.json({ profile: data })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

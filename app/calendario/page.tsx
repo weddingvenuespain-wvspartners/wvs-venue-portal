@@ -63,10 +63,10 @@ const DOW_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 // ── Config ───────────────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<Status, { label: string; bg: string; border: string; color: string; dot: string; badge: string }> = {
-  libre:       { label: 'Libre',          bg: '#fff',    border: 'var(--ivory)', color: 'var(--charcoal)', dot: '#d1fae5', badge: '#d1fae5' },
-  negociacion: { label: 'En negociación', bg: '#fef9ec', border: '#fde68a',      color: '#92400e',         dot: '#f59e0b', badge: '#fef3c7' },
-  reservado:   { label: 'Reservado',      bg: '#fdf2f8', border: '#fbcfe8',      color: '#9d174d',         dot: '#ec4899', badge: '#fce7f3' },
-  bloqueado:   { label: 'Bloqueado',      bg: '#f3f4f6', border: '#d1d5db',      color: '#6b7280',         dot: '#9ca3af', badge: '#f3f4f6' },
+  libre:       { label: 'Libre',          bg: '#fff',     border: '#e8ddd3', color: 'var(--charcoal)', dot: '#c5b9aa', badge: '#f5f0eb' },
+  negociacion: { label: 'En negociación', bg: '#fef7ec',  border: '#f5deb3', color: '#8a6d2b',         dot: '#d4a24c', badge: '#fef7ec' },
+  reservado:   { label: 'Reservado',      bg: '#eef6f0',  border: '#c3dfc9', color: '#3d6b4a',         dot: '#5a9e6b', badge: '#eef6f0' },
+  bloqueado:   { label: 'Bloqueado',      bg: '#f0eeec',  border: '#d6d2ce', color: '#8b8580',         dot: '#a8a3a0', badge: '#f0eeec' },
 }
 
 const LEAD_STATUS: Record<string, { label: string; color: string }> = {
@@ -88,8 +88,13 @@ const CEREMONY_LABEL: Record<string, string> = {
 }
 
 const MONTHS     = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-const DAYS_SHORT = ['L','M','X','J','V','S','D']
+const DAYS_SHORT = ['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM']
 const HIGH_SEASON = [4,5,6,7,8,9]
+
+const SEASON_NAME: Record<number, string> = {
+  0: 'Invierno', 1: 'Invierno', 2: 'Primavera', 3: 'Primavera', 4: 'Primavera',
+  5: 'Verano', 6: 'Verano', 7: 'Verano', 8: 'Otoño', 9: 'Otoño', 10: 'Otoño', 11: 'Invierno',
+}
 
 function pad(n: number) { return String(n).padStart(2, '0') }
 function dateStr(y: number, m: number, d: number) { return `${y}-${pad(m+1)}-${pad(d)}` }
@@ -399,67 +404,65 @@ export default function CalendarioPage() {
 
         <div className="page-content">
           {/* Stats */}
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }}>
-            <div className="stat-card accent">
-              <div className="stat-label">Fechas libres</div>
-              <div className="stat-value" style={{ color: '#16a34a' }}>{lastDay - countByStatus('negociacion') - countByStatus('reservado') - countByStatus('bloqueado')}</div>
-              <div className="stat-sub">{MONTHS[month]}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">En negociación</div>
-              <div className="stat-value" style={{ color: '#d97706' }}>{countByStatus('negociacion')}</div>
-              <div className="stat-sub">Pendientes de confirmar</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Reservados</div>
-              <div className="stat-value" style={{ color: '#9d174d' }}>{countByStatus('reservado')}</div>
-              <div className="stat-sub">Bodas confirmadas</div>
-            </div>
-            <div className="stat-card" style={{ borderTop: isHighSeason ? '2px solid var(--gold)' : undefined }}>
-              <div className="stat-label">Temporada</div>
-              <div className="stat-value" style={{ fontSize: 16, paddingTop: 4, color: isHighSeason ? 'var(--gold)' : 'var(--warm-gray)' }}>
-                {isHighSeason ? '🌞 Alta' : '❄️ Baja'}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+            {[
+              { value: lastDay - countByStatus('negociacion') - countByStatus('reservado') - countByStatus('bloqueado'), label: 'Fechas libres', color: 'var(--espresso)' },
+              { value: countByStatus('negociacion'), label: 'En negociación', color: 'var(--gold)' },
+              { value: countByStatus('reservado'), label: 'Reservados', color: '#5c4033' },
+              { value: null, label: isHighSeason ? 'Alta temporada' : 'Temporada baja', color: 'var(--warm-gray)', text: isHighSeason ? 'May – Oct' : 'Nov – Abr' },
+            ].map((s, i) => (
+              <div key={i} style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, padding: '20px 22px' }}>
+                <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 36, fontWeight: 500, color: s.color, lineHeight: 1, marginBottom: 8 }}>
+                  {s.value !== null ? String(s.value).padStart(2, '0') : s.text}
+                </div>
+                <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>
+                  {s.label}
+                </div>
               </div>
-              <div className="stat-sub">{isHighSeason ? 'May–Oct · Alta demanda' : 'Nov–Abr · Baja demanda'}</div>
-            </div>
+            ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, alignItems: 'start' }}>
             {/* Calendar */}
-            <div className="card">
-              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <button className="btn btn-ghost btn-sm" onClick={prevMonth}><ChevronLeft size={14} /></button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 22, color: 'var(--espresso)', fontWeight: 500 }}>
+            <div className="card" style={{ overflow: 'hidden', gridColumn: 'span 3' }}>
+              {/* Calendar header */}
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 26, color: 'var(--espresso)', fontWeight: 400 }}>
                     {MONTHS[month]} {year}
                   </span>
-                  {isHighSeason && (
-                    <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: 20, fontWeight: 500 }}>
-                      TEMPORADA ALTA
-                    </span>
-                  )}
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()) }}
-                    style={{ fontSize: 11 }}>Hoy</button>
+                  <button onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()) }}
+                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                    Hoy
+                  </button>
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={nextMonth}><ChevronRight size={14} /></button>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <button onClick={prevMonth}
+                    style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
+                    <ChevronLeft size={15} />
+                  </button>
+                  <button onClick={nextMonth}
+                    style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
               </div>
 
-              <div style={{ padding: '16px 20px' }}>
-                {/* Day headers */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3, marginBottom: 3 }}>
-                  {DAYS_SHORT.map((d, i) => (
-                    <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '0.06em', padding: '4px 0' }}>
-                      {d}
-                    </div>
-                  ))}
-                </div>
+              {/* Day headers */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid var(--ivory)' }}>
+                {DAYS_SHORT.map((d, i) => (
+                  <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '0.08em', padding: '12px 0' }}>
+                    {d}
+                  </div>
+                ))}
+              </div>
 
                 {loading ? (
-                  <div style={{ textAlign: 'center', padding: 40, color: 'var(--warm-gray)', fontSize: 13 }}>Cargando...</div>
+                  <div style={{ textAlign: 'center', padding: 60, color: 'var(--warm-gray)', fontSize: 13 }}>Cargando...</div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
                     {cells.map((day, i) => {
-                      if (!day) return <div key={`e-${i}`} />
+                      if (!day) return <div key={`e-${i}`} style={{ minHeight: 90, borderBottom: '1px solid var(--ivory)', borderRight: i % 7 !== 6 ? '1px solid var(--ivory)' : 'none' }} />
                       const dow       = (startDow + day - 1) % 7
                       const isWeekend = dow >= 5
                       const ds        = dateStr(year, month, day)
@@ -473,32 +476,34 @@ export default function CalendarioPage() {
                       const dayLeads  = leadsByDate[ds] || []
                       const linkedLead = entry?.lead_id ? leadsById[entry.lead_id] : null
 
-                      // Name to show on cell
                       const displayName = linkedLead?.name || (dayLeads.length === 1 ? dayLeads[0].name : null)
                       const hasUnlinkedLeads = dayLeads.length > 0 && !linkedLead
+
+                      const cellBg = isBulkSel ? '#fef3c7' : isPast ? '#faf8f5' : status && status !== 'libre' ? cfg.bg : '#fff'
+                      const colIndex = (startDow + day - 1 + startDow === 0 ? 0 : i) % 7
 
                       return (
                         <button
                           key={ds}
                           onClick={() => handleDayClick(ds, isPast && !bulkMode)}
                           style={{
-                            width: '100%', minHeight: 62, border: '1px solid',
-                            borderColor: isBulkStart ? 'var(--gold)' : isBulkSel ? '#fbbf24' : isToday ? 'var(--gold)' : isWeekend && !status ? '#e5d4c0' : cfg.border,
-                            borderRadius: 6,
-                            background: isBulkSel ? '#fef3c7' : isPast ? 'var(--cream)' : isWeekend && !status ? '#faf7f4' : cfg.bg,
+                            width: '100%', minHeight: 90, border: 'none',
+                            borderBottom: '1px solid var(--ivory)',
+                            borderRight: i % 7 !== 6 ? '1px solid var(--ivory)' : 'none',
+                            background: cellBg,
                             cursor: isPast && !bulkMode ? 'default' : 'pointer',
-                            transition: 'all 0.1s',
+                            transition: 'background 0.15s',
                             display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-                            justifyContent: 'space-between', padding: '5px 6px', outline: 'none',
-                            boxShadow: isToday ? '0 0 0 2px var(--gold)' : 'none',
+                            justifyContent: 'space-between', padding: '8px 10px', outline: 'none',
+                            boxShadow: isToday ? 'inset 0 0 0 2px var(--gold)' : isBulkStart ? 'inset 0 0 0 2px var(--gold)' : 'none',
                             opacity: saving ? 0.7 : 1,
                             position: 'relative',
                           }}
                         >
                           {/* Day number */}
                           <span style={{
-                            fontSize: 13, fontWeight: isToday ? 700 : 400, lineHeight: 1,
-                            color: isPast ? 'var(--stone)' : isToday ? 'var(--gold)' : cfg.color,
+                            fontSize: 15, fontWeight: isToday ? 700 : 500, lineHeight: 1,
+                            color: isPast ? 'var(--stone)' : isToday ? 'var(--gold)' : 'var(--charcoal)',
                             fontFamily: 'DM Sans, sans-serif',
                           }}>
                             {day}
@@ -507,28 +512,37 @@ export default function CalendarioPage() {
                           {/* Lead name */}
                           {displayName && !isPast && (
                             <span style={{
-                              fontSize: 9, lineHeight: 1.2, color: cfg.color,
+                              fontSize: 9, lineHeight: 1.3, color: cfg.color,
                               fontWeight: 600, maxWidth: '100%', overflow: 'hidden',
                               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                              textAlign: 'left', wordBreak: 'break-word',
+                              textAlign: 'left', wordBreak: 'break-word', marginTop: 2,
                             }}>
                               {displayName}
                             </span>
                           )}
 
-                          {/* Bottom indicators */}
-                          <div style={{ display: 'flex', gap: 3, alignItems: 'center', width: '100%' }}>
+                          {/* Bottom: status label or indicators */}
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', marginTop: 'auto' }}>
                             {status && status !== 'libre' && (
-                              <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: cfg.color, whiteSpace: 'nowrap' }}>
+                                  {status === 'negociacion' ? 'Negociación' : cfg.label}
+                                </span>
+                              </div>
                             )}
-                            {hasUnlinkedLeads && (
-                              <span title={`${dayLeads.length} lead(s)`} style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
-                            )}
-                            {entry?.note && (
-                              <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
-                            )}
+                            {!status || status === 'libre' ? (
+                              <>
+                                {hasUnlinkedLeads && (
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} title={`${dayLeads.length} lead(s)`} />
+                                )}
+                                {entry?.note && (
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--stone)', flexShrink: 0 }} />
+                                )}
+                              </>
+                            ) : null}
                             {dayLeads.length > 1 && (
-                              <span style={{ fontSize: 8, color: '#3b82f6', fontWeight: 700, marginLeft: 1 }}>+{dayLeads.length}</span>
+                              <span style={{ fontSize: 8, color: 'var(--warm-gray)', fontWeight: 700, marginLeft: 2 }}>+{dayLeads.length}</span>
                             )}
                           </div>
                         </button>
@@ -536,32 +550,26 @@ export default function CalendarioPage() {
                     })}
                   </div>
                 )}
-              </div>
 
               {/* Legend */}
-              <div style={{ padding: '10px 20px', borderTop: '1px solid var(--ivory)', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--ivory)', display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
                 {Object.entries(STATUS_CFG).map(([key, cfg]) => (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <div style={{ width: 9, height: 9, borderRadius: 2, background: cfg.bg, border: `1px solid ${cfg.border}` }} />
-                    <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{cfg.label}</span>
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 11, height: 11, borderRadius: 3, background: cfg.bg, border: `1px solid ${cfg.border}` }} />
+                    <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>{cfg.label}</span>
                   </div>
                 ))}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#3b82f6' }} />
-                  <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Lead sin reservar</span>
-                </div>
-                <span style={{ fontSize: 11, color: 'var(--stone)', marginLeft: 'auto' }}>Click para gestionar</span>
               </div>
             </div>
 
             {/* Sidebar */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignSelf: 'stretch' }}>
               {/* Upcoming booked */}
-              <div className="card">
+              <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <div className="card-header" style={{ padding: '12px 16px' }}>
                   <div className="card-title" style={{ fontSize: 13 }}>Próximas fechas</div>
                 </div>
-                <div style={{ padding: '0 0 8px' }}>
+                <div style={{ padding: '0 0 8px', flex: 1, overflowY: 'auto' }}>
                   {upcomingEntries.length === 0 ? (
                     <div style={{ padding: '12px 16px', fontSize: 12, color: 'var(--warm-gray)' }}>Sin fechas marcadas</div>
                   ) : upcomingEntries.map(e => {
@@ -591,12 +599,12 @@ export default function CalendarioPage() {
               </div>
 
               {/* Leads with upcoming dates */}
-              <div className="card">
+              <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <div className="card-header" style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div className="card-title" style={{ fontSize: 13 }}>Leads con fecha</div>
                   <a href="/leads" style={{ fontSize: 11, color: 'var(--gold)', textDecoration: 'none' }}>Ver todos →</a>
                 </div>
-                <div style={{ padding: '0 0 8px' }}>
+                <div style={{ padding: '0 0 8px', flex: 1, overflowY: 'auto' }}>
                   {upcomingLeads.length === 0 ? (
                     <div style={{ padding: '12px 16px', fontSize: 12, color: 'var(--warm-gray)' }}>Sin leads con fecha</div>
                   ) : upcomingLeads.map(l => {

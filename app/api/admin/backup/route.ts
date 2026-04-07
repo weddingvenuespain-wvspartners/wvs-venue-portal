@@ -104,6 +104,6 @@ export async function GET(req: NextRequest) {
     })
   } catch (err: any) {
     console.error('[/api/admin/backup]', err)
-    return NextResponse.json({ error: err.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

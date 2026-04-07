@@ -40,7 +40,7 @@ export async function PATCH(req: NextRequest) {
     if (error) throw error
     return NextResponse.json({ success: true, plan: data })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
 
@@ -75,6 +75,6 @@ export async function DELETE(req: NextRequest) {
     if (error) throw error
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
