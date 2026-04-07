@@ -640,12 +640,24 @@ export default function FichaPage() {
   )
 
   const isApproved     = !!profile?.wp_venue_id
-  const mainStatus     = onboarding?.status || 'draft'
-  const changesStatus  = onboarding?.changes_status || 'draft'
-  const isLocked       = !isApproved && mainStatus === 'submitted'
-  const isRejected     = !isApproved && mainStatus === 'rejected'
+  const mainStatus      = onboarding?.status || 'draft'
+  const changesStatus   = onboarding?.changes_status || 'draft'
+  const isLocked        = !isApproved && mainStatus === 'submitted'
+  const isRejected      = !isApproved && mainStatus === 'rejected'
   const changesPending  = isApproved && changesStatus === 'submitted'
   const changesRejected = isApproved && changesStatus === 'rejected'
+  const changesApproved = isApproved && changesStatus === 'approved'
+
+  // Dismissable "cambios aprobados" notification — keyed by reviewed_at so it reappears on future approvals
+  const approvalKey = `wvs-approval-dismissed-${user?.id}-${onboarding?.reviewed_at || ''}`
+  const [approvalDismissed, setApprovalDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(approvalKey) === '1'
+  })
+  const dismissApproval = () => {
+    localStorage.setItem(approvalKey, '1')
+    setApprovalDismissed(true)
+  }
   const ERR = '#dc2626'
   const hasError = (field: string) => validationErrors.some(e => e.field === field)
 
@@ -714,6 +726,35 @@ export default function FichaPage() {
           {isRejected && <StatusBanner type="error" title="Solicitud no aprobada" body={onboarding?.admin_notes || 'Corrige los campos indicados y vuelve a enviar.'} />}
           {changesPending && <StatusBanner type="pending" title="Cambios en revisión" body="Los cambios están siendo revisados. La versión actual sigue publicada." />}
           {changesRejected && <StatusBanner type="error" title="Cambios no aprobados" body={onboarding?.admin_notes || ''} />}
+          {changesApproved && !approvalDismissed && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
+              background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+              border: '1px solid #6ee7b7', borderRadius: 10, padding: '14px 16px', marginBottom: 16,
+            }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 20, lineHeight: 1 }}>🎉</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#065f46', marginBottom: 3 }}>
+                    ¡Cambios publicados!
+                  </div>
+                  <div style={{ fontSize: 12, color: '#047857', lineHeight: 1.5 }}>
+                    Tus últimos cambios han sido revisados y publicados en WeddingVenuesSpain.com.
+                    {onboarding?.reviewed_at && (
+                      <span style={{ marginLeft: 6, opacity: 0.75 }}>
+                        ({new Date(onboarding.reviewed_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={dismissApproval}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#059669', padding: 2, flexShrink: 0, fontSize: 16, lineHeight: 1 }}
+                title="Cerrar"
+              >✕</button>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 4, marginBottom: 28, alignItems: 'center', position: 'sticky', top: 54, zIndex: 30, background: 'var(--cream)', paddingTop: 16, paddingBottom: 12, marginTop: -16 }}>
             {tabs.map(t => {
