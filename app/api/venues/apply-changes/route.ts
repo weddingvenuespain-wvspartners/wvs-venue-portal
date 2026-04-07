@@ -199,7 +199,14 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify(wpPayload),
       })
       const wpData = await wpRes.json()
-      if (!wpRes.ok) return NextResponse.json({ error: wpData.message || 'WP error' }, { status: 500 })
+      if (!wpRes.ok) {
+        const wpMsg = wpData?.message || wpData?.code || 'WP error'
+        const isAuth = wpMsg.includes('not allowed') || wpMsg.includes('rest_forbidden') || wpData?.code === 'rest_forbidden'
+        const friendlyMsg = isAuth
+          ? `WordPress rechazó la autenticación. Verifica que WVS_REST_TOKEN esté configurado correctamente en Vercel (Settings → Environment Variables). Error WP: "${wpMsg}"`
+          : `Error de WordPress: ${wpMsg}`
+        return NextResponse.json({ error: friendlyMsg }, { status: 500 })
+      }
       resolvedWpId = existingWpId
 
       if (is_initial) {
@@ -231,7 +238,14 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify(wpPayload),
       })
       const wpData = await wpRes.json()
-      if (!wpRes.ok) return NextResponse.json({ error: wpData.message || 'WP error' }, { status: 500 })
+      if (!wpRes.ok) {
+        const wpMsg = wpData?.message || wpData?.code || 'WP error'
+        const isAuth = wpMsg.includes('not allowed') || wpMsg.includes('rest_forbidden') || wpData?.code === 'rest_forbidden'
+        const friendlyMsg = isAuth
+          ? `WordPress rechazó la autenticación. Verifica que WVS_REST_TOKEN esté configurado en Vercel. Error WP: "${wpMsg}"`
+          : `Error de WordPress al crear venue: ${wpMsg}`
+        return NextResponse.json({ error: friendlyMsg }, { status: 500 })
+      }
       resolvedWpId = wpData.id
 
       // Save WP ID — upsert ensures row is created even if venue_profiles didn't exist

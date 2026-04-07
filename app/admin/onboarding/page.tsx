@@ -57,12 +57,33 @@ function VenueModal({
   const isChanges  = onb.status === 'approved' && onb.changes_status === 'submitted'
   const isApproved = onb.status === 'approved' && (!onb.changes_status || ['approved','draft'].includes(onb.changes_status))
 
-  const FieldRow = ({ label, value }: { label: string; value?: string | number | boolean | null }) => {
+  // For changes review: compare changes_data field vs ficha_data (published) field
+  const published = onb.ficha_data ?? {}
+  const hasChanged = (key: string): boolean => {
+    if (!isChanges) return false
+    const newVal = onb.changes_data?.[key]
+    const oldVal = published[key]
+    if (newVal === undefined && oldVal === undefined) return false
+    return JSON.stringify(newVal) !== JSON.stringify(oldVal)
+  }
+
+  const FieldRow = ({ label, value, fieldKey }: { label: string; value?: string | number | boolean | null; fieldKey?: string }) => {
     if (value === null || value === undefined || value === '') return null
+    const changed = fieldKey ? hasChanged(fieldKey) : false
     return (
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', color: 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 3 }}>{label}</div>
-        <div style={{ fontSize: 13, color: 'var(--charcoal)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{String(value)}</div>
+      <div style={{
+        marginBottom: 14,
+        ...(changed ? { background: '#fef3c7', borderLeft: '3px solid #f59e0b', padding: '6px 8px', borderRadius: 4, marginLeft: -8 } : {})
+      }}>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', color: changed ? '#92400e' : 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 3 }}>
+          {label}{changed && <span style={{ marginLeft: 6, fontSize: 9, background: '#f59e0b', color: '#fff', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>CAMBIO</span>}
+        </div>
+        <div style={{ fontSize: 13, color: changed ? '#78350f' : 'var(--charcoal)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{String(value)}</div>
+        {changed && published[fieldKey!] !== undefined && published[fieldKey!] !== null && published[fieldKey!] !== '' && (
+          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, textDecoration: 'line-through', opacity: 0.7 }}>
+            Antes: {String(published[fieldKey!])}
+          </div>
+        )}
       </div>
     )
   }
@@ -118,7 +139,8 @@ function VenueModal({
         {/* Status badge */}
         {isChanges && (
           <div className="alert alert-info" style={{ fontSize: 12, marginBottom: 20 }}>
-            Este venue está publicado (WP #{onb.wp_post_id}). Está solicitando cambios en su ficha.
+            <strong>Solicitud de cambios</strong> — Venue publicado (WP #{onb.wp_post_id}).
+            Los campos <span style={{ background: '#fef3c7', color: '#92400e', padding: '1px 5px', borderRadius: 3, fontWeight: 600 }}>resaltados en amarillo</span> han cambiado respecto a la versión publicada.
           </div>
         )}
 
@@ -128,43 +150,51 @@ function VenueModal({
             {/* LEFT COLUMN */}
             <div>
               <Section title="Información principal">
-                <FieldRow label="Nombre H1" value={data.H1_Venue} />
-                <FieldRow label="Región" value={data.location} />
-                <FieldRow label="Descripción corta" value={data.shortDesc} />
-                <FieldRow label="Capacidad" value={data.capacity} />
+                <FieldRow label="Nombre H1" value={data.H1_Venue} fieldKey="H1_Venue" />
+                <FieldRow label="Región" value={data.location} fieldKey="location" />
+                <FieldRow label="Descripción corta" value={data.shortDesc} fieldKey="shortDesc" />
+                <FieldRow label="Capacidad" value={data.capacity} fieldKey="capacity" />
               </Section>
 
               <Section title="Descripción">
-                <FieldRow label="Mini título (H2)" value={data.miniDesc} />
-                <FieldRow label="Mini párrafo" value={data.miniParagraph} />
-                {data.postContent && (
-                  <div style={{ marginBottom: 14 }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', color: 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 3 }}>Descripción completa</div>
-                    <div style={{ fontSize: 11, color: 'var(--charcoal)', fontFamily: 'monospace', background: 'var(--cream)', padding: '8px 10px', borderRadius: 6, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                      {data.postContent}
+                <FieldRow label="Mini título (H2)" value={data.miniDesc} fieldKey="miniDesc" />
+                <FieldRow label="Mini párrafo" value={data.miniParagraph} fieldKey="miniParagraph" />
+                {data.postContent && (() => {
+                  const chg = hasChanged('postContent')
+                  return (
+                    <div style={{
+                      marginBottom: 14,
+                      ...(chg ? { background: '#fef3c7', borderLeft: '3px solid #f59e0b', padding: '6px 8px', borderRadius: 4, marginLeft: -8 } : {})
+                    }}>
+                      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', color: chg ? '#92400e' : 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 3 }}>
+                        Descripción completa{chg && <span style={{ marginLeft: 6, fontSize: 9, background: '#f59e0b', color: '#fff', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>CAMBIO</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: chg ? '#78350f' : 'var(--charcoal)', fontFamily: 'monospace', background: chg ? '#fde68a' : 'var(--cream)', padding: '8px 10px', borderRadius: 6, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                        {data.postContent}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
               </Section>
 
               <Section title="Ubicación">
-                <FieldRow label="Ubicación específica" value={data.specificLocation} />
-                <FieldRow label="Lugares cercanos" value={data.placesNearby} />
-                <FieldRow label="Aeropuerto más cercano" value={data.closestAirport} />
+                <FieldRow label="Ubicación específica" value={data.specificLocation} fieldKey="specificLocation" />
+                <FieldRow label="Lugares cercanos" value={data.placesNearby} fieldKey="placesNearby" />
+                <FieldRow label="Aeropuerto más cercano" value={data.closestAirport} fieldKey="closestAirport" />
               </Section>
             </div>
 
             {/* RIGHT COLUMN */}
             <div>
               <Section title="Precios">
-                <FieldRow label="Precio símbolo" value={data.venuePrice} />
-                <FieldRow label="Menú desde" value={data.menuPrice} />
-                <FieldRow label="Venue fee" value={data.breakdown1} />
-                <FieldRow label="Venue fee — detalle" value={data.breakdown1text} />
-                <FieldRow label="Catering" value={data.breakdown3} />
-                <FieldRow label="Catering — detalle" value={data.breakdown3text} />
-                <FieldRow label="Alojamiento" value={data.accommodation} />
-                <FieldRow label="WVS ayuda alojamiento" value={data.wvsAccomHelp ? 'Sí' : null} />
+                <FieldRow label="Precio símbolo" value={data.venuePrice} fieldKey="venuePrice" />
+                <FieldRow label="Menú desde" value={data.menuPrice} fieldKey="menuPrice" />
+                <FieldRow label="Venue fee" value={data.breakdown1} fieldKey="breakdown1" />
+                <FieldRow label="Venue fee — detalle" value={data.breakdown1text} fieldKey="breakdown1text" />
+                <FieldRow label="Catering" value={data.breakdown3} fieldKey="breakdown3" />
+                <FieldRow label="Catering — detalle" value={data.breakdown3text} fieldKey="breakdown3text" />
+                <FieldRow label="Alojamiento" value={data.accommodation} fieldKey="accommodation" />
+                <FieldRow label="WVS ayuda alojamiento" value={data.wvsAccomHelp ? 'Sí' : null} fieldKey="wvsAccomHelp" />
               </Section>
 
               <Section title="Imágenes">

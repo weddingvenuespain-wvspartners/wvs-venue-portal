@@ -17,7 +17,7 @@ export default function Sidebar() {
   const userEmail    = user?.email || ''
   const initials     = userEmail.slice(0, 2).toUpperCase()
 
-  // Badge: new leads count
+  // Badge: new leads count (venue users)
   const [newLeadsCount, setNewLeadsCount] = useState(0)
   useEffect(() => {
     if (!user || isAdmin) return
@@ -26,6 +26,17 @@ export default function Sidebar() {
       .eq('user_id', user.id).eq('status', 'new')
       .then(({ count }) => { if (count) setNewLeadsCount(count) })
   }, [user?.id]) // eslint-disable-line
+
+  // Badge: pending onboarding requests (admin only)
+  const [pendingOnboardingCount, setPendingOnboardingCount] = useState(0)
+  useEffect(() => {
+    if (!user || !isAdmin) return
+    const supabase = createClient()
+    // Count rows where initial submission is pending OR changes are pending
+    supabase.from('venue_onboarding').select('id', { count: 'exact', head: true })
+      .or('status.eq.submitted,changes_status.eq.submitted')
+      .then(({ count }) => { if (count) setPendingOnboardingCount(count) })
+  }, [user?.id, isAdmin]) // eslint-disable-line
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -55,10 +66,10 @@ export default function Sidebar() {
     { href: '/guias', label: 'Centro de ayuda', icon: 'M8 1a7 7 0 100 14A7 7 0 008 1zM8 6v.5M8 9.5V11' },
   ]
 
-  const adminItems = [
+  const adminItems: { href: string; label: string; icon: string; badge?: number }[] = [
     { href: '/admin',            label: 'CRM de venues',   icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4' },
     { href: '/admin/planes',     label: 'Planes',          icon: 'M1 4h14v8H1zM4 4V2M12 4V2M1 8h14' },
-    { href: '/admin/onboarding', label: 'Solicitudes',     icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4M12 5v4M10 7h4' },
+    { href: '/admin/onboarding', label: 'Solicitudes',     icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4M12 5v4M10 7h4', badge: pendingOnboardingCount },
   ]
 
   const isActive = (href: string) =>
@@ -88,6 +99,16 @@ export default function Sidebar() {
                 className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
               >
                 <Icon d={item.icon} /> {item.label}
+                {item.badge && item.badge > 0 && (
+                  <span style={{
+                    marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
+                    background: '#ef4444', color: '#fff',
+                    fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '0 5px',
+                  }}>
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
               </Link>
             ))}
 
