@@ -508,7 +508,6 @@ export default function FichaPage() {
   autoSaveRef.current = () => {
     if (loading) return
     const isApproved = !!resolvedVenueWpId
-    if (!isApproved && onboarding?.status === 'submitted') return // locked
     const fichaData = collectAllFields()
     const body = isApproved
       ? { changes_data: fichaData, changes_status: onboarding?.changes_status === 'submitted' ? 'submitted' : 'draft' }
@@ -1467,10 +1466,15 @@ export default function FichaPage() {
             </div>
           )}
 
-          {!isLocked && activeTab !== 'config' && (
+          {activeTab !== 'config' && (
             <div style={{ position: 'fixed', bottom: 0, left: 'var(--sidebar-w)', right: 0, display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 28px', borderTop: '1px solid var(--ivory)', background: '#fff', zIndex: 40, alignItems: 'center' }}>
-              {/* Indicador de borrador guardado pendiente de enviar */}
-              {!isDirty && !changesPending && (isApproved ? (changesStatus === 'draft' && !!onboarding?.changes_data) : (mainStatus === 'draft' && !!onboarding?.ficha_data)) && (
+              {/* Indicador de estado */}
+              {!isDirty && changesPending && (
+                <span style={{ fontSize: 11, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Clock size={11} /> Cambios en revisión — puedes reenviar si necesitas corregir algo
+                </span>
+              )}
+              {!isDirty && !changesPending && (isApproved ? (['draft','submitted'].includes(changesStatus) && !!onboarding?.changes_data) : (['draft','submitted'].includes(mainStatus) && !!onboarding?.ficha_data)) && (
                 <span style={{ fontSize: 11, color: '#92400e', background: '#fef9ec', border: '1px solid #fde68a', borderRadius: 6, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
                   <Clock size={11} /> Tienes cambios guardados sin enviar
                 </span>
@@ -1478,17 +1482,26 @@ export default function FichaPage() {
               <button className="btn btn-ghost" onClick={saveDraft} disabled={saving}>
                 {saving ? 'Guardando...' : 'Guardar borrador'}
               </button>
-              {!changesPending && (() => {
-                // Habilitar cuando hay cambios en el formulario (isDirty)
-                // O cuando hay un borrador guardado que aún no se ha enviado a revisión
+              {(() => {
+                // Permitir enviar siempre que haya algo que enviar:
+                //   - isDirty: cambios sin guardar en el formulario
+                //   - hasDraft: borrador o envío previo que se puede reenviar corregido
                 const hasDraft = isApproved
-                  ? (changesStatus === 'draft' && !!onboarding?.changes_data)
-                  : (mainStatus === 'draft' && !!onboarding?.ficha_data)
+                  ? (['draft','submitted'].includes(changesStatus) && !!onboarding?.changes_data)
+                  : (['draft','submitted'].includes(mainStatus) && !!onboarding?.ficha_data)
                 const canSubmit = isDirty || hasDraft
+                const isResend  = changesPending || (!isApproved && mainStatus === 'submitted')
+                const btnLabel  = submitting
+                  ? 'Enviando...'
+                  : isResend && isDirty
+                    ? (isApproved ? 'Actualizar y reenviar cambios' : 'Actualizar y reenviar')
+                    : isResend
+                      ? (isApproved ? 'Reenviar cambios para revisión' : 'Reenviar para revisión')
+                      : (isApproved ? 'Enviar cambios para revisión' : 'Enviar para revisión')
                 return (
                   <button className="btn btn-primary" onClick={handleSubmitClick} disabled={submitting || !canSubmit}
                     style={{ opacity: !canSubmit && !submitting ? 0.5 : 1 }}>
-                    {submitting ? 'Enviando...' : isApproved ? 'Enviar cambios para revisión' : 'Enviar para revisión'}
+                    {btnLabel}
                   </button>
                 )
               })()}
