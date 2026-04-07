@@ -19,22 +19,37 @@ function getServiceClient() {
 
 // Build WordPress auth headers.
 // Priority 1: custom WVS token (X-WVS-Token), if configured.
-// Priority 2: WordPress Basic Auth using WORDPRESS_ADMIN_USER + WORDPRESS_ADMIN_PASSWORD.
-function getWpHeaders(): Record<string, string> {
-  const token = process.env.WVS_REST_TOKEN
-  if (token) {
-    return { 'Content-Type': 'application/json', 'X-WVS-Token': token }
+// Priority 2: JWT auth — POST credentials to /wp-json/jwt-auth/v1/token, use Bearer token.
+async function getWpHeaders(): Promise<Record<string, string>> {
+  const wvsToken = process.env.WVS_REST_TOKEN
+  if (wvsToken) {
+    return { 'Content-Type': 'application/json', 'X-WVS-Token': wvsToken }
   }
+
   const user = process.env.WORDPRESS_ADMIN_USER
   const pass = process.env.WORDPRESS_ADMIN_PASSWORD
-  if (user && pass) {
-    const encoded = Buffer.from(`${user}:${pass}`).toString('base64')
-    return { 'Content-Type': 'application/json', 'Authorization': `Basic ${encoded}` }
+  if (!user || !pass) {
+    throw new Error(
+      'No hay credenciales de WordPress configuradas. ' +
+      'Añade WORDPRESS_ADMIN_USER y WORDPRESS_ADMIN_PASSWORD en Vercel → Settings → Environment Variables.'
+    )
   }
-  throw new Error(
-    'No WordPress authentication configured. ' +
-    'Add WVS_REST_TOKEN or WORDPRESS_ADMIN_USER + WORDPRESS_ADMIN_PASSWORD to Vercel Environment Variables.'
-  )
+
+  // Obtain a short-lived JWT token using the WP JWT Auth plugin
+  const jwtRes = await fetch(`${WP_URL}/wp-json/jwt-auth/v1/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: user, password: pass }),
+  })
+  const jwtData = await jwtRes.json()
+  if (!jwtRes.ok || !jwtData.token) {
+    throw new Error(
+      `JWT auth de WordPress falló (${jwtRes.status}): ${jwtData?.message || jwtData?.code || 'sin token en respuesta'}. ` +
+      'Verifica que WORDPRESS_ADMIN_USER y WORDPRESS_ADMIN_PASSWORD sean correctos en Vercel.'
+    )
+  }
+
+  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwtData.token}` }
 }
 
 // Remove dangerous HTML tags and attributes before sending to WordPress
@@ -193,7 +208,7 @@ export async function POST(req: NextRequest) {
     if (!fichaData) return NextResponse.json({ error: 'Sin datos de ficha' }, { status: 400 })
 
     const wpPayload = buildWpPayload(fichaData)
-    const wvsHeaders = getWpHeaders()
+    const wvsHeaders = await getWpHeaders()
 
     let wpRes: Response
     let resolvedWpId: number | null = null
