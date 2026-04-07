@@ -633,6 +633,17 @@ export default function FichaPage() {
     finally { setUploadingPhoto(false); setUploadMsg('') }
   }
 
+  // Dismissable "cambios aprobados" notification — must be before early return to respect Rules of Hooks
+  const approvalKey = `wvs-approval-dismissed-${user?.id}-${onboarding?.reviewed_at || ''}`
+  const [approvalDismissed, setApprovalDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(approvalKey) === '1'
+  })
+  const dismissApproval = () => {
+    localStorage.setItem(approvalKey, '1')
+    setApprovalDismissed(true)
+  }
+
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ color: 'var(--gold)' }}>Cargando...</div>
@@ -648,16 +659,6 @@ export default function FichaPage() {
   const changesRejected = isApproved && changesStatus === 'rejected'
   const changesApproved = isApproved && changesStatus === 'approved'
 
-  // Dismissable "cambios aprobados" notification — keyed by reviewed_at so it reappears on future approvals
-  const approvalKey = `wvs-approval-dismissed-${user?.id}-${onboarding?.reviewed_at || ''}`
-  const [approvalDismissed, setApprovalDismissed] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem(approvalKey) === '1'
-  })
-  const dismissApproval = () => {
-    localStorage.setItem(approvalKey, '1')
-    setApprovalDismissed(true)
-  }
   const ERR = '#dc2626'
   const hasError = (field: string) => validationErrors.some(e => e.field === field)
 
