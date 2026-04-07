@@ -114,6 +114,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, user_id: userId, profile, subscription_id: subId })
   } catch (err: any) {
     console.error('[/api/admin/create-user]', err)
-    return NextResponse.json({ error: err.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { Upload, X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react'
+import DOMPurify from 'dompurify'
 
 type Tab = 'info' | 'descripcion' | 'precios' | 'ubicacion' | 'fotos' | 'resenas' | 'config'
 type VenuePriceMode = 'auto' | 'included' | 'none'
@@ -1773,7 +1774,7 @@ function RichTextEditor({ value, onChange, disabled, style, minHeight = 300, com
 
   // Populate on first mount (tab switch remounts, so this catches every time)
   useEffect(() => {
-    if (ref.current) ref.current.innerHTML = value
+    if (ref.current) ref.current.innerHTML = DOMPurify.sanitize(value, { ALLOWED_TAGS: ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'h3', 'ul', 'ol', 'li'], ALLOWED_ATTR: [] })
   }, []) // eslint-disable-line
 
   const exec = (cmd: string, val?: string) => {

@@ -11,7 +11,7 @@ function getAdminAuth() {
 
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
-  if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+  if (!id || !/^\d+$/.test(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
   const auth = getAdminAuth()
   const headers: Record<string, string> = {}

@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, subscription: savedSub })
   } catch (err: any) {
     console.error('[/api/admin/subscriptions]', err)
-    return NextResponse.json({ error: err.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
 
@@ -127,6 +127,6 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
