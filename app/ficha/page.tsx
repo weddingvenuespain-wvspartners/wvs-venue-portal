@@ -1468,39 +1468,33 @@ export default function FichaPage() {
 
           {activeTab !== 'config' && (
             <div style={{ position: 'fixed', bottom: 0, left: 'var(--sidebar-w)', right: 0, display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 28px', borderTop: '1px solid var(--ivory)', background: '#fff', zIndex: 40, alignItems: 'center' }}>
-              {/* Indicador de estado */}
+              {/* Indicadores de estado (solo cuando no hay cambios sin guardar) */}
               {!isDirty && changesPending && (
                 <span style={{ fontSize: 11, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Clock size={11} /> Cambios en revisión — puedes reenviar si necesitas corregir algo
+                  <Clock size={11} /> Cambios en revisión — edita para reenviar corregido
                 </span>
               )}
-              {!isDirty && !changesPending && (isApproved ? (['draft','submitted'].includes(changesStatus) && !!onboarding?.changes_data) : (['draft','submitted'].includes(mainStatus) && !!onboarding?.ficha_data)) && (
+              {!isDirty && !changesPending && (isApproved ? (changesStatus === 'draft' && !!onboarding?.changes_data) : (mainStatus === 'draft' && !!onboarding?.ficha_data)) && (
                 <span style={{ fontSize: 11, color: '#92400e', background: '#fef9ec', border: '1px solid #fde68a', borderRadius: 6, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
                   <Clock size={11} /> Tienes cambios guardados sin enviar
                 </span>
               )}
-              <button className="btn btn-ghost" onClick={saveDraft} disabled={saving}>
+              <button className="btn btn-ghost" onClick={saveDraft} disabled={saving || !isDirty}>
                 {saving ? 'Guardando...' : 'Guardar borrador'}
               </button>
               {(() => {
-                // Permitir enviar siempre que haya algo que enviar:
-                //   - isDirty: cambios sin guardar en el formulario
-                //   - hasDraft: borrador o envío previo que se puede reenviar corregido
-                const hasDraft = isApproved
-                  ? (['draft','submitted'].includes(changesStatus) && !!onboarding?.changes_data)
-                  : (['draft','submitted'].includes(mainStatus) && !!onboarding?.ficha_data)
-                const canSubmit = isDirty || hasDraft
+                // El botón solo se activa cuando el usuario ha editado algo (isDirty).
+                // Así permanece apagado al abrir la ficha y se ilumina al primer cambio.
+                const canSubmit = isDirty
                 const isResend  = changesPending || (!isApproved && mainStatus === 'submitted')
                 const btnLabel  = submitting
                   ? 'Enviando...'
-                  : isResend && isDirty
+                  : isResend
                     ? (isApproved ? 'Actualizar y reenviar cambios' : 'Actualizar y reenviar')
-                    : isResend
-                      ? (isApproved ? 'Reenviar cambios para revisión' : 'Reenviar para revisión')
-                      : (isApproved ? 'Enviar cambios para revisión' : 'Enviar para revisión')
+                    : (isApproved ? 'Enviar cambios para revisión' : 'Enviar para revisión')
                 return (
                   <button className="btn btn-primary" onClick={handleSubmitClick} disabled={submitting || !canSubmit}
-                    style={{ opacity: !canSubmit && !submitting ? 0.5 : 1 }}>
+                    style={{ opacity: !canSubmit && !submitting ? 0.4 : 1, transition: 'opacity 0.2s' }}>
                     {btnLabel}
                   </button>
                 )

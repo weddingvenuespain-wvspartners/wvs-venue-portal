@@ -6,11 +6,15 @@ import { cookies } from 'next/headers'
 const WP_URL = process.env.NEXT_PUBLIC_WP_URL || 'https://weddingvenuesspain.com'
 
 function getServiceClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error(
+      'Falta SUPABASE_SERVICE_ROLE_KEY (o NEXT_PUBLIC_SUPABASE_URL) en las variables de entorno de Vercel. ' +
+      'Ve a Vercel → Settings → Environment Variables y añade SUPABASE_SERVICE_ROLE_KEY con la Service Role Key de tu proyecto Supabase.'
+    )
+  }
+  return createClient(url, key, { auth: { persistSession: false } })
 }
 
 // Build WordPress auth headers.
@@ -279,8 +283,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, wp_venue_id: resolvedWpId })
 
-  } catch (err) {
+  } catch (err: any) {
     console.error('[/api/venues/apply-changes]', err)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+    const msg = err?.message || String(err) || 'Error interno desconocido'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
