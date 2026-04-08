@@ -74,6 +74,7 @@ const LEAD_STATUS: Record<string, { label: string; color: string }> = {
   contacted:      { label: 'Contactado',       color: '#8b5cf6' },
   proposal_sent:  { label: 'Propuesta enviada', color: '#f59e0b' },
   visit_scheduled:{ label: 'Visita agendada',  color: '#10b981' },
+  post_visit:     { label: 'Post-visita',      color: '#06b6d4' },
   budget_sent:    { label: 'Presupuesto',      color: '#6366f1' },
   won:            { label: 'Reservado',         color: '#16a34a' },
   lost:           { label: 'Perdido',          color: '#dc2626' },
@@ -163,6 +164,9 @@ export default function CalendarioPage() {
   const [bulkStatus, setBulkStatus] = useState<Status>('reservado')
   const [bulkStart,  setBulkStart]  = useState<string | null>(null)
 
+  // Calendar filter
+  const [calendarFilter, setCalendarFilter] = useState<'all' | 'visitas' | 'bodas' | 'leads'>('all')
+
   useEffect(() => {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
@@ -238,6 +242,18 @@ export default function CalendarioPage() {
   const leadsById = useMemo(() => {
     const m: Record<string, Lead> = {}
     leads.forEach(l => { m[l.id] = l })
+    return m
+  }, [leads])
+
+  // Leads with a scheduled visit indexed by visit_date
+  const visitsByDate = useMemo(() => {
+    const m: Record<string, Lead[]> = {}
+    leads.forEach(l => {
+      if (l.visit_date) {
+        if (!m[l.visit_date]) m[l.visit_date] = []
+        m[l.visit_date].push(l)
+      }
+    })
     return m
   }, [leads])
 
@@ -448,6 +464,21 @@ export default function CalendarioPage() {
                 </div>
               </div>
 
+              {/* Filter buttons */}
+              <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {(['all', 'visitas', 'bodas', 'leads'] as const).map(f => (
+                  <button key={f} onClick={() => setCalendarFilter(f)} style={{
+                    fontSize: 11, padding: '3px 10px', borderRadius: 20, border: '1px solid',
+                    borderColor: calendarFilter === f ? (f === 'visitas' ? '#10b981' : f === 'bodas' ? '#ec4899' : f === 'leads' ? '#3b82f6' : 'var(--gold)') : 'var(--ivory)',
+                    background: calendarFilter === f ? (f === 'visitas' ? '#10b981' : f === 'bodas' ? '#ec4899' : f === 'leads' ? '#3b82f6' : 'var(--gold)') : 'transparent',
+                    color: calendarFilter === f ? '#fff' : 'var(--warm-gray)',
+                    cursor: 'pointer', fontWeight: calendarFilter === f ? 600 : 400, transition: 'all 0.15s',
+                  }}>
+                    {f === 'all' ? 'Todos' : f === 'visitas' ? 'Visitas' : f === 'bodas' ? 'Bodas confirmadas' : 'Leads'}
+                  </button>
+                ))}
+              </div>
+
               {/* Day headers */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid var(--ivory)' }}>
                 {DAYS_SHORT.map((d, i) => (
@@ -473,13 +504,25 @@ export default function CalendarioPage() {
                       const isPast    = ds < todayIso
                       const isBulkSel = bulkDates.has(ds)
                       const isBulkStart = bulkStart === ds
-                      const dayLeads  = leadsByDate[ds] || []
+                      const dayLeads   = leadsByDate[ds] || []
                       const linkedLead = entry?.lead_id ? leadsById[entry.lead_id] : null
+                      const visitLeads = visitsByDate[ds] || []
+                      const hasVisits  = visitLeads.length > 0
 
-                      const displayName = linkedLead?.name || (dayLeads.length === 1 ? dayLeads[0].name : null)
-                      const hasUnlinkedLeads = dayLeads.length > 0 && !linkedLead
+                      // Filter: does this cell match the active filter?
+                      const matchesFilter =
+                        calendarFilter === 'all' ||
+                        (calendarFilter === 'visitas' && hasVisits) ||
+                        (calendarFilter === 'bodas' && status === 'reservado') ||
+                        (calendarFilter === 'leads' && dayLeads.length > 0)
 
-                      const cellBg = isBulkSel ? '#fef3c7' : isPast ? '#faf8f5' : status && status !== 'libre' ? cfg.bg : '#fff'
+                      // Name to show on cell — visit takes priority visually
+                      const displayName = !matchesFilter ? null
+                        : hasVisits ? visitLeads[0].name
+                        : linkedLead?.name || (dayLeads.length === 1 ? dayLeads[0].name : null)
+                      const hasUnlinkedLeads = matchesFilter && dayLeads.length > 0 && !linkedLead && !hasVisits
+
+                      const cellBg = isBulkSel ? '#fef3c7' : isPast ? '#faf8f5' : hasVisits && !status ? 'rgba(16,185,129,0.06)' : status && status !== 'libre' ? cfg.bg : '#fff'
                       const colIndex = (startDow + day - 1 + startDow === 0 ? 0 : i) % 7
 
                       return (
@@ -509,21 +552,22 @@ export default function CalendarioPage() {
                             {day}
                           </span>
 
-                          {/* Lead name */}
+                          {/* Lead name / visit name */}
                           {displayName && !isPast && (
                             <span style={{
-                              fontSize: 9, lineHeight: 1.3, color: cfg.color,
+                              fontSize: 9, lineHeight: 1.3,
+                              color: hasVisits && matchesFilter ? '#059669' : cfg.color,
                               fontWeight: 600, maxWidth: '100%', overflow: 'hidden',
                               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                               textAlign: 'left', wordBreak: 'break-word', marginTop: 2,
                             }}>
-                              {displayName}
+                              {hasVisits && matchesFilter ? `📅 ${displayName}` : displayName}
                             </span>
                           )}
 
                           {/* Bottom: status label or indicators */}
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', marginTop: 'auto' }}>
-                            {status && status !== 'libre' && (
+                            {matchesFilter && status && status !== 'libre' && (
                               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
                                 <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: cfg.color, whiteSpace: 'nowrap' }}>
@@ -531,17 +575,28 @@ export default function CalendarioPage() {
                                 </span>
                               </div>
                             )}
-                            {!status || status === 'libre' ? (
+                            {matchesFilter && hasVisits && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} title={`Visita: ${visitLeads.map(v => v.name).join(', ')}`} />
+                                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#059669', whiteSpace: 'nowrap' }}>
+                                  Visita
+                                </span>
+                                {visitLeads.length > 1 && (
+                                  <span style={{ fontSize: 8, color: '#10b981', fontWeight: 700 }}>+{visitLeads.length}</span>
+                                )}
+                              </div>
+                            )}
+                            {(!status || status === 'libre') && !hasVisits ? (
                               <>
                                 {hasUnlinkedLeads && (
                                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} title={`${dayLeads.length} lead(s)`} />
                                 )}
-                                {entry?.note && (
+                                {matchesFilter && entry?.note && (
                                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--stone)', flexShrink: 0 }} />
                                 )}
                               </>
                             ) : null}
-                            {dayLeads.length > 1 && (
+                            {!hasVisits && matchesFilter && dayLeads.length > 1 && (
                               <span style={{ fontSize: 8, color: 'var(--warm-gray)', fontWeight: 700, marginLeft: 2 }}>+{dayLeads.length}</span>
                             )}
                           </div>
@@ -559,6 +614,10 @@ export default function CalendarioPage() {
                     <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>{cfg.label}</span>
                   </div>
                 ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#10b981' }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>Visita agendada</span>
+                </div>
               </div>
             </div>
 
@@ -643,6 +702,7 @@ export default function CalendarioPage() {
           date={modalDate}
           entry={entries[modalDate] || null}
           leadsOnDate={leadsByDate[modalDate] || []}
+          visitsOnDate={visitsByDate[modalDate] || []}
           allLeads={leads}
           leadsById={leadsById}
           saving={saving}
@@ -655,6 +715,17 @@ export default function CalendarioPage() {
             const supabase = createClient()
             await supabase.from('leads').update(fields).eq('id', leadId)
             setLeads(prev => prev.map(l => l.id === leadId ? { ...l, ...fields } : l))
+          }}
+          onCancelWedding={async (lead, reason) => {
+            const supabase = createClient()
+            const notes = [lead.notes, reason ? `Boda cancelada: ${reason}` : 'Boda cancelada'].filter(Boolean).join('\n')
+            await supabase.from('leads').update({ status: 'lost', notes }).eq('id', lead.id)
+            await supabase.from('calendar_entries')
+              .update({ status: 'libre', lead_id: null, note: null })
+              .eq('user_id', user!.id).eq('lead_id', lead.id).eq('status', 'reservado')
+            setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'lost', notes } : l))
+            setModalDate(null)
+            await load()
           }}
           userId={user!.id}
         />
@@ -674,12 +745,13 @@ export default function CalendarioPage() {
 // ── Day Modal ─────────────────────────────────────────────────────────────────
 
 function DayModal({
-  date, entry, leadsOnDate, allLeads, leadsById, saving, dateRules,
-  onSave, onDelete, onClose, onLeadCreated, onUpdateLead, userId
+  date, entry, leadsOnDate, visitsOnDate, allLeads, leadsById, saving, dateRules,
+  onSave, onDelete, onClose, onLeadCreated, onUpdateLead, onCancelWedding, userId
 }: {
   date: string
   entry: Entry | null
   leadsOnDate: Lead[]
+  visitsOnDate: Lead[]
   allLeads: Lead[]
   leadsById: Record<string, Lead>
   saving: boolean
@@ -689,6 +761,7 @@ function DayModal({
   onClose: () => void
   onLeadCreated: (l: Lead) => Promise<void>
   onUpdateLead: (leadId: string, fields: Partial<Lead>) => Promise<void>
+  onCancelWedding: (lead: Lead, reason: string) => Promise<void>
   userId: string
 }) {
   const [status,      setStatus]      = useState<Status>(entry?.status || 'libre')
@@ -718,6 +791,11 @@ function DayModal({
   const [expandedLeadId,  setExpandedLeadId]  = useState<string | null>(null)
   const [inlineEditForm,  setInlineEditForm]  = useState({ name: '', email: '', phone: '', guests: '', status: '' })
   const [inlineEditSaving, setInlineEditSaving] = useState(false)
+
+  // Cancel wedding confirmation
+  const [showCancelWedding,   setShowCancelWedding]   = useState(false)
+  const [cancelWeddingReason, setCancelWeddingReason] = useState('')
+  const [cancelWeddingSaving, setCancelWeddingSaving] = useState(false)
 
   const dt = new Date(date + 'T12:00:00')
   const isPast = date < new Date().toISOString().split('T')[0]
@@ -953,6 +1031,34 @@ function DayModal({
             </div>
           )}
 
+          {/* Visitas programadas */}
+          {visitsOnDate.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                Visitas programadas
+              </div>
+              {visitsOnDate.map(l => {
+                const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
+                return (
+                  <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 8, marginBottom: 6 }}>
+                    <Calendar size={14} style={{ color: '#10b981', flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#065f46' }}>{l.name}</div>
+                      <div style={{ fontSize: 11, color: '#059669' }}>
+                        {l.guests ? `${l.guests} inv.` : ''}
+                        {l.guests && (l.budget && l.budget !== 'sin_definir') ? ' · ' : ''}
+                        {l.budget && l.budget !== 'sin_definir' ? BUDGET_LABEL[l.budget] || l.budget : ''}
+                        {l.wedding_date ? ` · Boda: ${new Date(l.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 11, color: st.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{st.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           {/* Status selector */}
           {!isPast && (
             <div style={{ marginBottom: 20 }}>
@@ -975,8 +1081,8 @@ function DayModal({
             </div>
           )}
 
-          {/* Link existing lead */}
-          {!isPast && !showCreate && (
+          {/* Link existing lead — hidden when reservado (lead already shown in BODA RESERVADA card) */}
+          {!isPast && !showCreate && status !== 'reservado' && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
                 Lead vinculado
@@ -1034,7 +1140,7 @@ function DayModal({
           )}
 
           {/* Lead pipeline status editor */}
-          {selectedLead && !isPast && !showCreate && (
+          {selectedLead && !isPast && !showCreate && status !== 'reservado' && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Estado del lead</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
@@ -1055,7 +1161,7 @@ function DayModal({
           )}
 
           {/* Scope selector: apply calendar entry status to just this date or all linked dates */}
-          {selectedLead && !isPast && !showCreate && status !== 'libre' && leadEntries.length > 1 && (
+          {selectedLead && !isPast && !showCreate && status !== 'libre' && status !== 'reservado' && leadEntries.length > 1 && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
                 Aplicar estado del calendario a
@@ -1078,7 +1184,7 @@ function DayModal({
           )}
 
           {/* Visita programada */}
-          {selectedLead && !isPast && !showCreate && (
+          {selectedLead && !isPast && !showCreate && status !== 'reservado' && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
                 Visita programada
@@ -1115,21 +1221,62 @@ function DayModal({
                 <Flower2 size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Boda reservada
               </div>
               {selectedLead ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {[
-                    { label: 'Pareja', value: selectedLead.name },
-                    { label: 'Invitados', value: selectedLead.guests ? `${selectedLead.guests} personas` : '—' },
-                    { label: 'Presupuesto', value: BUDGET_LABEL[selectedLead.budget || ''] || selectedLead.budget || '—' },
-                    { label: 'Ceremonia', value: CEREMONY_LABEL[selectedLead.ceremony_type || ''] || selectedLead.ceremony_type || '—' },
-                    { label: 'Teléfono', value: selectedLead.phone || selectedLead.whatsapp || '—' },
-                    { label: 'Email', value: selectedLead.email || '—' },
-                  ].map(({ label, value }) => (
-                    <div key={label}>
-                      <div style={{ fontSize: 10, color: '#be185d', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-                      <div style={{ fontSize: 12, color: '#831843', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                    {[
+                      { label: 'Pareja', value: selectedLead.name },
+                      { label: 'Invitados', value: selectedLead.guests ? `${selectedLead.guests} personas` : '—' },
+                      { label: 'Presupuesto', value: BUDGET_LABEL[selectedLead.budget || ''] || selectedLead.budget || '—' },
+                      { label: 'Ceremonia', value: CEREMONY_LABEL[selectedLead.ceremony_type || ''] || selectedLead.ceremony_type || '—' },
+                      { label: 'Teléfono', value: selectedLead.phone || selectedLead.whatsapp || '—' },
+                      { label: 'Email', value: selectedLead.email || '—' },
+                    ].map(({ label, value }) => (
+                      <div key={label}>
+                        <div style={{ fontSize: 10, color: '#be185d', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+                        <div style={{ fontSize: 12, color: '#831843', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {!showCancelWedding ? (
+                    <button
+                      onClick={() => setShowCancelWedding(true)}
+                      style={{ fontSize: 12, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', width: '100%' }}>
+                      Cancelar boda
+                    </button>
+                  ) : (
+                    <div style={{ marginTop: 4 }}>
+                      <div style={{ fontSize: 11, color: '#9d174d', marginBottom: 8, lineHeight: 1.5 }}>
+                        Esta acción liberará la fecha y moverá el lead a Perdidos.
+                      </div>
+                      <textarea
+                        value={cancelWeddingReason}
+                        onChange={e => setCancelWeddingReason(e.target.value)}
+                        placeholder="Motivo de la cancelación (opcional)..."
+                        className="form-input"
+                        rows={2}
+                        style={{ fontSize: 12, marginBottom: 8, resize: 'none', width: '100%', boxSizing: 'border-box' }}
+                      />
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={() => { setShowCancelWedding(false); setCancelWeddingReason('') }}
+                          style={{ flex: 1, fontSize: 12, background: 'none', border: '1px solid var(--ivory)', borderRadius: 8, padding: '7px 0', cursor: 'pointer', color: 'var(--warm-gray)' }}>
+                          Volver
+                        </button>
+                        <button
+                          disabled={cancelWeddingSaving}
+                          onClick={async () => {
+                            setCancelWeddingSaving(true)
+                            await onCancelWedding(selectedLead, cancelWeddingReason)
+                            setCancelWeddingSaving(false)
+                            onClose()
+                          }}
+                          style={{ flex: 2, fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 600 }}>
+                          {cancelWeddingSaving ? 'Cancelando...' : 'Confirmar cancelación'}
+                        </button>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               ) : (
                 <div style={{ fontSize: 12, color: '#be185d' }}>
                   Vincula un lead para ver los detalles de la boda.

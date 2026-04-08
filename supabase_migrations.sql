@@ -92,3 +92,35 @@ CREATE TRIGGER set_venue_subscriptions_updated_at
 
 ALTER TABLE venue_profiles
   ADD COLUMN IF NOT EXISTS features_override JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+-- ── 7. Add post_visit to leads status check constraint ────────
+--    The pipeline now includes: new → contacted → proposal_sent
+--    → visit_scheduled → post_visit → budget_sent → won → lost
+
+ALTER TABLE leads
+  DROP CONSTRAINT IF EXISTS leads_status_check;
+
+ALTER TABLE leads
+  ADD CONSTRAINT leads_status_check
+    CHECK (status IN ('new','contacted','proposal_sent','visit_scheduled','post_visit','budget_sent','won','lost'));
+
+-- ── 8. Demo leads in post_visit (5 examples) ─────────────────
+--    Corre este bloque en Supabase → SQL Editor.
+--    Primero ejecuta la siguiente línea para ver tu user_id:
+--      SELECT user_id FROM venue_profiles LIMIT 1;
+--    Luego reemplaza 'TU-USER-ID-AQUI' con el UUID que aparezca.
+
+INSERT INTO leads (user_id, name, email, phone, status, date_flexibility, wedding_date, guests, source, budget, ceremony_type, notes, created_at)
+VALUES
+  ('TU-USER-ID-AQUI', 'Laura & Marcos',    'laura.marcos@gmail.com',   '+34 612 345 678', 'post_visit', 'exact',    (now() + interval '8 months')::date,  80,  'web',       '35k_50k',    'civil',     'Les gustó mucho la finca. Esperando propuesta.',      now() - interval '5 days'),
+  ('TU-USER-ID-AQUI', 'Sofía & Daniel',    'sofia.daniel@hotmail.com', '+34 623 456 789', 'post_visit', 'exact',    (now() + interval '14 months')::date, 120, 'instagram', 'mas_50k',    'religiosa', 'Visita muy positiva. Quieren presupuesto detallado.', now() - interval '9 days'),
+  ('TU-USER-ID-AQUI', 'Elena & Pablo',     'elena.pablo@gmail.com',    '+34 634 567 890', 'post_visit', 'exact',    (now() + interval '10 months')::date, 60,  'referral',  '20k_35k',    'simbolica', 'Interesados. Tienen otra visita pendiente.',          now() - interval '3 days'),
+  ('TU-USER-ID-AQUI', 'Marta & Alejandro', 'marta.ale@outlook.com',    '+34 645 678 901', 'post_visit', 'exact',    (now() + interval '6 months')::date,  100, 'web',       '35k_50k',    'civil',     'Muy interesados. Piden ver opciones de catering.',    now() - interval '12 days'),
+  ('TU-USER-ID-AQUI', 'Carmen & Javier',   'carmen.javi@gmail.com',    '+34 656 789 012', 'post_visit', 'flexible', NULL,                                  90,  'email',     'sin_definir', 'simbolica', 'Primera visita hecha. Aún sin fecha cerrada.',        now() - interval '7 days');
+
+-- ── 9. wedding_date_history column on leads ───────────────────
+--    Required for tracking date changes when leads move between statuses.
+--    Run in Supabase → SQL Editor.
+
+ALTER TABLE leads
+  ADD COLUMN IF NOT EXISTS wedding_date_history JSONB NOT NULL DEFAULT '[]'::jsonb;

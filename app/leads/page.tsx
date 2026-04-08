@@ -10,33 +10,37 @@ import {
   Calendar, Users, ChevronLeft, ChevronRight, RotateCcw, CheckCircle,
   ExternalLink, Edit2, Trash2, Clock, Filter, FileText, Download,
   AlertTriangle, PartyPopper, Snowflake, Sparkles, Eye, Landmark, XCircle,
-  Sprout, Sun, Leaf, Zap, LockKeyhole, OctagonAlert,
+  Sprout, Sun, Leaf, Zap, LockKeyhole, OctagonAlert, Flower2,
 } from 'lucide-react'
 
 // ── Types & config ─────────────────────────────────────────────────────────────
-type DbStatus = 'new' | 'contacted' | 'proposal_sent' | 'visit_scheduled' | 'budget_sent' | 'won' | 'lost'
-type Tab      = 'new' | 'in_progress' | 'visit' | 'confirmed' | 'lost'
+type DbStatus = 'new' | 'contacted' | 'proposal_sent' | 'visit_scheduled' | 'post_visit' | 'budget_sent' | 'won' | 'lost'
+type Tab      = 'new' | 'in_progress' | 'visit' | 'post_visit' | 'budget' | 'confirmed' | 'lost'
 
 const TAB_STATUSES: Record<Tab, DbStatus[]> = {
   new:         ['new'],
-  in_progress: ['contacted', 'proposal_sent', 'budget_sent'],
+  in_progress: ['contacted', 'proposal_sent'],
   visit:       ['visit_scheduled'],
+  post_visit:  ['post_visit'],
+  budget:      ['budget_sent'],
   confirmed:   ['won'],
   lost:        ['lost'],
 }
 
 const TABS: { key: Tab; label: string; emoji: React.ReactNode }[] = [
-  { key: 'new',         label: 'Nuevos',          emoji: <Sparkles size={13} /> },
-  { key: 'in_progress', label: 'En seguimiento',  emoji: <Eye size={13} /> },
-  { key: 'visit',       label: 'Visita agendada', emoji: <Landmark size={13} /> },
-  { key: 'confirmed',   label: 'Confirmados',     emoji: <PartyPopper size={13} /> },
-  { key: 'lost',        label: 'Perdidos',        emoji: <XCircle size={13} /> },
+  { key: 'new',         label: 'Nuevos',           emoji: <Sparkles size={13} /> },
+  { key: 'in_progress', label: 'En seguimiento',   emoji: <Eye size={13} /> },
+  { key: 'visit',       label: 'Visita agendada',  emoji: <Landmark size={13} /> },
+  { key: 'post_visit',  label: 'Post-visita',      emoji: <CheckCircle size={13} /> },
+  { key: 'budget',      label: 'Presupuesto',      emoji: <FileText size={13} /> },
+  { key: 'confirmed',   label: 'Confirmados',      emoji: <PartyPopper size={13} /> },
+  { key: 'lost',        label: 'Perdidos',         emoji: <XCircle size={13} /> },
 ]
 
 const SUB_STATUS_LABEL: Record<DbStatus, string> = {
   new: 'Nuevo', contacted: 'Contactado', proposal_sent: 'Propuesta enviada',
-  visit_scheduled: 'Visita agendada', budget_sent: 'Presupuesto enviado',
-  won: 'Confirmado', lost: 'Perdido',
+  visit_scheduled: 'Visita agendada', post_visit: 'Post-visita',
+  budget_sent: 'Presupuesto enviado', won: 'Confirmado', lost: 'Perdido',
 }
 const SOURCE_LABEL: Record<string, string> = {
   web: 'Web', whatsapp: 'WhatsApp', instagram: 'Instagram',
@@ -223,6 +227,11 @@ export default function LeadsPage() {
   const [toast,      setToast]      = useState('')
   const [dateConfirmLead,   setDateConfirmLead]   = useState<any | null>(null)
   const [dateConfirmStatus, setDateConfirmStatus] = useState<DbStatus | null>(null)
+  const [cancelVisitConfirm, setCancelVisitConfirm] = useState<{
+    lead: any; targetStatus: DbStatus; requiresDateModal: boolean
+  } | null>(null)
+  const [cancelWeddingLead,   setCancelWeddingLead]   = useState<any | null>(null)
+  const [cancelWeddingReason, setCancelWeddingReason] = useState('')
 
   useEffect(() => {
     if (authLoading) return
@@ -235,7 +244,18 @@ export default function LeadsPage() {
     const supabase = createClient()
     const { data } = await supabase.from('leads').select('*')
       .eq('user_id', user!.id).order('created_at', { ascending: false })
-    if (data) setLeads(data)
+    if (data) {
+      // Auto-move visit_scheduled leads whose visit_date has passed → post_visit
+      const today = todayIso()
+      const toAutoMove = data.filter(l => l.status === 'visit_scheduled' && l.visit_date && l.visit_date < today)
+      if (toAutoMove.length > 0) {
+        await supabase.from('leads')
+          .update({ status: 'post_visit' })
+          .in('id', toAutoMove.map((l: any) => l.id))
+        toAutoMove.forEach((l: any) => { l.status = 'post_visit' })
+      }
+      setLeads(data)
+    }
     setLoading(false)
   }
 
@@ -295,8 +315,10 @@ export default function LeadsPage() {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
     const newTab = (Object.entries(TAB_STATUSES) as [Tab, DbStatus[]][])
       .find(([, ss]) => ss.includes(status))?.[0]
-    if (newTab && newTab !== activeTab)
+    if (newTab && newTab !== activeTab) {
+      setActiveTab(newTab)
       showToast(`Lead movido a "${TABS.find(t => t.key === newTab)?.label}"`)
+    }
   }
 
   const triggerStatusChange = (lead: any, status: DbStatus) => {
@@ -305,6 +327,98 @@ export default function LeadsPage() {
       setDateConfirmStatus(status)
     } else {
       moveToStatus(lead.id, status)
+    }
+  }
+
+  // Wrappers that intercept status changes from visit_scheduled + show cancel-visit confirmation
+  const moveToStatusWithVisitCheck = (id: string, newStatus: DbStatus) => {
+    const lead = leads.find(l => l.id === id)
+    if (lead && lead.status === 'won' && newStatus === 'lost') {
+      setCancelWeddingLead(lead); setCancelWeddingReason('')
+    } else if (lead && lead.status === 'visit_scheduled' && lead.visit_date && newStatus !== 'visit_scheduled') {
+      setCancelVisitConfirm({ lead, targetStatus: newStatus, requiresDateModal: false })
+    } else {
+      moveToStatus(id, newStatus)
+    }
+  }
+
+  const handleCancelWedding = async () => {
+    if (!cancelWeddingLead) return
+    const supabase = createClient()
+    const notes = cancelWeddingReason.trim()
+      ? `[Boda cancelada] ${cancelWeddingReason.trim()}${cancelWeddingLead.notes ? '\n' + cancelWeddingLead.notes : ''}`
+      : cancelWeddingLead.notes
+    await supabase.from('leads').update({ status: 'lost', notes }).eq('id', cancelWeddingLead.id)
+
+    // Free the reserved calendar entry linked to this lead
+    const { data: reservedEntry } = await supabase
+      .from('calendar_entries')
+      .select('id, status')
+      .eq('user_id', user!.id)
+      .eq('lead_id', cancelWeddingLead.id)
+      .eq('status', 'reservado')
+      .maybeSingle()
+    if (reservedEntry?.id) {
+      await supabase.from('calendar_entries').update({ status: 'libre', lead_id: null, note: null }).eq('id', reservedEntry.id)
+    }
+
+    setLeads(prev => prev.map(l => l.id === cancelWeddingLead.id ? { ...l, status: 'lost', notes } : l))
+    setActiveTab('lost')
+    showToast('Boda cancelada — lead movido a Perdidos')
+    setCancelWeddingLead(null); setCancelWeddingReason('')
+  }
+
+  const triggerStatusChangeWithVisitCheck = (lead: any, newStatus: DbStatus) => {
+    if (lead.status === 'visit_scheduled' && lead.visit_date && newStatus !== 'visit_scheduled') {
+      const requiresDateModal = ['contacted', 'visit_scheduled', 'won'].includes(newStatus)
+      setCancelVisitConfirm({ lead, targetStatus: newStatus, requiresDateModal })
+    } else {
+      triggerStatusChange(lead, newStatus)
+    }
+  }
+
+  const confirmVisitCancel = async (clearVisit: boolean) => {
+    if (!cancelVisitConfirm) return
+    const { lead, targetStatus, requiresDateModal } = cancelVisitConfirm
+    setCancelVisitConfirm(null)
+
+    let updatedLead = lead
+    if (clearVisit) {
+      const supabase = createClient()
+      // Clear visit_date on the lead
+      await supabase.from('leads').update({ visit_date: null }).eq('id', lead.id)
+
+      // Also clean up the calendar entry created for the visit date
+      if (lead.visit_date) {
+        const { data: visitEntry } = await supabase
+          .from('calendar_entries')
+          .select('id, status')
+          .eq('user_id', user!.id)
+          .eq('date', lead.visit_date)
+          .eq('lead_id', lead.id)
+          .maybeSingle()
+
+        if (visitEntry?.id) {
+          if (visitEntry.status === 'negociacion') {
+            // Entry was created just for the visit — delete it entirely
+            await supabase.from('calendar_entries').delete().eq('id', visitEntry.id)
+          } else {
+            // Entry has a higher status (reservado, etc.) — keep status but unlink the lead
+            await supabase.from('calendar_entries').update({ lead_id: null, note: null }).eq('id', visitEntry.id)
+          }
+        }
+      }
+
+      updatedLead = { ...lead, visit_date: null }
+      setLeads(prev => prev.map(l => l.id === lead.id ? updatedLead : l))
+      if (detailLead?.id === lead.id) setDetailLead(updatedLead)
+    }
+
+    if (requiresDateModal) {
+      setDateConfirmLead(updatedLead)
+      setDateConfirmStatus(targetStatus)
+    } else {
+      moveToStatus(lead.id, targetStatus)
     }
   }
 
@@ -319,27 +433,28 @@ export default function LeadsPage() {
     const { data: updatedLead } = await supabase.from('leads')
       .update(finalUpdates).eq('id', dateConfirmLead.id).select().single()
 
-    for (const d of calendarDates) {
-      const { data: existing } = await supabase.from('calendar_entries')
-        .select('id').eq('user_id', user!.id).eq('date', d).maybeSingle()
-      const entryPayload: any = {
-        status: calendarStatus,
-        lead_id: dateConfirmLead.id,
-        ...(isVisit ? { note: `Visita: ${dateConfirmLead.name}` } : {}),
-      }
-      if (existing?.id) {
-        await supabase.from('calendar_entries').update(entryPayload).eq('id', existing.id)
-      } else {
-        await supabase.from('calendar_entries').insert({ user_id: user!.id, date: d, ...entryPayload })
+    // Visits only update visit_date on the lead — they do NOT touch calendar_entries
+    // (availability of the day must not change just because someone is visiting)
+    if (!isVisit) {
+      for (const d of calendarDates) {
+        const { data: existing } = await supabase.from('calendar_entries')
+          .select('id').eq('user_id', user!.id).eq('date', d).maybeSingle()
+        const entryPayload: any = { status: calendarStatus, lead_id: dateConfirmLead.id }
+        if (existing?.id) {
+          await supabase.from('calendar_entries').update(entryPayload).eq('id', existing.id)
+        } else {
+          await supabase.from('calendar_entries').insert({ user_id: user!.id, date: d, ...entryPayload })
+        }
       }
     }
 
     if (updatedLead) setLeads(prev => prev.map(l => l.id === dateConfirmLead.id ? updatedLead : l))
     const newTab = (Object.entries(TAB_STATUSES) as [Tab, DbStatus[]][])
       .find(([, ss]) => ss.includes(dateConfirmStatus))?.[0]
-    if (newTab && newTab !== activeTab)
+    if (newTab && newTab !== activeTab) {
+      setActiveTab(newTab)
       showToast(`Lead movido a "${TABS.find(t => t.key === newTab)?.label}"`)
-    else showToast('Lead actualizado')
+    } else showToast('Lead actualizado')
     setDateConfirmLead(null)
     setDateConfirmStatus(null)
   }
@@ -564,11 +679,33 @@ export default function LeadsPage() {
                 onClear={() => { setSearch(''); setHidePast(false) }} onNew={openCreate} />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {visibleLeads.map(lead => (
+                {activeTab === 'visit' ? (() => {
+                  const today = todayIso()
+                  const upcoming = visibleLeads.filter(l => !l.visit_date || l.visit_date >= today)
+                  const past     = visibleLeads.filter(l => l.visit_date && l.visit_date < today)
+                  const rowProps = { tab: activeTab as Tab, onMove: moveToStatusWithVisitCheck, onEdit: openEdit, onDelete: deleteLead, onDetail: setDetailLead, onDateConfirm: triggerStatusChangeWithVisitCheck }
+                  return (
+                    <>
+                      {upcoming.map(lead => <LeadRow key={lead.id} lead={lead} {...rowProps} />)}
+                      {past.length > 0 && (
+                        <>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', padding: '8px 0 2px', borderTop: '1px solid var(--ivory)', marginTop: 4 }}>
+                            Visitas realizadas
+                          </div>
+                          {past.map(lead => (
+                            <div key={lead.id} style={{ opacity: 0.75 }}>
+                              <LeadRow lead={lead} {...rowProps} />
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </>
+                  )
+                })() : visibleLeads.map(lead => (
                   <LeadRow key={lead.id} lead={lead} tab={activeTab}
-                    onMove={moveToStatus} onEdit={openEdit}
+                    onMove={moveToStatusWithVisitCheck} onEdit={openEdit}
                     onDelete={deleteLead} onDetail={setDetailLead}
-                    onDateConfirm={triggerStatusChange} />
+                    onDateConfirm={triggerStatusChangeWithVisitCheck} />
                 ))}
               </div>
             )}
@@ -590,8 +727,8 @@ export default function LeadsPage() {
         <DetailDrawer lead={detailLead}
           tab={(Object.entries(TAB_STATUSES) as [Tab, DbStatus[]][]).find(([,ss]) => ss.includes(detailLead.status))?.[0] || 'new'}
           onClose={() => setDetailLead(null)}
-          onEdit={openEdit} onDelete={deleteLead} onMove={moveToStatus}
-          onDateConfirm={triggerStatusChange} />
+          onEdit={openEdit} onDelete={deleteLead} onMove={moveToStatusWithVisitCheck}
+          onDateConfirm={triggerStatusChangeWithVisitCheck} />
       )}
 
       {showForm && (
@@ -609,6 +746,91 @@ export default function LeadsPage() {
           onConfirm={handleDateConfirm}
           onClose={() => { setDateConfirmLead(null); setDateConfirmStatus(null) }}
         />
+      )}
+
+      {/* Cancel wedding modal */}
+      {cancelWeddingLead && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 16 }}
+          onClick={() => setCancelWeddingLead(null)}>
+          <div style={{ background: '#fff', borderRadius: 14, maxWidth: 420, width: '100%', padding: '24px 24px 20px', boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <X size={18} style={{ color: '#dc2626' }} />
+              </div>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
+                Cancelar boda
+              </div>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--charcoal)', marginBottom: 10 }}>
+              ¿Cancelar la boda de <strong>{cancelWeddingLead.name}</strong>? El lead pasará a <strong>Perdidos</strong>.
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280', background: '#f9fafb', border: '1px solid var(--ivory)', borderRadius: 7, padding: '8px 10px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Calendar size={12} style={{ flexShrink: 0, color: '#9ca3af' }} />
+              La fecha reservada en el calendario quedará liberada automáticamente.
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 6 }}>
+                Motivo de cancelación
+              </label>
+              <textarea
+                className="form-input"
+                rows={3}
+                placeholder="Ej: cambio de planes, presupuesto, otro venue..."
+                value={cancelWeddingReason}
+                onChange={e => setCancelWeddingReason(e.target.value)}
+                style={{ resize: 'vertical', fontSize: 13 }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={handleCancelWedding}
+                style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                Confirmar cancelación
+              </button>
+              <button
+                onClick={() => { setCancelWeddingLead(null); setCancelWeddingReason('') }}
+                style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--charcoal)', fontSize: 13, cursor: 'pointer' }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel visit confirmation */}
+      {cancelVisitConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 16 }}
+          onClick={() => setCancelVisitConfirm(null)}>
+          <div style={{ background: '#fff', borderRadius: 14, maxWidth: 400, width: '100%', padding: '24px 24px 20px', boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Calendar size={18} style={{ color: '#d97706' }} />
+              </div>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
+                ¿Cancelar la visita?
+              </div>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.6, marginBottom: 20 }}>
+              <strong>{cancelVisitConfirm.lead.name}</strong> tiene una visita programada el{' '}
+              <strong>{new Date(cancelVisitConfirm.lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>.
+              <br />¿Quieres cancelarla?
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => confirmVisitCancel(true)}
+                style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                Sí, cancelar visita
+              </button>
+              <button
+                onClick={() => confirmVisitCancel(false)}
+                style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--charcoal)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                No, mantenerla
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -723,29 +945,24 @@ function DateConfirmModal({
       const hasMissingRequested = availableRequested.some(d => !selectedDates.includes(d))
       const hasChanges = extraDates.length > 0 || hasMissingRequested || unavailableRequested.length > 0
 
-      if (hasChanges) {
-        const oldSnapshot = {
-          changed_at: new Date().toISOString(),
-          date_flexibility: lead.date_flexibility || 'exact',
-          wedding_date: lead.wedding_date,
-          wedding_date_to: lead.wedding_date_to,
-          wedding_date_ranges: lead.wedding_date_ranges,
-          wedding_year: lead.wedding_year,
-          wedding_month: lead.wedding_month,
-        }
-        const history = [...(lead.wedding_date_history || []), oldSnapshot]
-
-        if (extraDates.length > 0 || hasMissingRequested) {
-          // Date fields changed — update them
-          const sorted = [...selectedDates].sort()
-          leadUpdates = sorted.length === 1
-            ? { date_flexibility: 'exact', wedding_date: sorted[0], wedding_date_to: null, wedding_date_ranges: null, wedding_year: null, wedding_month: null, wedding_date_history: history }
-            : sorted.length > 1
-              ? { date_flexibility: 'multi_range', wedding_date: null, wedding_date_to: null, wedding_date_ranges: sorted.map(d => ({ from: d, to: d })), wedding_year: null, wedding_month: null, wedding_date_history: history }
-              : { wedding_date_history: history }
+      if (extraDates.length > 0 || hasMissingRequested) {
+        // Date fields changed — update them based on selection
+        const sorted = [...selectedDates].sort()
+        if (sorted.length === 0) {
+          leadUpdates = {}
+        } else if (sorted.length === 1) {
+          leadUpdates = { date_flexibility: 'exact', wedding_date: sorted[0], wedding_date_to: null, wedding_date_ranges: null, wedding_year: null, wedding_month: null }
         } else {
-          // Only unavailable dates — keep date fields, just save history note
-          leadUpdates = { wedding_date_history: history }
+          // Detect if dates are contiguous → range, otherwise → multi_range
+          const isContiguous = sorted.every((d, i) => {
+            if (i === 0) return true
+            const prev = new Date(sorted[i - 1] + 'T12:00:00')
+            const curr = new Date(d + 'T12:00:00')
+            return (curr.getTime() - prev.getTime()) / 86400000 === 1
+          })
+          leadUpdates = isContiguous
+            ? { date_flexibility: 'range', wedding_date: sorted[0], wedding_date_to: sorted[sorted.length - 1], wedding_date_ranges: null, wedding_year: null, wedding_month: null }
+            : { date_flexibility: 'multi_range', wedding_date: null, wedding_date_to: null, wedding_date_ranges: sorted.map(d => ({ from: d, to: d })), wedding_year: null, wedding_month: null }
         }
       }
     }
@@ -855,23 +1072,23 @@ function DateConfirmModal({
               </div>
             )}
 
-            <div style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden' }}>
+            <div style={{ border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden' }}>
               {/* Month nav */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--cream)', borderBottom: '1px solid var(--ivory)' }}>
-                <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--charcoal)', padding: '2px 6px', borderRadius: 4 }}><ChevronLeft size={16} /></button>
-                <span style={{ fontSize: 16, color: 'var(--espresso)', fontWeight: 600 }}>{MONTHS[viewMonth]} {viewYear}</span>
-                <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--charcoal)', padding: '2px 6px', borderRadius: 4 }}><ChevronRight size={16} /></button>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', background: 'var(--cream)', borderBottom: '1px solid var(--ivory)' }}>
+                <button onClick={prevMonth} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}><ChevronLeft size={14} /></button>
+                <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500 }}>{MONTHS[viewMonth]} {viewYear}</span>
+                <button onClick={nextMonth} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}><ChevronRight size={14} /></button>
               </div>
               {/* Day headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '6px 8px 2px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--ivory)' }}>
                 {DAYS_SHORT.map((d, i) => (
-                  <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '0.05em', padding: '2px 0' }}>{d}</div>
+                  <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '0.08em', padding: '10px 0' }}>{d}</div>
                 ))}
               </div>
-              {/* Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, padding: '2px 8px 10px' }}>
+              {/* Grid — border-based, no gap */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
                 {cells.map((day, i) => {
-                  if (!day) return <div key={`e-${i}`} />
+                  if (!day) return <div key={`e-${i}`} style={{ minHeight: 68, borderBottom: '1px solid var(--ivory)', borderRight: i % 7 !== 6 ? '1px solid var(--ivory)' : 'none' }} />
                   const ds = `${viewYear}-${pad(viewMonth + 1)}-${pad(day)}`
                   const entry = calEntries[ds]
                   const entryStatus = entry?.status || 'libre'
@@ -886,40 +1103,51 @@ function DateConfirmModal({
                   const isWeekend = dow >= 5
                   const isExtra = isSelected && !isRequested
                   const otherLeadCount = dateLeadCounts[ds] || 0
+                  const cellIdx = i  // for borderRight calc
 
                   return (
                     <button key={ds} onClick={() => canClick && toggleDate(ds)}
-                      title={isUnavailable ? cfg.label : isRequested ? 'Fecha solicitada por la pareja' : otherLeadCount > 0 ? `${otherLeadCount} lead${otherLeadCount > 1 ? 's' : ''} interesado${otherLeadCount > 1 ? 's' : ''}` : ''}
+                      title={isUnavailable ? cfg.label : isRequested ? 'Fecha solicitada por la pareja' : otherLeadCount > 0 ? `${otherLeadCount} lead(s) interesado(s)` : ''}
                       style={{
-                        minHeight: 38, border: '1.5px solid',
-                        borderColor: isSelected ? (isExtra ? '#3b82f6' : 'var(--gold)') : isRequested ? '#f59e0b' : isToday ? 'var(--gold)' : isWeekend && !isUnavailable ? '#e5d4c0' : cfg.border,
-                        borderRadius: 5,
-                        background: isSelected ? (isExtra ? '#eff6ff' : '#fef3c7') : cfg.bg,
-                        cursor: canClick ? 'pointer' : 'not-allowed',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                        opacity: isPast ? 0.3 : isUnavailable ? 0.65 : 1,
-                        position: 'relative', transition: 'all 0.1s',
+                        minHeight: 68, border: 'none',
+                        borderBottom: '1px solid var(--ivory)',
+                        borderRight: cellIdx % 7 !== 6 ? '1px solid var(--ivory)' : 'none',
+                        background: isSelected
+                          ? (isExtra ? '#eff6ff' : '#fffbeb')
+                          : isPast ? '#faf8f5'
+                          : isWeekend && !isUnavailable ? '#faf7f4'
+                          : cfg.bg,
+                        cursor: canClick ? 'pointer' : isPast ? 'default' : 'not-allowed',
+                        display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                        justifyContent: 'space-between', padding: '8px 9px',
+                        boxShadow: isToday ? 'inset 0 0 0 2px var(--gold)' : isSelected ? `inset 0 0 0 2px ${isExtra ? '#3b82f6' : '#f59e0b'}` : 'none',
+                        opacity: isPast ? 0.35 : 1,
+                        position: 'relative', transition: 'background 0.1s', outline: 'none',
                       }} disabled={!canClick || isPast}>
-                      <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 400, color: isPast ? 'var(--stone)' : isUnavailable ? 'var(--warm-gray)' : isToday ? 'var(--gold)' : 'var(--charcoal)', lineHeight: 1 }}>{day}</span>
-                      {/* Status dot */}
-                      {entryStatus !== 'libre' && <div style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot }} />}
-                      {/* Unavailable indicator */}
-                      {isUnavailable && <span style={{ fontSize: 8, lineHeight: 1 }}>✕</span>}
-                      {/* Other leads count badge */}
+                      {/* Day number */}
+                      <span style={{ fontSize: 14, fontWeight: isToday ? 700 : 500, color: isPast ? 'var(--stone)' : isToday ? 'var(--gold)' : isWeekend ? 'var(--gold)' : 'var(--charcoal)', lineHeight: 1, fontFamily: 'Manrope, sans-serif' }}>{day}</span>
+                      {/* Bottom status */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 'auto', width: '100%' }}>
+                        {entryStatus !== 'libre' && (
+                          <>
+                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                            <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                              color: entryStatus === 'negociacion' ? '#92400e' : entryStatus === 'reservado' ? '#9d174d' : '#6b7280' }}>
+                              {entryStatus === 'negociacion' ? 'Neg.' : entryStatus === 'reservado' ? 'Reserv.' : 'Bloq.'}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {/* Other leads badge */}
                       {otherLeadCount > 0 && !isUnavailable && !isPast && (
-                        <div style={{
-                          position: 'absolute', top: 2, left: 2,
-                          background: '#f97316', color: '#fff',
-                          fontSize: 8, fontWeight: 700, lineHeight: 1,
-                          minWidth: 13, height: 13, borderRadius: 7,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          padding: '0 2px',
-                        }}>
+                        <div style={{ position: 'absolute', top: 4, right: 4, background: '#f97316', color: '#fff', fontSize: 8, fontWeight: 700, minWidth: 14, height: 14, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 2px' }}>
                           {otherLeadCount > 9 ? '9+' : otherLeadCount}
                         </div>
                       )}
-                      {/* Selection indicator */}
-                      {isSelected && <div style={{ position: 'absolute', top: 2, right: 2, width: 6, height: 6, borderRadius: '50%', background: isExtra ? '#3b82f6' : 'var(--gold)' }} />}
+                      {/* Selected dot */}
+                      {isSelected && !otherLeadCount && (
+                        <div style={{ position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: '50%', background: isExtra ? '#3b82f6' : 'var(--gold)' }} />
+                      )}
                     </button>
                   )
                 })}
@@ -1028,92 +1256,102 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm 
           return <div style={{ width: 4, background: color, flexShrink: 0 }} />
         })()}
 
-        {/* Main content */}
-        <div style={{ flex: 1, padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer', minWidth: 0 }}
-          onClick={() => onDetail(lead)}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Info row — clickable */}
+          <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer', minWidth: 0 }}
+            onClick={() => onDetail(lead)}>
 
-          <div style={{ minWidth: 170, maxWidth: 200 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>{lead.name}</div>
-              {tab === 'new' && lead.created_at && (() => {
-                const ta = timeAgo(lead.created_at)
-                return (
-                  <span style={{ fontSize: 10, fontWeight: 500, color: ta.urgent ? '#dc2626' : ta.warning ? '#d97706' : 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
-                    {ta.text}
+            {/* Name + badges */}
+            <div style={{ minWidth: 160, maxWidth: 200, flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.name}</div>
+                {tab === 'new' && lead.created_at && (() => {
+                  const ta = timeAgo(lead.created_at)
+                  return (
+                    <span style={{ fontSize: 10, fontWeight: 500, color: ta.urgent ? '#dc2626' : ta.warning ? '#d97706' : 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
+                      {ta.text}
+                    </span>
+                  )
+                })()}
+              </div>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {lead.source && (
+                  <span style={{ fontSize: 10, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '1px 7px', borderRadius: 10 }}>
+                    {SOURCE_LABEL[lead.source] || lead.source}
                   </span>
+                )}
+                {(tab === 'in_progress' || tab === 'post_visit' || tab === 'budget') && (
+                  <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', padding: '1px 7px', borderRadius: 10, fontWeight: 500 }}>
+                    {SUB_STATUS_LABEL[lead.status as DbStatus]}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Date */}
+            <div style={{ minWidth: 120, flexShrink: 0 }}>
+              {(() => {
+                const { line1, line2, color } = formatLeadDate(lead)
+                return (
+                  <>
+                    <div style={{ fontSize: 12, color: color || 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Calendar size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                      {line1}
+                    </div>
+                    {line2 && <div style={{ fontSize: 11, color: color || 'var(--warm-gray)', fontWeight: 600, marginTop: 2 }}>{line2}</div>}
+                  </>
                 )
               })()}
-            </div>
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-              {lead.source && (
-                <span style={{ fontSize: 10, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '1px 7px', borderRadius: 10 }}>
-                  {SOURCE_LABEL[lead.source] || lead.source}
-                </span>
+              {tab === 'visit' && lead.visit_date && (
+                <div style={{ fontSize: 11, color: '#3b82f6', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Landmark size={11} /> {new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                </div>
               )}
-              {tab === 'in_progress' && (
-                <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', padding: '1px 7px', borderRadius: 10, fontWeight: 500 }}>
-                  {SUB_STATUS_LABEL[lead.status as DbStatus]}
-                </span>
+              {tab === 'confirmed' && lead.wedding_date && (
+                <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <PartyPopper size={11} /> {new Date(lead.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </div>
+              )}
+              {tab === 'confirmed' && lead.visit_date && lead.visit_date >= todayIso() && (
+                <div style={{ fontSize: 11, color: '#10b981', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Landmark size={11} /> Visita: {new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                </div>
               )}
             </div>
-          </div>
 
-          <div style={{ minWidth: 130 }}>
-            {(() => {
-              const { line1, line2, color } = formatLeadDate(lead)
-              return (
-                <>
-                  <div style={{ fontSize: 12, color: color || 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <Calendar size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                    {line1}
-                  </div>
-                  {line2 && <div style={{ fontSize: 11, color: color || 'var(--warm-gray)', fontWeight: 600, marginTop: 2 }}>{line2}</div>}
-                </>
-              )
-            })()}
-            {tab === 'visit' && lead.visit_date && (
-              <div style={{ fontSize: 11, color: '#3b82f6', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Landmark size={11} /> {new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-              </div>
-            )}
-          </div>
-
-          <div style={{ minWidth: 90 }}>
-            {lead.guests && (
-              <div style={{ fontSize: 12, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                <Users size={11} style={{ color: 'var(--warm-gray)' }} /> {lead.guests} inv.
-              </div>
-            )}
-            {lead.budget && lead.budget !== 'sin_definir' && (
-              <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{BUDGET_LABEL[lead.budget]}</div>
-            )}
-          </div>
-
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {lead.email && (
-              <div style={{ fontSize: 12, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}>
-                <Mail size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} /> {lead.email}
-              </div>
-            )}
-            {lead.phone && (
-              <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <Phone size={10} style={{ flexShrink: 0 }} /> {lead.phone}
-              </div>
-            )}
-          </div>
-
-          {lead.notes && (
-            <div style={{ maxWidth: 150, fontSize: 11, color: 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              "{lead.notes.slice(0,50)}{lead.notes.length > 50 ? '…' : ''}"
+            {/* Guests + budget */}
+            <div style={{ minWidth: 80, flexShrink: 0 }}>
+              {lead.guests && (
+                <div style={{ fontSize: 12, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Users size={11} style={{ color: 'var(--warm-gray)' }} /> {lead.guests} inv.
+                </div>
+              )}
+              {lead.budget && lead.budget !== 'sin_definir' && (
+                <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{BUDGET_LABEL[lead.budget]}</div>
+              )}
             </div>
-          )}
 
-          <ChevronRight size={14} style={{ color: 'var(--stone)', flexShrink: 0 }} />
-        </div>
+            {/* Email + phone */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {lead.email && (
+                <div style={{ fontSize: 12, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Mail size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} /> {lead.email}
+                </div>
+              )}
+              {lead.phone && (
+                <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Phone size={10} style={{ flexShrink: 0 }} /> {lead.phone}
+                </div>
+              )}
+            </div>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 14px', borderLeft: '1px solid var(--ivory)', flexShrink: 0 }}>
-          <QuickActions lead={lead} tab={tab} onMove={onMove} onEdit={onEdit} onDelete={onDelete} onDateConfirm={onDateConfirm} />
+            <ChevronRight size={14} style={{ color: 'var(--stone)', flexShrink: 0 }} />
+          </div>
+
+          {/* Actions row */}
+          <div style={{ padding: '0 14px 10px', borderTop: '1px solid var(--ivory)', paddingTop: 8, display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
+            <QuickActions lead={lead} tab={tab} onMove={onMove} onEdit={onEdit} onDelete={onDelete} onDateConfirm={onDateConfirm} />
+          </div>
         </div>
       </div>
     </div>
@@ -1154,8 +1392,8 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
 
       {tab === 'in_progress' && (<>
         {canProposal
-          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} style={{ ...g, textDecoration: 'none' }}><FileText size={11} /> Propuesta</a>
-          : <LockedProposalBtn label="Propuesta" />}
+          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} style={{ ...g, textDecoration: 'none' }}><FileText size={11} /> Propuesta digital</a>
+          : <LockedProposalBtn label="Propuesta digital" />}
         <button style={p} onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
         <button style={{ ...p, background: '#16a34a' }} onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
         {lead.status !== 'budget_sent' && <button style={g} onClick={() => onMove(lead.id, 'budget_sent')}>Presupuesto enviado</button>}
@@ -1166,8 +1404,27 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
 
       {tab === 'visit' && (<>
         <button style={p} onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
-        <button style={g} onClick={() => onMove(lead.id, 'budget_sent')}>Enviar presupuesto</button>
+        <button style={g} onClick={() => onMove(lead.id, 'post_visit')}><CheckCircle size={11} /> Visita realizada</button>
+        <button style={g} onClick={() => onMove(lead.id, 'budget_sent')}>Presupuesto</button>
         <button style={g} onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
+        <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
+        <button style={d} onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
+      </>)}
+
+      {tab === 'post_visit' && (<>
+        <button style={p} onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
+        <button style={g} onClick={() => onMove(lead.id, 'budget_sent')}><FileText size={11} /> Mover a presupuesto</button>
+        {canProposal
+          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} style={{ ...g, textDecoration: 'none' }}><FileText size={11} /> Presupuesto digital</a>
+          : <LockedProposalBtn label="Presupuesto digital" />}
+        <button style={g} onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
+        <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
+        <button style={d} onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
+      </>)}
+
+      {tab === 'budget' && (<>
+        <button style={p} onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
+        <button style={g} onClick={() => onMove(lead.id, 'post_visit')}><RotateCcw size={11} /> Post-visita</button>
         <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
         <button style={d} onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
       </>)}
@@ -1177,6 +1434,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
           ? <a href="/propuestas" style={{ ...g, textDecoration: 'none' }}><ExternalLink size={11} /> Propuesta</a>
           : <LockedProposalBtn label="Propuesta" />}
         <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
+        <button style={d} onClick={() => onMove(lead.id, 'lost')}>Cancelar boda</button>
         <button style={d} onClick={() => onDelete(lead.id)}><Trash2 size={11} /></button>
       </>)}
 
@@ -1218,12 +1476,43 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
         </div>
 
         <div style={{ flex: 1, padding: '20px 24px' }}>
+          {/* Confirmed: wedding date banner with change button */}
+          {tab === 'confirmed' && (
+            <div style={{ marginBottom: 20, padding: '16px 18px', background: 'linear-gradient(135deg, #fdf2f8, #fce7f3)', border: '1px solid #fbcfe8', borderRadius: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#be185d', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                <Flower2 size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />Fecha de boda confirmada
+              </div>
+              {lead.wedding_date ? (
+                <>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#831843', fontFamily: 'Cormorant Garamond, Georgia, serif', marginBottom: 4 }}>
+                    {new Date(lead.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  </div>
+                  {(() => {
+                    const days = Math.ceil((new Date(lead.wedding_date + 'T12:00:00').getTime() - Date.now()) / 86400000)
+                    return days > 0
+                      ? <div style={{ fontSize: 12, color: '#be185d', fontWeight: 500 }}>{days} días restantes</div>
+                      : <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Fecha pasada</div>
+                  })()}
+                </>
+              ) : (
+                <div style={{ fontSize: 14, color: '#be185d' }}>Sin fecha asignada</div>
+              )}
+              <button
+                onClick={() => onDateConfirm(lead, 'won')}
+                style={{ marginTop: 12, fontSize: 12, padding: '6px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid #f9a8d4', background: '#fff', color: '#be185d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Calendar size={12} /> Cambiar fecha
+              </button>
+            </div>
+          )}
+
           {(() => {
             const { line1, line2, color } = formatLeadDate(lead)
             return (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
-            <InfoBlock icon={<Calendar size={13} />} label="Fecha de boda"
-              value={line1} sub={line2} subColor={color} />
+            {tab !== 'confirmed' && (
+              <InfoBlock icon={<Calendar size={13} />} label="Fecha de boda"
+                value={line1} sub={line2} subColor={color} />
+            )}
             {lead.visit_date && (
               <InfoBlock icon={<Landmark size={13} />} label="Fecha de visita"
                 value={new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })} />
