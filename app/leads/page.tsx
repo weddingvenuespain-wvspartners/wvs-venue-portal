@@ -998,6 +998,16 @@ function DateConfirmModal({
   )
 }
 
+// ── Time ago helper (for new leads) ───────────────────────────────────────────
+function timeAgo(dateStr: string): { text: string; urgent: boolean; warning: boolean } {
+  const ms = Date.now() - new Date(dateStr).getTime()
+  const hours = Math.floor(ms / 3600000)
+  if (hours < 1) return { text: 'hace <1h', urgent: false, warning: false }
+  if (hours < 24) return { text: `hace ${hours}h`, urgent: false, warning: hours >= 4 }
+  const days = Math.floor(hours / 24)
+  return { text: `hace ${days}d`, urgent: true, warning: false }
+}
+
 // ── Lead Row ───────────────────────────────────────────────────────────────────
 function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm }: {
   lead: any; tab: Tab
@@ -1023,7 +1033,17 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm 
           onClick={() => onDetail(lead)}>
 
           <div style={{ minWidth: 170, maxWidth: 200 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)', marginBottom: 3 }}>{lead.name}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>{lead.name}</div>
+              {tab === 'new' && lead.created_at && (() => {
+                const ta = timeAgo(lead.created_at)
+                return (
+                  <span style={{ fontSize: 10, fontWeight: 500, color: ta.urgent ? '#dc2626' : ta.warning ? '#d97706' : 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
+                    {ta.text}
+                  </span>
+                )
+              })()}
+            </div>
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
               {lead.source && (
                 <span style={{ fontSize: 10, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '1px 7px', borderRadius: 10 }}>

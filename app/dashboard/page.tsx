@@ -228,6 +228,7 @@ function VenueDashboard() {
   const [venue, setVenue]         = useState<any>(null)
   const [venueLoading, setVenueLoading] = useState(false)
   const [leads, setLeads]         = useState<any[]>([])
+  const [leadsMonthCount, setLeadsMonthCount] = useState<number>(0)
   const [leadsLoaded, setLeadsLoaded] = useState(false)
   const [onboarding, setOnboarding] = useState<any>(null)
 
@@ -236,10 +237,17 @@ function VenueDashboard() {
     if (!user) { router.push('/login'); return }
 
     const supabase = createClient()
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
 
+    // Fetch last 5 leads for the list
     supabase.from('leads').select('*').eq('user_id', user.id)
       .order('created_at', { ascending: false }).limit(5)
       .then(({ data }) => { if (data) setLeads(data); setLeadsLoaded(true) })
+
+    // Count all leads this month for the KPI
+    supabase.from('leads').select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id).gte('created_at', monthStart)
+      .then(({ count }) => { setLeadsMonthCount(count ?? 0) })
 
     if (profile?.wp_venue_id) {
       const cacheKey = `wvs_venue_${profile.wp_venue_id}`
@@ -370,7 +378,7 @@ function VenueDashboard() {
           <div className="stats-grid">
             <div className="stat-card accent">
               <div className="stat-label">Leads este mes</div>
-              <div className="stat-value">{leadsLoaded ? leads.length : <Skeleton w={40} h={28} radius={4} />}</div>
+              <div className="stat-value">{leadsLoaded ? leadsMonthCount : <Skeleton w={40} h={28} radius={4} />}</div>
               <div className="stat-sub">Desde tu ficha y canales</div>
             </div>
             <div className="stat-card">
@@ -488,9 +496,8 @@ function VenueDashboard() {
 
 // ─── Page router ──────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const { profile, loading } = useAuth()
+  const { user, profile, loading } = useAuth()
   const router = useRouter()
-  const { user } = useAuth()
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')

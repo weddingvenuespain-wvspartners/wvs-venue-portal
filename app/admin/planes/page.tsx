@@ -296,8 +296,8 @@ export default function PlanesPage() {
   }
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#1A1512', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#C4975A' }}>Cargando...</div>
+    <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ color: 'var(--gold)' }}>Cargando...</div>
     </div>
   )
 

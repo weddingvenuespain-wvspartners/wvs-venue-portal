@@ -124,8 +124,8 @@ export default function FacturasPage() {
 
   // ── Loading skeleton
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#1A1512', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#C4975A' }}>Cargando facturas...</div>
+    <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ color: 'var(--gold)' }}>Cargando facturas...</div>
     </div>
   )
 
