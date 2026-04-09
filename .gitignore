@@ -47,3 +47,7 @@ wvs-backup-*.json
 wvs-mis-datos-*.json
 backups/
 .github/workflows/
+
+# Redsys docs (referencia local, no código)
+docs/redsys/
+scripts/crawl-redsys.py
