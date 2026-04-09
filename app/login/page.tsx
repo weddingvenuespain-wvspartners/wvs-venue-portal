@@ -1,14 +1,30 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { Suspense } from 'react'
 
 type Mode = 'login' | 'signup' | 'reset' | 'new_password'
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
+
+  // Support redirect back after login (e.g. /login?redirect=/pricing&plan=X&cycle=Y)
+  const rawRedirect = searchParams.get('redirect') || ''
+  const redirectPath = rawRedirect.startsWith('/') ? rawRedirect : '/dashboard'
+  // Preserve extra query params (plan, cycle) for the redirect target
+  const redirectQuery = new URLSearchParams()
+  const plan = searchParams.get('plan')
+  const cycle = searchParams.get('cycle')
+  if (plan) redirectQuery.set('plan', plan)
+  if (cycle) redirectQuery.set('cycle', cycle)
+  const redirectUrl = redirectQuery.toString()
+    ? `${redirectPath}${redirectPath.includes('?') ? '&' : '?'}${redirectQuery}`
+    : redirectPath
+
   const [mode, setMode]         = useState<Mode>('login')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -18,12 +34,12 @@ export default function LoginPage() {
   const [error, setError]       = useState('')
   const [success, setSuccess]   = useState('')
 
-  // Cuando el auth-context confirme que hay usuario, navegar al dashboard
+  // Cuando el auth-context confirme que hay usuario, navegar al destino
   useEffect(() => {
     if (!authLoading && user) {
-      router.push('/dashboard')
+      router.push(redirectUrl)
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading, router, redirectUrl])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -60,7 +76,7 @@ export default function LoginPage() {
     const supabase = createClient()
     const { error } = await supabase.auth.signUp({
       email, password,
-      options: { emailRedirectTo: `${window.location.origin}/dashboard` }
+      options: { emailRedirectTo: `${window.location.origin}${redirectUrl}` }
     })
     if (error) { setError(error.message); setLoading(false) }
     else { setSuccess('Cuenta creada. Revisa tu email para confirmar.'); setLoading(false) }
@@ -91,7 +107,7 @@ export default function LoginPage() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` }
+      options: { redirectTo: `${window.location.origin}${redirectUrl}` }
     })
   }
 
@@ -193,5 +209,13 @@ export default function LoginPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageInner />
+    </Suspense>
   )
 }

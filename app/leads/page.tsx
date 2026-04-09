@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import {
   Plus, Search, X, Phone, Mail, MessageCircle,
@@ -206,6 +207,7 @@ const emptyForm = {
 export default function LeadsPage() {
   const router   = useRouter()
   const { user, loading: authLoading } = useAuth()
+  const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
 
   const [leads,     setLeads]     = useState<any[]>([])
@@ -546,6 +548,8 @@ export default function LeadsPage() {
   }
 
 
+
+  if (isBlocked) return null
 
   if (loading) return (
     <div style={{ display: 'flex' }}>

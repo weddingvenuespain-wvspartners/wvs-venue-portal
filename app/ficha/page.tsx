@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { Upload, X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react'
 import DOMPurify from 'dompurify'
 
@@ -46,6 +47,7 @@ const WC_COLORS = (count: number, limit: number) =>
 export default function FichaPage() {
   const router = useRouter()
   const { user, profile, userVenues, loading: authLoading } = useAuth()
+  const { isBlocked } = useRequireSubscription()
   const hasLoaded   = useRef(false)
   const autoSaveRef = useRef<() => void>(() => {})
   const [venue, setVenue]           = useState<any>(null)
@@ -643,6 +645,8 @@ export default function FichaPage() {
     localStorage.setItem(approvalKey, '1')
     setApprovalDismissed(true)
   }
+
+  if (isBlocked) return null
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

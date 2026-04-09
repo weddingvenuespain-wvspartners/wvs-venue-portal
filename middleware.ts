@@ -4,8 +4,10 @@ import { createServerClient } from '@supabase/ssr'
 
 // Routes that don't require authentication
 const PUBLIC_ROUTES = [
-  '/api/leads/create',   // uses its own WVS_REST_TOKEN auth
-  '/api/admin/backup',   // uses Bearer API key for GitHub Actions cron
+  '/api/leads/create',          // uses its own WVS_REST_TOKEN auth
+  '/api/admin/backup',          // uses Bearer API key for GitHub Actions cron
+  '/api/redsys/notification',   // Redsys webhook (server-to-server, no session)
+  '/api/plans',                 // public plan listing for pricing page
 ]
 
 export async function middleware(req: NextRequest) {

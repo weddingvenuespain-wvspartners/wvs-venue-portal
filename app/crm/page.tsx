@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
 
 const STATUS_LABELS: Record<string, string> = {
   new: 'Nuevo', contacted: 'Contactado', visit: 'Visita',
@@ -18,6 +19,7 @@ const STATUS_CLASSES: Record<string, string> = {
 export default function CrmPage() {
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
+  const { isBlocked } = useRequireSubscription()
   const [leads, setLeads] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -74,6 +76,8 @@ export default function CrmPage() {
   }
 
   const filtered = filter === 'all' ? leads : leads.filter(l => l.status === filter)
+
+  if (isBlocked) return null
 
   if (loading) return <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ color: 'var(--gold)' }}>Cargando...</div></div>
 

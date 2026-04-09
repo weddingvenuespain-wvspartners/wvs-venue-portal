@@ -18,7 +18,7 @@ export type PlanFeatures = {
 // ── Fallbacks (cuando el plan no tiene permissions en la DB) ──────────────────
 
 /** Sin plan / trial: mismas funciones que básico durante el período de prueba. */
-const BASIC_FALLBACK: PlanFeatures = {
+export const BASIC_FALLBACK: PlanFeatures = {
   ficha:             true,
   leads:             true,
   leads_new_only:    false,
@@ -32,7 +32,7 @@ const BASIC_FALLBACK: PlanFeatures = {
 }
 
 /** Plan premium por defecto: acceso completo. */
-const PREMIUM_FALLBACK: PlanFeatures = {
+export const PREMIUM_FALLBACK: PlanFeatures = {
   ficha:             true,
   leads:             true,
   leads_new_only:    false,

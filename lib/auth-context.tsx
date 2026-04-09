@@ -25,26 +25,29 @@ async function fetchProfileAndVenues(userId: string) {
     supabase.from('venue_profiles').select('*').eq('user_id', userId).maybeSingle(),
   ])
 
-  const profile = profileResult.data ?? null
+  let profile = profileResult.data ?? null
 
-  // Fetch active/trial subscription — needed to determine plan features
+  // Auto-create profile for self-registered users (admin-created users already have one)
+  if (!profile) {
+    try {
+      await fetch('/api/auth/ensure-profile', { method: 'POST' })
+      const retry = await supabase.from('venue_profiles').select('*').eq('user_id', userId).maybeSingle()
+      profile = retry.data ?? null
+    } catch { /* ignore — will retry on next load */ }
+  }
+
+  // Fetch active/trial subscription via API (bypasses RLS on venue_subscriptions)
   if (profile) {
-    const subRes = await supabase
-      .from('venue_subscriptions')
-      .select('id, status, trial_end_date, plan:venue_plans(id, name, display_name, permissions)')
-      .eq('user_id', userId)
-      .in('status', ['active', 'trial'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (subRes.error) {
-      console.warn('[auth] Could not fetch subscription:', subRes.error.message)
-      // On error: leave profile.plan undefined → usePlanFeatures will use BASIC fallback
-    } else if (subRes.data) {
-      ;(profile as any).plan               = subRes.data.plan
-      ;(profile as any).subscription_status = subRes.data.status          // 'active' | 'trial'
-      ;(profile as any).trial_end_date      = subRes.data.trial_end_date  // string | null
+    try {
+      const subRes = await fetch('/api/auth/subscription')
+      const { subscription } = await subRes.json()
+      if (subscription) {
+        ;(profile as any).plan               = subscription.plan
+        ;(profile as any).subscription_status = subscription.status          // 'active' | 'trial'
+        ;(profile as any).trial_end_date      = subscription.trial_end_date  // string | null
+      }
+    } catch (err) {
+      console.warn('[auth] Could not fetch subscription:', err)
     }
     // No subscription found → profile.plan stays undefined → basic/restricted access
   }

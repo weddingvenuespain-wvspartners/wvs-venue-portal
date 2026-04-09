@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { Users, TrendingUp, CheckCircle, ExternalLink, AlertCircle, ClipboardList, Building2, CreditCard, Clock, UserPlus, BarChart2, Hourglass, UserRoundPlus } from 'lucide-react'
 
 function Skeleton({ w, h, radius = 4 }: { w?: string | number; h?: number; radius?: number }) {
@@ -497,11 +498,14 @@ function VenueDashboard() {
 // ─── Page router ──────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { user, profile, loading } = useAuth()
+  const { isBlocked } = useRequireSubscription()
   const router = useRouter()
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
   }, [loading, user]) // eslint-disable-line
+
+  if (isBlocked) return null
 
   if (loading) return (
     <div style={{ display: 'flex' }}>

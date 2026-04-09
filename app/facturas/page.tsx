@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { Download, FileText, ExternalLink, RefreshCw } from 'lucide-react'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -73,6 +74,7 @@ function getPlanBadge(plan: string) {
 export default function FacturasPage() {
   const router  = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
+  const { isBlocked } = useRequireSubscription()
 
   const [invoices,      setInvoices]      = useState<Invoice[]>([])
   const [loading,       setLoading]       = useState(true)
@@ -121,6 +123,8 @@ export default function FacturasPage() {
   const filtered = filterStatus === 'all'
     ? invoices
     : invoices.filter(i => i.status === filterStatus)
+
+  if (isBlocked) return null
 
   // ── Loading skeleton
   if (loading) return (

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
 import {
   ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
   FileText, Calendar, Search, AlertCircle, Settings, Info, Trash2, RotateCcw, Flower2
@@ -143,6 +144,7 @@ function formatDateEs(ds: string): string {
 export default function CalendarioPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
+  const { isBlocked } = useRequireSubscription()
 
   const [entries,      setEntries]      = useState<Record<string, Entry>>({})
   const [leads,        setLeads]        = useState<Lead[]>([])
@@ -378,6 +380,8 @@ export default function CalendarioPage() {
       })
       .slice(0, 6)
   }, [leads, todayIso])
+
+  if (isBlocked) return null
 
   return (
     <div style={{ display: 'flex' }}>

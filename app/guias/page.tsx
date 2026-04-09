@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
 import Sidebar from '@/components/Sidebar'
 import { Search, ChevronDown, ChevronUp, Clock, User, Link2, BarChart3, Download, Building2, Upload, FileText, Palette, Mail, CreditCard, Star, ArrowUpCircle } from 'lucide-react'
 
@@ -186,12 +187,15 @@ const categories = ['Primeros pasos', 'Leads', 'Propuestas', 'Suscripción']
 export default function GuiasPage() {
   const router = useRouter()
   const { user, loading } = useAuth()
+  const { isBlocked } = useRequireSubscription()
   const [search, setSearch] = useState('')
   const [openGuide, setOpenGuide] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
   }, [loading, user]) // eslint-disable-line
+
+  if (isBlocked) return null
 
   if (loading || !user) return null
 

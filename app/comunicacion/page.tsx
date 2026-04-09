@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
 import {
   MessageCircle, Mail, FileText, Plus, Trash2, Send, X,
   Copy, Check, Upload, Eye, Sparkles, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
@@ -555,6 +556,7 @@ const DEFAULT_PROPOSAL_TPL: Omit<ProposalTemplate, 'id'> = {
 export default function ComunicacionPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
+  const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
 
   const [activeTab, setActiveTab]         = useState<CommTab>('messages')
@@ -652,6 +654,8 @@ export default function ComunicacionPage() {
     { key: 'proposal', label: 'Web de propuesta', icon: <Eye size={15} />,           desc: 'Plantilla, secciones y contenido de la propuesta' },
     { key: 'dossier',  label: 'Dossier',          icon: <FileText size={15} />,      desc: 'PDF para enviar a parejas' },
   ]
+
+  if (isBlocked) return null
 
   if (authLoading || loading) return (
     <div style={{ display: 'flex' }}>

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Palette, Upload, Trash2, AlertCircle, Lock, Zap, Sparkles, ClipboardList, MessageCircle, Target } from 'lucide-react'
 import type { SectionsData } from '@/lib/proposal-types'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
@@ -163,6 +164,7 @@ function PropuestasPageContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
+  const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
 
   const [proposals,    setProposals]    = useState<Proposal[]>([])
@@ -526,6 +528,8 @@ function PropuestasPageContent() {
     viewed: proposals.filter(p => p.status === 'viewed').length,
     views:  proposals.reduce((a, p) => a + (p.views || 0), 0),
   }
+
+  if (isBlocked) return null
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

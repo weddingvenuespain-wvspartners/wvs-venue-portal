@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import { useTheme, type Theme } from '@/lib/theme-context'
 import {
@@ -119,6 +120,7 @@ function PerfilPageContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const { user, profile, loading: authLoading } = useAuth()
+  const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
   const { theme, setTheme } = useTheme()
 
@@ -423,6 +425,8 @@ function PerfilPageContent() {
     setMfaFactors(f => f.filter(x => x.id !== factorId))
     notify('Verificación en dos pasos desactivada')
   }
+
+  if (isBlocked) return null
 
   // ─── Skeleton ─────────────────────────────────────────────────────────────
   if (authLoading) return (

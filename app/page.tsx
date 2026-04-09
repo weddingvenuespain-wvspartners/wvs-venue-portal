@@ -1,16 +1,30 @@
 'use client'
 import { useEffect } from 'react'
 import { useAuth } from '@/lib/auth-context'
+import { usePlanFeatures } from '@/lib/use-plan-features'
+import LandingPage from '@/app/landing/page'
 
 export default function Home() {
-  const { user, loading } = useAuth()
+  const { user, profile, loading } = useAuth()
+  const { hasPlan } = usePlanFeatures()
+  const isAdmin = profile?.role === 'admin'
 
   useEffect(() => {
-    if (!loading) {
-      window.location.replace(user ? '/dashboard' : '/login')
+    if (!loading && user) {
+      if (isAdmin || hasPlan) {
+        window.location.replace('/dashboard')
+      } else {
+        window.location.replace('/pricing')
+      }
     }
-  }, [user, loading])
+  }, [user, loading, isAdmin, hasPlan])
 
+  // Not logged in: show the landing page
+  if (!loading && !user) {
+    return <LandingPage />
+  }
+
+  // Loading or logged in (redirecting)
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1A1512' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>

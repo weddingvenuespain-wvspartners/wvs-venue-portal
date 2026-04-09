@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { Eye, MousePointerClick, MessageSquare, TrendingUp } from 'lucide-react'
 
 const LEAD_STATUS_MAP = [
@@ -19,6 +20,7 @@ const LEAD_STATUS_MAP = [
 export default function EstadisticasPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
+  const { isBlocked } = useRequireSubscription()
   const [proposals,   setProposals]   = useState<any[]>([])
   const [leads,       setLeads]       = useState<any[]>([])
   const [ctaReqs,     setCtaReqs]     = useState<any[]>([])
@@ -58,6 +60,8 @@ export default function EstadisticasPage() {
   const now = new Date()
   const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const newLeadsMonth = leads.filter(l => l.created_at >= thisMonthStart).length
+
+  if (isBlocked) return null
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
