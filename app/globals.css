@@ -96,15 +96,17 @@
 .btn-sm { padding: 8px 16px; font-size: 12.5px; }
 
 /* ── Quick-action buttons (leads pipeline) ─────────────── */
-.qa { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; white-space: nowrap; transition: all 0.15s; text-decoration: none; font-family: 'Manrope', sans-serif; line-height: 1.4; min-height: 27px; box-sizing: border-box; }
-.qa-primary { background: var(--gold); color: #fff; border: none; }
-.qa-primary:hover { background: #b8894f; }
-.qa-ghost { background: transparent; color: var(--warm-gray); border: 1px solid var(--ivory); }
-.qa-ghost:hover { background: var(--ivory); color: var(--charcoal); }
-.qa-danger { background: transparent; color: var(--rose); border: 1px solid var(--stone); }
-.qa-danger:hover { background: var(--rose-light); color: var(--rose); }
-.qa-locked { cursor: not-allowed; opacity: 0.45; user-select: none; }
-.qa-locked:hover { background: transparent; color: var(--warm-gray); }
+.qa { display: inline-flex; align-items: center; gap: 5px; padding: 5px 13px; border-radius: 20px; cursor: pointer; font-size: 11px; font-weight: 600; white-space: nowrap; transition: all 0.15s; text-decoration: none; font-family: 'Manrope', sans-serif; line-height: 1.4; min-height: 28px; box-sizing: border-box; }
+.qa-primary { background: var(--gold); color: #fff; border: none; box-shadow: 0 1px 4px rgba(180,130,60,0.25); }
+.qa-primary:hover { background: #b8894f; box-shadow: 0 2px 8px rgba(180,130,60,0.3); transform: translateY(-1px); }
+.qa-ghost { background: #fff; color: var(--charcoal); border: 1px solid #e5ddd5; }
+.qa-ghost:hover { background: var(--cream); border-color: #c9b99a; color: var(--espresso); transform: translateY(-1px); }
+.qa-danger { background: #fff5f5; color: #dc2626; border: 1px solid #fca5a5; }
+.qa-danger:hover { background: #fee2e2; border-color: #f87171; transform: translateY(-1px); }
+.qa-success { background: #f0fdf4; color: #16a34a; border: 1px solid #86efac; }
+.qa-success:hover { background: #dcfce7; border-color: #4ade80; color: #15803d; transform: translateY(-1px); }
+.qa-locked { cursor: not-allowed; opacity: 0.4; user-select: none; }
+.qa-locked:hover { background: #fff; color: var(--warm-gray); transform: none; }
 
 /* ── Forms ──────────────────────────────────────────────── */
 .form-group { margin-bottom: 16px; }
@@ -223,10 +225,10 @@ table.data-table tr:hover td { background: #fafaf9; }
   --charcoal: #d4c5b0;
   --warm-gray: #9a8878;
   --stone: #6b5c50;
-  --cream: #1e1a16;
-  --ivory: #2a2520;
-  --parchment: #141210;
-  --sidebar-bg: #0d0b08;
+  --cream: #272118;
+  --ivory: #312b22;
+  --parchment: #1a1610;
+  --sidebar-bg: #100e0b;
 }
 [data-theme="dark"] body {
   background: var(--parchment);
@@ -252,14 +254,19 @@ table.data-table tr:hover td { background: #fafaf9; }
 [data-theme="dark"] .main-layout {
   background: var(--parchment);
 }
+[data-theme="dark"] .sidebar {
+  background: var(--sidebar-bg);
+}
 [data-theme="dark"] .nav-item {
-  color: var(--charcoal);
+  color: var(--stone);
 }
 [data-theme="dark"] .nav-item:hover {
-  background: var(--ivory);
+  color: #e8ddd0;
+  background: rgba(255,255,255,0.05);
 }
 [data-theme="dark"] .nav-item.active {
-  background: var(--ivory);
+  color: var(--gold);
+  background: rgba(196,151,90,0.1);
 }
 [data-theme="dark"] .btn-ghost {
   color: var(--charcoal);
@@ -271,4 +278,44 @@ table.data-table tr:hover td { background: #fafaf9; }
 [data-theme="dark"] select option {
   background: var(--cream);
   color: var(--espresso);
+}
+[data-theme="dark"] .qa-ghost {
+  background: var(--ivory);
+  color: var(--charcoal);
+  border-color: var(--stone);
+}
+[data-theme="dark"] .qa-ghost:hover {
+  background: #3d3528;
+  color: var(--espresso);
+  border-color: #7a6a58;
+}
+[data-theme="dark"] .qa-primary {
+  background: var(--gold);
+  color: #fff;
+}
+[data-theme="dark"] .qa-success {
+  background: #14301f;
+  color: #4ade80;
+  border-color: #166534;
+}
+[data-theme="dark"] .qa-success:hover {
+  background: #1a3d26;
+  border-color: #4ade80;
+}
+[data-theme="dark"] .qa-danger {
+  background: #2d1414;
+  color: #f87171;
+  border-color: #7f1d1d;
+}
+[data-theme="dark"] .qa-danger:hover {
+  background: #3d1a1a;
+  border-color: #f87171;
+}
+[data-theme="dark"] .badge {
+  background: var(--ivory);
+}
+[data-theme="dark"] .alert-warning {
+  background: #2a2010;
+  border-color: #6b4f1a;
+  color: var(--charcoal);
 }

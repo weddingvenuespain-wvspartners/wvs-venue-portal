@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Users, TrendingUp, CheckCircle, ExternalLink, AlertCircle, ClipboardList, Building2, CreditCard, Clock, UserPlus, BarChart2, Hourglass, UserRoundPlus } from 'lucide-react'
+import { Users, TrendingUp, CheckCircle, ExternalLink, AlertCircle, ClipboardList, Building2, CreditCard, Clock, UserPlus, BarChart2, Hourglass, UserRoundPlus, CalendarDays, Sparkles, PartyPopper, Bell } from 'lucide-react'
 
 function Skeleton({ w, h, radius = 4 }: { w?: string | number; h?: number; radius?: number }) {
   return (
@@ -284,8 +284,9 @@ function VenueDashboard() {
     qualified: 'badge-active', proposal: 'badge-quote', booked: 'badge-booked',
   }
   const statusLabels: Record<string, string> = {
-    new: 'Nuevo', contacted: 'Contactado',
+    new: 'Nuevo', contacted: 'En seguimiento',
     proposal_sent: 'Propuesta enviada', visit_scheduled: 'Visita agendada',
+    post_visit: 'Post-visita',
     budget_sent: 'Presupuesto enviado', won: 'Ganado', lost: 'Perdido',
     qualified: 'Cualificado', proposal: 'Propuesta', booked: 'Reservado',
   }
@@ -365,67 +366,92 @@ function VenueDashboard() {
       <Sidebar />
       <div className="main-layout">
         <div className="topbar">
-          <div className="topbar-title">Dashboard</div>
-          <Link href="/leads" className="btn btn-primary btn-sm">+ Nuevo lead</Link>
+          <div>
+            <div className="topbar-title">Dashboard</div>
+            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>{venueName !== 'Mi Venue' ? venueName : 'Bienvenido de nuevo'}</div>
+          </div>
+          <Link href="/leads?new=1" className="btn btn-primary btn-sm">
+            <UserPlus size={13} /> Nuevo lead
+          </Link>
         </div>
         <div className="page-content">
           {newLeads > 0 && leadsLoaded && (
             <div className="alert alert-warning">
-              <AlertCircle size={15} style={{ flexShrink: 0 }} />
+              <Bell size={15} style={{ flexShrink: 0 }} />
               <span><strong>{newLeads} {newLeads === 1 ? 'lead sin responder' : 'leads sin responder'}.</strong> <Link href="/leads" style={{ textDecoration: 'underline' }}>Ver ahora →</Link></span>
             </div>
           )}
 
-          <div className="stats-grid">
-            <div className="stat-card accent">
-              <div className="stat-label">Leads este mes</div>
-              <div className="stat-value">{leadsLoaded ? leadsMonthCount : <Skeleton w={40} h={28} radius={4} />}</div>
-              <div className="stat-sub">Desde tu ficha y canales</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">En seguimiento</div>
-              <div className="stat-value">{leadsLoaded ? activeLeads : <Skeleton w={30} h={28} radius={4} />}</div>
-              <div className="stat-sub">Leads activos</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Sin responder</div>
-              <div className="stat-value" style={{ color: newLeads > 0 ? 'var(--gold)' : undefined }}>
-                {leadsLoaded ? newLeads : <Skeleton w={30} h={28} radius={4} />}
+          {/* KPI cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+            {[
+              {
+                label: 'Leads este mes', icon: <Sparkles size={16} />,
+                value: leadsLoaded ? leadsMonthCount : null,
+                sub: 'Desde tu ficha y canales',
+                accent: 'var(--espresso)', bg: '#fff',
+                border: 'var(--ivory)', stripe: 'var(--gold)',
+              },
+              {
+                label: 'En seguimiento', icon: <Users size={16} />,
+                value: leadsLoaded ? activeLeads : null,
+                sub: 'Leads activos en pipeline',
+                accent: 'var(--espresso)', bg: '#fff',
+                border: 'var(--ivory)', stripe: '#7c3aed',
+              },
+              {
+                label: 'Sin responder', icon: <Bell size={16} />,
+                value: leadsLoaded ? newLeads : null,
+                sub: newLeads > 0 ? 'Requieren atención' : 'Al día ✓',
+                accent: newLeads > 0 ? '#dc2626' : 'var(--espresso)',
+                bg: newLeads > 0 ? '#fff8f8' : '#fff',
+                border: newLeads > 0 ? '#fca5a5' : 'var(--ivory)',
+                stripe: newLeads > 0 ? '#dc2626' : '#16a34a',
+              },
+              {
+                label: 'Bodas confirmadas', icon: <PartyPopper size={16} />,
+                value: leadsLoaded ? bookedLeads : null,
+                sub: 'Reservas cerradas',
+                accent: 'var(--espresso)', bg: '#fff',
+                border: 'var(--ivory)', stripe: '#be185d',
+              },
+            ].map((k: any, i) => (
+              <div key={i} style={{ background: k.bg, border: `1px solid ${k.border}`, borderRadius: 14, padding: '18px 20px', position: 'relative', overflow: 'hidden', borderTop: `3px solid ${k.stripe}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{k.label}</div>
+                  <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: k.stripe }}>
+                    {k.icon}
+                  </div>
+                </div>
+                <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 34, fontWeight: 700, color: k.accent, lineHeight: 1, marginBottom: 6 }}>
+                  {k.value !== null ? k.value : <Skeleton w={40} h={28} radius={4} />}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{k.sub}</div>
               </div>
-              <div className={`stat-sub ${newLeads > 0 ? 'warn' : ''}`}>{leadsLoaded ? (newLeads > 0 ? 'Requieren atención' : 'Al día ✓') : ''}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Confirmadas</div>
-              <div className="stat-value">{leadsLoaded ? bookedLeads : <Skeleton w={30} h={28} radius={4} />}</div>
-              <div className="stat-sub">Bodas reservadas</div>
-            </div>
+            ))}
           </div>
 
-          <div className="card" style={{ marginBottom: 16, marginTop: 16 }}>
-            <div className="card-body" style={{ padding: '14px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                {[
-                  { href: '/leads',      icon: <Users size={15} />,       label: 'Añadir lead',  sub: 'Registro manual' },
-                  { href: '/calendario', icon: <CheckCircle size={15} />, label: 'Calendario',   sub: 'Visitas y bodas' },
-                  { href: '/ficha',      icon: <TrendingUp size={15} />,  label: 'Editar ficha', sub: 'Info, fotos, precios' },
-                  ...(venue ? [{ href: venue.link, icon: <ExternalLink size={15} />, label: 'Ficha pública', sub: 'weddingvenuesspain.com', external: true }] : []),
-                ].map((item, i, arr) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                    <Link href={item.href} target={(item as any).external ? '_blank' : undefined}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, padding: '4px 0', textDecoration: 'none' }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 6, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>
-                        {item.icon}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--charcoal)' }}>{item.label}</div>
-                        <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{item.sub}</div>
-                      </div>
-                    </Link>
-                    {i < arr.length - 1 && <div style={{ width: 1, height: 36, background: 'var(--ivory)', margin: '0 16px', flexShrink: 0 }} />}
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* Quick actions */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+            {[
+              { href: '/leads?new=1', icon: <UserPlus size={18} />,    label: 'Nuevo lead',   sub: 'Añadir manualmente',       color: 'var(--gold)',  bg: '#fef9ec', border: '#f0d98a' },
+              { href: '/calendario',  icon: <CalendarDays size={18} />, label: 'Calendario',   sub: 'Ver disponibilidad',        color: '#3b82f6',     bg: '#eff6ff',  border: '#bfdbfe' },
+              { href: '/leads',       icon: <Users size={18} />,        label: 'Leads',        sub: 'Gestionar pipeline',        color: '#7c3aed',     bg: '#f5f3ff',  border: '#ddd6fe' },
+              { href: '/ficha',       icon: <TrendingUp size={18} />,   label: 'Editar ficha', sub: 'Info, fotos y precios',     color: '#be185d',     bg: '#fdf2f8',  border: '#fbcfe8' },
+            ].map((item, i) => (
+              <Link key={i} href={item.href}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: item.bg, border: `1px solid ${item.border}`, borderRadius: 12, textDecoration: 'none', transition: 'transform 0.1s' }}
+                onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
+                onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  {item.icon}
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>{item.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>{item.sub}</div>
+                </div>
+              </Link>
+            ))}
           </div>
 
           <div className="two-col" style={{ marginBottom: 16 }}>

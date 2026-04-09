@@ -424,12 +424,11 @@ export default function CalendarioPage() {
 
         <div className="page-content">
           {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 20 }}>
             {[
               { value: lastDay - countByStatus('negociacion') - countByStatus('reservado') - countByStatus('bloqueado'), label: 'Fechas libres', color: 'var(--espresso)' },
               { value: countByStatus('negociacion'), label: 'En negociación', color: 'var(--gold)' },
               { value: countByStatus('reservado'), label: 'Reservados', color: '#5c4033' },
-              { value: null, label: isHighSeason ? 'Alta temporada' : 'Temporada baja', color: 'var(--warm-gray)', text: isHighSeason ? 'May – Oct' : 'Nov – Abr' },
             ].map((s, i) => (
               <div key={i} style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, padding: '20px 22px' }}>
                 <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 36, fontWeight: 500, color: s.color, lineHeight: 1, marginBottom: 8 }}>

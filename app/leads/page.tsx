@@ -12,7 +12,7 @@ import {
   ExternalLink, Edit2, Trash2, Clock, Filter, FileText, Download,
   AlertTriangle, PartyPopper, Snowflake, Sparkles, Eye, Landmark, XCircle,
   Sprout, Sun, Leaf, Zap, LockKeyhole, OctagonAlert, Flower2,
-  List, LayoutGrid,
+  List, LayoutGrid, Receipt, ChevronDown,
 } from 'lucide-react'
 
 // ── Types & config ─────────────────────────────────────────────────────────────
@@ -236,11 +236,20 @@ export default function LeadsPage() {
   const [cancelWeddingLead,   setCancelWeddingLead]   = useState<any | null>(null)
   const [cancelWeddingReason, setCancelWeddingReason] = useState('')
   const [deleteConfirmId,     setDeleteConfirmId]     = useState<string | null>(null)
+  const [clearDatesConfirm,   setClearDatesConfirm]   = useState<any | null>(null)
 
   useEffect(() => {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
     load()
+    // Open new lead modal if navigated from dashboard with ?new=1
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('new') === '1') {
+        setForm(emptyForm); setEditLead(null); setShowForm(true)
+        window.history.replaceState({}, '', '/leads')
+      }
+    }
   }, [user, authLoading])
 
   const load = async () => {
@@ -341,6 +350,8 @@ export default function LeadsPage() {
       setCancelWeddingLead(lead); setCancelWeddingReason('')
     } else if (lead && lead.status === 'visit_scheduled' && lead.visit_date && newStatus !== 'visit_scheduled') {
       setCancelVisitConfirm({ lead, targetStatus: newStatus, requiresDateModal: false })
+    } else if (newStatus === 'new' && lead && (lead.wedding_date || lead.wedding_date_ranges?.length)) {
+      setClearDatesConfirm(lead)
     } else {
       moveToStatus(id, newStatus)
     }
@@ -897,6 +908,45 @@ export default function LeadsPage() {
           </div>
         )
       })()}
+
+      {clearDatesConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 16 }}
+          onClick={() => setClearDatesConfirm(null)}>
+          <div style={{ background: '#fff', borderRadius: 14, maxWidth: 400, width: '100%', padding: '24px 24px 20px', boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef9ec', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Calendar size={18} style={{ color: 'var(--gold)' }} />
+              </div>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
+                Mover a Nuevos
+              </div>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.6, marginBottom: 20 }}>
+              <strong>{clearDatesConfirm.name}</strong> tiene fechas de boda seleccionadas. ¿Quieres deseleccionarlas al mover el lead a Nuevos?
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={async () => {
+                const supabase = createClient()
+                await supabase.from('leads').update({ status: 'new', wedding_date: null, wedding_date_to: null, date_flexibility: 'flexible', wedding_date_ranges: null }).eq('id', clearDatesConfirm.id)
+                setLeads(prev => prev.map(l => l.id === clearDatesConfirm.id ? { ...l, status: 'new', wedding_date: null, wedding_date_to: null, date_flexibility: 'flexible', wedding_date_ranges: null } : l))
+                setActiveTab('new')
+                setClearDatesConfirm(null)
+              }} style={{ padding: '9px 14px', borderRadius: 8, border: 'none', background: 'var(--gold)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                Sí, deseleccionar fechas
+              </button>
+              <button onClick={() => { moveToStatus(clearDatesConfirm.id, 'new'); setClearDatesConfirm(null) }}
+                style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--charcoal)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                No, mantener fechas
+              </button>
+              <button onClick={() => setClearDatesConfirm(null)}
+                style={{ padding: '9px 14px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--warm-gray)', fontSize: 12, cursor: 'pointer' }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1312,13 +1362,13 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm 
 }) {
 
   return (
-    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'stretch' }}>
+    <div className="card" style={{ padding: 0, overflow: 'visible' }}>
+      <div style={{ display: 'flex', alignItems: 'stretch', borderRadius: 10 }}>
         {/* Urgency stripe */}
         {(() => {
           const days = lead.date_flexibility === 'exact' || !lead.date_flexibility ? (lead.wedding_date ? Math.ceil((new Date(lead.wedding_date + 'T12:00:00').getTime() - Date.now()) / 86400000) : null) : null
           const color = days !== null && days > 0 ? urgencyColor(days) : 'var(--ivory)'
-          return <div style={{ width: 4, background: color, flexShrink: 0 }} />
+          return <div style={{ width: 4, background: color, flexShrink: 0, borderRadius: '10px 0 0 10px' }} />
         })()}
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1414,11 +1464,85 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm 
           </div>
 
           {/* Actions row */}
-          <div style={{ padding: '0 14px 10px', borderTop: '1px solid var(--ivory)', paddingTop: 8, display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
+          <div style={{ padding: '7px 14px 10px', background: 'var(--cream)', borderTop: '1px solid var(--ivory)', display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
             <QuickActions lead={lead} tab={tab} onMove={onMove} onEdit={onEdit} onDelete={onDelete} onDateConfirm={onDateConfirm} />
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── En Seguimiento Dropdown Button ────────────────────────────────────────────
+function EnSeguimientoBtn({ lead, canProposal, onDateConfirm }: {
+  lead: any; canProposal: boolean; onDateConfirm: (lead: any, s: DbStatus) => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      {open && <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setOpen(false)} />}
+      <button className="qa qa-ghost" onClick={() => setOpen(o => !o)} style={{ gap: 4 }}>
+        <ChevronRight size={11} /> En seguimiento <ChevronDown size={9} style={{ opacity: 0.6 }} />
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50, background: '#fff', border: '1px solid #e5ddd5', borderRadius: 10, boxShadow: '0 6px 20px rgba(0,0,0,0.1)', padding: 4, minWidth: 200 }}>
+          <button
+            className="qa qa-ghost"
+            style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
+            onClick={() => { onDateConfirm(lead, 'contacted'); setOpen(false) }}>
+            <ChevronRight size={11} /> Mover a en seguimiento
+          </button>
+          {canProposal
+            ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} className="qa qa-ghost"
+                style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
+                onClick={() => setOpen(false)}>
+                <Zap size={11} /> PDF digital
+              </a>
+            : <span className="qa qa-ghost qa-locked"
+                style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
+                title="Disponible en plan Premium — actualiza para crear propuestas digitales">
+                <Zap size={11} /> PDF digital <LockKeyhole size={10} />
+              </span>
+          }
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Presupuesto Dropdown Button ────────────────────────────────────────────────
+function PresupuestoBtn({ lead, canProposal, onMove }: {
+  lead: any; canProposal: boolean; onMove: (id: string, s: DbStatus) => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      {open && <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setOpen(false)} />}
+      <button className="qa qa-ghost" onClick={() => setOpen(o => !o)} style={{ gap: 4 }}>
+        <Receipt size={11} /> Presupuesto <ChevronDown size={9} style={{ opacity: 0.6 }} />
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50, background: '#fff', border: '1px solid #e5ddd5', borderRadius: 10, boxShadow: '0 6px 20px rgba(0,0,0,0.1)', padding: 4, minWidth: 200 }}>
+          <button
+            className="qa qa-ghost"
+            style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
+            onClick={() => { onMove(lead.id, 'budget_sent'); setOpen(false) }}>
+            <ChevronRight size={11} /> Mover a presupuesto
+          </button>
+          {canProposal
+            ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} className="qa qa-ghost"
+                style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
+                onClick={() => setOpen(false)}>
+                <Zap size={11} /> Presupuesto digital
+              </a>
+            : <span className="qa qa-ghost qa-locked"
+                style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
+                title="Disponible en plan Premium — actualiza para crear presupuestos digitales">
+                <Zap size={11} /> Presupuesto digital <LockKeyhole size={10} />
+              </span>
+          }
+        </div>
+      )}
     </div>
   )
 }
@@ -1442,50 +1566,41 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
   return (
     <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
       {tab === 'new' && (<>
-        {canProposal
-          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} className="qa qa-primary"><FileText size={11} /> Crear propuesta</a>
-          : <LockedProposalBtn label="Crear propuesta" />}
-        <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'contacted')}><ChevronRight size={11} /> En seguimiento</button>
+        <EnSeguimientoBtn lead={lead} canProposal={canProposal} onDateConfirm={onDateConfirm} />
         <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
-        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'budget_sent')}><FileText size={11} /> Presupuesto</button>
+        <PresupuestoBtn lead={lead} canProposal={canProposal} onMove={onMove} />
         <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
         <button className="qa qa-danger" onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
       </>)}
 
       {tab === 'in_progress' && (<>
-        {canProposal
-          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} className="qa qa-ghost"><FileText size={11} /> Propuesta digital</a>
-          : <LockedProposalBtn label="Propuesta digital" />}
-        <button className="qa qa-primary" onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
-        <button className="qa qa-primary" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
-        {lead.status !== 'budget_sent' && <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'budget_sent')}>Presupuesto enviado</button>}
+        <button className="qa qa-success" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
+        <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
+        <PresupuestoBtn lead={lead} canProposal={canProposal} onMove={onMove} />
         <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'new')}><RotateCcw size={11} /> Nuevo</button>
         <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
         <button className="qa qa-danger" onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
       </>)}
 
       {tab === 'visit' && (<>
-        <button className="qa qa-primary" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
+        <button className="qa qa-success" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
         <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'post_visit')}><CheckCircle size={11} /> Visita realizada</button>
-        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'budget_sent')}>Presupuesto</button>
+        <PresupuestoBtn lead={lead} canProposal={canProposal} onMove={onMove} />
         <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
         <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
         <button className="qa qa-danger" onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
       </>)}
 
       {tab === 'post_visit' && (<>
-        <button className="qa qa-primary" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
-        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'budget_sent')}><FileText size={11} /> Mover a presupuesto</button>
-        {canProposal
-          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} className="qa qa-ghost"><FileText size={11} /> Presupuesto digital</a>
-          : <LockedProposalBtn label="Presupuesto digital" />}
+        <button className="qa qa-success" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
+        <PresupuestoBtn lead={lead} canProposal={canProposal} onMove={onMove} />
         <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
         <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
         <button className="qa qa-danger" onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
       </>)}
 
       {tab === 'budget' && (<>
-        <button className="qa qa-primary" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
+        <button className="qa qa-success" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
         <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'post_visit')}><RotateCcw size={11} /> Post-visita</button>
         <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
         <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
