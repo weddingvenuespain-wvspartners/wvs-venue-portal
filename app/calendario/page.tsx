@@ -432,7 +432,7 @@ export default function CalendarioPage() {
             ].map((s, i) => (
               <div key={i} style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, padding: '20px 22px' }}>
                 <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 36, fontWeight: 500, color: s.color, lineHeight: 1, marginBottom: 8 }}>
-                  {s.value !== null ? String(s.value).padStart(2, '0') : s.text}
+                  {String(s.value).padStart(2, '0')}
                 </div>
                 <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>
                   {s.label}
