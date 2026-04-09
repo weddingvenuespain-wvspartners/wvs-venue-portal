@@ -11,6 +11,7 @@ import {
   ExternalLink, Edit2, Trash2, Clock, Filter, FileText, Download,
   AlertTriangle, PartyPopper, Snowflake, Sparkles, Eye, Landmark, XCircle,
   Sprout, Sun, Leaf, Zap, LockKeyhole, OctagonAlert, Flower2,
+  List, LayoutGrid,
 } from 'lucide-react'
 
 // ── Types & config ─────────────────────────────────────────────────────────────
@@ -104,7 +105,7 @@ function formatLeadDate(lead: any): { line1: string; line2?: React.ReactNode; co
     default: // exact
       if (!lead.wedding_date) return { line1: 'Sin fecha', color: 'var(--stone)' }
       const days = Math.ceil((new Date(lead.wedding_date + 'T12:00:00').getTime() - Date.now()) / 86400000)
-      const color = days < 0 ? 'var(--warm-gray)' : days < 60 ? '#dc2626' : days < 120 ? '#d97706' : '#16a34a'
+      const color = days < 0 ? 'var(--warm-gray)' : days < 60 ? 'var(--rose)' : days < 120 ? 'var(--gold)' : 'var(--sage)'
       return { line1: fmtShort(lead.wedding_date), line2: days > 0 ? <>{days < 60 ? <><Zap size={11} style={{ display: 'inline', verticalAlign: 'middle' }} />{' '}</> : ''}{days} días</> : undefined, color }
   }
 }
@@ -143,9 +144,9 @@ function isLeadDatePast(lead: any): boolean {
 
 function urgencyColor(days: number | null) {
   if (days === null || days < 0) return 'var(--warm-gray)'
-  if (days < 60) return '#dc2626'
-  if (days < 120) return '#d97706'
-  return '#16a34a'
+  if (days < 60) return 'var(--rose)'
+  if (days < 120) return 'var(--gold)'
+  return 'var(--sage)'
 }
 
 function formatDateLabel(ds: string): string {
@@ -183,7 +184,7 @@ const CAL_AVAIL_CFG: Record<string, { bg: string; border: string; dot: string; l
   libre:       { bg: '#fff',    border: '#e5e7eb', dot: '#d1fae5', label: 'Libre' },
   negociacion: { bg: '#fef9ec', border: '#fde68a', dot: '#f59e0b', label: 'En negociación' },
   reservado:   { bg: '#fdf2f8', border: '#fbcfe8', dot: '#ec4899', label: 'Reservado' },
-  bloqueado:   { bg: '#f3f4f6', border: '#d1d5db', dot: '#9ca3af', label: 'Bloqueado' },
+  bloqueado:   { bg: '#f3f4f6', border: 'var(--stone)', dot: '#9ca3af', label: 'Bloqueado' },
 }
 
 const emptyForm = {
@@ -213,10 +214,10 @@ export default function LeadsPage() {
   const [search,    setSearch]    = useState('')
 
   // Filters
-  const [hidePast,    setHidePast]    = useState(true)
+  const [hidePast,    setHidePast]    = useState(false)
   const [filterSrc,   setFilterSrc]   = useState('all')
   const [filterBudget,setFilterBudget]= useState('all')
-  const [showFilters, setShowFilters] = useState(false)
+  const [viewMode,    setViewMode]    = useState<'list' | 'kanban'>('list')
 
   // Modals
   const [showForm,   setShowForm]   = useState(false)
@@ -232,6 +233,7 @@ export default function LeadsPage() {
   } | null>(null)
   const [cancelWeddingLead,   setCancelWeddingLead]   = useState<any | null>(null)
   const [cancelWeddingReason, setCancelWeddingReason] = useState('')
+  const [deleteConfirmId,     setDeleteConfirmId]     = useState<string | null>(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -459,13 +461,38 @@ export default function LeadsPage() {
     setDateConfirmStatus(null)
   }
 
-  const deleteLead = async (id: string) => {
-    if (!confirm('¿Eliminar este lead?')) return
+  const requestDeleteLead = (id: string) => { setDeleteConfirmId(id) }
+
+  const confirmDeleteLead = async () => {
+    if (!deleteConfirmId) return
+    const lead = leads.find(l => l.id === deleteConfirmId)
     const supabase = createClient()
-    await supabase.from('leads').delete().eq('id', id)
-    setLeads(prev => prev.filter(l => l.id !== id))
-    if (detailLead?.id === id) setDetailLead(null)
-    showToast('Lead eliminado')
+
+    if (lead?.status === 'won') {
+      // Soft delete: move to lost + free calendar
+      await supabase.from('leads').update({ status: 'lost' }).eq('id', deleteConfirmId)
+      const { data: reservedEntry } = await supabase
+        .from('calendar_entries')
+        .select('id')
+        .eq('user_id', user!.id)
+        .eq('lead_id', deleteConfirmId)
+        .eq('status', 'reservado')
+        .maybeSingle()
+      if (reservedEntry?.id) {
+        await supabase.from('calendar_entries').update({ status: 'libre', lead_id: null, note: null }).eq('id', reservedEntry.id)
+      }
+      setLeads(prev => prev.map(l => l.id === deleteConfirmId ? { ...l, status: 'lost' } : l))
+      setActiveTab('lost')
+      showToast('Lead movido a Perdidos')
+    } else {
+      // Hard delete (only from "lost" tab)
+      await supabase.from('leads').delete().eq('id', deleteConfirmId)
+      setLeads(prev => prev.filter(l => l.id !== deleteConfirmId))
+      showToast('Lead eliminado definitivamente')
+    }
+
+    if (detailLead?.id === deleteConfirmId) setDetailLead(null)
+    setDeleteConfirmId(null)
   }
 
   const openCreate = () => { setForm(emptyForm); setEditLead(null); setShowForm(true) }
@@ -518,11 +545,7 @@ export default function LeadsPage() {
     setShowForm(false); setEditLead(null); setSaving(false)
   }
 
-  const activeFiltersCount = [
-    hidePast ? 0 : 1,
-    filterSrc !== 'all' ? 1 : 0,
-    filterBudget !== 'all' ? 1 : 0,
-  ].reduce((a,b) => a+b, 0) + (hidePast ? 1 : 0)  // hidePast ON counts as 1 filter active
+
 
   if (loading) return (
     <div style={{ display: 'flex' }}>
@@ -542,14 +565,6 @@ export default function LeadsPage() {
         <div className="topbar">
           <div className="topbar-title">Leads</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            { (
-              <div style={{ position: 'relative' }}>
-                <Search size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
-                <input className="form-input" style={{ paddingLeft: 28, fontSize: 12, width: 220 }}
-                  placeholder="Buscar por nombre o email…"
-                  value={search} onChange={e => setSearch(e.target.value)} />
-              </div>
-            )}
             {features.leads_export && (
               <button className="btn btn-ghost btn-sm" onClick={exportCSV} title="Exportar leads visibles a CSV">
                 <Download size={13} /> Exportar CSV
@@ -563,14 +578,73 @@ export default function LeadsPage() {
 
         <div className="page-content">
 
+          {/* Toolbar: search + filters + view toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: 280 }}>
+              <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
+              <input className="form-input" style={{ paddingLeft: 32 }}
+                placeholder="Buscar por nombre o email…"
+                value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
+              <select className="form-input" style={{ width: 'auto' }}
+                value={filterSrc} onChange={e => setFilterSrc(e.target.value)}>
+                <option value="all">Fuente: Todas</option>
+                {Object.entries(SOURCE_LABEL).map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+              <select className="form-input" style={{ width: 'auto' }}
+                value={filterBudget} onChange={e => setFilterBudget(e.target.value)}>
+                <option value="all">Presupuesto: Todos</option>
+                {Object.entries(BUDGET_LABEL).filter(([v]) => v !== 'sin_definir').map(([v,l]) =>
+                  <option key={v} value={v}>{l}</option>)}
+              </select>
+              {features.leads_date_filter && (
+                <button onClick={() => setHidePast(p => !p)}
+                  style={{ padding: '8px 12px', border: '1px solid var(--ivory)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap',
+                    background: hidePast ? 'var(--gold)' : '#fff',
+                    color: hidePast ? '#fff' : 'var(--warm-gray)',
+                    transition: 'all 0.15s' }}>
+                  <Clock size={13} /> Ocultar pasadas
+                </button>
+              )}
+              {(filterSrc !== 'all' || filterBudget !== 'all') && (
+                <button onClick={() => { setFilterSrc('all'); setFilterBudget('all') }}
+                  style={{ padding: '8px 10px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--warm-gray)', fontSize: 12, textDecoration: 'underline', whiteSpace: 'nowrap' }}>
+                  Limpiar
+                </button>
+              )}
+            </div>
+
+            {!features.leads_new_only && (
+              <div style={{ display: 'flex', border: '1px solid var(--ivory)', borderRadius: 8, overflow: 'hidden', marginLeft: 'auto' }}>
+                <button onClick={() => setViewMode('list')} title="Vista lista"
+                  style={{ padding: '8px 12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 500,
+                    background: viewMode === 'list' ? 'var(--gold)' : 'transparent',
+                    color: viewMode === 'list' ? '#fff' : 'var(--warm-gray)',
+                    transition: 'all 0.15s' }}>
+                  <List size={14} /> Lista
+                </button>
+                <button onClick={() => setViewMode('kanban')} title="Vista kanban"
+                  style={{ padding: '8px 12px', border: 'none', borderLeft: '1px solid var(--ivory)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 500,
+                    background: viewMode === 'kanban' ? 'var(--gold)' : 'transparent',
+                    color: viewMode === 'kanban' ? '#fff' : 'var(--warm-gray)',
+                    transition: 'all 0.15s' }}>
+                  <LayoutGrid size={14} /> Kanban
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Plan restriction notice */}
           {features.leads_new_only && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, marginBottom: 16, fontSize: 12, color: '#1e40af' }}>
-              <AlertTriangle size={12} style={{ color: 'var(--warm-gray)' }} />
-              <span>Tu plan <strong>{features.planName}</strong> muestra únicamente los leads nuevos recibidos. <a href="/perfil" style={{ color: '#1e40af', fontWeight: 600 }}>Actualiza tu plan</a> para acceder a todo el CRM de leads.</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: 'var(--cream)', border: '1px solid var(--gold-light)', borderRadius: 8, marginBottom: 16, fontSize: 12, color: 'var(--charcoal)' }}>
+              <AlertTriangle size={12} style={{ color: 'var(--gold)' }} />
+              <span>Tu plan <strong>{features.planName}</strong> muestra únicamente los leads nuevos recibidos. <a href="/perfil" style={{ color: 'var(--gold)', fontWeight: 600 }}>Actualiza tu plan</a> para acceder a todo el CRM de leads.</span>
             </div>
           )}
 
+          {viewMode === 'list' && (<>
           {/* Tabs + filters row */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', borderBottom: '1px solid var(--ivory)', marginBottom: 0 }}>
             <div style={{ display: 'flex', gap: 2 }}>
@@ -601,79 +675,10 @@ export default function LeadsPage() {
               })}
             </div>
 
-            {/* Filter toggle button (only on non-calendar tabs) */}
-            { (
-              <button onClick={() => setShowFilters(f => !f)} style={{
-                marginBottom: 4, fontSize: 12, padding: '5px 12px', borderRadius: 6,
-                cursor: 'pointer', border: '1px solid var(--ivory)', background: showFilters ? 'var(--cream)' : 'transparent',
-                color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 5,
-              }}>
-                <Filter size={12} />
-                Filtros
-                {activeFiltersCount > 0 && (
-                  <span style={{ background: 'var(--gold)', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 8, padding: '1px 5px' }}>
-                    {activeFiltersCount}
-                  </span>
-                )}
-              </button>
-            )}
           </div>
 
-          {/* Filters panel */}
-          {showFilters &&  (
-            <div style={{ background: 'var(--cream)', border: '1px solid var(--ivory)', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-              {/* Hide past — only visible if plan allows date filtering */}
-              {features.leads_date_filter && (
-                <>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
-                    <div onClick={() => setHidePast(p => !p)} style={{
-                      width: 36, height: 20, borderRadius: 10, background: hidePast ? 'var(--gold)' : '#d1d5db',
-                      position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
-                    }}>
-                      <div style={{
-                        position: 'absolute', top: 2, left: hidePast ? 18 : 2, width: 16, height: 16,
-                        borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                      }} />
-                    </div>
-                    <span style={{ color: 'var(--charcoal)', fontWeight: 500 }}>Ocultar fechas pasadas</span>
-                  </label>
-                  <div style={{ width: 1, height: 24, background: 'var(--ivory)' }} />
-                </>
-              )}
-
-              {/* Source filter */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontWeight: 500 }}>Fuente:</span>
-                <select className="form-input" style={{ width: 'auto' }}
-                  value={filterSrc} onChange={e => setFilterSrc(e.target.value)}>
-                  <option value="all">Todas</option>
-                  {Object.entries(SOURCE_LABEL).map(([v,l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-              </div>
-
-              {/* Budget filter */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontWeight: 500 }}>Presupuesto:</span>
-                <select className="form-input" style={{ width: 'auto' }}
-                  value={filterBudget} onChange={e => setFilterBudget(e.target.value)}>
-                  <option value="all">Todos</option>
-                  {Object.entries(BUDGET_LABEL).filter(([v]) => v !== 'sin_definir').map(([v,l]) =>
-                    <option key={v} value={v}>{l}</option>)}
-                </select>
-              </div>
-
-              {/* Reset */}
-              {(filterSrc !== 'all' || filterBudget !== 'all') && (
-                <button onClick={() => { setFilterSrc('all'); setFilterBudget('all') }}
-                  style={{ fontSize: 11, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                  Limpiar filtros
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Content */}
-          <div style={{ marginTop: showFilters ? 0 : 16 }}>
+          {/* List content */}
+          <div style={{ marginTop: 8 }}>
             {visibleLeads.length === 0 ? (
               <EmptyState tab={activeTab} search={search} hidePast={hidePast}
                 onClear={() => { setSearch(''); setHidePast(false) }} onNew={openCreate} />
@@ -683,7 +688,7 @@ export default function LeadsPage() {
                   const today = todayIso()
                   const upcoming = visibleLeads.filter(l => !l.visit_date || l.visit_date >= today)
                   const past     = visibleLeads.filter(l => l.visit_date && l.visit_date < today)
-                  const rowProps = { tab: activeTab as Tab, onMove: moveToStatusWithVisitCheck, onEdit: openEdit, onDelete: deleteLead, onDetail: setDetailLead, onDateConfirm: triggerStatusChangeWithVisitCheck }
+                  const rowProps = { tab: activeTab as Tab, onMove: moveToStatusWithVisitCheck, onEdit: openEdit, onDelete: requestDeleteLead, onDetail: setDetailLead, onDateConfirm: triggerStatusChangeWithVisitCheck }
                   return (
                     <>
                       {upcoming.map(lead => <LeadRow key={lead.id} lead={lead} {...rowProps} />)}
@@ -704,12 +709,31 @@ export default function LeadsPage() {
                 })() : visibleLeads.map(lead => (
                   <LeadRow key={lead.id} lead={lead} tab={activeTab}
                     onMove={moveToStatusWithVisitCheck} onEdit={openEdit}
-                    onDelete={deleteLead} onDetail={setDetailLead}
+                    onDelete={requestDeleteLead} onDetail={setDetailLead}
                     onDateConfirm={triggerStatusChangeWithVisitCheck} />
                 ))}
               </div>
             )}
           </div>
+          </>)}
+
+          {viewMode === 'kanban' && (
+            <KanbanBoard
+              leads={leads.filter(l => {
+                if (search && !l.name?.toLowerCase().includes(search.toLowerCase()) &&
+                    !l.email?.toLowerCase().includes(search.toLowerCase())) return false
+                if (filterSrc !== 'all' && l.source !== filterSrc) return false
+                if (filterBudget !== 'all' && l.budget !== filterBudget) return false
+                if (features.leads_date_filter && hidePast && isLeadDatePast(l)) return false
+                return true
+              })}
+              onMove={moveToStatusWithVisitCheck}
+              onEdit={openEdit}
+              onDelete={requestDeleteLead}
+              onDetail={setDetailLead}
+              onDateConfirm={triggerStatusChangeWithVisitCheck}
+            />
+          )}
         </div>
       </div>
 
@@ -727,7 +751,7 @@ export default function LeadsPage() {
         <DetailDrawer lead={detailLead}
           tab={(Object.entries(TAB_STATUSES) as [Tab, DbStatus[]][]).find(([,ss]) => ss.includes(detailLead.status))?.[0] || 'new'}
           onClose={() => setDetailLead(null)}
-          onEdit={openEdit} onDelete={deleteLead} onMove={moveToStatusWithVisitCheck}
+          onEdit={openEdit} onDelete={requestDeleteLead} onMove={moveToStatusWithVisitCheck}
           onDateConfirm={triggerStatusChangeWithVisitCheck} />
       )}
 
@@ -755,8 +779,8 @@ export default function LeadsPage() {
           <div style={{ background: '#fff', borderRadius: 14, maxWidth: 420, width: '100%', padding: '24px 24px 20px', boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <X size={18} style={{ color: '#dc2626' }} />
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--rose-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <X size={18} style={{ color: 'var(--rose)' }} />
               </div>
               <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
                 Cancelar boda
@@ -785,7 +809,7 @@ export default function LeadsPage() {
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={handleCancelWedding}
-                style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: 'none', background: 'var(--rose)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                 Confirmar cancelación
               </button>
               <button
@@ -805,8 +829,8 @@ export default function LeadsPage() {
           <div style={{ background: '#fff', borderRadius: 14, maxWidth: 400, width: '100%', padding: '24px 24px 20px', boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Calendar size={18} style={{ color: '#d97706' }} />
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--gold-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Calendar size={18} style={{ color: 'var(--gold)' }} />
               </div>
               <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
                 ¿Cancelar la visita?
@@ -820,7 +844,7 @@ export default function LeadsPage() {
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => confirmVisitCancel(true)}
-                style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: 'none', background: 'var(--rose)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                 Sí, cancelar visita
               </button>
               <button
@@ -832,6 +856,43 @@ export default function LeadsPage() {
           </div>
         </div>
       )}
+
+      {/* Delete confirmation modal */}
+      {deleteConfirmId && (() => {
+        const leadToDelete = leads.find(l => l.id === deleteConfirmId)
+        const isSoftDelete = leadToDelete?.status === 'won'
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 16 }}
+            onClick={() => setDeleteConfirmId(null)}>
+            <div style={{ background: '#fff', borderRadius: 14, maxWidth: 400, width: '100%', padding: '24px 24px 20px', boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: isSoftDelete ? 'var(--gold-light)' : 'var(--rose-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {isSoftDelete ? <XCircle size={18} style={{ color: 'var(--gold)' }} /> : <Trash2 size={18} style={{ color: 'var(--rose)' }} />}
+                </div>
+                <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
+                  {isSoftDelete ? 'Mover a Perdidos' : 'Eliminar lead'}
+                </div>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.6, marginBottom: 20 }}>
+                {isSoftDelete
+                  ? <><strong>{leadToDelete?.name}</strong> pasará a <strong>Perdidos</strong> y la fecha reservada en el calendario quedará liberada. Podrás reactivarlo más adelante.</>
+                  : <>¿Seguro que quieres eliminar a <strong>{leadToDelete?.name || 'este lead'}</strong>? Esta acción no se puede deshacer.</>}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={confirmDeleteLead}
+                  style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: 'none', background: isSoftDelete ? 'var(--gold)' : 'var(--rose)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  {isSoftDelete ? 'Sí, mover a Perdidos' : 'Sí, eliminar'}
+                </button>
+                <button onClick={() => setDeleteConfirmId(null)}
+                  style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--charcoal)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -1017,25 +1078,25 @@ function DateConfirmModal({
                       onClick={() => !isUnavailable && toggleDate(d)}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
-                        background: isUnavailable ? '#fef2f2' : isChecked ? '#f0fdf4' : 'var(--cream)',
-                        border: `1px solid ${isUnavailable ? '#fca5a5' : isChecked ? '#86efac' : 'var(--ivory)'}`,
+                        background: isUnavailable ? 'var(--rose-light)' : isChecked ? 'var(--sage-light)' : 'var(--cream)',
+                        border: `1px solid ${isUnavailable ? 'var(--stone)' : isChecked ? 'var(--sage)' : 'var(--ivory)'}`,
                         borderRadius: 8, cursor: isUnavailable ? 'not-allowed' : 'pointer',
                       }}>
                       {/* Checkbox */}
                       <div style={{
                         width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-                        border: `2px solid ${isUnavailable ? '#fca5a5' : isChecked ? '#16a34a' : '#d1d5db'}`,
-                        background: isChecked && !isUnavailable ? '#16a34a' : isUnavailable ? '#fee2e2' : '#fff',
+                        border: `2px solid ${isUnavailable ? 'var(--stone)' : isChecked ? 'var(--sage)' : 'var(--stone)'}`,
+                        background: isChecked && !isUnavailable ? 'var(--sage)' : isUnavailable ? 'var(--rose-light)' : '#fff',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>
                         {isChecked && !isUnavailable && <span style={{ color: '#fff', fontSize: 11, lineHeight: 1, fontWeight: 700 }}>✓</span>}
-                        {isUnavailable && <span style={{ color: '#dc2626', fontSize: 9, lineHeight: 1, fontWeight: 700 }}>✕</span>}
+                        {isUnavailable && <span style={{ color: 'var(--rose)', fontSize: 9, lineHeight: 1, fontWeight: 700 }}>✕</span>}
                       </div>
                       <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: isUnavailable ? '#9ca3af' : 'var(--charcoal)', textDecoration: isUnavailable ? 'line-through' : 'none' }}>
                         {formatDateLabel(d)}
                       </span>
                       {isUnavailable ? (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: 10 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--rose)', background: 'var(--rose-light)', padding: '2px 8px', borderRadius: 10 }}>
                           {entryStatus === 'reservado' ? <><LockKeyhole size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Reservado</> : <><OctagonAlert size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Bloqueado</>}
                         </span>
                       ) : entryStatus === 'negociacion' ? (
@@ -1170,7 +1231,7 @@ function DateConfirmModal({
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} />
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--gold)' }} />
               <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Alternativa añadida</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1186,11 +1247,11 @@ function DateConfirmModal({
             {isVisitMode ? (
               selectedDates.length === 0
                 ? <span style={{ color: 'var(--warm-gray)' }}>Haz click en una fecha disponible para agendar la visita</span>
-                : <span style={{ color: '#16a34a', fontWeight: 500 }}><Calendar size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Visita: {formatDateLabel(selectedDates[0])}</span>
+                : <span style={{ color: 'var(--sage)', fontWeight: 500 }}><Calendar size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Visita: {formatDateLabel(selectedDates[0])}</span>
             ) : (
               <>
                 {selectedDates.length > 0 ? (
-                  <div style={{ color: '#16a34a', fontWeight: 500 }}>
+                  <div style={{ color: 'var(--sage)', fontWeight: 500 }}>
                     ✓ {selectedDates.length} fecha{selectedDates.length > 1 ? 's' : ''} confirmada{selectedDates.length > 1 ? 's' : ''}
                     {' · '}se marcarán como <strong>{isWonMode ? 'Reservado' : 'En negociación'}</strong> en el calendario
                   </div>
@@ -1203,7 +1264,7 @@ function DateConfirmModal({
                   </div>
                 )}
                 {extraDates.length > 0 && (
-                  <div style={{ color: '#3b82f6' }}>
+                  <div style={{ color: 'var(--gold)' }}>
                     + {extraDates.length} fecha{extraDates.length > 1 ? 's' : ''} alternativa{extraDates.length > 1 ? 's' : ''} añadida{extraDates.length > 1 ? 's' : ''}
                   </div>
                 )}
@@ -1217,7 +1278,7 @@ function DateConfirmModal({
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
           <button className="btn btn-primary" onClick={handleConfirm}
             disabled={!canConfirm}
-            style={{ background: isWonMode ? '#16a34a' : undefined, opacity: !canConfirm ? 0.5 : 1 }}>
+            style={{ background: isWonMode ? 'var(--sage)' : undefined, opacity: !canConfirm ? 0.5 : 1 }}>
             {saving ? 'Guardando...' : isVisitMode ? <><Calendar size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Confirmar visita</> : isWonMode ? <><PartyPopper size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Confirmar boda</> : '✓ Pasar a seguimiento'}
           </button>
         </div>
@@ -1268,7 +1329,7 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm 
                 {tab === 'new' && lead.created_at && (() => {
                   const ta = timeAgo(lead.created_at)
                   return (
-                    <span style={{ fontSize: 10, fontWeight: 500, color: ta.urgent ? '#dc2626' : ta.warning ? '#d97706' : 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 10, fontWeight: 500, color: ta.urgent ? 'var(--rose)' : ta.warning ? 'var(--gold)' : 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
                       {ta.text}
                     </span>
                   )
@@ -1281,7 +1342,7 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm 
                   </span>
                 )}
                 {(tab === 'in_progress' || tab === 'post_visit' || tab === 'budget') && (
-                  <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', padding: '1px 7px', borderRadius: 10, fontWeight: 500 }}>
+                  <span style={{ fontSize: 10, background: 'var(--gold-light)', color: 'var(--espresso)', padding: '1px 7px', borderRadius: 10, fontWeight: 500 }}>
                     {SUB_STATUS_LABEL[lead.status as DbStatus]}
                   </span>
                 )}
@@ -1303,17 +1364,17 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm 
                 )
               })()}
               {tab === 'visit' && lead.visit_date && (
-                <div style={{ fontSize: 11, color: '#3b82f6', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--gold)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Landmark size={11} /> {new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
                 </div>
               )}
               {tab === 'confirmed' && lead.wedding_date && (
-                <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--sage)', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <PartyPopper size={11} /> {new Date(lead.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </div>
               )}
               {tab === 'confirmed' && lead.visit_date && lead.visit_date >= todayIso() && (
-                <div style={{ fontSize: 11, color: '#10b981', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--sage)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Landmark size={11} /> Visita: {new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
                 </div>
               )}
@@ -1367,81 +1428,80 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
   onDateConfirm: (lead: any, s: DbStatus) => void
 }) {
   const { propuestas: canProposal } = usePlanFeatures()
-  const p: React.CSSProperties = { fontSize: 11, padding: '5px 11px', borderRadius: 6, cursor: 'pointer', border: 'none', fontWeight: 600, background: 'var(--gold)', color: '#fff', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }
-  const g: React.CSSProperties = { fontSize: 11, padding: '5px 9px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }
-  const d: React.CSSProperties = { fontSize: 11, padding: '5px 9px', borderRadius: 6, cursor: 'pointer', border: '1px solid #fca5a5', background: 'transparent', color: '#dc2626', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }
 
-  // Locked proposal button shown to basic users as a premium upsell hint
   const LockedProposalBtn = ({ label }: { label: string }) => (
-    <span title="Disponible en plan Premium — actualiza para crear propuestas digitales"
-      style={{ ...g, cursor: 'not-allowed', opacity: 0.45, userSelect: 'none' }}>
+    <span className="qa qa-ghost qa-locked" title="Disponible en plan Premium — actualiza para crear propuestas digitales">
       <FileText size={11} /> {label} <LockKeyhole size={11} />
     </span>
   )
 
   return (
-    <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
       {tab === 'new' && (<>
         {canProposal
-          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} style={{ ...p, textDecoration: 'none' }}><FileText size={11} /> Crear propuesta</a>
+          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} className="qa qa-primary"><FileText size={11} /> Crear propuesta</a>
           : <LockedProposalBtn label="Crear propuesta" />}
-        <button style={g} onClick={() => onDateConfirm(lead, 'contacted')}><ChevronRight size={11} /> En seguimiento</button>
-        <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
-        <button style={d} onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
+        <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'contacted')}><ChevronRight size={11} /> En seguimiento</button>
+        <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
+        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'budget_sent')}><FileText size={11} /> Presupuesto</button>
+        <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
+        <button className="qa qa-danger" onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
       </>)}
 
       {tab === 'in_progress' && (<>
         {canProposal
-          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} style={{ ...g, textDecoration: 'none' }}><FileText size={11} /> Propuesta digital</a>
+          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} className="qa qa-ghost"><FileText size={11} /> Propuesta digital</a>
           : <LockedProposalBtn label="Propuesta digital" />}
-        <button style={p} onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
-        <button style={{ ...p, background: '#16a34a' }} onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
-        {lead.status !== 'budget_sent' && <button style={g} onClick={() => onMove(lead.id, 'budget_sent')}>Presupuesto enviado</button>}
-        <button style={g} onClick={() => onMove(lead.id, 'new')}><RotateCcw size={11} /> Nuevo</button>
-        <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
-        <button style={d} onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
+        <button className="qa qa-primary" onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
+        <button className="qa qa-primary" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
+        {lead.status !== 'budget_sent' && <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'budget_sent')}>Presupuesto enviado</button>}
+        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'new')}><RotateCcw size={11} /> Nuevo</button>
+        <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
+        <button className="qa qa-danger" onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
       </>)}
 
       {tab === 'visit' && (<>
-        <button style={p} onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
-        <button style={g} onClick={() => onMove(lead.id, 'post_visit')}><CheckCircle size={11} /> Visita realizada</button>
-        <button style={g} onClick={() => onMove(lead.id, 'budget_sent')}>Presupuesto</button>
-        <button style={g} onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
-        <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
-        <button style={d} onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
+        <button className="qa qa-primary" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
+        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'post_visit')}><CheckCircle size={11} /> Visita realizada</button>
+        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'budget_sent')}>Presupuesto</button>
+        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
+        <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
+        <button className="qa qa-danger" onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
       </>)}
 
       {tab === 'post_visit' && (<>
-        <button style={p} onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
-        <button style={g} onClick={() => onMove(lead.id, 'budget_sent')}><FileText size={11} /> Mover a presupuesto</button>
+        <button className="qa qa-primary" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
+        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'budget_sent')}><FileText size={11} /> Mover a presupuesto</button>
         {canProposal
-          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} style={{ ...g, textDecoration: 'none' }}><FileText size={11} /> Presupuesto digital</a>
+          ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} className="qa qa-ghost"><FileText size={11} /> Presupuesto digital</a>
           : <LockedProposalBtn label="Presupuesto digital" />}
-        <button style={g} onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
-        <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
-        <button style={d} onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
+        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
+        <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
+        <button className="qa qa-danger" onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
       </>)}
 
       {tab === 'budget' && (<>
-        <button style={p} onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
-        <button style={g} onClick={() => onMove(lead.id, 'post_visit')}><RotateCcw size={11} /> Post-visita</button>
-        <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
-        <button style={d} onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
+        <button className="qa qa-primary" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
+        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'post_visit')}><RotateCcw size={11} /> Post-visita</button>
+        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
+        <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
+        <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
+        <button className="qa qa-danger" onClick={() => onMove(lead.id, 'lost')}>Perdido</button>
       </>)}
 
       {tab === 'confirmed' && (<>
         {canProposal
-          ? <a href="/propuestas" style={{ ...g, textDecoration: 'none' }}><ExternalLink size={11} /> Propuesta</a>
+          ? <a href="/propuestas" className="qa qa-ghost"><ExternalLink size={11} /> Propuesta</a>
           : <LockedProposalBtn label="Propuesta" />}
-        <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
-        <button style={d} onClick={() => onMove(lead.id, 'lost')}>Cancelar boda</button>
-        <button style={d} onClick={() => onDelete(lead.id)}><Trash2 size={11} /></button>
+        <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
+        <button className="qa qa-danger" onClick={() => onMove(lead.id, 'lost')}>Cancelar boda</button>
+        <button className="qa qa-danger" onClick={() => onDelete(lead.id)}><Trash2 size={11} /></button>
       </>)}
 
       {tab === 'lost' && (<>
-        <button style={g} onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> Reactivar</button>
-        <button style={g} onClick={() => onEdit(lead)}><Edit2 size={11} /></button>
-        <button style={d} onClick={() => onDelete(lead.id)}><Trash2 size={11} /></button>
+        <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> Reactivar</button>
+        <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
+        <button className="qa qa-danger" onClick={() => onDelete(lead.id)}><Trash2 size={11} /></button>
       </>)}
     </div>
   )
@@ -1540,7 +1600,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
               )}
               {lead.whatsapp && (
                 <a href={`https://wa.me/${lead.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#16a34a', textDecoration: 'none', padding: '8px 12px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--sage)', textDecoration: 'none', padding: '8px 12px', background: 'var(--sage-light)', borderRadius: 8, border: '1px solid var(--sage)' }}>
                   <MessageCircle size={14} /> WhatsApp: {lead.whatsapp}
                 </a>
               )}
@@ -1618,10 +1678,213 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
               </div>
             )}
             <button onClick={() => onDelete(lead.id)}
-              style={{ fontSize: 12, padding: '8px 12px', borderRadius: 6, cursor: 'pointer', border: '1px solid #fca5a5', background: 'transparent', color: '#dc2626', display: 'flex', alignItems: 'center', gap: 5 }}>
+              style={{ fontSize: 12, padding: '8px 12px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--stone)', background: 'transparent', color: 'var(--rose)', display: 'flex', alignItems: 'center', gap: 5 }}>
               <Trash2 size={12} /> Eliminar
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Kanban Board ──────────────────────────────────────────────────────────────
+const KANBAN_ROW_1: Tab[] = ['new', 'in_progress', 'visit', 'post_visit']
+const KANBAN_ROW_2: Tab[] = ['budget', 'confirmed', 'lost']
+
+function KanbanColumn({ col, leads, isOver, draggingId, onDragOver, onDragLeave, onDrop, onDragStart, onDragEnd, onDetail }: {
+  col: typeof TABS[number]; leads: any[]; isOver: boolean; draggingId: string | null
+  onDragOver: (e: React.DragEvent) => void; onDragLeave: (e: React.DragEvent) => void
+  onDrop: (e: React.DragEvent) => void; onDragStart: (e: React.DragEvent, lead: any) => void
+  onDragEnd: () => void; onDetail: (l: any) => void
+}) {
+  const isLost = col.key === 'lost'
+  return (
+    <div
+      onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+      style={{
+        flex: 1, minWidth: 0,
+        background: isOver ? 'var(--gold-light)' : '#fff',
+        borderRadius: 10,
+        border: isOver ? '2px dashed var(--gold)' : '1px solid var(--ivory)',
+        transition: 'background 0.15s, border-color 0.15s',
+        display: 'flex', flexDirection: 'column',
+        minHeight: 180,
+      }}
+    >
+      {/* Column header */}
+      <div style={{
+        padding: '9px 12px',
+        borderBottom: '1px solid var(--ivory)',
+        borderTop: isLost ? '2px solid var(--stone)' : '2px solid var(--gold)',
+        borderRadius: '10px 10px 0 0',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: isLost ? 'var(--stone)' : 'var(--espresso)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <span style={{ color: isLost ? 'var(--stone)' : 'var(--gold)' }}>{col.emoji}</span>
+          <span>{col.label}</span>
+        </div>
+        {leads.length > 0 && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, minWidth: 20, height: 20,
+            borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: isLost ? 'var(--ivory)' : 'var(--gold)', color: isLost ? 'var(--warm-gray)' : '#fff', padding: '0 6px',
+          }}>{leads.length}</span>
+        )}
+      </div>
+
+      {/* Cards */}
+      <div style={{ padding: 6, flex: 1, overflowY: 'auto', maxHeight: 'calc(50vh - 80px)' }}>
+        {leads.map(lead => {
+          const isDragging = draggingId === lead.id
+          return (
+            <div
+              key={lead.id}
+              draggable
+              onDragStart={e => onDragStart(e, lead)}
+              onDragEnd={onDragEnd}
+              onClick={() => onDetail(lead)}
+              style={{
+                background: isDragging ? 'var(--cream)' : 'var(--cream)',
+                border: '1px solid var(--ivory)',
+                borderRadius: 8,
+                padding: '9px 10px',
+                marginBottom: 5,
+                cursor: isDragging ? 'grabbing' : 'grab',
+                opacity: isDragging ? 0.35 : 1,
+                transition: 'box-shadow 0.15s, opacity 0.15s',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+              }}
+              onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = '0 3px 10px rgba(0,0,0,0.07)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)' }}
+            >
+              <div style={{ fontWeight: 600, color: 'var(--espresso)', fontSize: 12.5, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {lead.name}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                <Calendar size={10} style={{ color: 'var(--stone)', flexShrink: 0 }} />
+                <span style={{ fontSize: 10.5, color: 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {formatLeadDate(lead).line1}
+                </span>
+              </div>
+              {col.key === 'visit' && lead.visit_date && (
+                <div style={{ fontSize: 10, color: 'var(--gold)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 3, fontWeight: 500 }}>
+                  <Landmark size={10} /> Visita: {new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                {lead.source && (
+                  <span style={{ fontSize: 9, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '1px 6px', borderRadius: 8 }}>
+                    {SOURCE_LABEL[lead.source] || lead.source}
+                  </span>
+                )}
+                {lead.guests && (
+                  <span style={{ fontSize: 9, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '1px 6px', borderRadius: 8 }}>
+                    {lead.guests} inv.
+                  </span>
+                )}
+                {lead.budget && lead.budget !== 'sin_definir' && (
+                  <span style={{ fontSize: 9, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '1px 6px', borderRadius: 8 }}>
+                    {BUDGET_LABEL[lead.budget]}
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+        {leads.length === 0 && (
+          <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 11, color: 'var(--stone)' }}>
+            Sin leads
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function KanbanBoard({ leads, onMove, onEdit, onDelete, onDetail, onDateConfirm }: {
+  leads: any[]
+  onMove: (id: string, s: DbStatus) => void
+  onEdit: (l: any) => void
+  onDelete: (id: string) => void
+  onDetail: (l: any) => void
+  onDateConfirm: (lead: any, s: DbStatus) => void
+}) {
+  const [dragOverCol, setDragOverCol] = useState<Tab | null>(null)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+
+  const leadsByTab = useMemo(() => {
+    const map: Record<Tab, any[]> = { new: [], in_progress: [], visit: [], post_visit: [], budget: [], confirmed: [], lost: [] }
+    leads.forEach(l => {
+      const tab = (Object.entries(TAB_STATUSES) as [Tab, DbStatus[]][])
+        .find(([, ss]) => ss.includes(l.status))?.[0]
+      if (tab) map[tab].push(l)
+    })
+    return map
+  }, [leads])
+
+  const handleDragStart = (e: React.DragEvent, lead: any) => {
+    e.dataTransfer.setData('text/plain', lead.id)
+    e.dataTransfer.effectAllowed = 'move'
+    setDraggingId(lead.id)
+  }
+
+  const handleDragEnd = () => { setDraggingId(null); setDragOverCol(null) }
+
+  const handleDrop = (e: React.DragEvent, tab: Tab) => {
+    e.preventDefault()
+    setDragOverCol(null)
+    setDraggingId(null)
+    const leadId = e.dataTransfer.getData('text/plain')
+    const lead = leads.find(l => l.id === leadId)
+    if (!lead) return
+    const currentTab = (Object.entries(TAB_STATUSES) as [Tab, DbStatus[]][])
+      .find(([, ss]) => ss.includes(lead.status))?.[0]
+    if (currentTab === tab) return
+    const targetStatus = TAB_STATUSES[tab][0]
+    if (['contacted', 'visit_scheduled', 'won'].includes(targetStatus)) {
+      onDateConfirm(lead, targetStatus)
+    } else {
+      onMove(lead.id, targetStatus)
+    }
+  }
+
+  const colProps = (tab: Tab) => ({
+    isOver: dragOverCol === tab,
+    draggingId,
+    onDragOver: (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverCol(tab) },
+    onDragLeave: (e: React.DragEvent) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverCol(null) },
+    onDrop: (e: React.DragEvent) => handleDrop(e, tab),
+    onDragStart: handleDragStart,
+    onDragEnd: handleDragEnd,
+    onDetail,
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 8 }}>
+      {/* Row 1: Pipeline activo */}
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 2 }}>
+          Pipeline
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+          {KANBAN_ROW_1.map(tabKey => {
+            const col = TABS.find(t => t.key === tabKey)!
+            return <KanbanColumn key={tabKey} col={col} leads={leadsByTab[tabKey] || []} {...colProps(tabKey)} />
+          })}
+        </div>
+      </div>
+
+      {/* Row 2: Cierre */}
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 2 }}>
+          Cierre
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          {KANBAN_ROW_2.map(tabKey => {
+            const col = TABS.find(t => t.key === tabKey)!
+            return <KanbanColumn key={tabKey} col={col} leads={leadsByTab[tabKey] || []} {...colProps(tabKey)} />
+          })}
         </div>
       </div>
     </div>
@@ -1708,12 +1971,11 @@ function LeadFormModal({ form, setForm, isEdit, saving, onSubmit, onClose }: {
               <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
                 {DATE_FLEX_OPTS.map(opt => (
                   <button key={opt.value} type="button" onClick={() => set('date_flexibility', opt.value)} style={{
-                    padding: '4px 11px', borderRadius: 20, fontSize: 12, cursor: 'pointer', border: '1px solid',
+                    padding: '4px 11px', borderRadius: 20, fontSize: 12, cursor: 'pointer', border: '1px solid', fontWeight: 500,
                     borderColor: form.date_flexibility === opt.value ? 'var(--gold)' : 'var(--ivory)',
                     background:  form.date_flexibility === opt.value ? 'var(--gold)' : 'transparent',
                     color:       form.date_flexibility === opt.value ? '#fff' : 'var(--warm-gray)',
-                    fontWeight:  form.date_flexibility === opt.value ? 600 : 400,
-                    transition: 'all 0.15s',
+                    transition: 'background 0.15s, color 0.15s, border-color 0.15s',
                   }}>{opt.label}</button>
                 ))}
               </div>
@@ -1744,7 +2006,7 @@ function LeadFormModal({ form, setForm, isEdit, saving, onSubmit, onClose }: {
                       <input className="form-input" type="date" value={r.to}
                         onChange={e => { const ranges = [...form.wedding_date_ranges]; ranges[i] = { ...r, to: e.target.value }; set('wedding_date_ranges', ranges) }} />
                       <button type="button" onClick={() => set('wedding_date_ranges', (form.wedding_date_ranges as { from: string; to: string }[]).filter((_: { from: string; to: string }, j: number) => j !== i))}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: 16, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>×</button>
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rose)', fontSize: 16, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>×</button>
                     </div>
                   ))}
                   <button type="button"
@@ -1794,11 +2056,15 @@ function LeadFormModal({ form, setForm, isEdit, saving, onSubmit, onClose }: {
             <div className="two-col">
               <div className="form-group">
                 <label className="form-label">Email</label>
-                <input className="form-input" type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+                <input className="form-input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="pareja@email.com" />
               </div>
               <div className="form-group">
                 <label className="form-label">Teléfono</label>
-                <input className="form-input" value={form.phone} onChange={e => set('phone', e.target.value)} />
+                <input className="form-input" value={form.phone} onChange={e => {
+                  const val = e.target.value
+                  set('phone', val)
+                  if (!form.whatsapp || form.whatsapp === form.phone) set('whatsapp', val)
+                }} placeholder="+34 600 000 000" />
               </div>
             </div>
 
