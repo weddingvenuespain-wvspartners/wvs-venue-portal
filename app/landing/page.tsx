@@ -154,7 +154,7 @@ export default function LandingPage() {
               fontSize: 13, fontWeight: 500, color: '#fff',
               background: C.gold, borderRadius: 8, padding: '8px 18px',
             }}>
-              Empezar ahora
+              Empieza gratis
             </Link>
           </div>
         )}
@@ -199,7 +199,7 @@ export default function LandingPage() {
               fontSize: 15, fontWeight: 500, color: '#fff', textAlign: 'center',
               background: C.gold, borderRadius: 8, padding: '12px 0',
             }}>
-              Empezar ahora
+              Empieza gratis
             </Link>
           </div>
         </div>
@@ -243,13 +243,13 @@ export default function LandingPage() {
             display: 'flex', flexDirection: isMobile ? 'column' : 'row',
             gap: 14, marginTop: 32, alignItems: 'center', justifyContent: 'center',
           }}>
-            <Link href="/pricing" style={{
+            <Link href="/login?mode=signup" style={{
               textDecoration: 'none', fontFamily: 'Manrope, sans-serif',
               fontSize: 16, fontWeight: 500, color: '#fff', background: C.gold,
               padding: '14px 32px', borderRadius: 8, display: 'inline-flex',
               alignItems: 'center', gap: 8,
             }}>
-              Empieza ahora <ChevronRight size={16} />
+              Empieza gratis — 14 días <ChevronRight size={16} />
             </Link>
             <button onClick={() => scrollTo('funcionalidades')} style={{
               fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 500,
@@ -394,7 +394,7 @@ export default function LandingPage() {
             background: 'rgba(196,151,90,0.1)', borderRadius: 20, padding: '6px 16px',
             fontSize: 13, color: C.gold, fontWeight: 500,
           }}>
-            <Check size={14} /> Prueba gratis 30 días — sin compromiso
+            <Check size={14} /> Prueba gratis 14 días — sin compromiso
           </div>
 
           {/* Billing toggle */}
@@ -519,7 +519,7 @@ export default function LandingPage() {
                       color: '#fff', background: isPremium ? C.gold : C.charcoal,
                       padding: '12px 0', borderRadius: 8, marginTop: 24,
                     }}>
-                      Empezar ahora
+                      Empieza gratis
                     </Link>
                   </div>
                 )

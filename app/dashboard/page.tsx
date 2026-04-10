@@ -237,6 +237,12 @@ function VenueDashboard() {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
 
+    // First login: profile exists but display_name is not set → go to onboarding
+    if (profile !== undefined && profile !== null && !profile.display_name) {
+      router.replace('/onboarding')
+      return
+    }
+
     const supabase = createClient()
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
 

@@ -3,7 +3,8 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { usePlanFeatures, BASIC_FALLBACK, PREMIUM_FALLBACK, type PlanFeatures } from '@/lib/use-plan-features'
-import { Check, X, Loader2, ArrowLeft, Shield } from 'lucide-react'
+import { Check, X, Loader2, ArrowLeft, Shield, LogOut } from 'lucide-react'
+import { createClient } from '@/lib/supabase'
 import type { BillingCycle } from '@/lib/billing-types'
 import { Suspense } from 'react'
 
@@ -42,6 +43,12 @@ function PricingPageInner() {
   const formRef = useRef<HTMLFormElement>(null)
 
   const isLoggedIn = !!user
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   // Load plans
   useEffect(() => {
@@ -133,16 +140,29 @@ function PricingPageInner() {
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           {isLoggedIn ? (
-            <button
-              onClick={() => router.push('/dashboard')}
-              style={{
-                background: 'none', border: 'none', color: 'var(--warm-gray)',
-                fontSize: 12, cursor: 'pointer', marginBottom: 16, display: 'inline-flex',
-                alignItems: 'center', gap: 4, fontFamily: 'Manrope, sans-serif',
-              }}
-            >
-              <ArrowLeft size={14} /> Volver al portal
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <button
+                onClick={() => router.push('/dashboard')}
+                style={{
+                  background: 'none', border: 'none', color: 'var(--warm-gray)',
+                  fontSize: 12, cursor: 'pointer', display: 'inline-flex',
+                  alignItems: 'center', gap: 4, fontFamily: 'Manrope, sans-serif',
+                }}
+              >
+                <ArrowLeft size={14} /> Volver al portal
+              </button>
+              <button
+                onClick={handleLogout}
+                style={{
+                  background: 'none', border: '1px solid var(--ivory)', borderRadius: 6,
+                  color: 'var(--warm-gray)', fontSize: 12, cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontFamily: 'Manrope, sans-serif', padding: '5px 10px',
+                }}
+              >
+                <LogOut size={13} /> Cerrar sesión
+              </button>
+            </div>
           ) : (
             <div style={{ marginBottom: 16 }}>
               <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, color: 'var(--gold)', letterSpacing: '0.06em', fontWeight: 500 }}>
@@ -178,7 +198,7 @@ function PricingPageInner() {
             background: 'rgba(196,151,90,0.1)', borderRadius: 20, padding: '6px 16px',
             fontSize: 13, color: 'var(--gold)', fontWeight: 500,
           }}>
-            <Check size={14} /> Prueba gratis 30 días — sin compromiso
+            <Check size={14} /> Prueba gratis 14 días — sin compromiso
           </div>
 
           {/* Billing toggle */}
