@@ -92,8 +92,30 @@ function LoginPageInner() {
 
   return (
     <div className="login-page">
+      {/* Logo horizontal fijo arriba a la izquierda → vuelve a la landing */}
+      <a href="/" style={{ position: 'fixed', top: 20, left: 24, textDecoration: 'none', zIndex: 10 }}>
+        <img
+          src="https://weddingvenuesspain.com/wp-content/uploads/2024/10/logo-wedding-venues-spain-white-e1732122540714.png"
+          alt="Wedding Venues Spain"
+          style={{ height: 30, width: 'auto', opacity: 0.75, transition: 'opacity 0.2s' }}
+          onMouseOver={e => (e.currentTarget.style.opacity = '1')}
+          onMouseOut={e => (e.currentTarget.style.opacity = '0.75')}
+        />
+      </a>
+
       <div className="login-box">
-        <div className="login-logo">Wedding Venues Spain</div>
+        {/* Logo circular centrado + enlace a landing */}
+        <a href="/" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginBottom: 16 }}>
+          <img
+            src="/logo-icon.png"
+            alt="Wedding Venues Spain"
+            style={{ width: 80, height: 80, objectFit: 'contain', display: 'inline-block' }}
+            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+          />
+        </a>
+        <div className="login-logo" style={{ fontSize: 16, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+          Wedding Venues Spain
+        </div>
         <div className="login-subtitle">Partner Portal</div>
 
         {error && <div className="login-error">{error}</div>}

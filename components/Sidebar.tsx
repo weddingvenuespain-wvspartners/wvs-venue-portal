@@ -107,7 +107,7 @@ export default function Sidebar() {
                 className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
               >
                 <Icon d={item.icon} /> {item.label}
-                {item.badge && item.badge > 0 && (
+                {item.badge != null && item.badge > 0 && (
                   <span style={{
                     marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
                     background: '#ef4444', color: '#fff',

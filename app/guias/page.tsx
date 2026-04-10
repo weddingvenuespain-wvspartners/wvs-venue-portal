@@ -159,7 +159,7 @@ export default function GuiasPage() {
               </div>
               <div style={{ fontSize: 12.5, color: '#166534', lineHeight: 1.5 }}>El equipo responde en menos de 24 horas en días laborables.</div>
             </div>
-            <a href="mailto:soporte@weddingvenuespain.com"
+            <a href="mailto:info@weddingvenuesspain.com"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 18px', borderRadius: 10, background: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
               <Mail size={14} /> Escribir al soporte
             </a>

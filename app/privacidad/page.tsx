@@ -34,7 +34,7 @@ export default function PrivacidadPage() {
           Política de Privacidad
         </h1>
         <p style={{ fontSize: 13, color: '#8c7b6b' }}>
-          Última actualización: enero de 2025 · Wedding Venues Spain S.L.
+          Última actualización: enero de 2025 · WVS Partners SL
         </p>
       </div>
 
@@ -49,7 +49,7 @@ export default function PrivacidadPage() {
         <div style={bodyStyle}>
           <p>El responsable del tratamiento de tus datos personales es:</p>
           <div style={{ marginTop: 12, padding: '14px 18px', background: '#faf8f4', border: '1px solid #ede8df', borderRadius: 8 }}>
-            <p><strong>Wedding Venues Spain S.L.</strong></p>
+            <p><strong>WVS Partners SL</strong></p>
             <p style={{ marginTop: 4 }}>Email de contacto: <a href="mailto:hola@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>hola@weddingvenuesspain.com</a></p>
             <p style={{ marginTop: 4 }}>Actividad: Plataforma digital para la gestión de venues de bodas</p>
           </div>
@@ -153,7 +153,7 @@ export default function PrivacidadPage() {
         <div style={bodyStyle}>
           <p>Si tienes cualquier duda sobre esta política de privacidad o sobre el tratamiento de tus datos, puedes contactarnos en:</p>
           <div style={{ marginTop: 12, padding: '14px 18px', background: '#faf8f4', border: '1px solid #ede8df', borderRadius: 8 }}>
-            <p><strong>Wedding Venues Spain S.L.</strong></p>
+            <p><strong>WVS Partners SL</strong></p>
             <p style={{ marginTop: 4 }}>
               <a href="mailto:hola@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>hola@weddingvenuesspain.com</a>
             </p>

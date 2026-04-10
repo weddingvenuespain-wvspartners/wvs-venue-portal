@@ -62,7 +62,7 @@ export default function CookiesPage() {
           Política de Cookies
         </h1>
         <p style={{ fontSize: 13, color: '#8c7b6b' }}>
-          Última actualización: enero de 2025 · Wedding Venues Spain S.L.
+          Última actualización: enero de 2025 · WVS Partners SL
         </p>
       </div>
 
@@ -177,7 +177,7 @@ export default function CookiesPage() {
         <div style={bodyStyle}>
           <p>Si tienes alguna pregunta sobre nuestra política de cookies, puedes contactarnos en:</p>
           <div style={{ marginTop: 12, padding: '14px 18px', background: '#faf8f4', border: '1px solid #ede8df', borderRadius: 8 }}>
-            <p><strong>Wedding Venues Spain S.L.</strong></p>
+            <p><strong>WVS Partners SL</strong></p>
             <p style={{ marginTop: 4 }}>
               <a href="mailto:hola@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>hola@weddingvenuesspain.com</a>
             </p>
