@@ -5,7 +5,16 @@ import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { Suspense } from 'react'
 
-type Mode = 'login' | 'signup' | 'reset' | 'new_password'
+type Mode = 'login' | 'reset' | 'new_password'
+
+const GoogleIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+  </svg>
+)
 
 function LoginPageInner() {
   const router = useRouter()
@@ -15,7 +24,6 @@ function LoginPageInner() {
   // Support redirect back after login (e.g. /login?redirect=/pricing&plan=X&cycle=Y)
   const rawRedirect = searchParams.get('redirect') || ''
   const redirectPath = rawRedirect.startsWith('/') ? rawRedirect : '/dashboard'
-  // Preserve extra query params (plan, cycle) for the redirect target
   const redirectQuery = new URLSearchParams()
   const plan = searchParams.get('plan')
   const cycle = searchParams.get('cycle')
@@ -25,27 +33,21 @@ function LoginPageInner() {
     ? `${redirectPath}${redirectPath.includes('?') ? '&' : '?'}${redirectQuery}`
     : redirectPath
 
-  const initialMode = (searchParams.get('mode') === 'signup' ? 'signup' : 'login') as Mode
-  const [mode, setMode]         = useState<Mode>(initialMode)
-  const [email, setEmail]       = useState('')
+  const [mode, setMode]     = useState<Mode>('login')
+  const [email, setEmail]   = useState('')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
-  const [success, setSuccess]   = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError]   = useState('')
+  const [success, setSuccess] = useState('')
 
-  // Cuando el auth-context confirme que hay usuario, navegar al destino
   useEffect(() => {
-    if (!authLoading && user) {
-      router.push(redirectUrl)
-    }
+    if (!authLoading && user) router.push(redirectUrl)
   }, [user, authLoading, router, redirectUrl])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const hash = window.location.hash
-      if (hash.includes('type=recovery')) setMode('new_password')
+      if (window.location.hash.includes('type=recovery')) setMode('new_password')
     }
   }, [])
 
@@ -55,32 +57,8 @@ function LoginPageInner() {
     setError('')
     const supabase = createClient()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-      return
-    }
-    if (!data.session) {
-      setError('No se pudo iniciar sesión. Inténtalo de nuevo.')
-      setLoading(false)
-    }
-    // Si hay sesión: el useEffect que escucha user del auth-context navegará al dashboard
-    // No llamar router.push aquí — provoca race condition (dashboard monta antes de que user esté listo)
-  }
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (password !== confirmPassword) { setError('Las contraseñas no coinciden'); return }
-    if (password.length < 8) { setError('La contraseña debe tener al menos 8 caracteres'); return }
-    setLoading(true)
-    setError('')
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
-      email, password,
-      options: { emailRedirectTo: `${window.location.origin}/onboarding` }
-    })
-    if (error) { setError(error.message); setLoading(false) }
-    else { setSuccess('Cuenta creada. Revisa tu email para confirmar.'); setLoading(false) }
+    if (error) { setError(error.message); setLoading(false); return }
+    if (!data.session) { setError('No se pudo iniciar sesión. Inténtalo de nuevo.'); setLoading(false) }
   }
 
   const handleReset = async (e: React.FormEvent) => {
@@ -106,13 +84,9 @@ function LoginPageInner() {
 
   const handleGoogle = async () => {
     const supabase = createClient()
-    // For signup mode → onboarding; for login mode → normal redirect
-    const googleRedirect = mode === 'signup'
-      ? `${window.location.origin}/onboarding`
-      : `${window.location.origin}${redirectUrl}`
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: googleRedirect }
+      options: { redirectTo: `${window.location.origin}${redirectUrl}` }
     })
   }
 
@@ -129,23 +103,6 @@ function LoginPageInner() {
           </div>
         )}
 
-        {(mode === 'login' || mode === 'signup') && (
-          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 24 }}>
-            {(['login', 'signup'] as Mode[]).map(m => (
-              <button key={m} onClick={() => { setMode(m); setError(''); setSuccess('') }}
-                style={{
-                  flex: 1, padding: '8px 0', background: 'none', border: 'none',
-                  color: mode === m ? '#C4975A' : 'rgba(255,255,255,0.3)',
-                  fontSize: 12, fontWeight: mode === m ? 500 : 400,
-                  borderBottom: `2px solid ${mode === m ? '#C4975A' : 'transparent'}`,
-                  cursor: 'pointer', marginBottom: -1, fontFamily: 'Manrope, sans-serif', transition: 'all 0.15s'
-                }}>
-                {m === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
-              </button>
-            ))}
-          </div>
-        )}
-
         {mode === 'login' && (
           <form onSubmit={handleLogin}>
             <input className="login-input" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
@@ -155,13 +112,7 @@ function LoginPageInner() {
             </button>
             <div className="login-divider">o</div>
             <button type="button" className="login-google" onClick={handleGoogle}>
-              <svg width="16" height="16" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              Continuar con Google
+              <GoogleIcon /> Continuar con Google
             </button>
             <div style={{ textAlign: 'center', marginTop: 16 }}>
               <button type="button" onClick={() => { setMode('reset'); setError(''); setSuccess('') }}
@@ -169,27 +120,6 @@ function LoginPageInner() {
                 ¿Olvidaste tu contraseña?
               </button>
             </div>
-          </form>
-        )}
-
-        {mode === 'signup' && (
-          <form onSubmit={handleSignup}>
-            <input className="login-input" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
-            <input className="login-input" type="password" placeholder="Contraseña (mín. 8 caracteres)" value={password} onChange={e => setPassword(e.target.value)} required />
-            <input className="login-input" type="password" placeholder="Confirmar contraseña" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
-            <button className="login-btn" type="submit" disabled={loading}>
-              {loading ? 'Creando cuenta...' : 'Crear cuenta'}
-            </button>
-            <div className="login-divider">o</div>
-            <button type="button" className="login-google" onClick={handleGoogle}>
-              <svg width="16" height="16" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              Continuar con Google
-            </button>
           </form>
         )}
 
@@ -221,6 +151,20 @@ function LoginPageInner() {
               {loading ? 'Guardando...' : 'Guardar contraseña'}
             </button>
           </form>
+        )}
+
+        {/* Bottom link to signup */}
+        {mode === 'login' && (
+          <div style={{ textAlign: 'center', marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>¿No tienes cuenta? </span>
+            <button
+              type="button"
+              onClick={() => router.push('/registro')}
+              style={{ background: 'none', border: 'none', color: '#C4975A', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'Manrope, sans-serif' }}
+            >
+              Regístrate gratis →
+            </button>
+          </div>
         )}
       </div>
     </div>

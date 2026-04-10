@@ -149,7 +149,7 @@ export default function LandingPage() {
             }}>
               Iniciar sesión
             </Link>
-            <Link href="/pricing" style={{
+            <Link href="/registro" style={{
               textDecoration: 'none', fontFamily: 'Manrope, sans-serif',
               fontSize: 13, fontWeight: 500, color: '#fff',
               background: C.gold, borderRadius: 8, padding: '8px 18px',
@@ -194,7 +194,7 @@ export default function LandingPage() {
             }}>
               Iniciar sesión
             </Link>
-            <Link href="/pricing" onClick={() => setMobileMenu(false)} style={{
+            <Link href="/registro" onClick={() => setMobileMenu(false)} style={{
               textDecoration: 'none', fontFamily: 'Manrope, sans-serif',
               fontSize: 15, fontWeight: 500, color: '#fff', textAlign: 'center',
               background: C.gold, borderRadius: 8, padding: '12px 0',
@@ -243,7 +243,7 @@ export default function LandingPage() {
             display: 'flex', flexDirection: isMobile ? 'column' : 'row',
             gap: 14, marginTop: 32, alignItems: 'center', justifyContent: 'center',
           }}>
-            <Link href="/login?mode=signup" style={{
+            <Link href="/registro" style={{
               textDecoration: 'none', fontFamily: 'Manrope, sans-serif',
               fontSize: 16, fontWeight: 500, color: '#fff', background: C.gold,
               padding: '14px 32px', borderRadius: 8, display: 'inline-flex',
@@ -513,7 +513,7 @@ export default function LandingPage() {
                     </div>
 
                     {/* CTA */}
-                    <Link href="/pricing" style={{
+                    <Link href="/registro" style={{
                       display: 'block', textAlign: 'center', textDecoration: 'none',
                       fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 500,
                       color: '#fff', background: isPremium ? C.gold : C.charcoal,
@@ -541,7 +541,7 @@ export default function LandingPage() {
           Únete a cientos de venues que ya gestionan sus bodas de forma profesional.
         </p>
         <div style={{ marginTop: 28 }}>
-          <Link href="/pricing" style={{
+          <Link href="/registro" style={{
             textDecoration: 'none', fontFamily: 'Manrope, sans-serif',
             fontSize: 16, fontWeight: 500, color: '#fff', background: C.gold,
             padding: '14px 32px', borderRadius: 8, display: 'inline-flex',
