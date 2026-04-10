@@ -48,17 +48,17 @@ export const PREMIUM_FALLBACK: PlanFeatures = {
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function usePlanFeatures(): PlanFeatures & {
-  planId:        string
-  planName:      string
-  planTier:      'basic' | 'premium'
-  hasPlan:       boolean   // has an active or trial subscription
-  isTrial:       boolean   // subscription status is 'trial'
-  trialDaysLeft: number | null  // null if not trial or no end date
+  planId:          string
+  planName:        string
+  planTier:        'basic' | 'premium'
+  hasPlan:         boolean          // has an active or trial subscription (not expired)
+  isTrial:         boolean          // subscription status is 'trial'
+  isTrialExpired:  boolean          // trial exists but trial_end_date is in the past
+  trialDaysLeft:   number | null    // null if not trial or no end date
 } {
   const { profile } = useAuth()
 
-  const plan     = profile?.plan
-  const hasPlan  = !!plan
+  const plan = profile?.plan
 
   // Trial state from subscription_status set in auth-context
   const isTrial       = profile?.subscription_status === 'trial'
@@ -66,6 +66,12 @@ export function usePlanFeatures(): PlanFeatures & {
   const trialDaysLeft = trialEndDate
     ? Math.ceil((new Date(trialEndDate).getTime() - Date.now()) / 86400000)
     : null
+
+  // Trial is expired when it's a trial subscription but the end date has passed
+  const isTrialExpired = isTrial && trialDaysLeft !== null && trialDaysLeft <= 0
+
+  // hasPlan = subscription exists AND trial is not expired
+  const hasPlan = !!plan && !isTrialExpired
 
   // Tier:
   //   - No plan/subscription → treat as basic (not free premium)
@@ -95,11 +101,12 @@ export function usePlanFeatures(): PlanFeatures & {
 
   return {
     ...resolved,
-    planId:   plan?.id           ?? '',
-    planName: plan?.display_name ?? plan?.name ?? '',
+    planId:         plan?.id           ?? '',
+    planName:       plan?.display_name ?? plan?.name ?? '',
     planTier,
     hasPlan,
     isTrial,
+    isTrialExpired,
     trialDaysLeft,
   }
 }

@@ -208,8 +208,25 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        {/* ── Trial banner ── */}
-        {!isAdmin && features.isTrial && (
+        {/* ── Trial expirado ── */}
+        {!isAdmin && features.isTrialExpired && (
+          <div style={{ marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+              <Hourglass size={12} style={{ color: '#f87171', flexShrink: 0 }} />
+              <span style={{ fontSize: 10, fontWeight: 600, color: '#f87171', letterSpacing: '0.08em' }}>PERIODO DE PRUEBA EXPIRADO</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--stone)', marginBottom: 10, lineHeight: 1.5 }}>
+              Tu periodo de prueba ha terminado. Activa tu plan para seguir usando el portal.
+            </div>
+            <Link href="/pricing"
+              style={{ display: 'block', padding: '8px 12px', borderRadius: 8, background: '#dc2626', color: '#fff', fontSize: 11, fontWeight: 600, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.02em' }}>
+              Activar plan ahora
+            </Link>
+          </div>
+        )}
+
+        {/* ── Trial activo ── */}
+        {!isAdmin && features.isTrial && !features.isTrialExpired && (
           <div style={{ marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
               <Hourglass size={12} style={{ color: 'var(--gold)', flexShrink: 0 }} />
@@ -222,14 +239,14 @@ export default function Sidebar() {
                   background: features.trialDaysLeft <= 3 ? 'rgba(220,38,38,0.15)' : 'rgba(196,151,90,0.12)',
                   color: features.trialDaysLeft <= 3 ? '#fca5a5' : 'var(--gold)',
                 }}>
-                  {features.trialDaysLeft > 0 ? `${features.trialDaysLeft} días restantes` : 'Expirado'}
+                  {features.trialDaysLeft} días restantes
                 </span>
               </div>
             )}
             <div style={{ fontSize: 11, color: 'var(--stone)', marginBottom: 10, lineHeight: 1.5 }}>
               Activa tu plan para seguir usando el portal.
             </div>
-            <Link href="/perfil?tab=suscripcion"
+            <Link href="/pricing"
               style={{ display: 'block', padding: '8px 12px', borderRadius: 8, background: 'var(--gold)', color: '#fff', fontSize: 11, fontWeight: 600, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.02em' }}>
               Activar plan
             </Link>
@@ -237,19 +254,23 @@ export default function Sidebar() {
         )}
 
         {/* ── Basic → Premium upgrade banner ── */}
-        {!isAdmin && !features.isTrial && features.hasPlan && features.planTier === 'basic' && (
-          <Link href="/perfil?tab=suscripcion"
+        {!isAdmin && !features.isTrial && !features.isTrialExpired && features.hasPlan && features.planTier === 'basic' && (
+          <Link href="/pricing"
             style={{ display: 'block', marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)', textDecoration: 'none' }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 4 }}>PASA A PREMIUM</div>
             <div style={{ fontSize: 11, color: 'var(--stone)', lineHeight: 1.5 }}>Propuestas, exportar leads y más.</div>
           </Link>
         )}
 
-        {/* ── Sin plan ── */}
-        {!isAdmin && !features.isTrial && !features.hasPlan && (
+        {/* ── Sin plan (no trial, no active) ── */}
+        {!isAdmin && !features.isTrial && !features.isTrialExpired && !features.hasPlan && (
           <div style={{ marginBottom: 10, padding: '9px 12px', borderRadius: 8, background: '#1e293b', border: '1px solid #334155' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#f87171', marginBottom: 2 }}>Sin suscripción activa</div>
-            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.4 }}>Contacta con tu gestor para activar tu plan.</div>
+            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.4, marginBottom: 8 }}>Activa tu plan para acceder al portal.</div>
+            <Link href="/pricing"
+              style={{ display: 'block', padding: '7px 12px', borderRadius: 7, background: '#dc2626', color: '#fff', fontSize: 11, fontWeight: 600, textAlign: 'center', textDecoration: 'none' }}>
+              Ver planes
+            </Link>
           </div>
         )}
 
