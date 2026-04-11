@@ -52,7 +52,13 @@ export default function OnboardingPage() {
       const { error: err } = await supabase
         .from('venue_profiles')
         .upsert(
-          { user_id: user!.id, display_name: venueName.trim(), company: venueName.trim(), region },
+          {
+            user_id: user!.id,
+            email: user!.email,
+            display_name: venueName.trim(),
+            company: venueName.trim(),
+            region,
+          },
           { onConflict: 'user_id' }
         )
       if (err) throw err
