@@ -501,14 +501,23 @@ function UserPanel({
               </div>
               <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                 {profile.wp_username && <span>{profile.wp_username}</span>}
-                <span className={`badge ${PROFILE_BADGE[profile.status] || ''}`} style={{ fontSize: 10 }}>
-                  {STATUS_LABEL[profile.status] || profile.status}
-                </span>
-                {activeSub && (
-                  <span className={`badge ${SUB_BADGE[activeSub.status] || 'badge-inactive'}`} style={{ fontSize: 10 }}>
-                    {STATUS_LABEL[activeSub.status]}
+                {/* Profile status: only show if account is inactive (to flag disabled accounts) */}
+                {profile.status !== 'active' && (
+                  <span className={`badge ${PROFILE_BADGE[profile.status] || ''}`} style={{ fontSize: 10 }}>
+                    Cuenta: {STATUS_LABEL[profile.status] || profile.status}
                   </span>
                 )}
+                {activeSub && (() => {
+                  const isExpiredTrial = activeSub.status === 'trial' &&
+                    daysLeft !== null && daysLeft <= 0
+                  const subLabel = isExpiredTrial ? 'Trial expirado' : STATUS_LABEL[activeSub.status]
+                  const subBadgeClass = isExpiredTrial ? 'badge-inactive' : SUB_BADGE[activeSub.status] || 'badge-inactive'
+                  return (
+                    <span className={`badge ${subBadgeClass}`} style={{ fontSize: 10 }}>
+                      {subLabel}
+                    </span>
+                  )
+                })()}
                 {subPlan && (
                   <span style={{
                     background: !subPlan.is_active ? '#fee2e2' : subPlan.name === 'basic' ? '#f0f9ff' : '#fef9ec',
@@ -667,8 +676,9 @@ function UserPanel({
                   <label className="form-label">Estado de cuenta</label>
                   <select className="form-input" value={pForm.status}
                     onChange={e => setPForm(f => ({ ...f, status: e.target.value }))}>
+                    <option value="pending_verification">⏳ Pendiente verificación</option>
                     <option value="pending">Pendiente</option>
-                    <option value="active">Activo</option>
+                    <option value="active">✅ Activo</option>
                     <option value="inactive">Inactivo</option>
                   </select>
                 </div>
@@ -805,11 +815,17 @@ function UserPanel({
                                 const c = getCycle(plan, sub?.billing_cycle || '')
                                 return c ? c.label : (sub?.billing_cycle || '—')
                               })()}
-                              {sub?.status && (
-                                <span className={`badge ${SUB_BADGE[sub.status] || 'badge-inactive'}`} style={{ fontSize: 9, marginLeft: 6 }}>
-                                  {STATUS_LABEL[sub.status]}
-                                </span>
-                              )}
+                              {sub?.status && (() => {
+                                const isExpTrial = sub.status === 'trial' &&
+                                  sub.trial_end_date &&
+                                  trialDaysLeft(sub.trial_end_date) !== null &&
+                                  (trialDaysLeft(sub.trial_end_date) as number) <= 0
+                                return (
+                                  <span className={`badge ${isExpTrial ? 'badge-inactive' : SUB_BADGE[sub.status] || 'badge-inactive'}`} style={{ fontSize: 9, marginLeft: 6 }}>
+                                    {isExpTrial ? 'Trial expirado' : STATUS_LABEL[sub.status]}
+                                  </span>
+                                )
+                              })()}
                             </div>
                           )}
                         </div>
@@ -1615,8 +1631,12 @@ export default function AdminPage() {
     const sub = subscriptions
       .filter(s => s.user_id === userId)
       .sort((a, b) => (STATUS_PRIORITY[a.status] ?? 9) - (STATUS_PRIORITY[b.status] ?? 9))[0]
-    const plan = plans.find(p => p.id === sub?.plan_id)
-    if (!sub || !plan) return null
+    if (!sub) return null
+    // Fallback plan when plan_id references a deleted/inactive plan
+    const plan = plans.find(p => p.id === sub.plan_id) ?? {
+      id: sub.plan_id ?? '', name: '(plan eliminado)', display_name: '(plan eliminado)',
+      is_active: false, billing_cycles: [], visible_on_web: false, trial_days: 14,
+    }
     return { sub, plan, tier: plan.name === 'basic' ? 'basic' : 'premium' as 'basic' | 'premium' }
   }
 
@@ -1647,6 +1667,7 @@ export default function AdminPage() {
   })
 
   const counts = {
+    pending_verification: owners.filter(p => p.status === 'pending_verification').length,
     pending:  owners.filter(p => p.status === 'pending').length,
     active:   owners.filter(p => p.status === 'active').length,
     inactive: owners.filter(p => p.status === 'inactive').length,
@@ -1719,7 +1740,7 @@ export default function AdminPage() {
             <div className="stat-card accent">
               <div className="stat-label">Venue owners</div>
               <div className="stat-value">{owners.length}</div>
-              <div className="stat-sub">{counts.active} activos · {counts.pending} pendientes</div>
+              <div className="stat-sub">{counts.active} activos · {counts.pending_verification} por verificar · {counts.pending} pendientes</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Pagando</div>
@@ -1756,7 +1777,7 @@ export default function AdminPage() {
                   value={search} onChange={e => setSearch(e.target.value)} />
               </div>
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                {([['all','Todos'], ['pending','Pendientes'], ['active','Activos'], ['inactive','Inactivos']] as [string,string][]).map(([k, label]) => (
+                {([['all','Todos'], ['pending_verification','⏳ Por verificar'], ['pending','Pendientes'], ['active','Activos'], ['inactive','Inactivos']] as [string,string][]).map(([k, label]) => (
                   <button key={k} onClick={() => setFilterStatus(k)}
                     className={`btn btn-sm ${filterStatus === k ? 'btn-primary' : 'btn-ghost'}`}>
                     {label}{k !== 'all' ? ` (${counts[k as keyof typeof counts] ?? 0})` : ` (${owners.length})`}
@@ -1874,12 +1895,14 @@ export default function AdminPage() {
                                 )}
                               </div>
                               <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
-                                <span className={`badge ${SUB_BADGE[info.sub.status] || 'badge-inactive'}`} style={{ fontSize: 10 }}>
-                                  {STATUS_LABEL[info.sub.status]}
-                                </span>
-                                {info.sub.status === 'trial' && tBadge && (
+                                {info.sub.status === 'trial' && tBadge ? (
+                                  // Show trial badge (may be "Trial expirado" or "Xd restantes")
                                   <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: tBadge.bg, color: tBadge.color }}>
                                     {tBadge.label}
+                                  </span>
+                                ) : (
+                                  <span className={`badge ${SUB_BADGE[info.sub.status] || 'badge-inactive'}`} style={{ fontSize: 10 }}>
+                                    {STATUS_LABEL[info.sub.status]}
                                   </span>
                                 )}
                                 {info.sub.status === 'active' && info.sub.renewal_date && (

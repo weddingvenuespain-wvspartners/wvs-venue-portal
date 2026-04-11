@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
+import { sendActivationEmail } from '@/lib/mailer'
 
 function getServiceClient() {
   return createClient(
@@ -88,10 +89,33 @@ export async function PATCH(req: NextRequest) {
 
     // Admin: update any field
     const svc = getServiceClient()
+
+    // Fetch current status before update to detect activation
+    const { data: current } = await svc
+      .from('venue_profiles').select('status, display_name, company').eq('user_id', user_id).single()
+
     const { data, error } = await svc
       .from('venue_profiles').update(rawFields).eq('user_id', user_id).select().single()
     if (error) throw error
-    return NextResponse.json({ profile: data })
+
+    // Auto-send activation email when status changes to 'active'
+    const wasActivated =
+      current?.status === 'pending_verification' && rawFields.status === 'active'
+    if (wasActivated) {
+      try {
+        const { data: { users } } = await svc.auth.admin.listUsers({ perPage: 1000 })
+        const authUser = users?.find(u => u.id === user_id)
+        if (authUser?.email) {
+          const venueName = current?.display_name || current?.company || ''
+          await sendActivationEmail(authUser.email, venueName)
+        }
+      } catch (mailErr) {
+        console.error('[activation email]', mailErr)
+        // Don't fail the request if email fails
+      }
+    }
+
+    return NextResponse.json({ profile: data, emailSent: wasActivated })
   } catch (err: any) {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
