@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { createClient } from '@/lib/supabase'
-import { Check, ArrowRight, Building2, MapPin, Users, CalendarDays, FileText, BarChart2, ChevronRight } from 'lucide-react'
+import { Check, ArrowRight, Building2, MapPin, Phone, Globe, FileText, Users, CalendarDays, BarChart2, ChevronRight } from 'lucide-react'
 
 const REGIONS = [
   'Andalucía', 'Aragón', 'Asturias', 'Baleares', 'Canarias', 'Cantabria',
@@ -19,32 +19,26 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // Step 1 fields
+  // Step 1
   const [venueName, setVenueName] = useState('')
   const [region, setRegion] = useState('')
 
-  // Step 2 fields
-  const [capacity, setCapacity] = useState('')
-  const [venueType, setVenueType] = useState('')
+  // Step 2
+  const [phone, setPhone] = useState('')
+  const [website, setWebsite] = useState('')
 
-  // Redirect if not logged in
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/login')
-    }
+    if (!authLoading && !user) router.replace('/login')
   }, [authLoading, user, router])
 
-  // If profile already has display_name → skip onboarding (already done)
   useEffect(() => {
-    if (!authLoading && profile && profile.display_name) {
-      router.replace('/dashboard')
-    }
+    if (!authLoading && profile && profile.display_name) router.replace('/dashboard')
   }, [authLoading, profile, router])
 
   const handleStep1 = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!venueName.trim()) { setError('Escribe el nombre de tu venue'); return }
-    if (!region) { setError('Selecciona una región'); return }
+    if (!region) { setError('Selecciona una comunidad autónoma'); return }
     setError('')
     setSaving(true)
     try {
@@ -56,14 +50,23 @@ export default function OnboardingPage() {
             user_id: user!.id,
             display_name: venueName.trim(),
             company: venueName.trim(),
-            region,
+            city: region,
+            // Required NOT NULL fields with sensible defaults for new accounts
+            role: 'partner',
+            status: 'active',
+            timezone: 'Europe/Madrid',
+            language: 'es',
+            date_format: 'DD/MM/YYYY',
+            marketing_consent: false,
+            features_override: {},
+            updated_at: new Date().toISOString(),
           },
           { onConflict: 'user_id' }
         )
       if (err) throw err
       setStep(2)
     } catch (e: any) {
-      setError(e?.message || JSON.stringify(e) || 'Error al guardar. Inténtalo de nuevo.')
+      setError(e?.message || 'Error al guardar. Inténtalo de nuevo.')
     } finally {
       setSaving(false)
     }
@@ -74,18 +77,18 @@ export default function OnboardingPage() {
     setSaving(true)
     try {
       const supabase = createClient()
-      const updates: Record<string, unknown> = { user_id: user!.id }
-      if (capacity) updates.capacity = parseInt(capacity, 10)
-      if (venueType) updates.venue_type = venueType
-      await supabase
-        .from('venue_profiles')
-        .upsert(updates, { onConflict: 'user_id' })
-      setStep(3)
+      const updates: Record<string, unknown> = {
+        user_id: user!.id,
+        updated_at: new Date().toISOString(),
+      }
+      if (phone.trim()) updates.phone = phone.trim()
+      if (website.trim()) updates.venue_website = website.trim()
+      await supabase.from('venue_profiles').upsert(updates, { onConflict: 'user_id' })
     } catch {
-      // Non-critical, just move on
-      setStep(3)
+      // Non-critical
     } finally {
       setSaving(false)
+      setStep(3)
     }
   }
 
@@ -214,29 +217,27 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 2: Capacidad + tipo */}
+        {/* Step 2: Teléfono + web */}
         {step === 2 && (
           <div style={{ background: '#fff', borderRadius: 16, padding: '36px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
             <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 6 }}>
-              Un poco más sobre tu espacio
+              Un poco más sobre ti
             </h1>
             <p style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 28 }}>
-              Estos datos nos ayudan a posicionarte mejor. Puedes editarlos después.
+              Opcional — puedes completarlo después desde tu perfil.
             </p>
 
             <form onSubmit={handleStep2}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 6 }}>
-                Capacidad máxima de invitados <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>(opcional)</span>
+                Teléfono de contacto <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>(opcional)</span>
               </label>
               <div style={{ position: 'relative', marginBottom: 20 }}>
-                <Users size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
+                <Phone size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
                 <input
-                  type="number"
-                  placeholder="Ej: 200"
-                  value={capacity}
-                  onChange={e => setCapacity(e.target.value)}
-                  min="1"
-                  max="5000"
+                  type="tel"
+                  placeholder="Ej: +34 612 345 678"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
                   style={{
                     width: '100%', padding: '10px 12px 10px 34px', borderRadius: 8,
                     border: '1px solid var(--ivory)', background: 'var(--cream)',
@@ -247,26 +248,22 @@ export default function OnboardingPage() {
               </div>
 
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 6 }}>
-                Tipo de venue <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>(opcional)</span>
+                Web del venue <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>(opcional)</span>
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 28 }}>
-                {['Finca', 'Hotel', 'Castillo / Palacio', 'Jardín / Exterior', 'Masía', 'Otro'].map(type => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setVenueType(venueType === type ? '' : type)}
-                    style={{
-                      padding: '9px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-                      fontFamily: 'Manrope, sans-serif', transition: 'all 0.15s',
-                      border: venueType === type ? '2px solid var(--gold)' : '1px solid var(--ivory)',
-                      background: venueType === type ? 'rgba(196,151,90,0.08)' : 'var(--cream)',
-                      color: venueType === type ? 'var(--gold)' : 'var(--charcoal)',
-                      fontWeight: venueType === type ? 500 : 400,
-                    }}
-                  >
-                    {type}
-                  </button>
-                ))}
+              <div style={{ position: 'relative', marginBottom: 28 }}>
+                <Globe size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
+                <input
+                  type="url"
+                  placeholder="Ej: https://tuvenue.com"
+                  value={website}
+                  onChange={e => setWebsite(e.target.value)}
+                  style={{
+                    width: '100%', padding: '10px 12px 10px 34px', borderRadius: 8,
+                    border: '1px solid var(--ivory)', background: 'var(--cream)',
+                    fontSize: 14, color: 'var(--charcoal)', outline: 'none',
+                    fontFamily: 'Manrope, sans-serif', boxSizing: 'border-box',
+                  }}
+                />
               </div>
 
               <button
@@ -316,7 +313,6 @@ export default function OnboardingPage() {
               Tu espacio está configurado. Ahora puedes completar tu ficha, gestionar leads y mucho más.
             </p>
 
-            {/* Quick links */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
               {[
                 { icon: <FileText size={16} />, label: 'Completar mi ficha', sub: 'Añade fotos, descripción y precios', href: '/ficha' },
