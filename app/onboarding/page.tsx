@@ -54,7 +54,7 @@ export default function OnboardingPage() {
             display_name:      venueName.trim(),
             company:           venueName.trim(),
             region,
-            role:              'partner',
+            role:              'venue_owner',
             status:            'active',
             timezone:          'Europe/Madrid',
             language:          'es',
