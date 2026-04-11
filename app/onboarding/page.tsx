@@ -55,7 +55,7 @@ export default function OnboardingPage() {
             company:           venueName.trim(),
             region,
             role:              'venue_owner',
-            status:            'active',
+            status:            'pending_verification',
             timezone:          'Europe/Madrid',
             language:          'es',
             date_format:       'DD/MM/YYYY',
@@ -74,6 +74,13 @@ export default function OnboardingPage() {
     }
   }
 
+  const normalizeUrl = (url: string) => {
+    const u = url.trim()
+    if (!u) return ''
+    if (/^https?:\/\//i.test(u)) return u
+    return 'https://' + u
+  }
+
   const handleStep2 = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -83,15 +90,15 @@ export default function OnboardingPage() {
         user_id:    user!.id,
         updated_at: new Date().toISOString(),
       }
-      if (venueType)        updates.venue_type    = venueType
-      if (capacity)         updates.capacity      = parseInt(capacity, 10)
-      if (venueWeb.trim())  updates.venue_website = venueWeb.trim()
+      if (venueType)       updates.venue_type    = venueType
+      if (capacity)        updates.capacity      = parseInt(capacity, 10)
+      if (venueWeb.trim()) updates.venue_website = normalizeUrl(venueWeb)
       await supabase.from('venue_profiles').upsert(updates, { onConflict: 'user_id' })
     } catch {
       // Non-critical, continue anyway
     } finally {
       setSaving(false)
-      setStep(3)
+      router.replace('/pricing')
     }
   }
 
@@ -227,7 +234,7 @@ export default function OnboardingPage() {
               <div style={{ position: 'relative', marginBottom: 28 }}>
                 <Globe size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
                 <input
-                  type="url" placeholder="Ej: https://tuvenue.com" value={venueWeb}
+                  type="text" placeholder="Ej: www.tuvenue.com" value={venueWeb}
                   onChange={e => setVenueWeb(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px 10px 34px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'var(--cream)', fontSize: 14, color: 'var(--charcoal)', outline: 'none', fontFamily: 'Manrope, sans-serif', boxSizing: 'border-box' }}
                 />
@@ -238,7 +245,7 @@ export default function OnboardingPage() {
               >
                 {saving ? 'Guardando...' : <>Continuar <ArrowRight size={15} /></>}
               </button>
-              <button type="button" onClick={() => setStep(3)}
+              <button type="button" onClick={() => router.replace('/pricing')}
                 style={{ width: '100%', padding: '10px 0', borderRadius: 8, border: 'none', background: 'none', color: 'var(--warm-gray)', fontSize: 13, cursor: 'pointer', marginTop: 8, fontFamily: 'Manrope, sans-serif' }}
               >
                 Omitir por ahora

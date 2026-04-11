@@ -13,15 +13,25 @@ export function useRequireSubscription() {
   const { user, profile, loading } = useAuth()
   const { hasPlan } = usePlanFeatures()
   const isAdmin = profile?.role === 'admin'
+  const isPending = profile?.status === 'pending_verification'
+
+  // Only redirect when:
+  // 1. Auth is fully loaded (loading = false)
+  // 2. User exists
+  // 3. Profile is confirmed loaded (not null) — avoids false redirect if profile fetch is slow
+  // 4. User is confirmed NOT admin
+  // 5. User has no active plan
+  // 6. User is NOT pending verification (those stay on /pricing)
+  const profileLoaded = !loading && profile !== null && profile !== undefined
 
   useEffect(() => {
-    if (!loading && user && !isAdmin && !hasPlan) {
+    if (profileLoaded && user && !isAdmin && !hasPlan && !isPending) {
       router.replace('/pricing')
     }
-  }, [loading, user, isAdmin, hasPlan, router])
+  }, [profileLoaded, user, isAdmin, hasPlan, isPending, router])
 
   return {
-    ready: !loading && !!user && (isAdmin || hasPlan),
-    isBlocked: !loading && !!user && !isAdmin && !hasPlan,
+    ready: profileLoaded && !!user && (isAdmin || hasPlan),
+    isBlocked: profileLoaded && !!user && !isAdmin && !hasPlan && !isPending,
   }
 }

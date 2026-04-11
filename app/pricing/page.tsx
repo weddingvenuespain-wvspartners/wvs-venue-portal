@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { usePlanFeatures, BASIC_FALLBACK, PREMIUM_FALLBACK, type PlanFeatures } from '@/lib/use-plan-features'
-import { Check, X, Loader2, ArrowLeft, Shield, LogOut } from 'lucide-react'
+import { Check, X, Loader2, ArrowLeft, Shield, LogOut, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import type { BillingCycle } from '@/lib/billing-types'
 import { Suspense } from 'react'
@@ -33,8 +33,9 @@ const FEATURE_LABELS: { key: keyof PlanFeatures; label: string }[] = [
 function PricingPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, loading: authLoading } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
   const { hasPlan, planName, planTier } = usePlanFeatures()
+  const isPendingVerification = profile?.status === 'pending_verification'
   const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState<string | null>(null)
@@ -242,6 +243,32 @@ function PricingPageInner() {
           </div>
         </div>
 
+        {/* Pending verification banner */}
+        {isPendingVerification && (
+          <div style={{
+            background: 'rgba(121,111,78,0.08)',
+            border: '1px solid rgba(121,111,78,0.25)',
+            borderRadius: 12, padding: '20px 24px',
+            marginBottom: 28, display: 'flex', gap: 16, alignItems: 'flex-start',
+          }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(121,111,78,0.12)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Clock size={18} color="var(--gold)" />
+            </div>
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', fontFamily: 'Manrope, sans-serif' }}>
+                Estamos verificando tu venue
+              </p>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.6 }}>
+                Nuestro equipo revisará tu registro en menos de <strong>24–48 horas</strong>. Recibirás un email en cuanto tu cuenta esté activada y podrás elegir tu plan. ¡Gracias por tu paciencia!
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Error */}
         {error && (
           <div style={{
@@ -354,22 +381,24 @@ function PricingPageInner() {
 
                 {/* CTA button */}
                 <button
-                  onClick={() => cycle && handleSelectPlan(plan.id, cycle.id)}
-                  disabled={!!submitting || isCurrentPlan || !cycle}
+                  onClick={() => !isPendingVerification && cycle && handleSelectPlan(plan.id, cycle.id)}
+                  disabled={!!submitting || isCurrentPlan || !cycle || isPendingVerification}
                   style={{
                     width: '100%', padding: '12px 0', borderRadius: 8, border: 'none',
                     fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 500,
-                    cursor: submitting || isCurrentPlan ? 'default' : 'pointer',
+                    cursor: submitting || isCurrentPlan || isPendingVerification ? 'default' : 'pointer',
                     transition: 'all 0.15s',
-                    background: isCurrentPlan ? 'var(--ivory)' : isPremium ? 'var(--gold)' : 'var(--charcoal)',
-                    color: isCurrentPlan ? 'var(--warm-gray)' : '#fff',
-                    opacity: submitting && !isLoading ? 0.5 : 1,
+                    background: isCurrentPlan || isPendingVerification ? 'var(--ivory)' : isPremium ? 'var(--gold)' : 'var(--charcoal)',
+                    color: isCurrentPlan || isPendingVerification ? 'var(--warm-gray)' : '#fff',
+                    opacity: (submitting && !isLoading) || isPendingVerification ? 0.5 : 1,
                   }}
                 >
                   {isLoading ? (
                     <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
                   ) : isCurrentPlan ? (
                     'Plan actual'
+                  ) : isPendingVerification ? (
+                    'Pendiente de verificación'
                   ) : !isLoggedIn ? (
                     'Empezar ahora'
                   ) : (
