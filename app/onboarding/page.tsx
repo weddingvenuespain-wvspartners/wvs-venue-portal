@@ -54,7 +54,6 @@ export default function OnboardingPage() {
         .upsert(
           {
             user_id: user!.id,
-            email: user!.email,
             display_name: venueName.trim(),
             company: venueName.trim(),
             region,
