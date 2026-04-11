@@ -51,8 +51,10 @@ export default function OnboardingPage() {
       const supabase = createClient()
       const { error: err } = await supabase
         .from('venue_profiles')
-        .update({ display_name: venueName.trim(), company: venueName.trim(), region })
-        .eq('user_id', user!.id)
+        .upsert(
+          { user_id: user!.id, display_name: venueName.trim(), company: venueName.trim(), region },
+          { onConflict: 'user_id' }
+        )
       if (err) throw err
       setStep(2)
     } catch {
@@ -67,12 +69,12 @@ export default function OnboardingPage() {
     setSaving(true)
     try {
       const supabase = createClient()
-      const updates: Record<string, unknown> = {}
+      const updates: Record<string, unknown> = { user_id: user!.id }
       if (capacity) updates.capacity = parseInt(capacity, 10)
       if (venueType) updates.venue_type = venueType
-      if (Object.keys(updates).length > 0) {
-        await supabase.from('venue_profiles').update(updates).eq('user_id', user!.id)
-      }
+      await supabase
+        .from('venue_profiles')
+        .upsert(updates, { onConflict: 'user_id' })
       setStep(3)
     } catch {
       // Non-critical, just move on
