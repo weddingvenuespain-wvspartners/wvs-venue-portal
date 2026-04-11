@@ -63,8 +63,8 @@ export default function OnboardingPage() {
         )
       if (err) throw err
       setStep(2)
-    } catch {
-      setError('Error al guardar. Inténtalo de nuevo.')
+    } catch (e: any) {
+      setError(e?.message || JSON.stringify(e) || 'Error al guardar. Inténtalo de nuevo.')
     } finally {
       setSaving(false)
     }
