@@ -25,13 +25,14 @@ export function useRequireSubscription() {
   const profileLoaded = !loading && profile !== null && profile !== undefined
 
   useEffect(() => {
-    if (profileLoaded && user && !isAdmin && !hasPlan && !isPending) {
+    // Pending verification always stays on /pricing, even if they've already paid
+    if (profileLoaded && user && !isAdmin && (isPending || !hasPlan)) {
       router.replace('/pricing')
     }
   }, [profileLoaded, user, isAdmin, hasPlan, isPending, router])
 
   return {
-    ready: profileLoaded && !!user && (isAdmin || hasPlan),
-    isBlocked: profileLoaded && !!user && !isAdmin && !hasPlan && !isPending,
+    ready: profileLoaded && !!user && (isAdmin || (hasPlan && !isPending)),
+    isBlocked: profileLoaded && !!user && !isAdmin && (!hasPlan || isPending),
   }
 }

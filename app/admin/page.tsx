@@ -51,7 +51,7 @@ type Subscription = {
   user_id: string
   plan_id: string
   billing_cycle: string          // matches a BillingCycle.id from the plan
-  status: 'active' | 'trial' | 'paused' | 'cancelled'
+  status: 'active' | 'trial' | 'trial_expired' | 'paused' | 'cancelled'
   start_date: string | null
   trial_end_date: string | null
   renewal_date: string | null    // = current_period_end
@@ -87,14 +87,20 @@ type PaymentEvent = {
   created_at: string
 }
 
+type TrialConfig = {
+  is_active: boolean
+  trial_days: number
+  trial_plan_id: string | null
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Activo', pending: 'Pendiente', inactive: 'Inactivo',
-  trial: 'Trial', paused: 'Pausado', cancelled: 'Cancelado',
+  trial: 'Trial', trial_expired: 'Fin de trial', paused: 'Pausado', cancelled: 'Cancelado',
 }
 const SUB_BADGE: Record<string, string> = {
-  active: 'badge-active', trial: 'badge-pending',
+  active: 'badge-active', trial: 'badge-pending', trial_expired: 'badge-inactive',
   paused: 'badge-inactive', cancelled: 'badge-inactive',
 }
 const PROFILE_BADGE: Record<string, string> = {
@@ -303,7 +309,7 @@ function CreateUserModal({
 function UserPanel({
   profile, wpVenues, plans, subscriptions, userVenues, saving,
   initialTab, onClose, onSaveProfile, onAssignVenue, onRemoveVenue,
-  onSaveSubscription, onRegisterPayment,
+  onSaveSubscription, onRegisterPayment, trialConfig,
 }: {
   profile: Profile
   wpVenues: any[]
@@ -311,15 +317,18 @@ function UserPanel({
   subscriptions: Subscription[]
   userVenues: UserVenue[]
   saving: boolean
-  initialTab?: 'perfil' | 'venues' | 'suscripcion' | 'historial'
+  initialTab?: 'perfil' | 'venues' | 'suscripcion' | 'historial' | 'equipo'
   onClose: () => void
   onSaveProfile: (p: Profile) => Promise<void>
-  onAssignVenue: (userId: string, wpId: number, planId: string, cycle: string, startTrial: boolean, trialDays: number) => Promise<void>
+  onAssignVenue: (userId: string, wpId: number, planId: string, cycle: string) => Promise<void>
+  trialConfig: TrialConfig
   onRemoveVenue: (uvId: string) => Promise<void>
   onSaveSubscription: (sub: Partial<Subscription> & { user_id: string }) => Promise<void>
   onRegisterPayment: (sub: Subscription, amount: string, ref: string) => Promise<void>
 }) {
-  const [tab, setTab] = useState<'perfil' | 'venues' | 'suscripcion' | 'historial'>(initialTab || 'perfil')
+  const [tab, setTab] = useState<'perfil' | 'venues' | 'suscripcion' | 'historial' | 'equipo'>(initialTab || 'perfil')
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [teamLoading, setTeamLoading] = useState(false)
   const [history, setHistory] = useState<PaymentEvent[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
 
@@ -361,8 +370,6 @@ function UserPanel({
   const [newVenueId,   setNewVenueId]   = useState('')
   const [newPlanId,    setNewPlanId]    = useState(plans[0]?.id || '')
   const [newCycle,     setNewCycle]     = useState('')
-  const [startTrial,   setStartTrial]   = useState(false)
-  const [customTrialDays, setCustomTrialDays] = useState(14)
 
   const STATUS_PRIO: Record<string, number> = { active: 0, trial: 1, paused: 2, cancelled: 3 }
   const activeSub = subscriptions
@@ -386,7 +393,7 @@ function UserPanel({
 
   // Subscription form
   const [subForm, setSubForm] = useState({
-    plan_id:           activeSub?.plan_id           || plans[0]?.id || '',
+    plan_id:           activeSub?.plan_id           || trialConfig.trial_plan_id || plans[0]?.id || '',
     billing_cycle:     activeSub?.billing_cycle     || '',
     status:            (activeSub?.status           || 'trial')  as Subscription['status'],
     start_date:        activeSub?.start_date        || new Date().toISOString().slice(0, 10),
@@ -410,9 +417,7 @@ function UserPanel({
   const selPlanNew = plans.find(p => p.id === newPlanId)
   useEffect(() => {
     if (!selPlanNew) return
-    // Auto-select first cycle when plan changes
     setNewCycle(selPlanNew.billing_cycles?.[0]?.id || '')
-    setCustomTrialDays(selPlanNew.trial_days || 14)
   }, [newPlanId]) // eslint-disable-line
 
   // Plan selected in subscription form
@@ -426,14 +431,15 @@ function UserPanel({
     }
   }, [subForm.start_date, subForm.billing_cycle]) // eslint-disable-line
 
-  // Auto trial_end_date
+  // Auto trial_end_date — uses global trial_config days
   useEffect(() => {
-    if (subForm.status === 'trial' && subForm.start_date && editPlan?.trial_days) {
+    if (subForm.status === 'trial' && subForm.start_date) {
+      const days = trialConfig.trial_days || 14
       const d = new Date(subForm.start_date)
-      d.setDate(d.getDate() + editPlan.trial_days)
+      d.setDate(d.getDate() + days)
       setSubForm(f => ({ ...f, trial_end_date: d.toISOString().slice(0, 10) }))
     }
-  }, [subForm.plan_id, subForm.status, subForm.start_date]) // eslint-disable-line
+  }, [subForm.status, subForm.start_date]) // eslint-disable-line
 
   // Load history when tab activated
   useEffect(() => {
@@ -448,6 +454,22 @@ function UserPanel({
       .then(({ data }) => {
         setHistory(data ?? [])
         setHistoryLoading(false)
+      })
+  }, [tab]) // eslint-disable-line
+
+  // Load team members when tab activated
+  useEffect(() => {
+    if (tab !== 'equipo') return
+    setTeamLoading(true)
+    const supabase = createClient()
+    supabase
+      .from('venue_profiles')
+      .select('id, user_id, first_name, last_name, role, status, created_at')
+      .eq('company', profile.company || '')
+      .neq('user_id', profile.user_id)
+      .then(({ data }) => {
+        setTeamMembers(data ?? [])
+        setTeamLoading(false)
       })
   }, [tab]) // eslint-disable-line
 
@@ -508,9 +530,9 @@ function UserPanel({
                   </span>
                 )}
                 {activeSub && (() => {
-                  const isExpiredTrial = activeSub.status === 'trial' &&
-                    daysLeft !== null && daysLeft <= 0
-                  const subLabel = isExpiredTrial ? 'Trial expirado' : STATUS_LABEL[activeSub.status]
+                  const isExpiredTrial = activeSub.status === 'trial_expired' ||
+                    (activeSub.status === 'trial' && daysLeft !== null && daysLeft <= 0)
+                  const subLabel = isExpiredTrial ? 'Fin de trial' : STATUS_LABEL[activeSub.status]
                   const subBadgeClass = isExpiredTrial ? 'badge-inactive' : SUB_BADGE[activeSub.status] || 'badge-inactive'
                   return (
                     <span className={`badge ${subBadgeClass}`} style={{ fontSize: 10 }}>
@@ -550,11 +572,13 @@ function UserPanel({
             }}>
               <CreditCard size={14} style={{ color: activeSub.status === 'trial' ? '#b45309' : '#16a34a', flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 150 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: activeSub.status === 'trial' ? '#92400e' : '#15803d' }}>
-                  {activeSub.status === 'trial' ? 'Registrar pago para activar' : 'Registrar pago / renovación'}
+                <div style={{ fontSize: 12, fontWeight: 600, color: (activeSub.status === 'trial' || activeSub.status === 'trial_expired') ? '#92400e' : '#15803d' }}>
+                  {(activeSub.status === 'trial' || activeSub.status === 'trial_expired') ? 'Registrar pago para activar' : 'Registrar pago / renovación'}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>
-                  {activeSub.status === 'trial'
+                  {activeSub.status === 'trial_expired'
+                    ? <><AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Fin de trial · pendiente de cobro</>
+                    : activeSub.status === 'trial'
                     ? (daysLeft !== null && daysLeft < 0
                         ? <><AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Trial expirado</>
                         : activeSub.trial_end_date
@@ -588,11 +612,12 @@ function UserPanel({
 
           {/* Tabs */}
           <div className="tabs" style={{ marginBottom: 20 }}>
-            {(['perfil', 'venues', 'suscripcion', 'historial'] as const).map(t => (
+            {(['perfil', 'venues', 'suscripcion', 'historial', 'equipo'] as const).map(t => (
               <button key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-                {t === 'perfil' ? 'Perfil'
-                  : t === 'venues' ? `Venues (${myVenues.length})`
+                {t === 'perfil'     ? 'Perfil'
+                  : t === 'venues'     ? `Venues (${myVenues.length})`
                   : t === 'suscripcion' ? 'Suscripción'
+                  : t === 'equipo'     ? 'Equipo'
                   : <><History size={11} style={{ display: 'inline', marginRight: 4 }} />Historial</>}
               </button>
             ))}
@@ -816,13 +841,14 @@ function UserPanel({
                                 return c ? c.label : (sub?.billing_cycle || '—')
                               })()}
                               {sub?.status && (() => {
-                                const isExpTrial = sub.status === 'trial' &&
+                                const isExpTrial = sub.status === 'trial_expired' ||
+                                  (sub.status === 'trial' &&
                                   sub.trial_end_date &&
                                   trialDaysLeft(sub.trial_end_date) !== null &&
-                                  (trialDaysLeft(sub.trial_end_date) as number) <= 0
+                                  (trialDaysLeft(sub.trial_end_date) as number) <= 0)
                                 return (
                                   <span className={`badge ${isExpTrial ? 'badge-inactive' : SUB_BADGE[sub.status] || 'badge-inactive'}`} style={{ fontSize: 9, marginLeft: 6 }}>
-                                    {isExpTrial ? 'Trial expirado' : STATUS_LABEL[sub.status]}
+                                    {isExpTrial ? 'Fin de trial' : STATUS_LABEL[sub.status]}
                                   </span>
                                 )
                               })()}
@@ -888,38 +914,13 @@ function UserPanel({
                   </div>
                 </div>
 
-                {/* Optional trial toggle */}
-                {newPlanId && (
-                  <div style={{ background: 'var(--cream)', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={startTrial} onChange={e => setStartTrial(e.target.checked)}
-                        style={{ width: 15, height: 15, accentColor: 'var(--gold)' }} />
-                      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--espresso)' }}>Iniciar trial</span>
-                      <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>(opcional — por defecto acceso inmediato sin trial)</span>
-                    </label>
-                    {startTrial && (
-                      <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <label style={{ fontSize: 12, color: 'var(--charcoal)', whiteSpace: 'nowrap' }}>Días de trial:</label>
-                        <input className="form-input" type="number" min={1} max={365}
-                          value={customTrialDays}
-                          onChange={e => setCustomTrialDays(parseInt(e.target.value) || 14)}
-                          style={{ width: 80 }} />
-                        <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
-                          (predeterminado del plan: {selPlanNew?.trial_days ?? 14} días)
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <button
                     className="btn btn-primary btn-sm"
                     disabled={!newVenueId || saving}
                     onClick={() => onAssignVenue(
                       profile.user_id, parseInt(newVenueId), newPlanId, newCycle,
-                      startTrial, customTrialDays,
-                    ).then(() => { setNewVenueId(''); setStartTrial(false) })}
+                    ).then(() => { setNewVenueId('') })}
                   >
                     <Plus size={12} /> Asignar venue
                   </button>
@@ -931,6 +932,31 @@ function UserPanel({
           {/* ── Suscripción ── */}
           {tab === 'suscripcion' && (
             <div>
+
+              {/* ── Contextual verification banner ── */}
+              {profile.status === 'pending_verification' && !activeSub && (
+                <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '14px 16px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: 18, lineHeight: 1 }}>⏳</span>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 3 }}>Sin plan — pendiente de verificación</div>
+                    <div style={{ fontSize: 11, color: '#b45309', lineHeight: 1.5 }}>
+                      El venue completó el onboarding pero aún no ha contratado ningún plan. Puede haberlo hecho desde la página de precios o estar esperando la activación. Activa la cuenta en la pestaña <strong>Perfil</strong> cuando hayas verificado el venue.
+                    </div>
+                  </div>
+                </div>
+              )}
+              {profile.status === 'pending_verification' && activeSub && (
+                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '14px 16px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: 18, lineHeight: 1 }}>✅</span>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginBottom: 3 }}>Plan contratado — pendiente de verificación</div>
+                    <div style={{ fontSize: 11, color: '#166534', lineHeight: 1.5 }}>
+                      El venue ya ha elegido y pagado su plan <strong>{subPlan ? planLabel(subPlan) : ''}</strong>. Solo falta que actives la cuenta en la pestaña <strong>Perfil</strong> para que pueda acceder al portal.
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Inactive plan migration banner */}
               {activeSub && subPlan && !subPlan.is_active && (
                 <div style={{ background: '#fffbeb', border: '2px solid #fcd34d', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
@@ -1056,7 +1082,9 @@ function UserPanel({
                 </div>
               ) : (
                 <div className="alert alert-info" style={{ fontSize: 12, marginBottom: 16 }}>
-                  Sin suscripción. Rellena el formulario para crear una.
+                  {profile.status === 'pending_verification'
+                    ? 'Aún sin plan contratado. Puedes crearlo manualmente o esperar a que el venue lo haga desde la web.'
+                    : 'Sin suscripción. Rellena el formulario para crear una.'}
                 </div>
               )}
 
@@ -1117,6 +1145,7 @@ function UserPanel({
                   <select className="form-input" value={subForm.status}
                     onChange={e => setSubForm(f => ({ ...f, status: e.target.value as Subscription['status'] }))}>
                     <option value="trial">Trial (pendiente de cobro)</option>
+                    <option value="trial_expired">Fin de trial — pendiente de cobro</option>
                     <option value="active">Activo (pagado ✓)</option>
                     <option value="paused">Pausado</option>
                     <option value="cancelled">Cancelado</option>
@@ -1147,16 +1176,33 @@ function UserPanel({
                     onChange={e => setSubForm(f => ({ ...f, start_date: e.target.value }))} />
                 </div>
 
-                {/* Trial end — solo si status=trial */}
-                {subForm.status === 'trial' && (
-                  <div className="form-group" style={{ background: '#fffbeb', padding: '10px 12px', borderRadius: 8, border: '1px solid #fcd34d' }}>
-                    <label className="form-label" style={{ color: '#92400e', display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={12} /> Fin del trial</label>
+                {/* Trial end — si status=trial (editable) o trial_expired (solo lectura) */}
+                {(subForm.status === 'trial' || subForm.status === 'trial_expired') && (
+                  <div className="form-group" style={{
+                    background: subForm.status === 'trial_expired' ? '#fff5f5' : '#fffbeb',
+                    padding: '10px 12px', borderRadius: 8,
+                    border: `1px solid ${subForm.status === 'trial_expired' ? '#fca5a5' : '#fcd34d'}`,
+                  }}>
+                    <label className="form-label" style={{ color: subForm.status === 'trial_expired' ? '#c0392b' : '#92400e', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {subForm.status === 'trial_expired'
+                        ? <><AlertTriangle size={12} /> Fin de trial (expirado)</>
+                        : <><Clock size={12} /> Fin del trial</>}
+                      {subForm.status === 'trial' && (
+                        <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 400, color: '#b45309' }}>
+                          Config global: {trialConfig.trial_days}d
+                        </span>
+                      )}
+                    </label>
                     <input className="form-input" type="date" value={subForm.trial_end_date}
-                      onChange={e => setSubForm(f => ({ ...f, trial_end_date: e.target.value }))} />
+                      readOnly={subForm.status === 'trial_expired'}
+                      style={subForm.status === 'trial_expired' ? { background: '#fee2e2', color: '#c0392b', cursor: 'default' } : {}}
+                      onChange={e => subForm.status === 'trial' && setSubForm(f => ({ ...f, trial_end_date: e.target.value }))} />
                     {subForm.trial_end_date && (() => {
                       const d = trialDaysLeft(subForm.trial_end_date)
-                      return <div style={{ fontSize: 10, color: '#b45309', marginTop: 3 }}>
-                        {d === null ? '' : d < 0 ? <><AlertTriangle size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> Ya ha expirado</> : `${d} días desde hoy`}
+                      return <div style={{ fontSize: 10, color: subForm.status === 'trial_expired' ? '#c0392b' : '#b45309', marginTop: 3 }}>
+                        {d === null ? '' : d < 0
+                          ? <><AlertTriangle size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> Expiró hace {Math.abs(d)} día{Math.abs(d) !== 1 ? 's' : ''}</>
+                          : `${d} días desde hoy`}
                       </div>
                     })()}
                   </div>
@@ -1291,6 +1337,90 @@ function UserPanel({
           )}
 
           {/* ── Historial ── */}
+          {/* ── Equipo ── */}
+          {tab === 'equipo' && (
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 14 }}>
+                Usuarios del equipo
+              </div>
+
+              {/* Datos del titular */}
+              <div style={{ background: 'var(--cream)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>
+                  Titular de la cuenta
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 2 }}>Nombre</div>
+                    <div style={{ fontSize: 13, color: 'var(--charcoal)', fontWeight: 500 }}>
+                      {[profile.first_name, profile.last_name].filter(Boolean).join(' ') || '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 2 }}>Email</div>
+                    <div style={{ fontSize: 13, color: 'var(--charcoal)' }}>{profile.email || '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 2 }}>Teléfono</div>
+                    <div style={{ fontSize: 13, color: 'var(--charcoal)' }}>{profile.phone || '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 2 }}>Web del venue</div>
+                    <div style={{ fontSize: 13, color: 'var(--charcoal)' }}>
+                      {(profile as any).venue_website
+                        ? <a href={(profile as any).venue_website} target="_blank" rel="noreferrer"
+                            style={{ color: 'var(--gold)', textDecoration: 'none' }}>
+                            {(profile as any).venue_website}
+                          </a>
+                        : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 2 }}>Ciudad</div>
+                    <div style={{ fontSize: 13, color: 'var(--charcoal)' }}>{profile.city || '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 2 }}>Tipo de venue</div>
+                    <div style={{ fontSize: 13, color: 'var(--charcoal)' }}>{(profile as any).venue_type || '—'}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Otros miembros */}
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>
+                Otros usuarios
+              </div>
+              {teamLoading ? (
+                <div style={{ textAlign: 'center', padding: 32, color: 'var(--warm-gray)', fontSize: 13 }}>Cargando...</div>
+              ) : teamMembers.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '28px 20px', background: 'var(--cream)', borderRadius: 10, color: 'var(--warm-gray)', fontSize: 13 }}>
+                  <User size={24} style={{ marginBottom: 8, opacity: .3, display: 'block', margin: '0 auto 8px' }} />
+                  Solo hay un usuario en esta cuenta.
+                  <div style={{ fontSize: 11, marginTop: 4 }}>En el futuro se podrán invitar miembros del equipo.</div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {teamMembers.map(m => (
+                    <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--cream)', borderRadius: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, color: 'var(--warm-gray)', flexShrink: 0 }}>
+                        {(m.first_name?.[0] || m.role?.[0] || '?').toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)' }}>
+                          {[m.first_name, m.last_name].filter(Boolean).join(' ') || 'Sin nombre'}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{m.role}</div>
+                      </div>
+                      <div style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: m.status === 'active' ? 'rgba(22,163,74,0.1)' : 'rgba(156,163,175,0.15)', color: m.status === 'active' ? '#16a34a' : 'var(--warm-gray)' }}>
+                        {m.status}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {tab === 'historial' && (
             <div>
               {historyLoading ? (
@@ -1386,6 +1516,7 @@ export default function AdminPage() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [userVenues, setUserVenues]       = useState<UserVenue[]>([])
   const [saving, setSaving]               = useState(false)
+  const [trialConfig, setTrialConfig]     = useState<TrialConfig>({ is_active: true, trial_days: 14, trial_plan_id: null })
   const [success, setSuccess]             = useState('')
   const [error, setError]                 = useState('')
   const [search, setSearch]               = useState('')
@@ -1408,16 +1539,18 @@ export default function AdminPage() {
     const { data: me } = await supabase.from('venue_profiles').select('role').eq('user_id', session.user.id).single()
     if (me?.role !== 'admin') { router.push('/dashboard'); return }
 
-    const [usersRes, { data: plansData }, { data: subsData }, { data: uvData }] = await Promise.all([
+    const [usersRes, { data: plansData }, { data: subsData }, { data: uvData }, trialRes] = await Promise.all([
       fetch('/api/admin/users').then(r => r.json()),
       supabase.from('venue_plans').select('id, name, display_name, billing_cycles, trial_days, is_active'),
       supabase.from('venue_subscriptions').select('*'),
       supabase.from('user_venues').select('*'),
+      fetch('/api/admin/trial-config').then(r => r.json()),
     ])
     if (usersRes?.profiles) setProfiles(usersRes.profiles)
     if (plansData) setPlans(plansData)
     if (subsData)  setSubscriptions(subsData)
     if (uvData)    setUserVenues(uvData)
+    if (trialRes?.config) setTrialConfig(trialRes.config)
 
     // Show the page immediately — load WP venues in the background (non-blocking)
     setLoading(false)
@@ -1489,9 +1622,7 @@ export default function AdminPage() {
   }
 
   const handleAssignVenue = async (
-    userId: string, wpId: number, planId: string,
-    cycle: string,
-    startTrial: boolean, trialDays: number,
+    userId: string, wpId: number, planId: string, cycle: string,
   ) => {
     setSaving(true)
     try {
@@ -1501,8 +1632,6 @@ export default function AdminPage() {
         body: JSON.stringify({
           user_id: userId, wp_venue_id: wpId,
           plan_id: planId || null, billing_cycle: cycle || null,
-          start_trial: startTrial,
-          trial_days: trialDays,
         }),
       })
       const data = await res.json()
@@ -1514,7 +1643,7 @@ export default function AdminPage() {
         const { data: subData } = await supabase.from('venue_subscriptions').select('*').eq('user_id', userId)
         if (subData) setSubscriptions(p => [...p.filter(s => s.user_id !== userId), ...subData])
       }
-      notify(startTrial ? 'Venue asignado ✓ — trial iniciado' : 'Venue asignado ✓')
+      notify('Venue asignado ✓')
     } catch (e: any) { notify(e.message || 'Error al asignar venue', true) }
     setSaving(false)
   }
@@ -1653,9 +1782,10 @@ export default function AdminPage() {
     const matchPlan =
       filterPlan === 'all'      ? true :
       filterPlan === 'none'     ? !info :
-      filterPlan === 'trial'    ? info?.sub.status === 'trial' :
-      filterPlan === 'expiring' ? expiringTrials.some(s => s.user_id === p.user_id) :
-      filterPlan === 'paused'   ? info?.sub.status === 'paused' :
+      filterPlan === 'trial'         ? info?.sub.status === 'trial' :
+      filterPlan === 'trial_expired' ? info?.sub.status === 'trial_expired' :
+      filterPlan === 'expiring'      ? expiringTrials.some(s => s.user_id === p.user_id) :
+      filterPlan === 'paused'        ? info?.sub.status === 'paused' :
       isPlanId                  ? info?.sub.plan_id === filterPlan : true
     const name   = [p.first_name, p.last_name].filter(Boolean).join(' ').toLowerCase()
     const matchQ = !search
@@ -1681,12 +1811,14 @@ export default function AdminPage() {
     s.status === 'trial' &&
     !subscriptions.some(s2 => s2.user_id === s.user_id && s2.status === 'trial' && s2.id > s.id)
   )
+  const uniqueTrialExpiredSubs = subscriptions.filter(s => s.status === 'trial_expired')
   const subCounts = {
-    active:   uniqueActiveSubs.length,
-    trial:    uniqueTrialSubs.length,
-    premium:  uniqueActiveSubs.filter(s => plans.find(p => p.id === s.plan_id)?.name !== 'basic').length,
-    basic:    uniqueActiveSubs.filter(s => plans.find(p => p.id === s.plan_id)?.name === 'basic').length,
-    expiring: expiringTrials.length,
+    active:        uniqueActiveSubs.length,
+    trial:         uniqueTrialSubs.length,
+    trial_expired: uniqueTrialExpiredSubs.length,
+    premium:       uniqueActiveSubs.filter(s => plans.find(p => p.id === s.plan_id)?.name !== 'basic').length,
+    basic:         uniqueActiveSubs.filter(s => plans.find(p => p.id === s.plan_id)?.name === 'basic').length,
+    expiring:      expiringTrials.length,
   }
 
   if (loading) return (
@@ -1750,7 +1882,10 @@ export default function AdminPage() {
             <div className="stat-card">
               <div className="stat-label">En trial</div>
               <div className="stat-value" style={{ color: subCounts.trial > 0 ? '#b45309' : undefined }}>{subCounts.trial}</div>
-              <div className="stat-sub">Pendientes de cobro</div>
+              <div className="stat-sub">
+                Pendientes de cobro
+                {subCounts.trial_expired > 0 && <> · <span style={{ color: '#c0392b', fontWeight: 600 }}>{subCounts.trial_expired} fin de trial</span></>}
+              </div>
             </div>
             <div className="stat-card" style={{ cursor: subCounts.expiring > 0 ? 'pointer' : undefined }}
               onClick={() => subCounts.expiring > 0 && setFilterPlan('expiring')}>
@@ -1793,6 +1928,7 @@ export default function AdminPage() {
                   </option>
                 ))}
                 <option value="trial">En trial</option>
+                <option value="trial_expired">Fin de trial {subCounts.trial_expired > 0 ? `(${subCounts.trial_expired})` : ''}</option>
                 <option value="expiring">Trial expirando {subCounts.expiring > 0 ? `(${subCounts.expiring})` : ''}</option>
                 <option value="paused">Pausados</option>
                 <option value="none">Sin plan</option>
@@ -1981,6 +2117,7 @@ export default function AdminPage() {
           onClose={() => setSelected(null)}
           onSaveProfile={handleSaveProfile}
           onAssignVenue={handleAssignVenue}
+          trialConfig={trialConfig}
           onRemoveVenue={handleRemoveVenue}
           onSaveSubscription={handleSaveSubscription}
           onRegisterPayment={handleRegisterPayment}

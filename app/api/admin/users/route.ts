@@ -98,10 +98,12 @@ export async function PATCH(req: NextRequest) {
       .from('venue_profiles').update(rawFields).eq('user_id', user_id).select().single()
     if (error) throw error
 
-    // Auto-send activation email when status changes to 'active'
+    // Auto-send activation email + create trial when status changes to 'active'
     const wasActivated =
       current?.status === 'pending_verification' && rawFields.status === 'active'
+
     if (wasActivated) {
+      // 1. Send activation email
       try {
         const { data: { users } } = await svc.auth.admin.listUsers({ perPage: 1000 })
         const authUser = users?.find(u => u.id === user_id)
@@ -111,7 +113,39 @@ export async function PATCH(req: NextRequest) {
         }
       } catch (mailErr) {
         console.error('[activation email]', mailErr)
-        // Don't fail the request if email fails
+      }
+
+      // 2. Auto-create trial subscription if trial is enabled and venue has no subscription yet
+      try {
+        const { data: trialConfig } = await svc
+          .from('trial_config').select('is_active, trial_days, trial_plan_id').eq('id', 1).maybeSingle()
+
+        if (trialConfig?.is_active) {
+          // Only create trial if venue doesn't already have any subscription
+          const { data: existingSub } = await svc
+            .from('venue_subscriptions')
+            .select('id')
+            .eq('user_id', user_id)
+            .in('status', ['active', 'trial', 'paused'])
+            .maybeSingle()
+
+          if (!existingSub) {
+            const today    = new Date()
+            const trialEnd = new Date()
+            trialEnd.setDate(today.getDate() + (trialConfig.trial_days ?? 14))
+
+            await svc.from('venue_subscriptions').insert({
+              user_id,
+              plan_id:        trialConfig.trial_plan_id ?? null,
+              billing_cycle:  null,
+              status:         'trial',
+              start_date:     today.toISOString().slice(0, 10),
+              trial_end_date: trialEnd.toISOString().slice(0, 10),
+            })
+          }
+        }
+      } catch (trialErr) {
+        console.error('[auto trial]', trialErr)
       }
     }
 

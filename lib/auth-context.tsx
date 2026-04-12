@@ -20,20 +20,23 @@ const AuthContext = createContext<AuthContextType>({
 async function fetchProfileAndVenues(userId: string) {
   const supabase = createClient()
 
-  const [venuesResult, profileResult] = await Promise.all([
-    supabase.from('user_venues').select('id, wp_venue_id').eq('user_id', userId),
-    supabase.from('venue_profiles').select('*').eq('user_id', userId).maybeSingle(),
-  ])
+  // Fetch venues via browser client (RLS: user sees own venues)
+  const venuesResult = await supabase
+    .from('user_venues').select('id, wp_venue_id').eq('user_id', userId)
 
-  let profile = profileResult.data ?? null
-
-  // Auto-create profile for self-registered users (admin-created users already have one)
-  if (!profile) {
-    try {
-      await fetch('/api/auth/ensure-profile', { method: 'POST' })
-      const retry = await supabase.from('venue_profiles').select('*').eq('user_id', userId).maybeSingle()
-      profile = retry.data ?? null
-    } catch { /* ignore — will retry on next load */ }
+  // Fetch profile via service-role API to bypass RLS.
+  // This is required for admin users whose venue_profiles rows
+  // may not be readable via the anon/user-scoped Supabase client.
+  let profile: any = null
+  try {
+    const profileRes = await fetch('/api/auth/profile')
+    const { profile: p } = await profileRes.json()
+    profile = p ?? null
+  } catch {
+    // Fallback: try direct browser client (works for most venue owners)
+    const { data } = await supabase
+      .from('venue_profiles').select('*').eq('user_id', userId).maybeSingle()
+    profile = data ?? null
   }
 
   // Fetch active/trial subscription via API (bypasses RLS on venue_subscriptions)

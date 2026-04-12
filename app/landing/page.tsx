@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
-  Check, X, ChevronRight, Menu, X as XIcon,
+  Check, ChevronRight, Menu, X as XIcon,
   ChevronDown, ArrowRight, ArrowUpRight,
 } from 'lucide-react'
-import { BASIC_FALLBACK, PREMIUM_FALLBACK, type PlanFeatures } from '@/lib/use-plan-features'
+import { FEATURE_DEFS, type PlanFeatures } from '@/lib/use-plan-features'
 import type { BillingCycle } from '@/lib/billing-types'
 
 type Plan = {
@@ -99,15 +99,23 @@ const TRANSLATIONS = {
       cta: 'Start free',
     },
     featureLabels: [
-      { key: 'ficha',             label: 'Venue listing' },
-      { key: 'leads',             label: 'Lead management' },
-      { key: 'leads_date_filter', label: 'Filter leads by date' },
-      { key: 'leads_export',      label: 'Export leads to CSV' },
-      { key: 'calendario',        label: 'Availability calendar' },
-      { key: 'propuestas',        label: 'Digital proposals' },
-      { key: 'propuestas_web',    label: 'Public proposal page' },
-      { key: 'comunicacion',      label: 'Communication & rates' },
-      { key: 'estadisticas',      label: 'Stats & metrics' },
+      // Basic
+      { key: 'ficha',                  label: 'Venue listing' },
+      { key: 'leads',                  label: 'Lead management' },
+      { key: 'leads_date_filter',      label: 'Filter leads by date' },
+      { key: 'calendario',             label: 'Availability calendar' },
+      { key: 'estadisticas',           label: 'Basic analytics' },
+      // Premium
+      { key: 'leads_export',           label: 'Export leads to CSV' },
+      { key: 'pipeline',               label: 'Sales pipeline' },
+      { key: 'propuestas',             label: 'Digital proposals' },
+      { key: 'propuestas_web',         label: 'Public proposal page' },
+      { key: 'propuestas_pdf',         label: 'Proposal PDF download' },
+      { key: 'comunicacion',           label: 'Rates & pricing zones' },
+      { key: 'estadisticas_avanzadas', label: 'Advanced analytics' },
+      { key: 'recordatorios',          label: 'Automatic reminders' },
+      { key: 'multiusuario',           label: 'Multiple users' },
+      { key: 'soporte_prioritario',    label: 'Priority support' },
     ] as { key: keyof PlanFeatures; label: string }[],
     faq: {
       eyebrow: 'FAQ',
@@ -215,15 +223,23 @@ const TRANSLATIONS = {
       cta: 'Empieza gratis',
     },
     featureLabels: [
-      { key: 'ficha',             label: 'Ficha del venue' },
-      { key: 'leads',             label: 'Gestión de leads' },
-      { key: 'leads_date_filter', label: 'Filtrar leads por fecha' },
-      { key: 'leads_export',      label: 'Exportar leads a CSV' },
-      { key: 'calendario',        label: 'Calendario de disponibilidad' },
-      { key: 'propuestas',        label: 'Propuestas digitales' },
-      { key: 'propuestas_web',    label: 'Web de propuesta pública' },
-      { key: 'comunicacion',      label: 'Comunicación y tarifas' },
-      { key: 'estadisticas',      label: 'Estadísticas y métricas' },
+      // Básico
+      { key: 'ficha',                  label: 'Ficha del venue' },
+      { key: 'leads',                  label: 'Gestión de leads' },
+      { key: 'leads_date_filter',      label: 'Filtrar leads por fecha' },
+      { key: 'calendario',             label: 'Calendario de disponibilidad' },
+      { key: 'estadisticas',           label: 'Estadísticas básicas' },
+      // Premium
+      { key: 'leads_export',           label: 'Exportar leads a CSV' },
+      { key: 'pipeline',               label: 'Pipeline de ventas' },
+      { key: 'propuestas',             label: 'Propuestas digitales' },
+      { key: 'propuestas_web',         label: 'Web pública de propuesta' },
+      { key: 'propuestas_pdf',         label: 'Descarga PDF de propuesta' },
+      { key: 'comunicacion',           label: 'Tarifas y zonas de precio' },
+      { key: 'estadisticas_avanzadas', label: 'Estadísticas avanzadas' },
+      { key: 'recordatorios',          label: 'Recordatorios automáticos' },
+      { key: 'multiusuario',           label: 'Múltiples usuarios' },
+      { key: 'soporte_prioritario',    label: 'Soporte prioritario' },
     ] as { key: keyof PlanFeatures; label: string }[],
     faq: {
       eyebrow: 'FAQ',
@@ -672,9 +688,15 @@ export default function LandingPage() {
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,1fr)', gap: 24 }}>
               {plans.map(plan => {
                 const isPremium = plan.name.toLowerCase().includes('premium')
-                const features: PlanFeatures = isPremium ? PREMIUM_FALLBACK : BASIC_FALLBACK
                 const cycle = plan.billing_cycles.find((c: BillingCycle) => billingAnnual ? c.interval_months === 12 : c.interval_months === 1) || plan.billing_cycles[0]
-                const sorted = [...t.featureLabels].sort((a, b) => (features[a.key] ? 0 : 1) - (features[b.key] ? 0 : 1))
+                // Build a tier lookup map from FEATURE_DEFS
+                const tierMap = Object.fromEntries(FEATURE_DEFS.map(f => [f.key, f.tier]))
+                // Basic: only basic tier; Premium: basic + premium (no restrictions, never show X)
+                const visibleFeatures = t.featureLabels.filter(f =>
+                  isPremium
+                    ? tierMap[f.key] !== 'restriction'
+                    : tierMap[f.key] === 'basic'
+                )
                 return (
                   <div key={plan.id} style={{ borderRadius: 16, padding: '36px 32px', border: isPremium ? `2px solid ${C.accent}` : `1px solid ${C.border}`, background: isPremium ? C.bg : C.white, position: 'relative', boxShadow: isPremium ? '0 12px 40px rgba(121,111,78,0.12)' : undefined }}>
                     {isPremium && <div style={{ position: 'absolute', top: -1, left: '50%', transform: 'translateX(-50%)', background: C.accent, color: C.white, fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '4px 16px', borderRadius: '0 0 8px 8px' }}>{t.pricing.recommended}</div>}
@@ -686,15 +708,12 @@ export default function LandingPage() {
                       {billingAnnual && cycle && <div style={{ fontFamily: SANS, fontSize: 12, color: C.muted, marginTop: 4 }}>{Math.round(cycle.price / 12)}€{t.pricing.billedAnnually}</div>}
                     </div>
                     <div>
-                      {sorted.map(f => {
-                        const ok = features[f.key]
-                        return (
-                          <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', opacity: ok ? 1 : 0.38 }}>
-                            {ok ? <Check size={14} color={C.accent} strokeWidth={2.5} style={{ flexShrink: 0 }} /> : <X size={14} color={C.muted} strokeWidth={2} style={{ flexShrink: 0 }} />}
-                            <span style={{ fontFamily: SANS, fontSize: 13, color: ok ? C.dark : C.muted }}>{f.label}</span>
-                          </div>
-                        )
-                      })}
+                      {visibleFeatures.map(f => (
+                        <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+                          <Check size={14} color={C.accent} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                          <span style={{ fontFamily: SANS, fontSize: 13, color: C.dark }}>{f.label}</span>
+                        </div>
+                      ))}
                     </div>
                     <Link href="/registro" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', fontFamily: SANS, fontSize: 14, fontWeight: 600, color: C.white, background: isPremium ? C.accent : C.dark, padding: '14px 0', borderRadius: 8, marginTop: 28, transition: 'opacity 0.2s' }}
                     onMouseOver={e => ((e.currentTarget as HTMLElement).style.opacity = '0.85')}

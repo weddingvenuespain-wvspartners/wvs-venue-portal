@@ -2,8 +2,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
-import { usePlanFeatures, BASIC_FALLBACK, PREMIUM_FALLBACK, type PlanFeatures } from '@/lib/use-plan-features'
-import { Check, X, Loader2, ArrowLeft, Shield, LogOut, Clock } from 'lucide-react'
+import { usePlanFeatures, FEATURE_DEFS, type PlanFeatures } from '@/lib/use-plan-features'
+import { Check, Loader2, ArrowLeft, Shield, LogOut, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import type { BillingCycle } from '@/lib/billing-types'
 import { Suspense } from 'react'
@@ -14,21 +14,14 @@ type Plan = {
   display_name: string | null
   description: string | null
   billing_cycles: BillingCycle[]
+  permissions: Partial<PlanFeatures> | null
   is_active: boolean
   visible_on_web: boolean
 }
 
-const FEATURE_LABELS: { key: keyof PlanFeatures; label: string }[] = [
-  { key: 'ficha',             label: 'Ficha del venue' },
-  { key: 'leads',             label: 'Gestión de leads' },
-  { key: 'leads_date_filter', label: 'Filtrar leads por fecha' },
-  { key: 'leads_export',      label: 'Exportar leads a CSV' },
-  { key: 'calendario',        label: 'Calendario de disponibilidad' },
-  { key: 'propuestas',        label: 'Propuestas digitales' },
-  { key: 'propuestas_web',    label: 'Web de propuesta pública' },
-  { key: 'comunicacion',      label: 'Comunicación y tarifas' },
-  { key: 'estadisticas',      label: 'Estadísticas y métricas' },
-]
+// Features shown per tier on pricing page (restrictions never shown)
+const BASIC_FEATURES   = FEATURE_DEFS.filter(f => f.tier === 'basic')
+const PREMIUM_FEATURES = FEATURE_DEFS.filter(f => f.tier !== 'restriction')
 
 function PricingPageInner() {
   const router = useRouter()
@@ -243,8 +236,8 @@ function PricingPageInner() {
           </div>
         </div>
 
-        {/* Pending verification banner */}
-        {isPendingVerification && (
+        {/* Pending verification banner — two states */}
+        {isPendingVerification && !hasPlan && (
           <div style={{
             background: 'rgba(121,111,78,0.08)',
             border: '1px solid rgba(121,111,78,0.25)',
@@ -263,7 +256,32 @@ function PricingPageInner() {
                 Estamos verificando tu venue
               </p>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.6 }}>
-                Nuestro equipo revisará tu registro en menos de <strong>24–48 horas</strong>. Recibirás un email en cuanto tu cuenta esté activada y podrás elegir tu plan. ¡Gracias por tu paciencia!
+                Nuestro equipo revisará tu registro en menos de <strong>24–48 horas</strong>. Mientras tanto ya puedes contratar tu plan — empezará en cuanto activemos tu cuenta.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {isPendingVerification && hasPlan && (
+          <div style={{
+            background: 'rgba(22,163,74,0.06)',
+            border: '1px solid rgba(22,163,74,0.25)',
+            borderRadius: 12, padding: '20px 24px',
+            marginBottom: 28, display: 'flex', gap: 16, alignItems: 'flex-start',
+          }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(22,163,74,0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Check size={18} color="#16a34a" />
+            </div>
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', fontFamily: 'Manrope, sans-serif' }}>
+                Plan contratado — verificación en curso
+              </p>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.6 }}>
+                Perfecto, ya tienes tu plan <strong>{planName}</strong> listo. En cuanto nuestro equipo verifique tu venue recibirás un email y podrás acceder al portal.
               </p>
             </div>
           </div>
@@ -290,7 +308,8 @@ function PricingPageInner() {
         }}>
           {plans.map(plan => {
             const isPremium = plan.name.toLowerCase().includes('premium')
-            const features = isPremium ? PREMIUM_FALLBACK : BASIC_FALLBACK
+            // Tier-aware feature list: basic only shows basic features; premium shows all non-restriction
+            const featureDefs = isPremium ? PREMIUM_FEATURES : BASIC_FEATURES
             const isCurrentPlan = isLoggedIn && hasPlan && (
               (isPremium && planTier === 'premium') ||
               (!isPremium && planTier === 'basic')
@@ -356,51 +375,42 @@ function PricingPageInner() {
                   )}
                 </div>
 
-                {/* Feature list */}
+                {/* Feature list — only shows features for this tier (no X / no lock for absent features) */}
                 <div style={{ marginTop: 20, marginBottom: 24 }}>
-                  {[...FEATURE_LABELS].sort((a, b) => {
-                    return (features[a.key] ? 0 : 1) - (features[b.key] ? 0 : 1)
-                  }).map(({ key, label }) => {
-                    const included = features[key]
-                    return (
-                      <div key={key} style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '5px 0', fontSize: 13,
-                        color: included ? 'var(--charcoal)' : 'var(--warm-gray)',
-                        opacity: included ? 1 : 0.4,
-                      }}>
-                        {included
-                          ? <Check size={15} color="var(--gold)" strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                          : <X size={15} style={{ flexShrink: 0 }} />
-                        }
-                        {label}
-                      </div>
-                    )
-                  })}
+                  {featureDefs.map(({ key, label }) => (
+                    <div key={key} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '5px 0', fontSize: 13,
+                      color: 'var(--charcoal)',
+                    }}>
+                      <Check size={15} color="var(--gold)" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                      {label}
+                    </div>
+                  ))}
                 </div>
 
                 {/* CTA button */}
                 <button
-                  onClick={() => !isPendingVerification && cycle && handleSelectPlan(plan.id, cycle.id)}
-                  disabled={!!submitting || isCurrentPlan || !cycle || isPendingVerification}
+                  onClick={() => cycle && handleSelectPlan(plan.id, cycle.id)}
+                  disabled={!!submitting || isCurrentPlan || !cycle}
                   style={{
                     width: '100%', padding: '12px 0', borderRadius: 8, border: 'none',
                     fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 500,
-                    cursor: submitting || isCurrentPlan || isPendingVerification ? 'default' : 'pointer',
+                    cursor: submitting || isCurrentPlan ? 'default' : 'pointer',
                     transition: 'all 0.15s',
-                    background: isCurrentPlan || isPendingVerification ? 'var(--ivory)' : isPremium ? 'var(--gold)' : 'var(--charcoal)',
-                    color: isCurrentPlan || isPendingVerification ? 'var(--warm-gray)' : '#fff',
-                    opacity: (submitting && !isLoading) || isPendingVerification ? 0.5 : 1,
+                    background: isCurrentPlan ? 'var(--ivory)' : isPremium ? 'var(--gold)' : 'var(--charcoal)',
+                    color: isCurrentPlan ? 'var(--warm-gray)' : '#fff',
+                    opacity: (submitting && !isLoading) ? 0.5 : 1,
                   }}
                 >
                   {isLoading ? (
                     <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
                   ) : isCurrentPlan ? (
                     'Plan actual'
-                  ) : isPendingVerification ? (
-                    'Pendiente de verificación'
                   ) : !isLoggedIn ? (
                     'Empezar ahora'
+                  ) : isPendingVerification ? (
+                    'Contratar y esperar activación'
                   ) : (
                     'Contratar'
                   )}

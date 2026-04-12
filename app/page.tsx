@@ -1,23 +1,19 @@
 'use client'
 import { useEffect } from 'react'
 import { useAuth } from '@/lib/auth-context'
-import { usePlanFeatures } from '@/lib/use-plan-features'
 import LandingPage from '@/app/landing/page'
 
 export default function Home() {
-  const { user, profile, loading } = useAuth()
-  const { hasPlan } = usePlanFeatures()
-  const isAdmin = profile?.role === 'admin'
+  const { user, loading } = useAuth()
 
   useEffect(() => {
     if (!loading && user) {
-      if (isAdmin || hasPlan) {
-        window.location.replace('/dashboard')
-      } else {
-        window.location.replace('/pricing')
-      }
+      // Always send logged-in users to dashboard.
+      // Dashboard and useRequireSubscription handle all routing from there
+      // (admin → AdminDashboard, no plan → /pricing, trial expired → /pricing, etc.)
+      window.location.replace('/dashboard')
     }
-  }, [user, loading, isAdmin, hasPlan])
+  }, [user, loading])
 
   // Not logged in: show the landing page
   if (!loading && !user) {

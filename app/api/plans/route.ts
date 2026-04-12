@@ -7,7 +7,7 @@ export async function GET() {
     const svc = getServiceClient()
     const { data, error } = await svc
       .from('venue_plans')
-      .select('id, name, display_name, description, billing_cycles, is_active, visible_on_web')
+      .select('id, name, display_name, description, billing_cycles, permissions, is_active, visible_on_web')
       .eq('is_active', true)
       .eq('visible_on_web', true)
       .order('created_at', { ascending: true })

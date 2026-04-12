@@ -8,41 +8,19 @@ import { Plus, Edit2, ToggleLeft, ToggleRight, ArrowLeft, Trash2, Check, X, Eye,
 import type { PlanFeatures } from '@/lib/use-plan-features'
 import { type BillingCycle, EMPTY_CYCLE, CYCLE_PRESETS } from '@/lib/billing-types'
 
-// ─── Feature definitions ──────────────────────────────────────────────────────
+// ─── Feature definitions (imported from lib) ─────────────────────────────────
+import { FEATURE_DEFS, BASIC_FALLBACK, PREMIUM_FALLBACK } from '@/lib/use-plan-features'
 
-type FeatureDef = {
-  key: keyof PlanFeatures
-  label: string
-  description: string
-  group: 'Básico' | 'Premium' | 'Restricciones'
-  dangerous?: boolean
-}
-
-const FEATURE_DEFS: FeatureDef[] = [
-  { key: 'ficha',             group: 'Básico',        label: 'Mi Ficha',               description: 'Editar y gestionar la ficha del venue' },
-  { key: 'calendario',        group: 'Básico',        label: 'Calendario',              description: 'Ver y gestionar disponibilidad de fechas' },
-  { key: 'leads',             group: 'Básico',        label: 'Leads',                   description: 'Recibir y gestionar consultas de clientes' },
-  { key: 'leads_date_filter', group: 'Básico',        label: 'Filtro por fecha (leads)', description: 'Filtrar leads por rango de fechas' },
-  { key: 'leads_export',      group: 'Premium',       label: 'Exportar leads CSV',      description: 'Descargar leads a Excel/CSV' },
-  { key: 'propuestas',        group: 'Premium',       label: 'Propuestas digitales',    description: 'Crear y enviar propuestas personalizadas' },
-  { key: 'propuestas_web',    group: 'Premium',       label: 'Web de propuesta',        description: 'Enlace público de propuesta para el cliente' },
-  { key: 'comunicacion',      group: 'Premium',       label: 'Comunicación / Tarifas',  description: 'Gestión de tarifas, zonas y períodos de precio' },
-  { key: 'estadisticas',      group: 'Premium',       label: 'Estadísticas',            description: 'Dashboard de métricas y análisis de leads' },
-  { key: 'leads_new_only',    group: 'Restricciones', label: 'Solo leads nuevos',       description: 'Limita la vista de leads a los de estado "Nuevo" únicamente', dangerous: true },
-]
-
-const PERMISSIONS_BASIC: PlanFeatures = {
-  ficha: true, calendario: true, leads: true, leads_date_filter: true,
-  leads_new_only: false, leads_export: false,
-  propuestas: false, propuestas_web: false, comunicacion: false, estadisticas: false,
-}
-const PERMISSIONS_PREMIUM: PlanFeatures = {
-  ficha: true, calendario: true, leads: true, leads_date_filter: true,
-  leads_new_only: false, leads_export: true,
-  propuestas: true, propuestas_web: true, comunicacion: true, estadisticas: true,
-}
+const PERMISSIONS_BASIC   = BASIC_FALLBACK
+const PERMISSIONS_PREMIUM = PREMIUM_FALLBACK
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type TrialConfig = {
+  is_active: boolean
+  trial_days: number
+  trial_plan_id: string | null
+}
 
 type Plan = {
   id: string
@@ -130,23 +108,30 @@ function CycleRow({
 
 // ─── Feature row ─────────────────────────────────────────────────────────────
 
-function FeatureRow({ def, checked, onChange }: { def: FeatureDef; checked: boolean; onChange: (v: boolean) => void }) {
+function FeatureRow({ def, checked, onChange }: { def: import('@/lib/use-plan-features').FeatureDef; checked: boolean; onChange: (v: boolean) => void }) {
+  const isRestriction = def.tier === 'restriction'
+  const isPremium     = def.tier === 'premium'
   return (
     <label style={{
       display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', borderRadius: 6,
       cursor: 'pointer', marginBottom: 5,
-      background: checked ? (def.dangerous ? '#fff5f5' : def.group === 'Premium' ? '#fef9ec' : '#f0fdf4') : '#f8f8f8',
-      border: `1px solid ${checked ? (def.dangerous ? '#fca5a5' : def.group === 'Premium' ? '#fde68a' : '#bbf7d0') : 'var(--ivory)'}`,
+      background: checked ? (isRestriction ? '#fff5f5' : isPremium ? '#fef9ec' : '#f0fdf4') : '#f8f8f8',
+      border: `1px solid ${checked ? (isRestriction ? '#fca5a5' : isPremium ? '#fde68a' : '#bbf7d0') : 'var(--ivory)'}`,
     }}>
       <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
-        style={{ marginTop: 2, width: 15, height: 15, accentColor: def.dangerous ? '#dc2626' : 'var(--gold)', flexShrink: 0 }} />
+        style={{ marginTop: 2, width: 15, height: 15, accentColor: isRestriction ? '#dc2626' : 'var(--gold)', flexShrink: 0 }} />
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--espresso)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--espresso)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {def.label}
-          {def.dangerous && <span style={{ fontSize: 9, background: '#fee2e2', color: '#dc2626', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>RESTRICCIÓN</span>}
-          {def.group === 'Premium' && !def.dangerous && <span style={{ fontSize: 9, background: '#fef9ec', color: '#92400e', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>PREMIUM</span>}
+          {isRestriction && <span style={{ fontSize: 9, background: '#fee2e2', color: '#dc2626', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>RESTRICCIÓN ⚠️</span>}
+          {isPremium && <span style={{ fontSize: 9, background: '#fef9ec', color: '#92400e', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>PREMIUM</span>}
         </div>
         <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{def.description}</div>
+        {isRestriction && checked && (
+          <div style={{ fontSize: 10, color: '#dc2626', marginTop: 4, fontStyle: 'italic' }}>
+            ⚠️ Esta restricción LIMITA al usuario. Actívala con cuidado.
+          </div>
+        )}
       </div>
     </label>
   )
@@ -168,6 +153,11 @@ export default function PlanesPage() {
   const [confirmDelete, setConfirmDelete] = useState<Plan | null>(null)
   const [deactivateWarning, setDeactivateWarning] = useState<Plan | null>(null)
 
+  // Trial config state
+  const [trialConfig, setTrialConfig]       = useState<TrialConfig>({ is_active: true, trial_days: 14, trial_plan_id: null })
+  const [trialSaving, setTrialSaving]       = useState(false)
+  const [trialSuccess, setTrialSuccess]     = useState('')
+
   useEffect(() => {
     const init = async () => {
       const supabase = createClient()
@@ -175,22 +165,60 @@ export default function PlanesPage() {
       if (!session) { router.push('/login'); return }
       const { data: me } = await supabase.from('venue_profiles').select('role').eq('user_id', session.user.id).single()
       if (me?.role !== 'admin') { router.push('/dashboard'); return }
-      const { data: plansData } = await supabase
-        .from('venue_plans').select('*').order('created_at', { ascending: true })
-      if (plansData) {
-        // Load active subscriber counts per plan
+
+      // Load plans and trial config in parallel
+      const [plansResult, trialResult] = await Promise.all([
+        supabase.from('venue_plans').select('*').order('created_at', { ascending: true }),
+        fetch('/api/admin/trial-config').then(r => r.json()),
+      ])
+
+      if (plansResult.data) {
         const { data: subCounts } = await supabase
           .from('venue_subscriptions')
           .select('plan_id')
           .in('status', ['active', 'trial', 'paused'])
         const countMap: Record<string, number> = {}
         subCounts?.forEach(s => { countMap[s.plan_id] = (countMap[s.plan_id] || 0) + 1 })
-        setPlans(plansData.map(p => ({ ...p, subscriber_count: countMap[p.id] || 0 })))
+        setPlans(plansResult.data.map((p: Plan) => ({ ...p, subscriber_count: countMap[p.id] || 0 })))
       }
+
+      if (trialResult.config) {
+        setTrialConfig(trialResult.config)
+      }
+
+      // Auto-select most basic plan if none configured yet
+      if (plansResult.data && !trialResult.config?.trial_plan_id) {
+        const basicPlan = plansResult.data.find((p: any) =>
+          p.name === 'basic' || p.name.toLowerCase().includes('basic')
+        ) ?? plansResult.data.find((p: any) => p.is_active)
+        if (basicPlan) {
+          setTrialConfig(c => ({ ...c, trial_plan_id: basicPlan.id }))
+        }
+      }
+
       setLoading(false)
     }
     init()
   }, [authLoading]) // eslint-disable-line
+
+  const handleSaveTrialConfig = async () => {
+    setTrialSaving(true)
+    try {
+      const res = await fetch('/api/admin/trial-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(trialConfig),
+      })
+      const result = await res.json()
+      if (!res.ok) { notify(result.error || 'Error al guardar configuración', true); return }
+      setTrialConfig(result.config)
+      setTrialSuccess('Configuración guardada ✓')
+      setTimeout(() => setTrialSuccess(''), 3000)
+    } catch (e: any) {
+      notify(e?.message || 'Error', true)
+    }
+    setTrialSaving(false)
+  }
 
   const notify = (msg: string, isErr = false) => {
     isErr ? setError(msg) : setSuccess(msg)
@@ -319,6 +347,114 @@ export default function PlanesPage() {
           {success && <div className="alert alert-success" style={{ marginBottom: 16 }}>{success}</div>}
           {error   && <div className="alert alert-error"   style={{ marginBottom: 16 }}>{error}</div>}
 
+          {/* ── Trial config section ─────────────────────────────────────────── */}
+          <div className="card" style={{ marginBottom: 28, border: trialConfig.is_active ? '1px solid rgba(196,151,90,0.3)' : '1px solid var(--ivory)' }}>
+            <div className="card-body" style={{ padding: '20px 24px' }}>
+
+              {/* Header row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 8, background: trialConfig.is_active ? 'rgba(196,151,90,0.12)' : 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Clock size={16} color={trialConfig.is_active ? 'var(--gold)' : 'var(--warm-gray)'} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)', fontFamily: 'Manrope, sans-serif' }}>
+                      Prueba gratuita (Trial)
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>
+                      Se activa automáticamente al aceptar un venue
+                    </div>
+                  </div>
+                </div>
+
+                {/* Master toggle — big and clear */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none', padding: '8px 14px', borderRadius: 8, background: trialConfig.is_active ? '#f0fdf4' : '#f9fafb', border: `1px solid ${trialConfig.is_active ? '#bbf7d0' : 'var(--ivory)'}` }}>
+                  <input
+                    type="checkbox"
+                    checked={trialConfig.is_active}
+                    onChange={e => setTrialConfig(c => ({ ...c, is_active: e.target.checked }))}
+                    style={{ width: 15, height: 15, accentColor: '#16a34a' }}
+                  />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: trialConfig.is_active ? '#15803d' : 'var(--warm-gray)' }}>
+                    {trialConfig.is_active ? 'Activo' : 'Inactivo'}
+                  </span>
+                </label>
+              </div>
+
+              {/* Main controls */}
+              <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 16, opacity: trialConfig.is_active ? 1 : 0.45, pointerEvents: trialConfig.is_active ? 'auto' : 'none' }}>
+
+                {/* Days — prominent */}
+                <div style={{ background: 'var(--cream)', borderRadius: 10, border: '1px solid var(--ivory)', padding: '14px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Duración</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={trialConfig.trial_days}
+                    onChange={e => setTrialConfig(c => ({ ...c, trial_days: parseInt(e.target.value) || 14 }))}
+                    style={{ width: '100%', padding: '4px 0', border: 'none', background: 'transparent', fontSize: 32, fontWeight: 700, color: 'var(--gold)', textAlign: 'center', fontFamily: 'Manrope, sans-serif', outline: 'none' }}
+                  />
+                  <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>días</span>
+                </div>
+
+                {/* Right side: plan selector + note */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Plan asignado durante el trial</label>
+                    <select
+                      className="form-input"
+                      value={trialConfig.trial_plan_id ?? ''}
+                      onChange={e => setTrialConfig(c => ({ ...c, trial_plan_id: e.target.value || null }))}
+                    >
+                      <option value="">Sin plan específico — acceso Premium completo</option>
+                      {plans.filter(p => p.is_active).map(p => (
+                        <option key={p.id} value={p.id}>{p.display_name || p.name}</option>
+                      ))}
+                      {plans.some(p => !p.is_active) && <option disabled>── Planes inactivos ──</option>}
+                      {plans.filter(p => !p.is_active).map(p => (
+                        <option key={p.id} value={p.id}>{p.display_name || p.name} (inactivo)</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Dynamic summary pill */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'rgba(196,151,90,0.07)', border: '1px solid rgba(196,151,90,0.2)' }}>
+                    <Clock size={12} color="var(--gold)" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                      Al activar un venue, se crea automáticamente un trial de{' '}
+                      <strong style={{ color: 'var(--charcoal)' }}>{trialConfig.trial_days} días</strong>
+                      {' '}con{' '}
+                      <strong style={{ color: 'var(--charcoal)' }}>
+                        {trialConfig.trial_plan_id
+                          ? `plan "${plans.find(p => p.id === trialConfig.trial_plan_id)?.display_name || plans.find(p => p.id === trialConfig.trial_plan_id)?.name}"`
+                          : 'acceso Premium completo'}
+                      </strong>.
+                      {' '}Si el venue ya contrató un plan, el trial no se crea.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--ivory)' }}>
+                {trialSuccess && (
+                  <span style={{ fontSize: 12, color: '#15803d', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Check size={13} /> {trialSuccess}
+                  </span>
+                )}
+                <button className="btn btn-primary btn-sm" onClick={handleSaveTrialConfig} disabled={trialSaving}>
+                  {trialSaving ? 'Guardando...' : 'Guardar configuración'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Plans section header ─────────────────────────────────────────── */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 14 }}>
+            Planes de pago
+          </div>
+
           {plans.length === 0 && (
             <div className="card" style={{ padding: 40, textAlign: 'center' }}>
               <div style={{ color: 'var(--warm-gray)', marginBottom: 16 }}>Aún no hay planes definidos.</div>
@@ -385,9 +521,13 @@ export default function PlanesPage() {
                       </div>
                     )}
 
-                    {/* Trial */}
+                    {/* Trial (global) */}
                     <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 12 }}>
-                      <Clock size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Trial: <strong>{plan.trial_days ?? 14} días</strong>
+                      <Clock size={11} style={{ display: 'inline', verticalAlign: 'middle' }} />
+                      {' '}Trial global:{' '}
+                      <strong style={{ color: trialConfig.is_active ? 'var(--gold)' : 'var(--warm-gray)' }}>
+                        {trialConfig.is_active ? `${trialConfig.trial_days} días` : 'desactivado'}
+                      </strong>
                       &nbsp;·&nbsp; <LandmarkIcon size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Domiciliación SEPA
                       &nbsp;·&nbsp; Preaviso: <strong>{cycles[0]?.cancel_notice_days ?? 15} días</strong>
                     </div>
@@ -400,9 +540,9 @@ export default function PlanesPage() {
                           {enabled.map(f => (
                             <span key={f.key} style={{
                               fontSize: 11, padding: '2px 8px', borderRadius: 20,
-                              background: f.group === 'Premium' ? '#fef9ec' : '#f0fdf4',
-                              color:      f.group === 'Premium' ? '#92400e'  : '#16a34a',
-                              border: `1px solid ${f.group === 'Premium' ? '#fde68a' : '#bbf7d0'}`,
+                              background: f.tier === 'premium' ? '#fef9ec' : '#f0fdf4',
+                              color:      f.tier === 'premium' ? '#92400e'  : '#16a34a',
+                              border: `1px solid ${f.tier === 'premium' ? '#fde68a' : '#bbf7d0'}`,
                               fontWeight: 500,
                             }}>✓ {f.label}</span>
                           ))}
@@ -471,18 +611,15 @@ export default function PlanesPage() {
                     placeholder="Premium" />
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
-                <div className="form-group">
-                  <label className="form-label">Descripción corta</label>
-                  <input className="form-input" value={form.description || ''}
-                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                    placeholder="Acceso completo a todas las funcionalidades" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Días de trial por defecto</label>
-                  <input className="form-input" type="number" min={0} value={form.trial_days}
-                    onChange={e => setForm(f => ({ ...f, trial_days: parseInt(e.target.value) || 0 }))} />
-                </div>
+              <div className="form-group">
+                <label className="form-label">Descripción corta</label>
+                <input className="form-input" value={form.description || ''}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Acceso completo a todas las funcionalidades" />
+              </div>
+              <div style={{ background: 'rgba(196,151,90,0.07)', border: '1px solid rgba(196,151,90,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                <Clock size={11} color="var(--gold)" style={{ flexShrink: 0 }} />
+                El período de trial se configura globalmente en la sección <strong style={{ color: 'var(--charcoal)' }}>Prueba gratuita</strong> de esta misma página, no por plan.
               </div>
 
               {/* Estado y visibilidad */}
@@ -569,17 +706,17 @@ export default function PlanesPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
                   <div>
                     <div style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Básicas</div>
-                    {FEATURE_DEFS.filter(f => f.group === 'Básico').map(def => (
+                    {FEATURE_DEFS.filter(f => f.tier === 'basic').map(def => (
                       <FeatureRow key={def.key} def={def} checked={form.permissions?.[def.key] === true} onChange={v => setPermission(def.key, v)} />
                     ))}
                     <div style={{ fontSize: 10, fontWeight: 600, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6, marginTop: 12 }}>Restricciones</div>
-                    {FEATURE_DEFS.filter(f => f.group === 'Restricciones').map(def => (
+                    {FEATURE_DEFS.filter(f => f.tier === 'restriction').map(def => (
                       <FeatureRow key={def.key} def={def} checked={form.permissions?.[def.key] === true} onChange={v => setPermission(def.key, v)} />
                     ))}
                   </div>
                   <div>
                     <div style={{ fontSize: 10, fontWeight: 600, color: '#92400e', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Premium</div>
-                    {FEATURE_DEFS.filter(f => f.group === 'Premium').map(def => (
+                    {FEATURE_DEFS.filter(f => f.tier === 'premium').map(def => (
                       <FeatureRow key={def.key} def={def} checked={form.permissions?.[def.key] === true} onChange={v => setPermission(def.key, v)} />
                     ))}
                   </div>
