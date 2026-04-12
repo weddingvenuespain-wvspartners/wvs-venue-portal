@@ -562,15 +562,15 @@ function UserPanel({
             </button>
           </div>
 
-          {/* Payment bar — trial OR next renewal */}
-          {activeSub && (activeSub.status === 'trial' || activeSub.status === 'active') && (
+          {/* Payment bar — trial / trial_expired OR next renewal */}
+          {activeSub && (activeSub.status === 'trial' || activeSub.status === 'trial_expired' || activeSub.status === 'active') && (
             <div style={{
-              background: activeSub.status === 'trial' ? '#fffbeb' : '#f0fdf4',
-              border: `1px solid ${activeSub.status === 'trial' ? '#fcd34d' : '#bbf7d0'}`,
+              background: (activeSub.status === 'trial' || activeSub.status === 'trial_expired') ? '#fffbeb' : '#f0fdf4',
+              border: `1px solid ${(activeSub.status === 'trial' || activeSub.status === 'trial_expired') ? '#fcd34d' : '#bbf7d0'}`,
               borderRadius: 8, padding: '12px 14px', marginBottom: 20,
               display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
             }}>
-              <CreditCard size={14} style={{ color: activeSub.status === 'trial' ? '#b45309' : '#16a34a', flexShrink: 0 }} />
+              <CreditCard size={14} style={{ color: (activeSub.status === 'trial' || activeSub.status === 'trial_expired') ? '#b45309' : '#16a34a', flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 150 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: (activeSub.status === 'trial' || activeSub.status === 'trial_expired') ? '#92400e' : '#15803d' }}>
                   {(activeSub.status === 'trial' || activeSub.status === 'trial_expired') ? 'Registrar pago para activar' : 'Registrar pago / renovación'}
