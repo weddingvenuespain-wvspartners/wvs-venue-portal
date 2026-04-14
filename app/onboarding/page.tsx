@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { createClient } from '@/lib/supabase'
-import { Check, ArrowRight, Building2, MapPin, Globe, Phone, User } from 'lucide-react'
+import { Check, ArrowRight, Building2, MapPin, Globe, Phone, User, Loader2 } from 'lucide-react'
 
 const VENUE_TYPES = ['Finca', 'Hotel', 'Castillo / Palacio', 'Jardín / Exterior', 'Masía', 'Otro']
 
@@ -42,7 +42,14 @@ export default function OnboardingPage() {
   }, [authLoading, user, router])
 
   useEffect(() => {
-    if (!authLoading && profile && profile.display_name) router.replace('/dashboard')
+    // Only redirect away if both onboarding steps are complete
+    if (!authLoading && profile && profile.display_name && profile.first_name) {
+      router.replace('/pricing')
+    }
+    // If step 1 is done but step 2 is not, jump to step 2
+    if (!authLoading && profile && profile.display_name && !profile.first_name) {
+      setStep(2)
+    }
   }, [authLoading, profile, router])
 
   const handleStep1 = async (e: React.FormEvent) => {
@@ -64,7 +71,7 @@ export default function OnboardingPage() {
             venue_type:        venueType,
             city:              city.trim(),
             role:              'venue_owner',
-            status:            'pending_verification',
+            status:            'pending',
             timezone:          'Europe/Madrid',
             language:          'es',
             date_format:       'DD/MM/YYYY',
@@ -114,7 +121,15 @@ export default function OnboardingPage() {
           { onConflict: 'user_id' }
         )
       if (err) throw err
-      router.replace('/pricing')
+
+      // Create trial subscription automatically
+      const trialRes = await fetch('/api/onboarding/complete', { method: 'POST' })
+      if (!trialRes.ok) {
+        const { error: trialErr } = await trialRes.json()
+        throw new Error(trialErr || 'Error al activar el período de prueba')
+      }
+
+      router.replace('/dashboard')
     } catch (e: any) {
       setError(e?.message || 'Error al guardar. Inténtalo de nuevo.')
     } finally {
@@ -189,18 +204,23 @@ export default function OnboardingPage() {
               {/* Tipo de venue */}
               <label style={labelStyle}>Tipo de venue</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
-                {VENUE_TYPES.map(type => (
-                  <button key={type} type="button" onClick={() => setVenueType(type)}
-                    style={{
-                      padding: '9px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-                      fontFamily: 'Manrope, sans-serif', transition: 'all 0.15s', textAlign: 'left',
-                      border: venueType === type ? '2px solid var(--gold)' : '1px solid var(--ivory)',
-                      background: venueType === type ? 'rgba(196,151,90,0.08)' : 'var(--cream)',
-                      color: venueType === type ? 'var(--gold)' : 'var(--charcoal)',
-                      fontWeight: venueType === type ? 600 : 400,
-                    }}
-                  >{type}</button>
-                ))}
+                {VENUE_TYPES.map(type => {
+                  const selected = venueType === type
+                  return (
+                    <button key={type} type="button" onClick={() => setVenueType(type)}
+                      onMouseOver={e => { if (!selected) { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.background = 'rgba(196,151,90,0.04)' } }}
+                      onMouseOut={e => { if (!selected) { e.currentTarget.style.borderColor = 'var(--ivory)'; e.currentTarget.style.background = 'var(--cream)' } }}
+                      style={{
+                        padding: '9px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                        fontFamily: 'Manrope, sans-serif', transition: 'all 0.15s', textAlign: 'left',
+                        border: selected ? '2px solid var(--gold)' : '2px solid var(--ivory)',
+                        background: selected ? 'rgba(196,151,90,0.08)' : 'var(--cream)',
+                        color: selected ? 'var(--gold)' : 'var(--charcoal)',
+                        fontWeight: selected ? 600 : 400,
+                      }}
+                    >{type}</button>
+                  )
+                })}
               </div>
 
               {/* Ciudad */}
@@ -215,7 +235,7 @@ export default function OnboardingPage() {
               <button type="submit" disabled={saving}
                 style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: 'var(--charcoal)', color: '#fff', fontSize: 14, fontWeight: 500, fontFamily: 'Manrope, sans-serif', cursor: saving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: saving ? 0.7 : 1, transition: 'opacity 0.15s' }}
               >
-                {saving ? 'Guardando...' : <>Continuar <ArrowRight size={15} /></>}
+                {saving ? <><Loader2 size={15} style={{ animation: 'spin 0.8s linear infinite' }} /> Guardando...</> : <>Continuar <ArrowRight size={15} /></>}
               </button>
             </form>
           </div>
@@ -281,7 +301,7 @@ export default function OnboardingPage() {
               <button type="submit" disabled={saving}
                 style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: 'var(--charcoal)', color: '#fff', fontSize: 14, fontWeight: 500, fontFamily: 'Manrope, sans-serif', cursor: saving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: saving ? 0.7 : 1, transition: 'opacity 0.15s' }}
               >
-                {saving ? 'Guardando...' : <>Finalizar <Check size={15} /></>}
+                {saving ? <><Loader2 size={15} style={{ animation: 'spin 0.8s linear infinite' }} /> Guardando...</> : <>Finalizar <Check size={15} /></>}
               </button>
             </form>
           </div>

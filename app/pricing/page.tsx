@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { usePlanFeatures, FEATURE_DEFS, type PlanFeatures } from '@/lib/use-plan-features'
-import { Check, Loader2, ArrowLeft, Shield, LogOut, Clock } from 'lucide-react'
+import { Check, X, Loader2, ArrowLeft, Shield, LogOut, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import type { BillingCycle } from '@/lib/billing-types'
 import { Suspense } from 'react'
@@ -19,16 +19,15 @@ type Plan = {
   visible_on_web: boolean
 }
 
-// Features shown per tier on pricing page (restrictions never shown)
-const BASIC_FEATURES   = FEATURE_DEFS.filter(f => f.tier === 'basic')
+// All features shown on pricing page (restrictions never shown)
 const PREMIUM_FEATURES = FEATURE_DEFS.filter(f => f.tier !== 'restriction')
 
 function PricingPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, profile, loading: authLoading } = useAuth()
-  const { hasPlan, planName, planTier } = usePlanFeatures()
-  const isPendingVerification = profile?.status === 'pending_verification'
+  const { hasPlan, planName, planTier, isTrial, isTrialExpired, trialDaysLeft } = usePlanFeatures()
+  const isPendingVerification = profile?.status === 'pending'
   const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState<string | null>(null)
@@ -118,10 +117,37 @@ function PricingPageInner() {
     }
   }
 
+  // User is active with a paid plan (not trial) — redirect to dashboard
+  const isActive = isLoggedIn && !isPendingVerification && hasPlan && !isTrial
+  useEffect(() => {
+    if (!authLoading && isActive) router.replace('/dashboard')
+  }, [authLoading, isActive, router])
+
   if (loading || (authLoading && !plans.length)) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--cream)' }}>
         <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--gold)' }} />
+      </div>
+    )
+  }
+
+  // Show activation message while redirecting
+  if (isActive) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--cream)', gap: 16 }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: '50%',
+          background: 'rgba(22,163,74,0.1)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Check size={24} color="#16a34a" strokeWidth={2.5} />
+        </div>
+        <p style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--charcoal)' }}>
+          ¡Tu período de prueba está activado!
+        </p>
+        <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>
+          Redirigiendo al portal...
+        </p>
       </div>
     )
   }
@@ -176,23 +202,56 @@ function PricingPageInner() {
             Potencia tu venue con las herramientas que necesitas para gestionar bodas de forma profesional.
           </p>
 
-          {isLoggedIn && hasPlan && (
-            <div style={{
-              display: 'inline-block', marginTop: 12, padding: '6px 14px',
-              background: 'rgba(196,151,90,0.1)', borderRadius: 6,
-              fontSize: 12, color: 'var(--gold)',
-            }}>
-              Tu plan actual: <strong>{planName}</strong>
-            </div>
-          )}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 12 }}>
+            {isLoggedIn && isTrial && !isTrialExpired && (
+              <div style={{
+                padding: '8px 16px',
+                background: 'rgba(196,151,90,0.1)', borderRadius: 8,
+                fontSize: 13, color: 'var(--gold)', textAlign: 'center',
+              }}>
+                Tu plan actual: <strong>{planName}</strong> (período de prueba)
+                {trialDaysLeft !== null && (
+                  <span style={{
+                    display: 'inline-block', marginLeft: 8, padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+                    background: trialDaysLeft <= 3 ? 'rgba(220,38,38,0.12)' : 'rgba(196,151,90,0.15)',
+                    color: trialDaysLeft <= 3 ? '#dc2626' : 'var(--gold)',
+                  }}>
+                    {trialDaysLeft} días restantes
+                  </span>
+                )}
+              </div>
+            )}
 
-          {/* Trial banner */}
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 16,
-            background: 'rgba(196,151,90,0.1)', borderRadius: 20, padding: '6px 16px',
-            fontSize: 13, color: 'var(--gold)', fontWeight: 500,
-          }}>
-            <Check size={14} /> Prueba gratis 14 días — sin compromiso
+            {isLoggedIn && isTrialExpired && (
+              <div style={{
+                padding: '12px 20px',
+                background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)',
+                borderRadius: 8, fontSize: 13, color: '#dc2626', textAlign: 'center', lineHeight: 1.6,
+              }}>
+                <strong>Tu período de prueba ha finalizado.</strong><br />
+                Escoge un plan para seguir utilizando la plataforma.
+              </div>
+            )}
+
+            {isLoggedIn && hasPlan && !isTrial && (
+              <div style={{
+                padding: '6px 14px',
+                background: 'rgba(196,151,90,0.1)', borderRadius: 6,
+                fontSize: 12, color: 'var(--gold)',
+              }}>
+                Tu plan actual: <strong>{planName}</strong>
+              </div>
+            )}
+
+            {!isLoggedIn && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                background: 'rgba(196,151,90,0.1)', borderRadius: 20, padding: '6px 16px',
+                fontSize: 13, color: 'var(--gold)', fontWeight: 500,
+              }}>
+                <Check size={14} /> Prueba gratis 14 días — sin compromiso
+              </div>
+            )}
           </div>
 
           {/* Billing toggle */}
@@ -308,8 +367,8 @@ function PricingPageInner() {
         }}>
           {plans.map(plan => {
             const isPremium = plan.name.toLowerCase().includes('premium')
-            // Tier-aware feature list: basic only shows basic features; premium shows all non-restriction
-            const featureDefs = isPremium ? PREMIUM_FEATURES : BASIC_FEATURES
+            // Both tiers show all non-restriction features; basic shows premium ones as strikethrough
+            const featureDefs = PREMIUM_FEATURES
             const isCurrentPlan = isLoggedIn && hasPlan && (
               (isPremium && planTier === 'premium') ||
               (!isPremium && planTier === 'basic')
@@ -328,11 +387,13 @@ function PricingPageInner() {
                 key={plan.id}
                 style={{
                   background: '#fff',
-                  border: isPremium ? '2px solid var(--gold)' : '1px solid var(--ivory)',
+                  border: isPremium ? '2px solid var(--gold)' : '2px solid var(--ivory)',
                   borderRadius: 14,
                   padding: '32px 28px',
+                  paddingTop: isPremium ? 32 : 32,
                   position: 'relative',
                   boxShadow: isPremium ? '0 8px 32px rgba(196,151,90,0.1)' : undefined,
+                  display: 'flex', flexDirection: 'column',
                 }}
               >
                 {isPremium && (
@@ -349,16 +410,14 @@ function PricingPageInner() {
 
                 <h2 style={{
                   fontFamily: 'Manrope, sans-serif', fontSize: 20, fontWeight: 600,
-                  color: 'var(--charcoal)', marginBottom: 4, marginTop: isPremium ? 10 : 0,
+                  color: 'var(--charcoal)', marginBottom: 4, marginTop: 0,
                 }}>
                   {plan.display_name || plan.name}
                 </h2>
 
-                {plan.description && (
-                  <p style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 0 }}>
-                    {plan.description}
-                  </p>
-                )}
+                <p style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 0, minHeight: 18 }}>
+                  {plan.description || '\u00A0'}
+                </p>
 
                 {/* Price */}
                 <div style={{ marginTop: 20, paddingBottom: 20, borderBottom: '1px solid var(--ivory)' }}>
@@ -375,18 +434,24 @@ function PricingPageInner() {
                   )}
                 </div>
 
-                {/* Feature list — only shows features for this tier (no X / no lock for absent features) */}
-                <div style={{ marginTop: 20, marginBottom: 24 }}>
-                  {featureDefs.map(({ key, label }) => (
+                {/* Feature list — basic shows premium features as strikethrough */}
+                <div style={{ marginTop: 20, marginBottom: 24, flex: 1 }}>
+                  {featureDefs.map(({ key, label, tier }) => {
+                    const isDisabled = !isPremium && tier === 'premium'
+                    return (
                     <div key={key} style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '5px 0', fontSize: 13,
-                      color: 'var(--charcoal)',
+                      color: isDisabled ? '#ccc' : 'var(--charcoal)',
                     }}>
-                      <Check size={15} color="var(--gold)" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                      {isDisabled
+                        ? <X size={15} color="var(--ivory)" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                        : <Check size={15} color="var(--gold)" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                      }
                       {label}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
 
                 {/* CTA button */}

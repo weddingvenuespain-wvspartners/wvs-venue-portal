@@ -530,31 +530,16 @@ function VenueDashboard() {
 // ─── Page router ──────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { user, profile, loading } = useAuth()
-  const { isBlocked } = useRequireSubscription()
+  const { ready } = useRequireSubscription()
   const router = useRouter()
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
   }, [loading, user]) // eslint-disable-line
 
-  if (isBlocked) return null
-
-  if (loading) return (
-    <div style={{ display: 'flex' }}>
-      <Sidebar />
-      <div className="main-layout">
-        <div className="topbar"><div className="topbar-title">Dashboard</div></div>
-        <div className="page-content">
-          <div className="stats-grid">
-            {[1,2,3,4].map(i => (
-              <div key={i} className="stat-card">
-                <Skeleton w="60%" h={10} /><Skeleton w="40%" h={28} radius={6} /><Skeleton w="70%" h={9} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-      <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
+  if (!ready) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--cream)' }}>
+      <div style={{ width: 24, height: 24, border: '2px solid var(--gold)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
     </div>
   )
 

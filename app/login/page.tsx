@@ -181,7 +181,7 @@ function LoginPageInner() {
             <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>¿No tienes cuenta? </span>
             <button
               type="button"
-              onClick={() => router.push('/registro')}
+              onClick={() => router.push('/signup')}
               style={{ background: 'none', border: 'none', color: '#C4975A', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'Manrope, sans-serif' }}
             >
               Regístrate gratis →

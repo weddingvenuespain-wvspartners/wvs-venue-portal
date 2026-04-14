@@ -100,7 +100,7 @@ export async function PATCH(req: NextRequest) {
 
     // Auto-send activation email + create trial when status changes to 'active'
     const wasActivated =
-      current?.status === 'pending_verification' && rawFields.status === 'active'
+      current?.status === 'pending' && rawFields.status === 'active'
 
     if (wasActivated) {
       // 1. Send activation email

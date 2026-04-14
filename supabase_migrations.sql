@@ -124,3 +124,14 @@ VALUES
 
 ALTER TABLE leads
   ADD COLUMN IF NOT EXISTS wedding_date_history JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+-- ── 10. Update venue_profiles status check constraint ─────────
+--    Add 'trial_expired' to allowed statuses.
+--    Run in Supabase → SQL Editor.
+
+ALTER TABLE venue_profiles
+  DROP CONSTRAINT IF EXISTS venue_profiles_status_check;
+
+ALTER TABLE venue_profiles
+  ADD CONSTRAINT venue_profiles_status_check
+    CHECK (status IN ('active', 'inactive', 'pending', 'trial_expired'));

@@ -388,7 +388,7 @@ export default function LandingPage() {
             onMouseOver={e => { (e.currentTarget as HTMLElement).style.color = '#fff'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.35)' }}
             onMouseOut={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.7)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)' }}
             >{t.nav.login}</Link>
-            <Link href="/registro" style={{
+            <Link href="/signup" style={{
               textDecoration: 'none', fontFamily: SANS, fontSize: 13, fontWeight: 600,
               color: C.white, background: C.accent, padding: '9px 20px', borderRadius: 6,
               transition: 'background 0.2s',
@@ -425,7 +425,7 @@ export default function LandingPage() {
               color: C.white, textAlign: 'center', border: '1px solid rgba(255,255,255,0.2)',
               borderRadius: 8, padding: '14px 0',
             }}>{t.nav.login}</Link>
-            <Link href="/registro" onClick={() => setMobileMenu(false)} style={{
+            <Link href="/signup" onClick={() => setMobileMenu(false)} style={{
               textDecoration: 'none', fontFamily: SANS, fontSize: 15, fontWeight: 600,
               color: C.white, textAlign: 'center', background: C.accent, borderRadius: 8, padding: '14px 0',
             }}>{t.nav.register}</Link>
@@ -462,7 +462,7 @@ export default function LandingPage() {
               {t.hero.sub}
             </p>
             <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, marginTop: 36, alignItems: isMobile ? 'stretch' : 'center' }}>
-              <Link href="/registro" style={{
+              <Link href="/signup" style={{
                 textDecoration: 'none', fontFamily: SANS, fontSize: 15, fontWeight: 600,
                 color: C.white, background: C.accent, padding: '14px 32px', borderRadius: 6,
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -549,7 +549,7 @@ export default function LandingPage() {
                 {t.how.title}<br /><em>{t.how.titleItalic}</em>
               </h2>
               <p style={{ fontFamily: SANS, fontSize: 15, color: C.muted, lineHeight: 1.8, margin: '0 0 32px' }}>{t.how.sub}</p>
-              <Link href="/registro" style={{
+              <Link href="/signup" style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none',
                 fontFamily: SANS, fontSize: 14, fontWeight: 600, color: C.white, background: C.dark,
                 padding: '12px 24px', borderRadius: 6,
@@ -715,7 +715,7 @@ export default function LandingPage() {
                         </div>
                       ))}
                     </div>
-                    <Link href="/registro" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', fontFamily: SANS, fontSize: 14, fontWeight: 600, color: C.white, background: isPremium ? C.accent : C.dark, padding: '14px 0', borderRadius: 8, marginTop: 28, transition: 'opacity 0.2s' }}
+                    <Link href="/signup" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', fontFamily: SANS, fontSize: 14, fontWeight: 600, color: C.white, background: isPremium ? C.accent : C.dark, padding: '14px 0', borderRadius: 8, marginTop: 28, transition: 'opacity 0.2s' }}
                     onMouseOver={e => ((e.currentTarget as HTMLElement).style.opacity = '0.85')}
                     onMouseOut={e => ((e.currentTarget as HTMLElement).style.opacity = '1')}
                     >{t.pricing.cta}</Link>
@@ -760,7 +760,7 @@ export default function LandingPage() {
           </h2>
           <p style={{ fontFamily: SANS, fontSize: 16, color: 'rgba(255,255,255,0.42)', maxWidth: 440, margin: '0 auto 36px', lineHeight: 1.75 }}>{t.cta.sub}</p>
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, alignItems: 'center', justifyContent: 'center' }}>
-            <Link href="/registro" style={{ textDecoration: 'none', fontFamily: SANS, fontSize: 16, fontWeight: 600, color: C.white, background: C.accent, padding: '16px 40px', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            <Link href="/signup" style={{ textDecoration: 'none', fontFamily: SANS, fontSize: 16, fontWeight: 600, color: C.white, background: C.accent, padding: '16px 40px', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 8 }}
             onMouseOver={e => ((e.currentTarget as HTMLElement).style.background = '#5E5538')}
             onMouseOut={e => ((e.currentTarget as HTMLElement).style.background = C.accent)}
             >{t.cta.btn} <ArrowUpRight size={16} /></Link>
@@ -792,7 +792,7 @@ export default function LandingPage() {
       {isMobile && (
         <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 900, background: 'rgba(44,38,20,0.97)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '12px 20px 24px', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', gap: 10 }}>
           <Link href="/login" style={{ flex: 1, textDecoration: 'none', fontFamily: SANS, fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.70)', textAlign: 'center', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '13px 0' }}>{t.nav.login}</Link>
-          <Link href="/registro" style={{ flex: 2, textDecoration: 'none', fontFamily: SANS, fontSize: 13, fontWeight: 600, color: C.white, textAlign: 'center', background: C.accent, borderRadius: 6, padding: '13px 0' }}>{t.nav.register}</Link>
+          <Link href="/signup" style={{ flex: 2, textDecoration: 'none', fontFamily: SANS, fontSize: 13, fontWeight: 600, color: C.white, textAlign: 'center', background: C.accent, borderRadius: 6, padding: '13px 0' }}>{t.nav.register}</Link>
         </div>
       )}
     </div>

@@ -101,7 +101,7 @@ function RegistroPageInner() {
   }
 
   return (
-    <div className="login-page" style={{ alignItems: 'flex-start', paddingTop: 24, paddingBottom: 24 }}>
+    <div className="login-page">
       {/* Logo horizontal fijo arriba a la izquierda → vuelve a la landing */}
       <a href="/" style={{ position: 'fixed', top: 20, left: 24, textDecoration: 'none', zIndex: 10 }}>
         <img
@@ -226,6 +226,13 @@ function RegistroPageInner() {
               <strong style={{ color: 'rgba(255,255,255,0.6)' }}>{email}</strong>{' '}
               y haz clic en el enlace de confirmación para activar tu cuenta.
             </p>
+            <button
+              type="button"
+              onClick={() => router.push('/login')}
+              style={{ background: 'none', border: 'none', color: '#C4975A', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', marginTop: 16 }}
+            >
+              Ir a iniciar sesión →
+            </button>
           </div>
         )}
 

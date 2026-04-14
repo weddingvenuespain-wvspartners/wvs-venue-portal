@@ -701,8 +701,7 @@ function UserPanel({
                   <label className="form-label">Estado de cuenta</label>
                   <select className="form-input" value={pForm.status}
                     onChange={e => setPForm(f => ({ ...f, status: e.target.value }))}>
-                    <option value="pending_verification">⏳ Pendiente verificación</option>
-                    <option value="pending">Pendiente</option>
+                    <option value="pending">⏳ Pendiente verificación</option>
                     <option value="active">✅ Activo</option>
                     <option value="inactive">Inactivo</option>
                   </select>
@@ -934,7 +933,7 @@ function UserPanel({
             <div>
 
               {/* ── Contextual verification banner ── */}
-              {profile.status === 'pending_verification' && !activeSub && (
+              {profile.status === 'pending' && !activeSub && (
                 <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '14px 16px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <span style={{ fontSize: 18, lineHeight: 1 }}>⏳</span>
                   <div>
@@ -945,7 +944,7 @@ function UserPanel({
                   </div>
                 </div>
               )}
-              {profile.status === 'pending_verification' && activeSub && (
+              {profile.status === 'pending' && activeSub && (
                 <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '14px 16px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <span style={{ fontSize: 18, lineHeight: 1 }}>✅</span>
                   <div>
@@ -1082,7 +1081,7 @@ function UserPanel({
                 </div>
               ) : (
                 <div className="alert alert-info" style={{ fontSize: 12, marginBottom: 16 }}>
-                  {profile.status === 'pending_verification'
+                  {profile.status === 'pending'
                     ? 'Aún sin plan contratado. Puedes crearlo manualmente o esperar a que el venue lo haga desde la web.'
                     : 'Sin suscripción. Rellena el formulario para crear una.'}
                 </div>
@@ -1797,7 +1796,7 @@ export default function AdminPage() {
   })
 
   const counts = {
-    pending_verification: owners.filter(p => p.status === 'pending_verification').length,
+    pending: owners.filter(p => p.status === 'pending').length,
     pending:  owners.filter(p => p.status === 'pending').length,
     active:   owners.filter(p => p.status === 'active').length,
     inactive: owners.filter(p => p.status === 'inactive').length,
@@ -1872,7 +1871,7 @@ export default function AdminPage() {
             <div className="stat-card accent">
               <div className="stat-label">Venue owners</div>
               <div className="stat-value">{owners.length}</div>
-              <div className="stat-sub">{counts.active} activos · {counts.pending_verification} por verificar · {counts.pending} pendientes</div>
+              <div className="stat-sub">{counts.active} activos · {counts.pending} por verificar · {counts.pending} pendientes</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Pagando</div>
@@ -1912,7 +1911,7 @@ export default function AdminPage() {
                   value={search} onChange={e => setSearch(e.target.value)} />
               </div>
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                {([['all','Todos'], ['pending_verification','⏳ Por verificar'], ['pending','Pendientes'], ['active','Activos'], ['inactive','Inactivos']] as [string,string][]).map(([k, label]) => (
+                {([['all','Todos'], ['pending','⏳ Por verificar'], ['pending','Pendientes'], ['active','Activos'], ['inactive','Inactivos']] as [string,string][]).map(([k, label]) => (
                   <button key={k} onClick={() => setFilterStatus(k)}
                     className={`btn btn-sm ${filterStatus === k ? 'btn-primary' : 'btn-ghost'}`}>
                     {label}{k !== 'all' ? ` (${counts[k as keyof typeof counts] ?? 0})` : ` (${owners.length})`}
