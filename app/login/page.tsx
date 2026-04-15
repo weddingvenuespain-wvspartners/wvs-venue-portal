@@ -104,16 +104,7 @@ function LoginPageInner() {
       </a>
 
       <div className="login-box">
-        {/* Logo circular centrado + enlace a landing */}
-        <a href="/" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginBottom: 16 }}>
-          <img
-            src="/logo-icon.png"
-            alt="Wedding Venues Spain"
-            style={{ width: 80, height: 80, objectFit: 'contain', display: 'inline-block' }}
-            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-          />
-        </a>
-        <div className="login-logo" style={{ fontSize: 16, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+        <div className="login-logo" style={{ fontSize: 16, letterSpacing: '0.05em', whiteSpace: 'nowrap', marginTop: 8 }}>
           Wedding Venues Spain
         </div>
         <div className="login-subtitle">Partner Portal</div>
