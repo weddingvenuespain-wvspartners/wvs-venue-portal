@@ -1796,7 +1796,6 @@ export default function AdminPage() {
   })
 
   const counts = {
-    pending: owners.filter(p => p.status === 'pending').length,
     pending:  owners.filter(p => p.status === 'pending').length,
     active:   owners.filter(p => p.status === 'active').length,
     inactive: owners.filter(p => p.status === 'inactive').length,
