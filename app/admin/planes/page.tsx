@@ -159,6 +159,7 @@ export default function PlanesPage() {
   const [trialSuccess, setTrialSuccess]     = useState('')
 
   useEffect(() => {
+    if (authLoading) return
     const init = async () => {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
@@ -167,10 +168,13 @@ export default function PlanesPage() {
       if (me?.role !== 'admin') { router.push('/dashboard'); return }
 
       // Load plans and trial config in parallel
+      const trialController = new AbortController()
+      const trialTimeout = setTimeout(() => trialController.abort(), 6000)
       const [plansResult, trialResult] = await Promise.all([
         supabase.from('venue_plans').select('*').order('created_at', { ascending: true }),
-        fetch('/api/admin/trial-config').then(r => r.json()),
+        fetch('/api/admin/trial-config', { signal: trialController.signal }).then(r => r.json()).catch(() => ({})),
       ])
+      clearTimeout(trialTimeout)
 
       if (plansResult.data) {
         const { data: subCounts } = await supabase
@@ -325,7 +329,7 @@ export default function PlanesPage() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: 'var(--gold)' }}>Cargando...</div>
+      <div style={{ width: 24, height: 24, border: '2px solid var(--gold)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
     </div>
   )
 

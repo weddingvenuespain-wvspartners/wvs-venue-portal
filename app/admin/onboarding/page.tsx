@@ -335,6 +335,7 @@ export default function AdminOnboardingPage() {
   }
 
   useEffect(() => {
+    if (authLoading) return
     const init = async () => {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
@@ -459,8 +460,8 @@ export default function AdminOnboardingPage() {
   }
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#1A1512', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#C4975A' }}>Cargando...</div>
+    <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 24, height: 24, border: '2px solid var(--gold)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
     </div>
   )
 

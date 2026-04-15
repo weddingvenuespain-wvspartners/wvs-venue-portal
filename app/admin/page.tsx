@@ -1538,13 +1538,16 @@ export default function AdminPage() {
     const { data: me } = await supabase.from('venue_profiles').select('role').eq('user_id', session.user.id).single()
     if (me?.role !== 'admin') { router.push('/dashboard'); return }
 
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
     const [usersRes, { data: plansData }, { data: subsData }, { data: uvData }, trialRes] = await Promise.all([
-      fetch('/api/admin/users').then(r => r.json()),
+      fetch('/api/admin/users', { signal: controller.signal }).then(r => r.json()).catch(() => ({})),
       supabase.from('venue_plans').select('id, name, display_name, billing_cycles, trial_days, is_active'),
       supabase.from('venue_subscriptions').select('*'),
       supabase.from('user_venues').select('*'),
-      fetch('/api/admin/trial-config').then(r => r.json()),
+      fetch('/api/admin/trial-config', { signal: controller.signal }).then(r => r.json()).catch(() => ({})),
     ])
+    clearTimeout(timeout)
     if (usersRes?.profiles) setProfiles(usersRes.profiles)
     if (plansData) setPlans(plansData)
     if (subsData)  setSubscriptions(subsData)
@@ -1558,10 +1561,13 @@ export default function AdminPage() {
     const cached = sessionStorage.getItem('wvs_wp_venues')
     if (cached) { try { setWpVenues(JSON.parse(cached)) } catch {} }
 
-    fetch('https://weddingvenuesspain.com/wp-json/wp/v2/venues?per_page=100&acf_format=standard&_fields=id,title,acf,link', { cache: 'no-store' })
+    const wpController = new AbortController()
+    const wpTimeout = setTimeout(() => wpController.abort(), 6000)
+    fetch('https://weddingvenuesspain.com/wp-json/wp/v2/venues?per_page=100&acf_format=standard&_fields=id,title,acf,link', { cache: 'no-store', signal: wpController.signal })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (Array.isArray(d)) { setWpVenues(d); sessionStorage.setItem('wvs_wp_venues', JSON.stringify(d)) } })
       .catch(() => {})
+      .finally(() => clearTimeout(wpTimeout))
   }
 
   // Only run once when auth finishes loading — not on every user/profile state change
@@ -1820,8 +1826,8 @@ export default function AdminPage() {
   }
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#1A1512', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#C4975A' }}>Cargando...</div>
+    <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 24, height: 24, border: '2px solid var(--gold)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
     </div>
   )
 
