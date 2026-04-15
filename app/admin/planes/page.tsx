@@ -160,6 +160,19 @@ export default function PlanesPage() {
 
   useEffect(() => {
     if (authLoading) return
+    const CACHE_KEY = 'wvs_admin_planes'
+
+    // Stale-while-revalidate: show cached data instantly
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY)
+      if (cached) {
+        const c = JSON.parse(cached)
+        if (c.plans) setPlans(c.plans)
+        if (c.trialConfig) setTrialConfig(c.trialConfig)
+        setLoading(false)
+      }
+    } catch {}
+
     const init = async () => {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
@@ -176,6 +189,7 @@ export default function PlanesPage() {
       ])
       clearTimeout(trialTimeout)
 
+      let enrichedPlans: Plan[] = []
       if (plansResult.data) {
         const { data: subCounts } = await supabase
           .from('venue_subscriptions')
@@ -183,7 +197,8 @@ export default function PlanesPage() {
           .in('status', ['active', 'trial', 'paused'])
         const countMap: Record<string, number> = {}
         subCounts?.forEach(s => { countMap[s.plan_id] = (countMap[s.plan_id] || 0) + 1 })
-        setPlans(plansResult.data.map((p: Plan) => ({ ...p, subscriber_count: countMap[p.id] || 0 })))
+        enrichedPlans = plansResult.data.map((p: Plan) => ({ ...p, subscriber_count: countMap[p.id] || 0 }))
+        setPlans(enrichedPlans)
       }
 
       if (trialResult.config) {
@@ -201,6 +216,11 @@ export default function PlanesPage() {
       }
 
       setLoading(false)
+
+      // Persist to cache for next visit
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+        plans: enrichedPlans, trialConfig: trialResult?.config || null,
+      }))
     }
     init()
   }, [authLoading]) // eslint-disable-line

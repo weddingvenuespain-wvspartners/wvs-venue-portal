@@ -327,15 +327,27 @@ export default function AdminOnboardingPage() {
   const [adminNotes, setAdminNotes]   = useState('')
   const [filterStatus, setFilterStatus] = useState('pending')
 
+  const CACHE_KEY = 'wvs_admin_onboarding'
+
   const fetchOnboardings = async () => {
     const supabase = createClient()
     const { data: onbs } = await supabase
       .from('venue_onboarding').select('*').order('submitted_at', { ascending: false })
-    if (onbs) setOnboardings(onbs)
+    if (onbs) {
+      setOnboardings(onbs)
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify(onbs))
+    }
   }
 
   useEffect(() => {
     if (authLoading) return
+
+    // Stale-while-revalidate: show cached data instantly
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY)
+      if (cached) { setOnboardings(JSON.parse(cached)); setLoading(false) }
+    } catch {}
+
     const init = async () => {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()

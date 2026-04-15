@@ -1531,13 +1531,32 @@ export default function AdminPage() {
   }
 
   const loadData = async () => {
-    setLoading(true)
+    // ── Stale-while-revalidate: show cached data instantly ──
+    const CACHE_KEY = 'wvs_admin_crm'
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY)
+      if (cached) {
+        const c = JSON.parse(cached)
+        if (c.profiles)      setProfiles(c.profiles)
+        if (c.plans)         setPlans(c.plans)
+        if (c.subscriptions) setSubscriptions(c.subscriptions)
+        if (c.userVenues)    setUserVenues(c.userVenues)
+        if (c.trialConfig)   setTrialConfig(c.trialConfig)
+        setLoading(false)
+      }
+    } catch {}
+
+    // WP venues from their own cache
+    try { const wpc = sessionStorage.getItem('wvs_wp_venues'); if (wpc) setWpVenues(JSON.parse(wpc)) } catch {}
+
+    // ── Auth check ──
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { router.push('/login'); return }
     const { data: me } = await supabase.from('venue_profiles').select('role').eq('user_id', session.user.id).single()
     if (me?.role !== 'admin') { router.push('/dashboard'); return }
 
+    // ── Fetch fresh data (background if cache hit) ──
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 8000)
     const [usersRes, { data: plansData }, { data: subsData }, { data: uvData }, trialRes] = await Promise.all([
@@ -1553,14 +1572,16 @@ export default function AdminPage() {
     if (subsData)  setSubscriptions(subsData)
     if (uvData)    setUserVenues(uvData)
     if (trialRes?.config) setTrialConfig(trialRes.config)
-
-    // Show the page immediately — load WP venues in the background (non-blocking)
     setLoading(false)
 
-    // Try sessionStorage cache first for instant load
-    const cached = sessionStorage.getItem('wvs_wp_venues')
-    if (cached) { try { setWpVenues(JSON.parse(cached)) } catch {} }
+    // Persist to cache for next visit
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+      profiles: usersRes?.profiles || [], plans: plansData || [],
+      subscriptions: subsData || [], userVenues: uvData || [],
+      trialConfig: trialRes?.config || null,
+    }))
 
+    // ── WP venues: background, non-blocking ──
     const wpController = new AbortController()
     const wpTimeout = setTimeout(() => wpController.abort(), 6000)
     fetch('https://weddingvenuesspain.com/wp-json/wp/v2/venues?per_page=100&acf_format=standard&_fields=id,title,acf,link', { cache: 'no-store', signal: wpController.signal })
