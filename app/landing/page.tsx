@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   Check, ChevronRight, Menu, X as XIcon,
   ChevronDown, ArrowRight, ArrowUpRight,
+  BarChart3, Building2, Globe,
 } from 'lucide-react'
 import { FEATURE_DEFS, type PlanFeatures } from '@/lib/use-plan-features'
 import type { BillingCycle } from '@/lib/billing-types'
@@ -271,9 +272,9 @@ const TRANSLATIONS = {
 const LOGO_URL  = 'https://weddingvenuesspain.com/wp-content/uploads/2024/10/logo-wedding-venues-spain-white-e1732122540714.png'
 const HERO_IMG  = 'https://images.unsplash.com/photo-1519741497674-611481863552?w=1920&q=90&auto=format'
 const IMGS = {
-  leads: 'https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=900&q=80&auto=format',
-  prop:  'https://images.unsplash.com/photo-1478146896981-b80fe463b330?w=900&q=80&auto=format',
-  cal:   'https://images.unsplash.com/photo-1469371670807-013ccf25f16a?w=900&q=80&auto=format',
+  leads: '/screenshots/leads-panel.svg',
+  prop:  '/screenshots/proposals.svg',
+  cal:   '/screenshots/calendar.svg',
 } as const
 
 const SERIF = "'Cormorant Garamond', Georgia, serif"
@@ -284,6 +285,12 @@ const C = {
   accentLight: 'rgba(121,111,78,0.10)', accentBorder: 'rgba(121,111,78,0.20)',
   bg: '#F5F3ED', white: '#FFFFFF', border: '#E2DDD4', muted: '#9A8F78',
 } as const
+
+const MINI_ICONS = [
+  <BarChart3 key="bar" size={22} color={C.accent} strokeWidth={1.8} />,
+  <Building2 key="bld" size={22} color={C.accent} strokeWidth={1.8} />,
+  <Globe key="glb" size={22} color={C.accent} strokeWidth={1.8} />,
+]
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function LandingPage() {
@@ -322,23 +329,59 @@ export default function LandingPage() {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  // Language toggle button
-  const LangToggle = ({ mobile }: { mobile?: boolean }) => (
-    <button
-      onClick={() => setLang(l => l === 'en' ? 'es' : 'en')}
-      style={{
-        background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.20)',
-        borderRadius: 6, cursor: 'pointer', fontFamily: SANS,
-        fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.80)',
-        letterSpacing: '0.06em', padding: mobile ? '10px 16px' : '6px 12px',
-        display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
-      }}
-      onMouseOver={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.18)'; (e.currentTarget as HTMLElement).style.color = '#fff' }}
-      onMouseOut={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.80)' }}
-    >
-      <span style={{ fontSize: 14 }}>{lang === 'en' ? '🇪🇸' : '🇬🇧'}</span>
-      {lang === 'en' ? 'ES' : 'EN'}
-    </button>
+  // Language dropdown
+  const [langOpen, setLangOpen] = useState(false)
+  useEffect(() => {
+    if (!langOpen) return
+    const close = () => setLangOpen(false)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [langOpen])
+
+  const LangToggle = () => (
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={e => { e.stopPropagation(); setLangOpen(o => !o) }}
+        style={{
+          background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.20)',
+          borderRadius: 6, cursor: 'pointer', fontFamily: SANS,
+          fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.80)',
+          letterSpacing: '0.06em', padding: '8px 10px',
+          display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
+        }}
+        onMouseOver={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.color = '#fff' }}
+        onMouseOut={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.color = 'rgba(255,255,255,0.80)' }}
+      >
+        <Globe size={14} strokeWidth={1.8} />
+        {lang === 'en' ? 'EN' : 'ES'}
+        <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: -2, transition: 'transform 0.2s', transform: langOpen ? 'rotate(180deg)' : 'none' }} />
+      </button>
+      {langOpen && (
+        <div onClick={e => e.stopPropagation()} style={{
+          position: 'absolute', top: '100%', right: 0, marginTop: 6,
+          background: 'rgba(44,38,20,0.96)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8,
+          padding: '4px', minWidth: 130, boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+        }}>
+          {([['en', 'English'], ['es', 'Español']] as const).map(([code, label]) => (
+            <button key={code} onClick={() => { setLang(code); setLangOpen(false) }} style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 12px', border: 'none', borderRadius: 6, cursor: 'pointer',
+              background: lang === code ? 'rgba(255,255,255,0.10)' : 'transparent',
+              fontFamily: SANS, fontSize: 13, fontWeight: lang === code ? 600 : 400,
+              color: lang === code ? '#fff' : 'rgba(255,255,255,0.55)',
+              transition: 'all 0.15s',
+            }}
+            onMouseOver={e => { if (lang !== code) e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+            onMouseOut={e => { if (lang !== code) e.currentTarget.style.background = 'transparent' }}
+            >
+              <span style={{ width: 16, textAlign: 'center' }}>{lang === code ? <Check size={12} strokeWidth={2.5} /> : ''}</span>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 
   return (
@@ -382,16 +425,18 @@ export default function LandingPage() {
             <LangToggle />
             <Link href="/login" style={{
               textDecoration: 'none', fontFamily: SANS, fontSize: 13, fontWeight: 500,
-              color: 'rgba(255,255,255,0.7)', padding: '8px 18px', borderRadius: 6,
+              color: 'rgba(255,255,255,0.7)', padding: '8px 0', borderRadius: 6,
               border: '1px solid rgba(255,255,255,0.15)', transition: 'all 0.2s',
+              minWidth: 120, textAlign: 'center',
             }}
             onMouseOver={e => { (e.currentTarget as HTMLElement).style.color = '#fff'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.35)' }}
             onMouseOut={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.7)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)' }}
             >{t.nav.login}</Link>
             <Link href="/signup" style={{
               textDecoration: 'none', fontFamily: SANS, fontSize: 13, fontWeight: 600,
-              color: C.white, background: C.accent, padding: '9px 20px', borderRadius: 6,
+              color: C.white, background: C.accent, padding: '9px 0', borderRadius: 6,
               transition: 'background 0.2s',
+              minWidth: 140, textAlign: 'center',
             }}
             onMouseOver={e => ((e.currentTarget as HTMLElement).style.background = '#5E5538')}
             onMouseOut={e => ((e.currentTarget as HTMLElement).style.background = C.accent)}
@@ -601,7 +646,7 @@ export default function LandingPage() {
                   ))}
                 </div>
               </div>
-              <div style={{ flex: 1, height: isMobile ? 240 : 360, borderRadius: 16, backgroundImage: `url(${IMGS[f.img as keyof typeof IMGS]})`, backgroundSize: 'cover', backgroundPosition: 'center', boxShadow: '0 32px 80px rgba(69,61,35,0.18)' }} />
+              <div style={{ flex: 1, height: isMobile ? 260 : 380, borderRadius: 16, backgroundImage: `url(${IMGS[f.img as keyof typeof IMGS]})`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundColor: C.bg, boxShadow: '0 32px 80px rgba(69,61,35,0.18)', border: `1px solid ${C.border}` }} />
             </div>
           ))}
 
@@ -611,7 +656,7 @@ export default function LandingPage() {
               onMouseOver={e => ((e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(69,61,35,0.08)')}
               onMouseOut={e => ((e.currentTarget as HTMLElement).style.boxShadow = 'none')}
               >
-                <div style={{ fontSize: 28, marginBottom: 14, lineHeight: 1 }}>{x.emoji}</div>
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: C.accentLight, border: `1px solid ${C.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>{MINI_ICONS[i]}</div>
                 <div style={{ fontFamily: SANS, fontSize: 14, fontWeight: 600, color: C.dark, marginBottom: 8 }}>{x.t}</div>
                 <div style={{ fontFamily: SANS, fontSize: 13, color: C.muted, lineHeight: 1.65 }}>{x.d}</div>
               </div>

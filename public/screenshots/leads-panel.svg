@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
+  <defs>
+    <filter id="shadow" x="-2%" y="-2%" width="104%" height="104%">
+      <feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#453D23" flood-opacity="0.08"/>
+    </filter>
+    <filter id="shadowSm" x="-2%" y="-2%" width="104%" height="108%">
+      <feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#453D23" flood-opacity="0.06"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="600" rx="16" fill="#F5F3ED"/>
+
+  <!-- Sidebar hint -->
+  <rect x="0" y="0" width="56" height="600" rx="16" fill="#2C2614"/>
+  <rect x="16" y="0" width="40" height="600" fill="#2C2614"/>
+  <!-- Sidebar icons -->
+  <circle cx="28" cy="32" r="10" fill="#796F4E" opacity="0.4"/>
+  <rect x="18" y="64" width="20" height="3" rx="1.5" fill="#796F4E" opacity="0.25"/>
+  <rect x="18" y="84" width="20" height="3" rx="1.5" fill="#fff" opacity="0.6"/>
+  <rect x="18" y="104" width="20" height="3" rx="1.5" fill="#796F4E" opacity="0.25"/>
+  <rect x="18" y="124" width="20" height="3" rx="1.5" fill="#796F4E" opacity="0.25"/>
+  <rect x="18" y="144" width="20" height="3" rx="1.5" fill="#796F4E" opacity="0.25"/>
+
+  <!-- Main content area -->
+  <!-- Header -->
+  <text x="88" y="48" font-family="system-ui, sans-serif" font-size="22" font-weight="700" fill="#453D23">Leads</text>
+  <rect x="760" y="26" width="110" height="34" rx="8" fill="#796F4E"/>
+  <text x="786" y="48" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#fff">+ Nuevo lead</text>
+
+  <!-- Tabs -->
+  <rect x="88" y="68" width="782" height="40" rx="8" fill="#EDEAE4"/>
+  <rect x="92" y="72" width="90" height="32" rx="6" fill="#453D23"/>
+  <text x="114" y="93" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#fff">Nuevos</text>
+  <text x="204" y="93" font-family="system-ui, sans-serif" font-size="11" font-weight="500" fill="#9A8F78">En seguimiento</text>
+  <text x="320" y="93" font-family="system-ui, sans-serif" font-size="11" font-weight="500" fill="#9A8F78">Visita</text>
+  <text x="390" y="93" font-family="system-ui, sans-serif" font-size="11" font-weight="500" fill="#9A8F78">Post-visita</text>
+  <text x="488" y="93" font-family="system-ui, sans-serif" font-size="11" font-weight="500" fill="#9A8F78">Presupuesto</text>
+  <text x="596" y="93" font-family="system-ui, sans-serif" font-size="11" font-weight="500" fill="#9A8F78">Confirmados</text>
+
+  <!-- Count badges -->
+  <circle cx="164" cy="88" r="9" fill="#796F4E"/>
+  <text x="164" y="92" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#fff" text-anchor="middle">3</text>
+
+  <!-- Search bar -->
+  <rect x="88" y="124" width="300" height="36" rx="8" fill="#fff" stroke="#E2DDD4" stroke-width="1" filter="url(#shadowSm)"/>
+  <text x="108" y="147" font-family="system-ui, sans-serif" font-size="12" fill="#9A8F78">Buscar leads...</text>
+  <!-- Filter button -->
+  <rect x="400" y="124" width="80" height="36" rx="8" fill="#fff" stroke="#E2DDD4" stroke-width="1"/>
+  <text x="420" y="147" font-family="system-ui, sans-serif" font-size="12" fill="#9A8F78">Filtros</text>
+
+  <!-- Lead Card 1 -->
+  <rect x="88" y="180" width="782" height="80" rx="12" fill="#fff" stroke="#E2DDD4" stroke-width="1" filter="url(#shadow)"/>
+  <!-- Avatar -->
+  <circle cx="132" cy="220" r="22" fill="#F5F3ED"/>
+  <text x="132" y="226" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#796F4E" text-anchor="middle">SM</text>
+  <!-- Name & details -->
+  <text x="168" y="210" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#453D23">Sarah &amp; Michael</text>
+  <text x="168" y="228" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78">sarah.m@email.com</text>
+  <text x="168" y="245" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78">120 invitados</text>
+  <!-- Date -->
+  <text x="420" y="214" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78">Fecha boda</text>
+  <text x="420" y="234" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#453D23">15 Sep 2026</text>
+  <!-- Source -->
+  <rect x="560" y="206" width="52" height="22" rx="4" fill="#F5F3ED"/>
+  <text x="572" y="221" font-family="system-ui, sans-serif" font-size="10" font-weight="500" fill="#796F4E">Web</text>
+  <!-- Status dot -->
+  <circle cx="680" cy="220" r="5" fill="#3b82f6"/>
+  <text x="694" y="224" font-family="system-ui, sans-serif" font-size="11" fill="#453D23">Nuevo</text>
+  <!-- Time -->
+  <text x="790" y="220" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78">hace 2h</text>
+
+  <!-- Lead Card 2 -->
+  <rect x="88" y="272" width="782" height="80" rx="12" fill="#fff" stroke="#E2DDD4" stroke-width="1" filter="url(#shadow)"/>
+  <circle cx="132" cy="312" r="22" fill="#F5F3ED"/>
+  <text x="132" y="318" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#796F4E" text-anchor="middle">EC</text>
+  <text x="168" y="302" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#453D23">Emma &amp; Charles</text>
+  <text x="168" y="320" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78">emma.charles@email.co.uk</text>
+  <text x="168" y="337" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78">80 invitados</text>
+  <text x="420" y="306" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78">Fecha boda</text>
+  <text x="420" y="326" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#453D23">22 Jun 2026</text>
+  <rect x="560" y="298" width="72" height="22" rx="4" fill="#F5F3ED"/>
+  <text x="572" y="313" font-family="system-ui, sans-serif" font-size="10" font-weight="500" fill="#796F4E">Instagram</text>
+  <circle cx="680" cy="312" r="5" fill="#3b82f6"/>
+  <text x="694" y="316" font-family="system-ui, sans-serif" font-size="11" fill="#453D23">Nuevo</text>
+  <text x="790" y="312" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78">hace 5h</text>
+
+  <!-- Lead Card 3 -->
+  <rect x="88" y="364" width="782" height="80" rx="12" fill="#fff" stroke="#E2DDD4" stroke-width="1" filter="url(#shadow)"/>
+  <circle cx="132" cy="404" r="22" fill="#F5F3ED"/>
+  <text x="132" y="410" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#796F4E" text-anchor="middle">LR</text>
+  <text x="168" y="394" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#453D23">Laura &amp; Roberto</text>
+  <text x="168" y="412" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78">laura.rob@gmail.com</text>
+  <text x="168" y="429" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78">150 invitados</text>
+  <text x="420" y="398" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78">Fecha boda</text>
+  <text x="420" y="418" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#453D23">8 Oct 2026</text>
+  <rect x="560" y="390" width="72" height="22" rx="4" fill="#F5F3ED"/>
+  <text x="572" y="405" font-family="system-ui, sans-serif" font-size="10" font-weight="500" fill="#796F4E">WhatsApp</text>
+  <circle cx="680" cy="404" r="5" fill="#3b82f6"/>
+  <text x="694" y="408" font-family="system-ui, sans-serif" font-size="11" fill="#453D23">Nuevo</text>
+  <text x="790" y="404" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78">hace 1d</text>
+
+  <!-- Stats bar at bottom -->
+  <rect x="88" y="470" width="782" height="100" rx="12" fill="#fff" stroke="#E2DDD4" stroke-width="1" filter="url(#shadow)"/>
+  <!-- Stat 1 -->
+  <text x="140" y="505" font-family="system-ui, sans-serif" font-size="28" font-weight="700" fill="#453D23" text-anchor="middle">12</text>
+  <text x="140" y="525" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78" text-anchor="middle">Leads activos</text>
+  <!-- Divider -->
+  <line x1="240" y1="485" x2="240" y2="555" stroke="#E2DDD4" stroke-width="1"/>
+  <!-- Stat 2 -->
+  <text x="340" y="505" font-family="system-ui, sans-serif" font-size="28" font-weight="700" fill="#453D23" text-anchor="middle">67%</text>
+  <text x="340" y="525" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78" text-anchor="middle">Tasa respuesta</text>
+  <!-- Divider -->
+  <line x1="440" y1="485" x2="440" y2="555" stroke="#E2DDD4" stroke-width="1"/>
+  <!-- Stat 3 -->
+  <text x="540" y="505" font-family="system-ui, sans-serif" font-size="28" font-weight="700" fill="#796F4E" text-anchor="middle">5</text>
+  <text x="540" y="525" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78" text-anchor="middle">Confirmados</text>
+  <!-- Divider -->
+  <line x1="640" y1="485" x2="640" y2="555" stroke="#E2DDD4" stroke-width="1"/>
+  <!-- Stat 4 -->
+  <text x="740" y="505" font-family="system-ui, sans-serif" font-size="28" font-weight="700" fill="#453D23" text-anchor="middle">2.4h</text>
+  <text x="740" y="525" font-family="system-ui, sans-serif" font-size="11" fill="#9A8F78" text-anchor="middle">Tiempo medio resp.</text>
+</svg>
