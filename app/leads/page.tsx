@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
@@ -78,6 +78,94 @@ function pad(n: number) { return String(n).padStart(2,'0') }
 function toIso(y: number, m: number, d: number) { return `${y}-${pad(m+1)}-${pad(d)}` }
 function todayIso() {
   const t = new Date(); return `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`
+}
+function shiftDateBy(d: string, days: number) {
+  const dt = new Date(d + 'T12:00:00'); dt.setDate(dt.getDate() + days)
+  return dt.toISOString().slice(0, 10)
+}
+// Expand anchor dates with venue rules to get the full set of dates to block
+function expandAnchorsWithRules(anchors: string[], rules: any): string[] {
+  const all = new Set<string>(anchors)
+  if (!rules) return Array.from(all).sort()
+  if (rules.type === 'overnight') {
+    const db = Math.ceil(rules.days_before || 0)
+    const da = Math.ceil(rules.days_after  || 0)
+    anchors.forEach(a => {
+      for (let i = db; i >= 1; i--) all.add(shiftDateBy(a, -i))
+      const d2 = shiftDateBy(a, 1)
+      all.add(d2)
+      for (let i = 1; i <= da; i++) all.add(shiftDateBy(d2, i))
+    })
+  } else if (rules.type === 'simple') {
+    const db = Math.ceil(rules.days_before || 0)
+    const da = Math.ceil(rules.days_after  || 0)
+    anchors.forEach(a => {
+      for (let i = db; i >= 1; i--) all.add(shiftDateBy(a, -i))
+      for (let i = 1; i <= da; i++) all.add(shiftDateBy(a, i))
+    })
+  } else if (rules.type === 'packages') {
+    anchors.forEach(a => {
+      const dow = new Date(a + 'T12:00:00').getDay()
+      const pkg = rules.packages?.find((p: any) => p.anchor_dow === dow)
+      if (pkg) {
+        const db = Math.ceil(pkg.days_before || 0)
+        const da = Math.ceil(pkg.days_after  || 0)
+        for (let i = db; i >= 1; i--) all.add(shiftDateBy(a, -i))
+        for (let i = 1; i < pkg.span_days; i++) all.add(shiftDateBy(a, i))
+        for (let i = 0; i < da; i++) all.add(shiftDateBy(a, pkg.span_days + i))
+      }
+    })
+  }
+  return Array.from(all).sort()
+}
+
+// Returns the set of dates that are HALF-DAY buffers (days_before/after with .5 fractional)
+// These need special visual treatment in the calendar
+function computeHalfDayBuffers(anchors: string[], rules: any): Set<string> {
+  const halfs = new Set<string>()
+  if (!rules || anchors.length === 0) return halfs
+  const addHalf = (base: string, offset: number) => halfs.add(shiftDateBy(base, offset))
+  if (rules.type === 'overnight') {
+    const anchor = rules.overnight_anchor ?? 'first'
+    const da = rules.days_after  || 0
+    const db = rules.days_before || 0
+    const da_full = Math.floor(da); const da_half = (da * 2) % 2 !== 0
+    const db_full = Math.floor(db); const db_half = (db * 2) % 2 !== 0
+    anchors.forEach(a => {
+      if (anchor === 'first') {
+        // d2 = a+1; desmontaje after d2; preparación before a
+        if (da_half) addHalf(a, 1 + da_full + 1)   // d2 + full days + 1
+        if (db_half) addHalf(a, -(db_full + 1))
+      } else {
+        // d1 = a-1; desmontaje after a; preparación before d1
+        if (da_half) addHalf(a, da_full + 1)
+        if (db_half) addHalf(a, -(1 + db_full + 1))
+      }
+    })
+  } else if (rules.type === 'simple') {
+    const da = rules.days_after  || 0
+    const db = rules.days_before || 0
+    const da_full = Math.floor(da); const da_half = (da * 2) % 2 !== 0
+    const db_full = Math.floor(db); const db_half = (db * 2) % 2 !== 0
+    anchors.forEach(a => {
+      if (da_half) addHalf(a, da_full + 1)
+      if (db_half) addHalf(a, -(db_full + 1))
+    })
+  } else if (rules.type === 'packages') {
+    anchors.forEach(a => {
+      const dow = new Date(a + 'T12:00:00').getDay()
+      const pkg = rules.packages?.find((p: any) => p.anchor_dow === dow)
+      if (pkg) {
+        const da = pkg.days_after  || 0
+        const db = pkg.days_before || 0
+        const da_full = Math.floor(da); const da_half = (da * 2) % 2 !== 0
+        const db_full = Math.floor(db); const db_half = (db * 2) % 2 !== 0
+        if (da_half) addHalf(a, pkg.span_days + da_full)
+        if (db_half) addHalf(a, -(db_full + 1))
+      }
+    })
+  }
+  return halfs
 }
 
 // Format the lead date for display
@@ -197,6 +285,12 @@ const emptyForm = {
   wedding_year: String(new Date().getFullYear() + 1),
   wedding_month: '6',
   wedding_season: 'summer',
+  wedding_duration_days: '1',
+  // original date fields (editable)
+  original_date_flexibility: '' as string,
+  original_wedding_date: '' as string,
+  original_wedding_date_to: '' as string,
+  original_wedding_date_ranges: [] as { from: string; to: string }[],
   // other
   visit_date: '', guests: '', source: 'web',
   notes: '', ceremony_type: 'sin_definir', budget: 'sin_definir',
@@ -228,8 +322,11 @@ export default function LeadsPage() {
   const [form,       setForm]       = useState(emptyForm)
   const [saving,     setSaving]     = useState(false)
   const [toast,      setToast]      = useState('')
+  const [flashedTab, setFlashedTab] = useState<string | null>(null)
+  const [lostBanner, setLostBanner] = useState<{ name: string } | null>(null)
   const [dateConfirmLead,   setDateConfirmLead]   = useState<any | null>(null)
   const [dateConfirmStatus, setDateConfirmStatus] = useState<DbStatus | null>(null)
+  const [dateConfirmKey,    setDateConfirmKey]    = useState(0)
   const [cancelVisitConfirm, setCancelVisitConfirm] = useState<{
     lead: any; targetStatus: DbStatus; requiresDateModal: boolean
   } | null>(null)
@@ -272,7 +369,21 @@ export default function LeadsPage() {
     setLoading(false)
   }
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
+  const showToast = (msg: string, flashTab?: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3200)
+    if (flashTab) {
+      setFlashedTab(flashTab)
+      setTimeout(() => setFlashedTab(null), 1800)
+    }
+    if (flashTab === 'lost' || msg.includes('Perdido')) {
+      // For "lost" moves, also show the in-content banner with lead name
+      const nameMatch = msg.match(/^(.+?) movido/)
+      if (nameMatch) setLostBanner({ name: nameMatch[1] })
+      else setLostBanner({ name: '' })
+      setTimeout(() => setLostBanner(null), 4000)
+    }
+  }
 
   // Tab counts (ignoring filters so counts are always real)
   const tabCounts = useMemo(() => {
@@ -322,22 +433,32 @@ export default function LeadsPage() {
     URL.revokeObjectURL(url)
   }
 
-  const moveToStatus = async (id: string, status: DbStatus) => {
+  const moveToStatus = async (id: string, status: DbStatus, cleanCalendar = false) => {
     const supabase = createClient()
     await supabase.from('leads').update({ status }).eq('id', id)
+
+    // Free calendar entries when losing a wedding or explicitly cleaning up (e.g. back to nuevo)
+    if (status === 'lost' || cleanCalendar) {
+      await supabase.from('calendar_entries')
+        .update({ status: 'libre', lead_id: null, note: null })
+        .eq('user_id', user!.id)
+        .eq('lead_id', id)
+    }
+
     setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
     const newTab = (Object.entries(TAB_STATUSES) as [Tab, DbStatus[]][])
       .find(([, ss]) => ss.includes(status))?.[0]
     if (newTab && newTab !== activeTab) {
       setActiveTab(newTab)
-      showToast(`Lead movido a "${TABS.find(t => t.key === newTab)?.label}"`)
+      showToast(`Lead movido a "${TABS.find(t => t.key === newTab)?.label}"`, newTab)
     }
   }
 
   const triggerStatusChange = (lead: any, status: DbStatus) => {
-    if (['contacted', 'visit_scheduled', 'won'].includes(status)) {
+    if (['contacted', 'proposal_sent', 'budget_sent', 'visit_scheduled', 'won'].includes(status)) {
       setDateConfirmLead(lead)
       setDateConfirmStatus(status)
+      setDateConfirmKey(k => k + 1)
     } else {
       moveToStatus(lead.id, status)
     }
@@ -352,6 +473,9 @@ export default function LeadsPage() {
       setCancelVisitConfirm({ lead, targetStatus: newStatus, requiresDateModal: false })
     } else if (newStatus === 'new' && lead && (lead.wedding_date || lead.wedding_date_ranges?.length)) {
       setClearDatesConfirm(lead)
+    } else if (newStatus === 'new' && lead && ['contacted', 'proposal_sent', 'budget_sent', 'post_visit'].includes(lead.status)) {
+      // Lead was in a status that creates calendar entries but has no wedding_date — clean up silently
+      moveToStatus(id, newStatus, true)
     } else {
       moveToStatus(id, newStatus)
     }
@@ -365,21 +489,15 @@ export default function LeadsPage() {
       : cancelWeddingLead.notes
     await supabase.from('leads').update({ status: 'lost', notes }).eq('id', cancelWeddingLead.id)
 
-    // Free the reserved calendar entry linked to this lead
-    const { data: reservedEntry } = await supabase
-      .from('calendar_entries')
-      .select('id, status')
+    // Free ALL calendar entries linked to this lead (reservado, negociacion, etc.)
+    await supabase.from('calendar_entries')
+      .update({ status: 'libre', lead_id: null, note: null })
       .eq('user_id', user!.id)
       .eq('lead_id', cancelWeddingLead.id)
-      .eq('status', 'reservado')
-      .maybeSingle()
-    if (reservedEntry?.id) {
-      await supabase.from('calendar_entries').update({ status: 'libre', lead_id: null, note: null }).eq('id', reservedEntry.id)
-    }
 
     setLeads(prev => prev.map(l => l.id === cancelWeddingLead.id ? { ...l, status: 'lost', notes } : l))
     setActiveTab('lost')
-    showToast('Boda cancelada — lead movido a Perdidos')
+    showToast('Boda cancelada — lead movido a Perdidos', 'lost')
     setCancelWeddingLead(null); setCancelWeddingReason('')
   }
 
@@ -432,26 +550,61 @@ export default function LeadsPage() {
     if (requiresDateModal) {
       setDateConfirmLead(updatedLead)
       setDateConfirmStatus(targetStatus)
+      setDateConfirmKey(k => k + 1)
     } else {
       moveToStatus(lead.id, targetStatus)
     }
   }
 
   // Note: requires ALTER TABLE leads ADD COLUMN IF NOT EXISTS wedding_date_history JSONB DEFAULT '[]';
-  const handleDateConfirm = async (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean) => {
+  const handleDateConfirm = async (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean, halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>) => {
     if (!dateConfirmLead || !dateConfirmStatus) return
     const supabase = createClient()
 
     const finalUpdates: any = { status: dateConfirmStatus, ...leadUpdates }
     if (isVisit && calendarDates.length > 0) finalUpdates.visit_date = calendarDates[0]
 
-    const { data: updatedLead } = await supabase.from('leads')
+    // Si aún no hay fechas originales guardadas, fijarlas ahora antes de cualquier cambio
+    // (se hace siempre al primer cambio de estado, cambien o no las fechas)
+    if (!isVisit && !dateConfirmLead.original_date_flexibility) {
+      finalUpdates.original_date_flexibility    = dateConfirmLead.date_flexibility    ?? 'exact'
+      finalUpdates.original_wedding_date        = dateConfirmLead.wedding_date        ?? null
+      finalUpdates.original_wedding_date_to     = dateConfirmLead.wedding_date_to     ?? null
+      finalUpdates.original_wedding_date_ranges = dateConfirmLead.wedding_date_ranges ?? null
+    }
+
+    const { data: updatedLead, error: updateErr } = await supabase.from('leads')
       .update(finalUpdates).eq('id', dateConfirmLead.id).select().single()
+
+    // Cascading fallbacks for missing optional columns (original_*, wedding_duration_days, etc.)
+    let resolvedLead = updatedLead
+    if (updateErr || !updatedLead) {
+      // 2nd try: drop original_* fields but keep core date fields + status
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { wedding_duration_days: _dur, ...coreLeadUpdates } = leadUpdates
+      const { data: fallback2, error: err2 } = await supabase.from('leads')
+        .update({ status: dateConfirmStatus, ...coreLeadUpdates }).eq('id', dateConfirmLead.id).select().single()
+      if (!err2 && fallback2) {
+        resolvedLead = fallback2
+      } else {
+        // 3rd try: just core date fields without duration, without original_*
+        const safeFields: any = { status: dateConfirmStatus }
+        if (leadUpdates.wedding_date     !== undefined) safeFields.wedding_date     = leadUpdates.wedding_date
+        if (leadUpdates.wedding_date_to  !== undefined) safeFields.wedding_date_to  = leadUpdates.wedding_date_to
+        if (leadUpdates.date_flexibility !== undefined) safeFields.date_flexibility = leadUpdates.date_flexibility
+        if (leadUpdates.wedding_date_ranges !== undefined) safeFields.wedding_date_ranges = leadUpdates.wedding_date_ranges
+        const { data: fallback3 } = await supabase.from('leads')
+          .update(safeFields).eq('id', dateConfirmLead.id).select().single()
+        resolvedLead = fallback3 ?? null
+      }
+    }
 
     // Visits only update visit_date on the lead — they do NOT touch calendar_entries
     // (availability of the day must not change just because someone is visiting)
     if (!isVisit) {
-      for (const d of calendarDates) {
+      // Save full-day calendar entries (dates NOT marked as half-day)
+      const fullDayDates = calendarDates.filter(d => !halfDayMap?.[d])
+      for (const d of fullDayDates) {
         const { data: existing } = await supabase.from('calendar_entries')
           .select('id').eq('user_id', user!.id).eq('date', d).maybeSingle()
         const entryPayload: any = { status: calendarStatus, lead_id: dateConfirmLead.id }
@@ -461,14 +614,28 @@ export default function LeadsPage() {
           await supabase.from('calendar_entries').insert({ user_id: user!.id, date: d, ...entryPayload })
         }
       }
+      // Save half-day entries — note encodes manana/tarde
+      if (halfDayMap) {
+        for (const [d, halfType] of Object.entries(halfDayMap)) {
+          if (!calendarDates.includes(d)) continue
+          const { data: existing } = await supabase.from('calendar_entries')
+            .select('id').eq('user_id', user!.id).eq('date', d).maybeSingle()
+          const entryPayload: any = { status: calendarStatus, lead_id: dateConfirmLead.id, note: halfType }
+          if (existing?.id) {
+            await supabase.from('calendar_entries').update(entryPayload).eq('id', existing.id)
+          } else {
+            await supabase.from('calendar_entries').insert({ user_id: user!.id, date: d, ...entryPayload })
+          }
+        }
+      }
     }
 
-    if (updatedLead) setLeads(prev => prev.map(l => l.id === dateConfirmLead.id ? updatedLead : l))
+    if (resolvedLead) setLeads(prev => prev.map(l => l.id === dateConfirmLead.id ? resolvedLead! : l))
     const newTab = (Object.entries(TAB_STATUSES) as [Tab, DbStatus[]][])
       .find(([, ss]) => ss.includes(dateConfirmStatus))?.[0]
     if (newTab && newTab !== activeTab) {
       setActiveTab(newTab)
-      showToast(`Lead movido a "${TABS.find(t => t.key === newTab)?.label}"`)
+      showToast(`Lead movido a "${TABS.find(t => t.key === newTab)?.label}"`, newTab)
     } else showToast('Lead actualizado')
     setDateConfirmLead(null)
     setDateConfirmStatus(null)
@@ -496,7 +663,7 @@ export default function LeadsPage() {
       }
       setLeads(prev => prev.map(l => l.id === deleteConfirmId ? { ...l, status: 'lost' } : l))
       setActiveTab('lost')
-      showToast('Lead movido a Perdidos')
+      showToast('Lead movido a Perdidos', 'lost')
     } else {
       // Hard delete (only from "lost" tab)
       await supabase.from('leads').delete().eq('id', deleteConfirmId)
@@ -519,6 +686,11 @@ export default function LeadsPage() {
       wedding_year: lead.wedding_year ? String(lead.wedding_year) : String(new Date().getFullYear() + 1),
       wedding_month: lead.wedding_month ? String(lead.wedding_month) : '6',
       wedding_season: lead.wedding_season || 'summer',
+      wedding_duration_days: lead.wedding_duration_days ? String(lead.wedding_duration_days) : '1',
+      original_date_flexibility:    lead.original_date_flexibility    || '',
+      original_wedding_date:        lead.original_wedding_date        || '',
+      original_wedding_date_to:     lead.original_wedding_date_to     || '',
+      original_wedding_date_ranges: lead.original_wedding_date_ranges || [],
       visit_date: lead.visit_date || '', guests: lead.guests?.toString() || '',
       source: lead.source || 'web', notes: lead.notes || '',
       ceremony_type: lead.ceremony_type || 'sin_definir',
@@ -530,13 +702,23 @@ export default function LeadsPage() {
 
   const handleSubmit = async () => {
     if (!form.name.trim()) { showToast('El nombre es obligatorio'); return }
+    if (!form.email?.trim() && !form.phone?.trim()) { showToast('Email o teléfono obligatorio'); return }
+    if (form.date_flexibility === 'exact' && !form.wedding_date) { showToast('La fecha de boda es obligatoria'); return }
+    if (form.date_flexibility === 'range' && !form.wedding_date) { showToast('La fecha de inicio del rango es obligatoria'); return }
+    if (form.date_flexibility === 'multi_range' && !form.wedding_date_ranges?.some((r: any) => r.from)) { showToast('Añade al menos un rango de fechas'); return }
     setSaving(true)
     const supabase = createClient()
+    // Excluir campos del formulario que no existen en la BD o se manejan por separado
+    const { wedding_duration_days: _dur,
+      original_date_flexibility: _oFlex, original_wedding_date: _oDate,
+      original_wedding_date_to: _oDateTo, original_wedding_date_ranges: _oRanges,
+      ...formData } = form
     const payload  = {
-      ...form,
+      ...formData,
       guests: form.guests ? parseInt(form.guests) : null,
       visit_date: form.visit_date || null,
       wedding_date: ['exact','range'].includes(form.date_flexibility) ? (form.wedding_date || null) : null,
+      // exact → siempre 1 día (sin wedding_date_to); range usa wedding_date_to del rango seleccionado
       wedding_date_to: form.date_flexibility === 'range' ? (form.wedding_date_to || null) : null,
       wedding_date_ranges: form.date_flexibility === 'multi_range' ? form.wedding_date_ranges.filter(r => r.from) : null,
       wedding_year: ['month','season'].includes(form.date_flexibility) ? parseInt(form.wedding_year) : null,
@@ -544,13 +726,35 @@ export default function LeadsPage() {
       wedding_season: form.date_flexibility === 'season' ? form.wedding_season : null,
     }
     if (editLead) {
-      const { data, error } = await supabase.from('leads').update(payload).eq('id', editLead.id).select().single()
+      const editPayload: any = { ...payload }
+      // Guardar los campos originales editados por el usuario
+      // Si el usuario no los ha tocado (vacíos) y tampoco había originales → fijar los actuales pre-edición
+      if (form.original_date_flexibility) {
+        editPayload.original_date_flexibility    = form.original_date_flexibility
+        editPayload.original_wedding_date        = form.original_date_flexibility === 'exact' || form.original_date_flexibility === 'range' ? (form.original_wedding_date || null) : null
+        editPayload.original_wedding_date_to     = form.original_date_flexibility === 'range' ? (form.original_wedding_date_to || null) : null
+        editPayload.original_wedding_date_ranges = form.original_date_flexibility === 'multi_range' ? (form.original_wedding_date_ranges?.filter((r: any) => r.from) || null) : null
+      } else if (!editLead.original_date_flexibility) {
+        editPayload.original_date_flexibility    = editLead.date_flexibility    ?? 'exact'
+        editPayload.original_wedding_date        = editLead.wedding_date        ?? null
+        editPayload.original_wedding_date_to     = editLead.wedding_date_to     ?? null
+        editPayload.original_wedding_date_ranges = editLead.wedding_date_ranges ?? null
+      }
+      const { data, error } = await supabase.from('leads').update(editPayload).eq('id', editLead.id).select().single()
       if (error) { showToast(`Error: ${error.message}`); setSaving(false); return }
       if (data) setLeads(prev => prev.map(l => l.id === editLead.id ? data : l))
       showToast('Lead actualizado')
     } else {
-      const { data, error } = await supabase.from('leads')
-        .insert({ ...payload, user_id: user!.id, status: 'new' }).select().single()
+      // Al crear: guardar también las fechas originales como referencia permanente
+      const { data, error } = await supabase.from('leads').insert({
+        ...payload,
+        user_id: user!.id,
+        status: 'new',
+        original_wedding_date:        payload.wedding_date,
+        original_wedding_date_to:     payload.wedding_date_to,
+        original_wedding_date_ranges: payload.wedding_date_ranges,
+        original_date_flexibility:    payload.date_flexibility,
+      }).select().single()
       if (error) { showToast(`Error: ${error.message}`); setSaving(false); return }
       if (data) setLeads(prev => [data, ...prev])
       showToast('Nuevo lead creado')
@@ -666,14 +870,27 @@ export default function LeadsPage() {
               {visibleTabs.map(tab => {
                 const count   = tabCounts[tab.key] || 0
                 const isActive = activeTab === tab.key
+                const isFlashing = flashedTab === tab.key
+                const isLost = tab.key === 'lost'
                 return (
-                  <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
-                    padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 13, fontWeight: 500,
-                    color: isActive ? 'var(--espresso)' : 'var(--warm-gray)',
-                    borderBottom: isActive ? '2px solid var(--gold)' : '2px solid transparent',
+                  <button key={tab.key} onClick={() => { setActiveTab(tab.key); setFlashedTab(null) }} style={{
+                    padding: '10px 16px',
+                    background: isFlashing && isLost ? '#dc2626'
+                      : isFlashing ? '#fefce8'
+                      : isLost && count > 0 && !isActive ? 'rgba(239,68,68,0.05)'
+                      : 'none',
+                    border: 'none', cursor: 'pointer',
+                    fontSize: 13, fontWeight: isActive || isFlashing ? 600 : 500,
+                    color: isFlashing && isLost ? '#fff'
+                      : isActive ? 'var(--espresso)'
+                      : isLost && count > 0 ? '#ef4444'
+                      : isFlashing ? 'var(--gold)'
+                      : 'var(--warm-gray)',
+                    borderBottom: isActive ? `2px solid ${isLost ? '#ef4444' : 'var(--gold)'}` : isFlashing ? '2px solid currentColor' : '2px solid transparent',
                     marginBottom: -1, display: 'flex', alignItems: 'center', gap: 6,
-                    transition: 'color 0.15s, border-color 0.15s', whiteSpace: 'nowrap',
+                    transition: 'all 0.25s', whiteSpace: 'nowrap',
+                    borderRadius: isFlashing ? '6px 6px 0 0' : 0,
+                    transform: isFlashing && isLost ? 'scale(1.04)' : 'scale(1)',
                   }}>
                     <span>{tab.emoji}</span>
                     <span>{tab.label}</span>
@@ -681,8 +898,17 @@ export default function LeadsPage() {
                       <span style={{
                         fontSize: 10, fontWeight: 700, minWidth: 18, height: 18,
                         borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: isActive ? 'var(--gold)' : 'var(--ivory)',
-                        color: isActive ? '#fff' : 'var(--warm-gray)', padding: '0 5px',
+                        background: isFlashing && isLost ? 'rgba(255,255,255,0.3)'
+                          : isActive && isLost ? '#ef4444'
+                          : isLost && count > 0 ? '#fee2e2'
+                          : isActive ? 'var(--gold)'
+                          : 'var(--ivory)',
+                        color: isFlashing && isLost ? '#fff'
+                          : isActive && isLost ? '#fff'
+                          : isLost && count > 0 ? '#ef4444'
+                          : isActive ? '#fff'
+                          : 'var(--warm-gray)',
+                        padding: '0 5px',
                       }}>{count}</span>
                     )}
                   </button>
@@ -691,6 +917,24 @@ export default function LeadsPage() {
             </div>
 
           </div>
+
+          {/* Lost banner — aparece cuando un lead se mueve a Perdidos */}
+          {lostBanner && (
+            <div style={{
+              margin: '10px 0 4px', padding: '10px 14px', background: '#fef2f2',
+              border: '1px solid #fca5a5', borderRadius: 8,
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <XCircle size={16} style={{ color: '#ef4444', flexShrink: 0 }} />
+              <span style={{ fontSize: 13, color: '#dc2626', fontWeight: 500, flex: 1 }}>
+                {lostBanner.name ? <><strong>{lostBanner.name}</strong> movido a Perdidos</> : 'Lead movido a Perdidos'}
+              </span>
+              <button onClick={() => setLostBanner(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 2, display: 'flex' }}>
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           {/* List content */}
           <div style={{ marginTop: 8 }}>
@@ -752,14 +996,16 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* Toast */}
-      {toast && (
+      {/* Toast — se oculta para "Perdido" (el banner inline lo reemplaza) */}
+      {toast && !toast.includes('Perdido') && (
         <div style={{
-          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
           background: 'var(--espresso)', color: '#fff', padding: '10px 20px',
-          borderRadius: 8, fontSize: 13, zIndex: 2000, boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-          pointerEvents: 'none',
-        }}>{toast}</div>
+          borderRadius: 8, fontSize: 13, fontWeight: 500, zIndex: 2000,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.2)', pointerEvents: 'none', whiteSpace: 'nowrap',
+        }}>
+          {toast}
+        </div>
       )}
 
       {detailLead && (
@@ -771,13 +1017,14 @@ export default function LeadsPage() {
       )}
 
       {showForm && (
-        <LeadFormModal form={form} setForm={setForm} isEdit={!!editLead}
-          saving={saving} onSubmit={handleSubmit}
+        <LeadFormModal form={form} setForm={setForm} isEdit={!!editLead} editLead={editLead}
+          saving={saving} onSubmit={handleSubmit} userId={user!.id}
           onClose={() => { setShowForm(false); setEditLead(null) }} />
       )}
 
       {dateConfirmLead && dateConfirmStatus && (
         <DateConfirmModal
+          key={dateConfirmKey}
           lead={dateConfirmLead}
           targetStatus={dateConfirmStatus}
           userId={user!.id}
@@ -928,9 +1175,24 @@ export default function LeadsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button onClick={async () => {
                 const supabase = createClient()
-                await supabase.from('leads').update({ status: 'new', wedding_date: null, wedding_date_to: null, date_flexibility: 'flexible', wedding_date_ranges: null }).eq('id', clearDatesConfirm.id)
-                setLeads(prev => prev.map(l => l.id === clearDatesConfirm.id ? { ...l, status: 'new', wedding_date: null, wedding_date_to: null, date_flexibility: 'flexible', wedding_date_ranges: null } : l))
-                setActiveTab('new')
+                const lead = clearDatesConfirm
+                // Si hay fechas originales guardadas, restaurarlas; si no, limpiar a flexible
+                const dateFields = lead.original_date_flexibility
+                  ? {
+                      date_flexibility:    lead.original_date_flexibility,
+                      wedding_date:        lead.original_wedding_date        ?? null,
+                      wedding_date_to:     lead.original_wedding_date_to     ?? null,
+                      wedding_date_ranges: lead.original_wedding_date_ranges ?? null,
+                      wedding_year:        lead.wedding_year  ?? null,
+                      wedding_month:       lead.wedding_month ?? null,
+                      wedding_season:      lead.wedding_season ?? null,
+                    }
+                  : { wedding_date: null, wedding_date_to: null, date_flexibility: 'flexible', wedding_date_ranges: null }
+                // Restore date fields (without status — moveToStatus handles status + calendar cleanup)
+                await supabase.from('leads').update(dateFields).eq('id', lead.id)
+                setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, ...dateFields } : l))
+                // Move to new + clean calendar entries
+                await moveToStatus(lead.id, 'new', true)
                 setClearDatesConfirm(null)
               }} style={{ padding: '9px 14px', borderRadius: 8, border: 'none', background: 'var(--gold)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                 Sí, deseleccionar fechas
@@ -959,13 +1221,26 @@ function DateConfirmModal({
   targetStatus: DbStatus
   userId: string
   allLeads: any[]
-  onConfirm: (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean) => Promise<void>
+  onConfirm: (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean, halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>) => Promise<void>
   onClose: () => void
 }) {
   const isVisitMode = targetStatus === 'visit_scheduled'
   const isWonMode   = targetStatus === 'won'
+  const [dateRules,  setDateRules]  = useState<any>(null)
 
-  const requestedDates = useMemo(() => expandLeadDates(lead), [lead])
+  // Use original requested dates (before any en-seguimiento confirmation) for pills + initial selection
+  // If no originals saved, fall back to current dates
+  const requestedDates = useMemo(() => {
+    if (lead.original_date_flexibility) {
+      return expandLeadDates({
+        date_flexibility:    lead.original_date_flexibility,
+        wedding_date:        lead.original_wedding_date        ?? null,
+        wedding_date_to:     lead.original_wedding_date_to     ?? null,
+        wedding_date_ranges: lead.original_wedding_date_ranges ?? null,
+      })
+    }
+    return expandLeadDates(lead)
+  }, [lead])
 
   // Build a map of date → count of OTHER leads who have that date requested
   const dateLeadCounts = useMemo(() => {
@@ -980,16 +1255,102 @@ function DateConfirmModal({
   }, [allLeads, lead.id])
   const hasRequestedDates = requestedDates.length > 0
 
-  const firstDate = getLeadFirstDate(lead)
+  // Open calendar on wedding_date (confirmed or original) if available
+  const firstDate = lead.wedding_date || getLeadFirstDate(lead)
   const initD = firstDate ? new Date(firstDate + 'T12:00:00') : new Date()
   const [viewYear,  setViewYear]  = useState(initD.getFullYear())
   const [viewMonth, setViewMonth] = useState(initD.getMonth())
-  // selectedDates = couple's confirmed dates (deselectable) + user-added alternatives
-  const [selectedDates, setSelectedDates] = useState<string[]>([])
+  // selectedDates = all calendar days to block (anchors + auto-added buffer/partner days)
+  const [selectedDates,  setSelectedDates]  = useState<string[]>([])
+  // selectedAnchors = only the dates the user explicitly clicked (the "wedding days")
+  const [selectedAnchors, setSelectedAnchors] = useState<string[]>([])
   const [calEntries,    setCalEntries]    = useState<Record<string, any>>({})
   const [saving,        setSaving]        = useState(false)
+  const [weddingDuration, setWeddingDuration] = useState<number>(lead.wedding_duration_days || 1)
+  const [editingDuration, setEditingDuration] = useState(false)
+  // Overnight: 1 = selected date is the wedding day (next day = check-out), 2 = selected date is check-out (prev day = wedding)
+  const [overnightDay, setOvernightDay] = useState<1 | 2>(1)
+  // When venue has overnight/packages rules, auto-apply them unless user clicks "Ignorar reglas"
+  const [ignoreRules, setIgnoreRules] = useState(false)
   // Prevent re-initialising selectedDates on month navigation
-  const isFirstLoad = { current: true }
+  const isFirstLoad    = useRef(true)
+  // Track when initial anchors are set so rules-expansion effect can fire
+  const [initialAnchorsSet, setInitialAnchorsSet] = useState(false)
+  const rulesApplied   = useRef(false)
+
+  // Clamp duration when user deselects dates.
+  // For overnight: each anchor = 2 wedding days (check-in + check-out)
+  // For packages:  each anchor contributes span_days
+  // For simple:    each anchor = 1 day
+  useEffect(() => {
+    if (selectedAnchors.length === 0) return
+    let maxDuration = selectedAnchors.length  // simple / fallback
+    if (dateRules?.type === 'overnight') {
+      maxDuration = selectedAnchors.length * 2
+    } else if (dateRules?.type === 'packages') {
+      maxDuration = selectedAnchors.reduce((sum, a) => {
+        const dow = new Date(a + 'T12:00:00').getDay()
+        const pkg = dateRules.packages?.find((p: any) => p.anchor_dow === dow)
+        return sum + (pkg?.span_days || 1)
+      }, 0)
+    }
+    if (weddingDuration > maxDuration) setWeddingDuration(maxDuration)
+  }, [selectedAnchors.length, dateRules?.type])
+
+  // Load date rules from venue settings
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('venue_settings').select('date_rules').eq('user_id', userId).maybeSingle()
+      .then(({ data }) => { if (data?.date_rules) setDateRules(data.date_rules) })
+  }, [userId])
+
+  // Set default duration from venue rules — rules always govern the default
+  const durationInitialized = useRef(false)
+  useEffect(() => {
+    if (!dateRules || durationInitialized.current || ignoreRules) return
+    durationInitialized.current = true
+    if (dateRules.type === 'overnight') setWeddingDuration(2)
+    else if (dateRules.type === 'packages' && dateRules.packages?.length) {
+      setWeddingDuration(dateRules.packages[0].span_days)
+    } else {
+      // simple or no specific span: keep 1 (the wedding day itself)
+      setWeddingDuration(1)
+    }
+  }, [dateRules])
+
+  // Once BOTH initial anchors and date rules are ready, expand the pre-selection with the rules
+  // Also filter out anchors whose full span has conflicts (dateRules wasn't ready during fetchEntries)
+  useEffect(() => {
+    if (!initialAnchorsSet || !dateRules || rulesApplied.current || ignoreRules || isVisitMode) return
+    rulesApplied.current = true
+    setSelectedAnchors(prev => {
+      if (prev.length === 0) return prev
+      const isHardBlocked = (d: string) => {
+        const e = calEntries[d]
+        return e?.status === 'reservado' || (e?.status === 'bloqueado' && !e?.note?.startsWith('medio_dia'))
+      }
+      // Filter anchors whose span has at least one hard-blocked day
+      const validAnchors = prev.filter(a => {
+        if (dateRules.type === 'packages') {
+          const dow = new Date(a + 'T12:00:00').getDay()
+          const pkg = (dateRules.packages as any[])?.find(p => p.anchor_dow === dow)
+          if (pkg) {
+            for (let i = 1; i < pkg.span_days; i++) {
+              if (isHardBlocked(shiftDateBy(a, i))) return false
+            }
+          }
+        }
+        if (dateRules.type === 'overnight') {
+          if (isHardBlocked(shiftDateBy(a, 1))) return false
+        }
+        return true
+      })
+      setSelectedDates(expandAnchorsWithRules(validAnchors, dateRules))
+      return validAnchors
+    })
+  // calEntries intentionally included so the filter uses up-to-date entries
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAnchorsSet, dateRules])
 
   // Load calendar entries. On first render also fetch all months with requested dates.
   useEffect(() => {
@@ -997,10 +1358,16 @@ function DateConfirmModal({
       const supabase = createClient()
       const monthsToLoad: string[] = [`${viewYear}-${pad(viewMonth + 1)}`]
       if (isFirstLoad.current && !isVisitMode) {
+        // Load months for the original requested dates (pills)
         requestedDates.forEach(d => {
           const ym = d.slice(0, 7)
           if (!monthsToLoad.includes(ym)) monthsToLoad.push(ym)
         })
+        // Also load month for the confirmed wedding_date (may differ from requested dates)
+        if (lead.wedding_date) {
+          const ym = lead.wedding_date.slice(0, 7)
+          if (!monthsToLoad.includes(ym)) monthsToLoad.push(ym)
+        }
       }
       const newEntries: Record<string, any> = {}
       for (const ym of monthsToLoad) {
@@ -1009,16 +1376,57 @@ function DateConfirmModal({
         const { data } = await supabase.from('calendar_entries')
           .select('*').eq('user_id', userId)
           .gte('date', `${ym}-01`).lte('date', `${ym}-${pad(lastDay)}`)
-        if (data) data.forEach((e: any) => { newEntries[e.date] = e })
+        if (data) {
+          // Group entries by date (a date can have 2 entries for double half-day)
+          const byDate: Record<string, any[]> = {}
+          data.forEach((e: any) => {
+            if (!byDate[e.date]) byDate[e.date] = []
+            byDate[e.date].push(e)
+          })
+          Object.entries(byDate).forEach(([date, arr]) => {
+            if (arr.length === 1) {
+              newEntries[date] = arr[0]
+            } else {
+              // Two entries — check if both halves are taken (fully booked)
+              const bothHalves = arr.filter(e => e.note?.startsWith('medio_dia')).length === 2
+              if (bothHalves) {
+                // Both halves taken — synthesize a fully-booked entry (removes half-day prefix so it shows as unavailable)
+                const dominated = arr.find(e => e.status === 'reservado') || arr[0]
+                const rawNote = dominated.note || ''
+                const pipeIdx = rawNote.indexOf('|')
+                const strippedNote = rawNote.startsWith('medio_dia')
+                  ? (pipeIdx >= 0 ? rawNote.slice(pipeIdx + 1) || null : null)
+                  : rawNote || null
+                newEntries[date] = { ...dominated, note: strippedNote }
+              } else {
+                // Primary entry wins
+                newEntries[date] = arr[0]
+              }
+            }
+          })
+        }
       }
-      // On first load: pre-select the couple's available requested dates
+      // On first load: seed the calendar selection
       if (isFirstLoad.current && !isVisitMode) {
         isFirstLoad.current = false
-        const available = requestedDates.filter(d => {
-          const s = newEntries[d]?.status
-          return s !== 'bloqueado' && s !== 'reservado'
-        })
+        // If the lead has a previously confirmed wedding_date, seed from that anchor
+        // so the expansion re-produces the previously selected dates.
+        // Otherwise fall back to the original requested dates.
+        const seedDates = lead.wedding_date
+          ? [lead.wedding_date]
+          : requestedDates
+
+        const isHardBlockedIn = (entries: Record<string, any>, d: string) => {
+          const e = entries[d]
+          return e?.status === 'reservado' || (e?.status === 'bloqueado' && !e?.note?.startsWith('medio_dia'))
+        }
+
+        // Only filter out the anchor itself here — span conflict check happens in the
+        // rulesApplied effect where dateRules is guaranteed to be loaded
+        const available = seedDates.filter(d => !isHardBlockedIn(newEntries, d))
         setSelectedDates(available)
+        setSelectedAnchors(available)
+        setInitialAnchorsSet(true)
       }
       setCalEntries(prev => ({ ...prev, ...newEntries }))
     }
@@ -1028,7 +1436,12 @@ function DateConfirmModal({
 
   // Derived
   const unavailableRequested = useMemo(
-    () => requestedDates.filter(d => calEntries[d]?.status === 'bloqueado' || calEntries[d]?.status === 'reservado'),
+    () => requestedDates.filter(d => {
+      const e = calEntries[d]
+      if (!e) return false
+      const isHalf = e.note?.startsWith('medio_dia')
+      return !isHalf && (e.status === 'bloqueado' || e.status === 'reservado')
+    }),
     [requestedDates, calEntries]
   )
   const availableRequested = useMemo(
@@ -1042,33 +1455,239 @@ function DateConfirmModal({
   )
 
   const toggleDate = (ds: string) => {
-    const s = calEntries[ds]?.status
-    if (s === 'bloqueado' || s === 'reservado') return
+    const entry = calEntries[ds]
+    const s = entry?.status
+    // Half-day entries (reservado or bloqueado ½) are soft: still selectable (the other half is free)
+    const isHardBlock = !(entry?.note?.startsWith('medio_dia')) && (s === 'reservado' || s === 'bloqueado')
+    if (isHardBlock) return
+
+    // Half-day mode: clicking a selected anchor cycles ½M → ½T → deseleccionar
+    // Full-day state never appears while this mode is active
+    if (halfDayMode && !isVisitMode && selectedAnchors.includes(ds)) {
+      const current = halfDayMap[ds]
+      if (current !== 'medio_dia_tarde') {
+        // ½M (o sin estado por si acaso) → ½T
+        setHalfDayMap(prev => ({ ...prev, [ds]: 'medio_dia_tarde' }))
+      } else {
+        // ½T → deseleccionar del todo
+        setHalfDayMap(prev => { const n = { ...prev }; delete n[ds]; return n })
+        setSelectedDates(prev => prev.filter(d => d !== ds))
+        setSelectedAnchors(prev => prev.filter(a => a !== ds))
+      }
+      return
+    }
+
+    // Package mode: clicking an anchor day selects/deselects the full span
+    // Only applies when rules are active (!ignoreRules); in manual mode fall through to simple toggle
+    if (!isVisitMode && !ignoreRules && dateRules?.type === 'packages') {
+      const dow = new Date(ds + 'T12:00:00').getDay()
+      const pkg = dateRules.packages?.find((p: any) => p.anchor_dow === dow)
+      if (!pkg) return  // not a valid anchor day in rules mode
+      const spanDates: string[] = []
+      for (let i = 0; i < pkg.span_days; i++) {
+        const dt = new Date(ds + 'T12:00:00'); dt.setDate(dt.getDate() + i)
+        spanDates.push(dt.toISOString().slice(0, 10))
+      }
+      const hasConflict = spanDates.some(sd => {
+        const e2 = calEntries[sd]
+        return e2?.status === 'reservado' || (e2?.status === 'bloqueado' && !(e2?.note?.startsWith('medio_dia')))
+      })
+      if (hasConflict) return
+      const allSelected = spanDates.every(sd => selectedDates.includes(sd))
+      if (allSelected) {
+        setSelectedDates(prev => prev.filter(pd => !spanDates.includes(pd)))
+        setSelectedAnchors(prev => prev.filter(a => a !== ds))
+        // Duration drops by this package's span
+        setWeddingDuration(prev => Math.max(1, prev - pkg.span_days))
+      } else {
+        setSelectedDates(prev => [...prev.filter(pd => !spanDates.includes(pd)), ...spanDates])
+        setSelectedAnchors(prev => {
+          const next = [...prev.filter(a => a !== ds), ds]
+          // Recompute total duration from all selected anchors
+          const total = next.reduce((sum, a) => {
+            const d = new Date(a + 'T12:00:00').getDay()
+            const p = dateRules.packages?.find((pk: any) => pk.anchor_dow === d)
+            return sum + (p?.span_days || 1)
+          }, 0)
+          setWeddingDuration(total)
+          return next
+        })
+      }
+      return
+    }
+
+    // Auto-rules: overnight — select/deselect the pair + optional buffer days
+    if (!isVisitMode && !ignoreRules && dateRules?.type === 'overnight') {
+      const d1 = overnightDay === 1 ? ds : shiftDate(ds, -1)
+      const d2 = shiftDate(d1, 1)
+      const daysBefore = Math.ceil(dateRules.days_before || 0)
+      const daysAfter  = Math.ceil(dateRules.days_after  || 0)
+      // Full span: days_before before d1, then d1+d2, then days_after after d2
+      const getSpan = (anchor: string) => {
+        const pair = shiftDate(anchor, 1)
+        const sp: string[] = []
+        for (let i = daysBefore; i >= 1; i--) sp.push(shiftDate(anchor, -i))
+        sp.push(anchor)
+        sp.push(pair)
+        for (let i = 1; i <= daysAfter; i++) sp.push(shiftDate(pair, i))
+        return sp
+      }
+      const spanDates = getSpan(d1)
+      const hasConflict = spanDates.some(sd => {
+        const e = calEntries[sd]
+        return e?.status === 'reservado' || (e?.status === 'bloqueado' && !(e?.note?.startsWith('medio_dia')))
+      })
+      if (hasConflict) return
+      // Deselect only when d1 is already an anchor AND its full span is applied
+      const isAnchor = selectedAnchors.includes(d1)
+      const fullyExpanded = spanDates.every(sd => selectedDates.includes(sd))
+      if (isAnchor && fullyExpanded) {
+        const otherAnchors = selectedAnchors.filter(a => a !== d1)
+        const keep = new Set(otherAnchors.flatMap(a => getSpan(a)))
+        setSelectedDates(prev => prev.filter(d => keep.has(d) || !spanDates.includes(d)))
+        setSelectedAnchors(prev => prev.filter(a => a !== d1))
+      } else {
+        setSelectedDates(prev => Array.from(new Set([...prev, ...spanDates])).sort())
+        setSelectedAnchors(prev => [...prev.filter(a => a !== d1), d1].sort())
+      }
+      return
+    }
+
+    // Auto-rules: simple with buffer days — select/deselect the anchor + buffer span
+    if (!isVisitMode && !ignoreRules && dateRules?.type === 'simple' && hasAutoRules) {
+      const daysBefore = Math.ceil(dateRules.days_before || 0)
+      const daysAfter  = Math.ceil(dateRules.days_after  || 0)
+      const getSpan = (a: string) => {
+        const sp: string[] = []
+        for (let i = daysBefore; i >= 1; i--) sp.push(shiftDate(a, -i))
+        sp.push(a)
+        for (let i = 1; i <= daysAfter; i++) sp.push(shiftDate(a, i))
+        return sp
+      }
+      const spanDates = getSpan(ds)
+      const hasConflict = spanDates.some(sd => {
+        const e = calEntries[sd]
+        return e?.status === 'reservado' || (e?.status === 'bloqueado' && !(e?.note?.startsWith('medio_dia')))
+      })
+      if (hasConflict) return
+      // Deselect only when ds is already an anchor AND its full span is applied
+      const isAnchor = selectedAnchors.includes(ds)
+      const fullyExpanded = spanDates.every(sd => selectedDates.includes(sd))
+      if (isAnchor && fullyExpanded) {
+        const otherAnchors = selectedAnchors.filter(a => a !== ds)
+        const keep = new Set(otherAnchors.flatMap(a => getSpan(a)))
+        setSelectedDates(prev => prev.filter(d => keep.has(d) || !spanDates.includes(d)))
+        setSelectedAnchors(prev => prev.filter(a => a !== ds))
+      } else {
+        // Add or expand: new anchor, or anchor whose buffer wasn't applied yet
+        setSelectedDates(prev => Array.from(new Set([...prev, ...spanDates])).sort())
+        setSelectedAnchors(prev => [...prev.filter(a => a !== ds), ds].sort())
+      }
+      return
+    }
+
     if (isVisitMode) {
       setSelectedDates(prev => prev[0] === ds ? [] : [ds])
     } else {
       setSelectedDates(prev => prev.includes(ds) ? prev.filter(d => d !== ds) : [...prev, ds])
+      setSelectedAnchors(prev => prev.includes(ds) ? prev.filter(a => a !== ds) : [...prev, ds])
     }
   }
+
+  const shiftDate = (d: string, days: number) => {
+    const dt = new Date(d + 'T12:00:00'); dt.setDate(dt.getDate() + days)
+    return dt.toISOString().slice(0, 10)
+  }
+
+  // Whether venue rules should be auto-applied (overnight, packages, or simple with buffer days)
+  const hasAutoRules = !isVisitMode && (
+    dateRules?.type === 'overnight' ||
+    dateRules?.type === 'packages' ||
+    (dateRules?.type === 'simple' && ((dateRules.days_before || 0) > 0 || (dateRules.days_after || 0) > 0))
+  )
+
+  // Per-date half-day mode: user can mark any selected date as ½M (mañana) or ½T (tarde)
+  const [halfDayMap, setHalfDayMap] = useState<Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>>({})
+  const [halfDayMode, setHalfDayMode] = useState(false)
+  const prevAnchorsRef = useRef<string[]>([])
+
+  // When half-day mode is activated, immediately convert all existing full-day anchors to ½M
+  useEffect(() => {
+    if (halfDayMode) {
+      setHalfDayMap(prev => {
+        const next = { ...prev }
+        selectedAnchors.forEach(a => { if (!next[a]) next[a] = 'medio_dia_manana' })
+        return next
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [halfDayMode])
+
+  // When a NEW anchor is added while half-day mode is on, auto-set it to ½M
+  useEffect(() => {
+    if (halfDayMode) {
+      const newAnchors = selectedAnchors.filter(a => !prevAnchorsRef.current.includes(a))
+      if (newAnchors.length > 0) {
+        setHalfDayMap(prev => {
+          const next = { ...prev }
+          newAnchors.forEach(a => { if (!next[a]) next[a] = 'medio_dia_manana' })
+          return next
+        })
+      }
+    }
+    prevAnchorsRef.current = [...selectedAnchors]
+  }, [selectedAnchors, halfDayMode])
+
+  // Keep halfDayMap in sync with selectedDates — clear entries for deselected dates
+  useEffect(() => {
+    setHalfDayMap(prev => {
+      const cleaned: typeof prev = {}
+      for (const key of Object.keys(prev)) {
+        if (selectedDates.includes(key)) cleaned[key] = prev[key]
+      }
+      return cleaned
+    })
+  }, [selectedDates])
+
+  // Half-day buffer dates (days_after/before with .5 fractional) — need diagonal visual
+  const halfDayBufferSet = useMemo(() => {
+    return (hasAutoRules && !ignoreRules) ? computeHalfDayBuffers(selectedAnchors, dateRules) : new Set<string>()
+  }, [selectedAnchors, dateRules, hasAutoRules, ignoreRules])
 
   const handleConfirm = async () => {
     setSaving(true)
     const calStatus: 'negociacion' | 'reservado' = isWonMode ? 'reservado' : 'negociacion'
     let leadUpdates: any = {}
+    // In auto mode, selectedDates already contains rule-expanded dates (pairs / spans)
+    // In manual mode with overnight, expand at confirm time
+    const isOvernight = !isVisitMode && dateRules?.type === 'overnight'
+    let calendarDates = [...selectedDates]
 
-    if (!isVisitMode) {
+    if (isOvernight && selectedDates.length > 0 && ignoreRules) {
+      // Manual overnight: expand at confirm time (auto mode already expands in toggleDate)
+      const expandedSet = new Set<string>()
+      selectedDates.forEach(d => {
+        expandedSet.add(overnightDay === 1 ? d : shiftDate(d, -1))
+        expandedSet.add(overnightDay === 1 ? shiftDate(d, 1) : d)
+      })
+      calendarDates = Array.from(expandedSet).sort()
+      leadUpdates = {
+        date_flexibility: 'range',
+        wedding_date: calendarDates[0],
+        wedding_date_to: calendarDates[calendarDates.length - 1],
+        wedding_date_ranges: null, wedding_year: null, wedding_month: null,
+      }
+    } else if (!isVisitMode) {
       const hasMissingRequested = availableRequested.some(d => !selectedDates.includes(d))
-      const hasChanges = extraDates.length > 0 || hasMissingRequested || unavailableRequested.length > 0
-
-      if (extraDates.length > 0 || hasMissingRequested) {
-        // Date fields changed — update them based on selection
+      // For simple-buffer auto mode, buffer days are just calendar blocks — don't update lead dates
+      const skipLeadDateUpdate = hasAutoRules && !ignoreRules && dateRules?.type === 'simple'
+      if (!skipLeadDateUpdate && (extraDates.length > 0 || hasMissingRequested)) {
         const sorted = [...selectedDates].sort()
         if (sorted.length === 0) {
           leadUpdates = {}
         } else if (sorted.length === 1) {
           leadUpdates = { date_flexibility: 'exact', wedding_date: sorted[0], wedding_date_to: null, wedding_date_ranges: null, wedding_year: null, wedding_month: null }
         } else {
-          // Detect if dates are contiguous → range, otherwise → multi_range
           const isContiguous = sorted.every((d, i) => {
             if (i === 0) return true
             const prev = new Date(sorted[i - 1] + 'T12:00:00')
@@ -1082,8 +1701,147 @@ function DateConfirmModal({
       }
     }
 
-    await onConfirm(leadUpdates, selectedDates, calStatus, isVisitMode)
+    // Always save duration
+    if (!isVisitMode) leadUpdates.wedding_duration_days = weddingDuration
+
+    await onConfirm(leadUpdates, calendarDates, calStatus, isVisitMode, Object.keys(halfDayMap).length > 0 ? halfDayMap : undefined)
     setSaving(false)
+  }
+
+  // ── Mass-select: add all available days in the current view-month ──────────
+  const selectWholeMonth = () => {
+    if (isVisitMode) return
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const monthStr = `${viewYear}-${pad(viewMonth + 1)}`
+
+    // Collect available days (not past, not hard-blocked)
+    const available: string[] = []
+    for (let d = 1; d <= lastDay; d++) {
+      const ds = `${monthStr}-${pad(d)}`
+      if (ds < todayStr) continue
+      const e = calEntries[ds]
+      if (e?.status === 'reservado') continue
+      if (e?.status === 'bloqueado' && !(e?.note?.startsWith('medio_dia'))) continue
+      available.push(ds)
+    }
+    if (available.length === 0) return
+
+    // ── Determine if we're in "already all selected" state ──
+    let isAllSelected = false
+    if (!ignoreRules && dateRules?.type === 'packages') {
+      const anchorsInMonth = available.filter(ds => {
+        const dow = new Date(ds + 'T12:00:00').getDay()
+        return dateRules.packages?.some((p: any) => p.anchor_dow === dow)
+      })
+      isAllSelected = anchorsInMonth.length > 0 && anchorsInMonth.every(ds => selectedAnchors.includes(ds))
+    } else if (!ignoreRules && dateRules?.type === 'overnight') {
+      const validAnchors = available.filter(ds => {
+        const db = Math.ceil(dateRules.days_before || 0)
+        const da = Math.ceil(dateRules.days_after  || 0)
+        const d1 = ds; const d2 = shiftDate(d1, 1)
+        const span: string[] = []
+        for (let i = db; i >= 1; i--) span.push(shiftDate(d1, -i))
+        span.push(d1, d2)
+        for (let i = 1; i <= da; i++) span.push(shiftDate(d2, i))
+        return !span.some(sd => { const e = calEntries[sd]; return e?.status === 'reservado' || (e?.status === 'bloqueado' && !(e?.note?.startsWith('medio_dia'))) })
+      })
+      isAllSelected = validAnchors.length > 0 && validAnchors.every(ds => selectedAnchors.includes(ds))
+    } else {
+      isAllSelected = available.length > 0 && available.every(ds => selectedDates.includes(ds))
+    }
+
+    // ── DESELECT branch ──
+    if (isAllSelected) {
+      if (!ignoreRules && dateRules?.type === 'packages') {
+        const anchorsInMonth = available.filter(ds => {
+          const dow = new Date(ds + 'T12:00:00').getDay()
+          return dateRules.packages?.some((p: any) => p.anchor_dow === dow)
+        })
+        // Compute all span dates for those anchors
+        const spanDatesToRemove = new Set<string>()
+        let removedDuration = 0
+        anchorsInMonth.forEach(ds => {
+          const dow = new Date(ds + 'T12:00:00').getDay()
+          const pkg = dateRules.packages?.find((p: any) => p.anchor_dow === dow)
+          if (!pkg) return
+          for (let i = 0; i < pkg.span_days; i++) {
+            const dt = new Date(ds + 'T12:00:00'); dt.setDate(dt.getDate() + i)
+            spanDatesToRemove.add(dt.toISOString().slice(0, 10))
+          }
+          removedDuration += pkg.span_days
+        })
+        setSelectedDates(prev => prev.filter(d => !spanDatesToRemove.has(d)))
+        setSelectedAnchors(prev => prev.filter(a => !anchorsInMonth.includes(a)))
+        setWeddingDuration(prev => Math.max(1, prev - removedDuration))
+      } else if (!ignoreRules && dateRules?.type === 'overnight') {
+        const db = Math.ceil(dateRules.days_before || 0)
+        const da = Math.ceil(dateRules.days_after  || 0)
+        const anchorsToRemove = available.filter(ds => selectedAnchors.includes(ds))
+        const spanDatesToRemove = new Set<string>()
+        anchorsToRemove.forEach(ds => {
+          const d1 = ds; const d2 = shiftDate(d1, 1)
+          for (let i = db; i >= 1; i--) spanDatesToRemove.add(shiftDate(d1, -i))
+          spanDatesToRemove.add(d1); spanDatesToRemove.add(d2)
+          for (let i = 1; i <= da; i++) spanDatesToRemove.add(shiftDate(d2, i))
+        })
+        setSelectedDates(prev => prev.filter(d => !spanDatesToRemove.has(d)))
+        setSelectedAnchors(prev => prev.filter(a => !anchorsToRemove.includes(a)))
+        setWeddingDuration(prev => {
+          const remaining = selectedAnchors.filter(a => !anchorsToRemove.includes(a)).length
+          return Math.max(1, remaining * 2)
+        })
+      } else {
+        setSelectedDates(prev => prev.filter(d => !available.includes(d)))
+        if (hasAutoRules && !ignoreRules) setSelectedAnchors(prev => prev.filter(a => !available.includes(a)))
+      }
+      return
+    }
+
+    // ── SELECT branch (original logic) ──
+    if (!ignoreRules && dateRules?.type === 'packages') {
+      let newDates    = [...selectedDates]
+      let newAnchors  = [...selectedAnchors]
+      let addedSpan   = 0
+      available.forEach(ds => {
+        const dow = new Date(ds + 'T12:00:00').getDay()
+        const pkg = dateRules.packages?.find((p: any) => p.anchor_dow === dow)
+        if (!pkg || newAnchors.includes(ds)) return
+        const span: string[] = []
+        for (let i = 0; i < pkg.span_days; i++) {
+          const dt = new Date(ds + 'T12:00:00'); dt.setDate(dt.getDate() + i)
+          span.push(dt.toISOString().slice(0, 10))
+        }
+        if (span.some(sd => { const e = calEntries[sd]; return e?.status === 'reservado' || (e?.status === 'bloqueado' && !(e?.note?.startsWith('medio_dia'))) })) return
+        span.forEach(sd => { if (!newDates.includes(sd)) newDates.push(sd) })
+        newAnchors.push(ds)
+        addedSpan += pkg.span_days
+      })
+      setSelectedDates([...new Set(newDates)].sort())
+      setSelectedAnchors([...new Set(newAnchors)].sort())
+      if (addedSpan > 0) setWeddingDuration(prev => prev + addedSpan)
+    } else if (!ignoreRules && dateRules?.type === 'overnight') {
+      const db = Math.ceil(dateRules.days_before || 0)
+      const da = Math.ceil(dateRules.days_after  || 0)
+      let newDates   = [...selectedDates]
+      let newAnchors = [...selectedAnchors]
+      available.forEach(ds => {
+        const d1 = ds; const d2 = shiftDate(d1, 1)
+        const span: string[] = []
+        for (let i = db; i >= 1; i--) span.push(shiftDate(d1, -i))
+        span.push(d1, d2)
+        for (let i = 1; i <= da; i++) span.push(shiftDate(d2, i))
+        if (newAnchors.includes(d1)) return
+        if (span.some(sd => { const e = calEntries[sd]; return e?.status === 'reservado' || (e?.status === 'bloqueado' && !(e?.note?.startsWith('medio_dia'))) })) return
+        span.forEach(sd => { if (!newDates.includes(sd)) newDates.push(sd) })
+        newAnchors.push(d1)
+      })
+      setSelectedDates([...new Set(newDates)].sort())
+      setSelectedAnchors([...new Set(newAnchors)].sort())
+      setWeddingDuration(([...new Set(newAnchors)]).length * 2)
+    } else {
+      setSelectedDates(prev => [...new Set([...prev, ...available])].sort())
+      if (hasAutoRules && !ignoreRules) setSelectedAnchors(prev => [...new Set([...prev, ...available])].sort())
+    }
   }
 
   const lastDay  = new Date(viewYear, viewMonth + 1, 0).getDate()
@@ -1116,57 +1874,107 @@ function DateConfirmModal({
 
         <div style={{ padding: '16px 24px' }}>
 
-          {/* Requested dates list (checkboxes) */}
+          {/* Requested dates — compact pills */}
           {!isVisitMode && hasRequestedDates && (
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
                 Fechas solicitadas por la pareja
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {requestedDates.map(d => {
+              {unavailableRequested.length === requestedDates.length && (
+                <div style={{ fontSize: 12, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '8px 12px', marginBottom: 6 }}>
+                  ✕ Todas las fechas solicitadas están bloqueadas o reservadas. Selecciona otras fechas en el calendario.
+                </div>
+              )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {requestedDates.filter(d => {
+                  // Never show past dates in the pills (can't select them)
+                  if (d < todayStr) return false
+                  // Show dates that are available or half-day (or already selected)
                   const entryStatus = calEntries[d]?.status
-                  const isUnavailable = entryStatus === 'bloqueado' || entryStatus === 'reservado'
+                  const entryNote = calEntries[d]?.note
+                  const isHalf = entryNote?.startsWith('medio_dia')
+                  const isUnavailable = !isHalf && (entryStatus === 'reservado' || entryStatus === 'bloqueado')
+                  return !isUnavailable || selectedDates.includes(d)
+                }).map(d => {
+                  const entryStatus = calEntries[d]?.status
+                  const entryNote = calEntries[d]?.note
+                  const isHalf2 = entryNote?.startsWith('medio_dia')
+                  const isUnavailable = !isHalf2 && (entryStatus === 'reservado' || entryStatus === 'bloqueado')
                   const isChecked = selectedDates.includes(d)
+                  // For requested dates pills: always allow DESELECTING (even if blocked/unavailable)
+                  // Allow SELECTING only if not unavailable
+                  const handleRequestedClick = () => {
+                    if (isChecked) {
+                      // Always allow deselect — direct remove from selectedDates
+                      setSelectedDates(prev => prev.filter(x => x !== d))
+                      setSelectedAnchors(prev => prev.filter(x => x !== d))
+                      return
+                    }
+                    if (isUnavailable) return
+                    const dow = new Date(d + 'T12:00:00').getDay()
+                    const isPkgMode = !isVisitMode && !ignoreRules && dateRules?.type === 'packages'
+                    const isAnchor = isPkgMode && !!dateRules?.packages?.find((p: any) => p.anchor_dow === dow)
+                    if (isAnchor || !isPkgMode) {
+                      toggleDate(d)
+                    } else {
+                      setSelectedDates(prev => [...prev, d])
+                    }
+                  }
                   return (
-                    <div key={d}
-                      onClick={() => !isUnavailable && toggleDate(d)}
+                    <button key={d} type="button"
+                      onClick={handleRequestedClick}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
-                        background: isUnavailable ? 'var(--rose-light)' : isChecked ? 'var(--sage-light)' : 'var(--cream)',
-                        border: `1px solid ${isUnavailable ? 'var(--stone)' : isChecked ? 'var(--sage)' : 'var(--ivory)'}`,
-                        borderRadius: 8, cursor: isUnavailable ? 'not-allowed' : 'pointer',
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '6px 12px', borderRadius: 20,
+                        cursor: (isChecked || !isUnavailable) ? 'pointer' : 'not-allowed',
+                        background: isUnavailable && !isChecked ? '#fef2f2' : isChecked ? '#fef3c7' : '#f9fafb',
+                        border: `1.5px solid ${isUnavailable && !isChecked ? '#fca5a5' : isChecked ? '#f59e0b' : 'var(--ivory)'}`,
+                        fontSize: 12, fontWeight: 600,
+                        color: isUnavailable && !isChecked ? '#9ca3af' : isChecked ? '#92400e' : 'var(--charcoal)',
+                        textDecoration: isUnavailable && !isChecked ? 'line-through' : 'none',
+                        transition: 'all 0.15s', outline: 'none',
                       }}>
-                      {/* Checkbox */}
-                      <div style={{
-                        width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-                        border: `2px solid ${isUnavailable ? 'var(--stone)' : isChecked ? 'var(--sage)' : 'var(--stone)'}`,
-                        background: isChecked && !isUnavailable ? 'var(--sage)' : isUnavailable ? 'var(--rose-light)' : '#fff',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        {isChecked && !isUnavailable && <span style={{ color: '#fff', fontSize: 11, lineHeight: 1, fontWeight: 700 }}>✓</span>}
-                        {isUnavailable && <span style={{ color: 'var(--rose)', fontSize: 9, lineHeight: 1, fontWeight: 700 }}>✕</span>}
-                      </div>
-                      <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: isUnavailable ? '#9ca3af' : 'var(--charcoal)', textDecoration: isUnavailable ? 'line-through' : 'none' }}>
-                        {formatDateLabel(d)}
-                      </span>
-                      {isUnavailable ? (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--rose)', background: 'var(--rose-light)', padding: '2px 8px', borderRadius: 10 }}>
-                          {entryStatus === 'reservado' ? <><LockKeyhole size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Reservado</> : <><OctagonAlert size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Bloqueado</>}
+                      {isChecked && (
+                        <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#f59e0b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>✓</span>
                         </span>
-                      ) : entryStatus === 'negociacion' ? (
-                        <span style={{ fontSize: 11, fontWeight: 500, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 10 }}>
-                          <AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> En negociación
-                        </span>
-                      ) : null}
-                    </div>
+                      )}
+                      {isUnavailable && !isChecked && (
+                        <span style={{ color: '#ef4444', fontSize: 12, fontWeight: 700, lineHeight: 1 }}>✕</span>
+                      )}
+                      {!isChecked && !isUnavailable && (
+                        <span style={{ width: 16, height: 16, borderRadius: '50%', border: '1.5px solid #d1d5db', flexShrink: 0 }} />
+                      )}
+                      {formatDateLabel(d)}
+                      {entryStatus === 'negociacion' && !isUnavailable && (
+                        <span style={{ fontSize: 9, background: '#fef3c7', color: '#92400e', padding: '1px 5px', borderRadius: 8, fontWeight: 700, border: '1px solid #fde68a' }}>Neg.</span>
+                      )}
+                    </button>
                   )
                 })}
               </div>
+              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Calendar size={10} style={{ flexShrink: 0 }} />
+                Duración solicitada:{' '}
+                <strong style={{ color: 'var(--charcoal)', marginLeft: 2 }}>
+                  {lead.wedding_duration_days || 1} {(lead.wedding_duration_days || 1) === 1 ? 'día' : 'días'}
+                </strong>
+              </div>
               {unavailableRequested.length > 0 && (
-                <div style={{ marginTop: 7, fontSize: 11, color: '#6b7280', padding: '6px 10px', background: '#f9fafb', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <AlertTriangle size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Las fechas no disponibles quedarán guardadas como opciones solicitadas sin confirmar.
+                <div style={{ marginTop: 8, fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <AlertTriangle size={11} /> {unavailableRequested.length} fecha{unavailableRequested.length > 1 ? 's' : ''} no disponible{unavailableRequested.length > 1 ? 's' : ''} — se guardarán como referencia.
                 </div>
               )}
+            </div>
+          )}
+
+          {!isVisitMode && !hasRequestedDates && (
+            <div style={{ marginBottom: 10, fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Calendar size={10} style={{ flexShrink: 0 }} />
+              Duración solicitada:{' '}
+              <strong style={{ color: 'var(--charcoal)', marginLeft: 2 }}>
+                {lead.wedding_duration_days || 1} {(lead.wedding_duration_days || 1) === 1 ? 'día' : 'días'}
+              </strong>
             </div>
           )}
 
@@ -1176,22 +1984,168 @@ function DateConfirmModal({
             </div>
           )}
 
+          {!isVisitMode && !ignoreRules && dateRules?.type === 'packages' && (() => {
+            const DOW_NAMES = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+            const PKG_COLORS = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#14b8a6']
+            const pkgs: any[] = dateRules.packages || []
+            return (
+              <div style={{ marginBottom: 14 }}>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 14 }}>📦</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)' }}>Venue con paquetes</span>
+                  </div>
+                  {/* Calendar legend for package mode */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 700, lineHeight: 1 }}>+</span>
+                      <span style={{ fontSize: 10, color: '#16a34a', fontWeight: 600 }}>Disponible</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{ width: 14, height: 14, borderRadius: 3, background: 'repeating-linear-gradient(45deg, #f3f4f6 0px, #f3f4f6 4px, #e9eaeb 4px, #e9eaeb 8px)' }} />
+                      <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 500 }}>No aplica</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Package cards */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {pkgs.map((pkg: any, pi: number) => {
+                    const color = PKG_COLORS[pi % PKG_COLORS.length]
+                    const anchorName = DOW_NAMES[pkg.anchor_dow]
+                    // Build span day names
+                    const spanDows: string[] = []
+                    for (let i = 0; i < pkg.span_days; i++) {
+                      spanDows.push(DOW_NAMES[(pkg.anchor_dow + i) % 7])
+                    }
+                    const lastDow = DOW_NAMES[(pkg.anchor_dow + pkg.span_days - 1) % 7]
+                    const isSelected = selectedAnchors.some(a => new Date(a + 'T12:00:00').getDay() === pkg.anchor_dow)
+                    return (
+                      <div key={pi} style={{
+                        border: `1.5px solid ${isSelected ? color : '#e5e7eb'}`,
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        background: isSelected ? `${color}08` : '#fafafa',
+                        transition: 'all 0.15s',
+                      }}>
+                        {/* Color bar + name */}
+                        <div style={{ background: color, padding: '5px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>
+                            {pkg.name || `Paquete ${pi + 1}`}
+                          </span>
+                          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>
+                            {pkg.span_days} {pkg.span_days === 1 ? 'día' : 'días'} · {anchorName}→{lastDow}
+                          </span>
+                        </div>
+                        {/* Day strip */}
+                        <div style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {spanDows.map((d, di) => (
+                            <div key={di} style={{
+                              padding: '2px 7px',
+                              borderRadius: 4,
+                              fontSize: 11,
+                              fontWeight: di === 0 ? 700 : 500,
+                              background: di === 0 ? color : `${color}30`,
+                              color: di === 0 ? '#fff' : color,
+                            }}>
+                              {d}
+                            </div>
+                          ))}
+                          {isSelected && (
+                            <span style={{ marginLeft: 6, fontSize: 10, color: color, fontWeight: 600 }}>✓ seleccionado</span>
+                          )}
+                          {!isSelected && (
+                            <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--warm-gray)' }}>clic en {anchorName} para seleccionar</span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Overnight: day 1 or day 2 selector — show in auto mode always, in manual mode only when dates selected */}
+          {!isVisitMode && dateRules?.type === 'overnight' && (!ignoreRules || selectedDates.length > 0) && (
+            <div style={{ marginBottom: 14, padding: '12px 14px', background: '#fdf4ff', border: '1px solid #e9d5ff', borderRadius: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                ¿Cuándo es la boda?
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[
+                  { val: 1 as const, label: 'Fecha seleccionada = boda', sub: `Calendario: boda + día siguiente` },
+                  { val: 2 as const, label: 'Fecha seleccionada = check-out', sub: `Calendario: día anterior + boda` },
+                ].map(opt => (
+                  <button key={opt.val} type="button" onClick={() => setOvernightDay(opt.val)} style={{
+                    flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                    border: `2px solid ${overnightDay === opt.val ? '#7c3aed' : 'var(--ivory)'}`,
+                    background: overnightDay === opt.val ? '#faf5ff' : '#fff',
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: overnightDay === opt.val ? '#7c3aed' : 'var(--charcoal)', marginBottom: 2 }}>{opt.label}</div>
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{opt.sub}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Calendar section */}
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
-              {isVisitMode ? 'Seleccionar fecha de visita' : hasRequestedDates ? 'Añadir fechas alternativas' : 'Seleccionar fechas disponibles'}
-            </div>
-            {!isVisitMode && hasRequestedDates && (
-              <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 8 }}>
-                Haz click en cualquier fecha libre o en negociación para añadirla como alternativa adicional.
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  {isVisitMode ? 'Fecha de visita' : 'Calendario'}
+                </div>
+                {hasAutoRules && (
+                  <button type="button" onClick={() => { setIgnoreRules(r => !r); setSelectedDates([]); setSelectedAnchors([]) }}
+                    title={ignoreRules ? 'Las reglas del venue están desactivadas — haz clic para reactivarlas' : 'Las reglas del venue se aplican automáticamente al seleccionar fechas'}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '3px 9px', borderRadius: 20, cursor: 'pointer', outline: 'none',
+                      fontSize: 11, fontWeight: 600, transition: 'all 0.15s',
+                      border: ignoreRules ? '1.5px solid #d1d5db' : '1.5px solid #a78bfa',
+                      background: ignoreRules ? '#f9fafb' : '#ede9fe',
+                      color: ignoreRules ? '#9ca3af' : '#5b21b6',
+                    }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: ignoreRules ? '#d1d5db' : '#7c3aed', flexShrink: 0 }} />
+                    {ignoreRules ? 'Sin reglas' : 'Reglas activas'}
+                  </button>
+                )}
               </div>
-            )}
+              {!isVisitMode && (
+                <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                  {hasRequestedDates ? '★ = fecha solicitada' : 'Clic para seleccionar'}
+                </div>
+              )}
+            </div>
 
             <div style={{ border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden' }}>
               {/* Month nav */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', background: 'var(--cream)', borderBottom: '1px solid var(--ivory)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: halfDayMode ? '#fffbeb' : 'var(--cream)', borderBottom: '1px solid var(--ivory)', transition: 'background 0.2s' }}>
                 <button onClick={prevMonth} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}><ChevronLeft size={14} /></button>
-                <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500 }}>{MONTHS[viewMonth]} {viewYear}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500 }}>{MONTHS[viewMonth]} {viewYear}</span>
+                  {!isVisitMode && (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <button type="button" onClick={selectWholeMonth}
+                        title="Añade todos los días disponibles de este mes a la selección"
+                        style={{ fontSize: 10, padding: '2px 10px', borderRadius: 20, cursor: 'pointer', outline: 'none', border: '1px solid var(--gold)', background: 'transparent', color: 'var(--gold)', fontWeight: 600, letterSpacing: '0.03em' }}>
+                        + Todo el mes
+                      </button>
+                      {selectedAnchors.length > 0 && (
+                        <button type="button" onClick={() => setHalfDayMode(m => !m)}
+                          title={halfDayMode ? 'Salir del modo medio día' : 'Marcar fechas como medio día (mañana o tarde)'}
+                          style={{ fontSize: 10, padding: '2px 10px', borderRadius: 20, cursor: 'pointer', outline: 'none', fontWeight: 700, letterSpacing: '0.03em', transition: 'all 0.15s',
+                            border: halfDayMode ? '1px solid #d97706' : '1px solid #fde68a',
+                            background: halfDayMode ? '#d97706' : '#fffbeb',
+                            color: halfDayMode ? '#fff' : '#b45309' }}>
+                          ½ día
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <button onClick={nextMonth} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}><ChevronRight size={14} /></button>
               </div>
               {/* Day headers */}
@@ -1203,65 +2157,183 @@ function DateConfirmModal({
               {/* Grid — border-based, no gap */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
                 {cells.map((day, i) => {
-                  if (!day) return <div key={`e-${i}`} style={{ minHeight: 68, borderBottom: '1px solid var(--ivory)', borderRight: i % 7 !== 6 ? '1px solid var(--ivory)' : 'none' }} />
+                  if (!day) return <div key={`e-${i}`} style={{ minHeight: 60, borderBottom: '1px solid var(--ivory)', borderRight: i % 7 !== 6 ? '1px solid var(--ivory)' : 'none' }} />
                   const ds = `${viewYear}-${pad(viewMonth + 1)}-${pad(day)}`
                   const entry = calEntries[ds]
                   const entryStatus = entry?.status || 'libre'
                   const cfg = CAL_AVAIL_CFG[entryStatus] || CAL_AVAIL_CFG.libre
                   const isRequested   = requestedDates.includes(ds)
                   const isSelected    = selectedDates.includes(ds)
-                  const isUnavailable = entryStatus === 'bloqueado' || entryStatus === 'reservado'
+                  const isHalfDay     = !!(entry?.note?.startsWith('medio_dia'))
+                  // Half-day entries are NOT fully unavailable — the other half is still free
+                  const isUnavailable = !isHalfDay && (entryStatus === 'reservado' || entryStatus === 'bloqueado')
                   const isToday       = ds === todayStr
                   const isPast        = ds < todayStr
-                  const canClick      = !isPast && !isUnavailable
+                  // In package mode (rules active), only anchor_dow days are clickable
+                  const isPackageMode  = !isVisitMode && !ignoreRules && dateRules?.type === 'packages'
+                  const dow2           = new Date(ds + 'T12:00:00').getDay()
+                  const isPkgAnchorDay = isPackageMode && !!dateRules.packages?.find((p: any) => p.anchor_dow === dow2)
+                  const isPartOfSpan   = isPackageMode && !isPkgAnchorDay && selectedDates.includes(ds)
+                  // In package mode, requested dates that are anchor days should be clickable
+                  // In pkg mode: anchor days + already-selected span days (to allow deselecting via anchor click)
+                  const canClick       = !isPast && !isUnavailable && (!isPackageMode || isPkgAnchorDay)
                   const dow = (startDow + day - 1) % 7
                   const isWeekend = dow >= 5
-                  const isExtra = isSelected && !isRequested
+                  // Wedding day = what the user explicitly clicked; buffer = auto-added by rule
+                  const isWeddingDay     = hasAutoRules && !ignoreRules ? selectedAnchors.includes(ds) : isSelected
+                  const isHalfDayBuffer  = hasAutoRules && !ignoreRules && halfDayBufferSet.has(ds)
+                  const isBufferDay      = hasAutoRules && !ignoreRules && isSelected && !isWeddingDay && !isHalfDayBuffer
+                  // Dual role: this wedding day is ALSO a buffer of another anchor (e.g. click 27→[27,28], click 28→[28,29]: 28 is both)
+                  const isAlsoBuffer = isWeddingDay && hasAutoRules && !ignoreRules && (() => {
+                    if (dateRules?.type === 'overnight') {
+                      const db = Math.ceil(dateRules.days_before || 0)
+                      const da = Math.ceil(dateRules.days_after  || 0)
+                      return selectedAnchors.some(a => {
+                        if (a === ds) return false
+                        const pair = shiftDate(a, 1)
+                        const diff = Math.round((new Date(ds + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()) / 86400000)
+                        const diffFromPair = Math.round((new Date(ds + 'T12:00:00').getTime() - new Date(pair + 'T12:00:00').getTime()) / 86400000)
+                        // ds is the d2 of another anchor, or within days_before/after of another anchor's span
+                        return diff === 1 || (diffFromPair >= 1 && diffFromPair <= da) || (diff <= -1 && diff >= -db)
+                      })
+                    }
+                    if (dateRules?.type === 'simple') {
+                      const db = Math.ceil(dateRules.days_before || 0)
+                      const da = Math.ceil(dateRules.days_after  || 0)
+                      return selectedAnchors.some(a => {
+                        if (a === ds) return false
+                        const diff = Math.round((new Date(ds + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()) / 86400000)
+                        return (diff >= 1 && diff <= da) || (diff <= -1 && diff >= -db)
+                      })
+                    }
+                    return false
+                  })()
+                  const isExtra = isSelected && !isRequested && !isBufferDay
                   const otherLeadCount = dateLeadCounts[ds] || 0
                   const cellIdx = i  // for borderRight calc
 
+                  // In package mode: non-anchor days that aren't unavailable or already part of a selected span
+                  const isPkgBlocked = isPackageMode && !isPkgAnchorDay && !isPartOfSpan && !isUnavailable && !isPast
+                  // Anchor day that's free, not yet selected, and available to click
+                  const isPkgAvailable = isPackageMode && isPkgAnchorDay && !isUnavailable && !isPast && !isSelected && !isPartOfSpan
+
                   return (
                     <button key={ds} onClick={() => canClick && toggleDate(ds)}
-                      title={isUnavailable ? cfg.label : isRequested ? 'Fecha solicitada por la pareja' : otherLeadCount > 0 ? `${otherLeadCount} lead(s) interesado(s)` : ''}
+                      title={isHalfDay ? (entryStatus === 'reservado' ? '½ Mañana/Tarde reservado — el otro medio está libre' : entryStatus === 'negociacion' ? '½ en negociación — el otro medio está libre' : '½ bloqueado — el otro medio está libre') : isUnavailable ? cfg.label : isPkgBlocked ? 'Este día no es inicio de ningún paquete' : isAlsoBuffer ? 'Boda + buffer del día anterior (doble rol)' : isBufferDay ? 'Día de buffer (regla del venue)' : isRequested ? 'Fecha solicitada — clic para marcar/desmarcar' : isPkgAvailable ? 'Inicio de paquete — disponible' : otherLeadCount > 0 ? `${otherLeadCount} lead(s) interesado(s)` : ''}
                       style={{
-                        minHeight: 68, border: 'none',
+                        minHeight: 60, border: 'none',
                         borderBottom: '1px solid var(--ivory)',
                         borderRight: cellIdx % 7 !== 6 ? '1px solid var(--ivory)' : 'none',
-                        background: isSelected
-                          ? (isExtra ? '#eff6ff' : '#fffbeb')
+                        background: isBufferDay
+                          ? '#fdf6ee'
+                          : isHalfDayBuffer
+                          ? 'linear-gradient(135deg, #fdf6ee 50%, #ffffff 50%)'
+                          : isSelected && halfDayMap[ds] === 'medio_dia_manana'
+                          ? 'linear-gradient(135deg, #fef3c7 50%, #ffffff 50%)'
+                          : isSelected && halfDayMap[ds] === 'medio_dia_tarde'
+                          ? 'linear-gradient(135deg, #ffffff 50%, #fef3c7 50%)'
+                          : isSelected
+                          ? '#fef3c7'
+                          : isPartOfSpan
+                          ? '#fef3c7'
+                          : isHalfDay
+                          ? `linear-gradient(135deg, ${cfg.bg} 50%, #ffffff 50%)`
                           : isPast ? '#faf8f5'
-                          : isWeekend && !isUnavailable ? '#faf7f4'
-                          : cfg.bg,
+                          : isUnavailable ? cfg.bg
+                          : isPkgBlocked
+                          ? 'repeating-linear-gradient(45deg, #f3f4f6 0px, #f3f4f6 4px, #e9eaeb 4px, #e9eaeb 8px)'
+                          : isPkgAvailable
+                          ? '#fff'
+                          : entryStatus === 'negociacion' ? '#fffcf0'
+                          : isWeekend ? '#faf7f4'
+                          : '#fff',
                         cursor: canClick ? 'pointer' : isPast ? 'default' : 'not-allowed',
-                        display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-                        justifyContent: 'space-between', padding: '8px 9px',
-                        boxShadow: isToday ? 'inset 0 0 0 2px var(--gold)' : isSelected ? `inset 0 0 0 2px ${isExtra ? '#3b82f6' : '#f59e0b'}` : 'none',
                         opacity: isPast ? 0.35 : 1,
+                        display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                        justifyContent: 'space-between', padding: '7px 7px 5px',
+                        boxShadow: isBufferDay
+                          ? 'inset 0 0 0 1.5px #f59e0b'
+                          : isHalfDayBuffer
+                          ? 'inset 0 0 0 1.5px #f59e0b'
+                          : isSelected
+                          ? 'inset 0 0 0 2px #d97706'
+                          : isPartOfSpan
+                          ? 'inset 0 0 0 1.5px #f59e0b'
+                          : isHalfDay && !isSelected
+                          ? `inset 0 0 0 1px ${cfg.border}`
+                          : isPkgAvailable
+                          ? 'none'
+                          : isToday ? 'inset 0 0 0 2px var(--gold)'
+                          : isRequested && !isUnavailable ? 'inset 0 0 0 1.5px #fde68a'
+                          : 'none',
                         position: 'relative', transition: 'background 0.1s', outline: 'none',
                       }} disabled={!canClick || isPast}>
                       {/* Day number */}
-                      <span style={{ fontSize: 14, fontWeight: isToday ? 700 : 500, color: isPast ? 'var(--stone)' : isToday ? 'var(--gold)' : isWeekend ? 'var(--gold)' : 'var(--charcoal)', lineHeight: 1, fontFamily: 'Manrope, sans-serif' }}>{day}</span>
-                      {/* Bottom status */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 'auto', width: '100%' }}>
-                        {entryStatus !== 'libre' && (
-                          <>
-                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
-                            <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-                              color: entryStatus === 'negociacion' ? '#92400e' : entryStatus === 'reservado' ? '#9d174d' : '#6b7280' }}>
-                              {entryStatus === 'negociacion' ? 'Neg.' : entryStatus === 'reservado' ? 'Reserv.' : 'Bloq.'}
-                            </span>
-                          </>
+                      <span style={{
+                        fontSize: 15, fontWeight: isToday ? 700 : 500, lineHeight: 1, fontFamily: 'Manrope, sans-serif',
+                        color: isPast ? 'var(--stone)'
+                          : isPkgBlocked ? '#b0b7c0'
+                          : isBufferDay || isHalfDayBuffer || isSelected || isPartOfSpan ? '#92400e'
+                          : isPkgAvailable ? 'var(--charcoal)'
+                          : isToday ? 'var(--gold)'
+                          : isWeekend ? 'var(--gold)'
+                          : 'var(--charcoal)',
+                      }}>{day}</span>
+                      {/* Bottom row */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginTop: 'auto' }}>
+                        {/* Requested star — solicitada por la pareja */}
+                        {isRequested && !isUnavailable && !isPast && (
+                          <span title="Fecha solicitada por la pareja" style={{ fontSize: 9, color: isSelected ? '#d97706' : '#ca8a04', lineHeight: 1, fontWeight: 700 }}>★</span>
+                        )}
+                        {/* Other leads count — orange circle badge */}
+                        {otherLeadCount > 0 && !isUnavailable && !isPast && (
+                          <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: isRequested ? 2 : 0, flexShrink: 0 }}>
+                            <span style={{ fontSize: 8, color: '#fff', fontWeight: 700, lineHeight: 1 }}>{otherLeadCount}</span>
+                          </div>
+                        )}
+                        {/* Status symbol — only for unavailable (×) and half-day (½) */}
+                        {(isUnavailable || isHalfDay) && !isPkgBlocked && !isPartOfSpan && (
+                          <span
+                            title={isUnavailable ? cfg.label : 'Medio día — el otro ½ está libre'}
+                            style={{ fontSize: isUnavailable ? 15 : 9, color: isUnavailable ? (entryStatus === 'reservado' ? '#dc2626' : '#9ca3af') : cfg.dot, fontWeight: 700, lineHeight: 1, marginLeft: 'auto' }}>
+                            {isUnavailable ? '×' : '½'}
+                          </span>
+                        )}
+                        {/* Span day indicator (part of a selected package) */}
+                        {isPartOfSpan && (
+                          <span style={{ fontSize: 8, color: '#d97706', fontWeight: 700, lineHeight: 1, marginLeft: 'auto' }}>→</span>
+                        )}
+                        {/* Package available dot — small green pip bottom-right */}
+                        {isPkgAvailable && !isRequested && (
+                          <span style={{ fontSize: 8, color: '#16a34a', fontWeight: 700, lineHeight: 1, marginLeft: 'auto' }}>+</span>
                         )}
                       </div>
-                      {/* Other leads badge */}
-                      {otherLeadCount > 0 && !isUnavailable && !isPast && (
-                        <div style={{ position: 'absolute', top: 4, right: 4, background: '#f97316', color: '#fff', fontSize: 8, fontWeight: 700, minWidth: 14, height: 14, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 2px' }}>
-                          {otherLeadCount > 9 ? '9+' : otherLeadCount}
+                      {/* Buffer day indicator (pure buffer, not also a wedding day) */}
+                      {isBufferDay && (
+                        <div style={{ position: 'absolute', top: 3, right: 3, width: 15, height: 15, borderRadius: '50%', background: '#f59e0b', opacity: 0.55, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>+</span>
                         </div>
                       )}
-                      {/* Selected dot */}
-                      {isSelected && !otherLeadCount && (
-                        <div style={{ position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: '50%', background: isExtra ? '#3b82f6' : 'var(--gold)' }} />
+                      {/* Half-day buffer indicator */}
+                      {isHalfDayBuffer && (
+                        <div style={{ position: 'absolute', top: 3, right: 3, width: 15, height: 15, borderRadius: '50%', background: '#f59e0b', opacity: 0.4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, lineHeight: 1 }}>½</span>
+                        </div>
+                      )}
+                      {/* Wedding day badge — with optional [+] prefix when also a buffer of another anchor */}
+                      {isSelected && !isBufferDay && !isHalfDayBuffer && (
+                        <div style={{ position: 'absolute', top: 3, right: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+                          {isAlsoBuffer && (
+                            <div style={{ width: 13, height: 13, borderRadius: '50%', background: '#f59e0b', opacity: 0.65, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, lineHeight: 1 }}>+</span>
+                            </div>
+                          )}
+                          <div style={{ width: 15, height: 15, borderRadius: '50%', background: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ color: '#fff', fontSize: halfDayMap[ds] ? 7 : 9, fontWeight: 700, lineHeight: 1 }}>
+                              {halfDayMap[ds] === 'medio_dia_manana' ? '½M' : halfDayMap[ds] === 'medio_dia_tarde' ? '½T' : isExtra ? '+' : '✓'}
+                            </span>
+                          </div>
+                        </div>
                       )}
                     </button>
                   )
@@ -1271,30 +2343,81 @@ function DateConfirmModal({
           </div>
 
           {/* Legend */}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-            {Object.entries(CAL_AVAIL_CFG).map(([key, cfg]) => (
-              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: cfg.bg, border: `1px solid ${cfg.border}` }} />
-                <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{cfg.label}</span>
-              </div>
-            ))}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, marginTop: 8 }}>
+            {/* Libre */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: '#fff', border: '1px solid #e5e7eb' }} />
+              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Libre</span>
+            </div>
+            {/* Reservado — full day */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: CAL_AVAIL_CFG.reservado.bg, border: `1px solid ${CAL_AVAIL_CFG.reservado.border}` }} />
+              <span style={{ fontSize: 9, color: '#dc2626', fontWeight: 700 }}>×</span>
+              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Reservado</span>
+            </div>
+            {/* Bloqueado — full day */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: CAL_AVAIL_CFG.bloqueado.bg, border: `1px solid ${CAL_AVAIL_CFG.bloqueado.border}` }} />
+              <span style={{ fontSize: 9, color: '#9ca3af', fontWeight: 700 }}>×</span>
+              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Bloqueado</span>
+            </div>
+            {/* Medio día — half available */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <div style={{ width: 14, height: 14, background: `linear-gradient(135deg, ${CAL_AVAIL_CFG.reservado.bg} 50%, #fff 50%)`, border: `1px solid ${CAL_AVAIL_CFG.reservado.border}`, borderRadius: 2 }} />
+              <span style={{ fontSize: 9, color: '#9ca3af', fontWeight: 700 }}>½</span>
+              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Medio día — otro ½ libre</span>
+            </div>
             {!isVisitMode && hasRequestedDates && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: '#fef3c7', border: '1.5px solid #f59e0b' }} />
-                <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Solicitada pareja</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <span style={{ fontSize: 9, color: '#ca8a04', fontWeight: 700 }}>★</span>
+                <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Solicitada</span>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--gold)' }} />
-              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Alternativa añadida</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 13, height: 13, borderRadius: 7, background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {!isVisitMode && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: '#fef3c7', border: '1.5px solid #d97706' }} />
+                <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>✓</span>
+                </div>
+                <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Seleccionada</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <div style={{ width: 14, height: 14, borderRadius: 7, background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>2</span>
               </div>
-              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Otros leads interesados</span>
+              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Otros leads</span>
             </div>
           </div>
+
+          {/* Duration — hidden in packages-rules mode (span is fixed by package); shown in manual mode */}
+          {!isVisitMode && !(dateRules?.type === 'packages' && !ignoreRules) && (
+            <div style={{ marginBottom: 14, padding: '12px 14px', background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', whiteSpace: 'nowrap' }}>Duración de la boda:</span>
+              {editingDuration ? (
+                <>
+                  <select className="form-input" style={{ width: 'auto' }}
+                    value={weddingDuration} onChange={e => setWeddingDuration(Number(e.target.value))}>
+                    {Array.from({ length: Math.max(1, selectedDates.length || 10) }, (_, i) => i + 1).map(d => (
+                      <option key={d} value={d}>{d} {d === 1 ? 'día' : 'días'}</option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={() => setEditingDuration(false)} style={{ fontSize: 11, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                    OK
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)' }}>
+                    {weddingDuration} {weddingDuration === 1 ? 'día' : 'días'}
+                  </span>
+                  <button type="button" onClick={() => setEditingDuration(true)} style={{ fontSize: 11, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                    Editar
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Summary box */}
           <div style={{ padding: '12px 14px', background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
@@ -1305,26 +2428,74 @@ function DateConfirmModal({
             ) : (
               <>
                 {selectedDates.length > 0 ? (
-                  <div style={{ color: 'var(--sage)', fontWeight: 500 }}>
-                    ✓ {selectedDates.length} fecha{selectedDates.length > 1 ? 's' : ''} confirmada{selectedDates.length > 1 ? 's' : ''}
-                    {' · '}se marcarán como <strong>{isWonMode ? 'Reservado' : 'En negociación'}</strong> en el calendario
+                  <div style={{ color: 'var(--charcoal)', fontWeight: 500 }}>
+                    ✓{' '}
+                    {(() => {
+                      if (hasAutoRules && !ignoreRules) {
+                        const n = selectedDates.length
+                        const rule = dateRules?.type === 'overnight' ? 'overnight' : dateRules?.type === 'packages' ? 'paquete' : 'fecha + buffer'
+                        return `${n} día${n > 1 ? 's' : ''} · ${rule}`
+                      }
+                      const confirmed = availableRequested.filter(d => selectedDates.includes(d)).length
+                      const extras = extraDates.length
+                      const parts = []
+                      if (confirmed > 0) parts.push(`${confirmed} fecha${confirmed > 1 ? 's' : ''} confirmada${confirmed > 1 ? 's' : ''}`)
+                      if (extras > 0) parts.push(`${extras} alternativa${extras > 1 ? 's' : ''}`)
+                      return parts.join(' + ') || `${selectedDates.length} fecha${selectedDates.length > 1 ? 's' : ''}`
+                    })()}
+                    {' · '}<strong>{weddingDuration} {weddingDuration === 1 ? 'día' : 'días'}</strong>
+                    {' · '}
+                    <strong style={{ color: isWonMode ? '#16a34a' : '#d97706' }}>
+                      {isWonMode ? 'Reservado' : 'En negociación'}
+                    </strong>
                   </div>
                 ) : (
-                  <div style={{ color: 'var(--warm-gray)' }}>Sin fechas seleccionadas — el lead pasará a {isWonMode ? 'confirmado' : 'seguimiento'} sin entradas en el calendario</div>
-                )}
-                {unavailableRequested.length > 0 && (
-                  <div style={{ color: '#6b7280' }}>
-                    <AlertTriangle size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> {unavailableRequested.length} fecha{unavailableRequested.length > 1 ? 's' : ''} no disponible{unavailableRequested.length > 1 ? 's' : ''} (guardadas como info): {unavailableRequested.map(d => formatDateLabel(d)).join(', ')}
-                  </div>
-                )}
-                {extraDates.length > 0 && (
-                  <div style={{ color: 'var(--gold)' }}>
-                    + {extraDates.length} fecha{extraDates.length > 1 ? 's' : ''} alternativa{extraDates.length > 1 ? 's' : ''} añadida{extraDates.length > 1 ? 's' : ''}
+                  <div style={{ color: 'var(--warm-gray)' }}>
+                    Sin fechas seleccionadas — el lead pasará a {isWonMode ? 'confirmado' : 'seguimiento'} sin entradas en el calendario
                   </div>
                 )}
               </>
             )}
           </div>
+
+          {/* Fechas de interés original — solo si está explícitamente guardado Y difiere de las actuales */}
+          {lead.original_date_flexibility && (() => {
+            const origFlex   = lead.original_date_flexibility
+            const origDate1  = lead.original_wedding_date
+            const origDate2  = lead.original_wedding_date_to
+            const origRanges = lead.original_wedding_date_ranges
+            // No mostrar si es idéntico a las fechas actuales (evitar duplicado con "Fechas solicitadas")
+            const isSameAsCurrent = origFlex === lead.date_flexibility &&
+              origDate1 === lead.wedding_date && origDate2 === lead.wedding_date_to
+            if (isSameAsCurrent) return null
+
+            const hasData = (origFlex === 'exact' && origDate1) || (origFlex === 'range' && origDate1) ||
+              (origFlex === 'multi_range' && origRanges?.length) || origFlex === 'month' || origFlex === 'season'
+            if (!hasData) return null
+
+            const fmtLong  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+            const fmtShort = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+            const fmtFull  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+
+            let dateText = 'Sin fecha definida'
+            if (origFlex === 'exact' && origDate1)          dateText = fmtLong(origDate1)
+            else if (origFlex === 'range' && origDate1)      dateText = `${fmtShort(origDate1)}${origDate2 ? ` – ${fmtFull(origDate2)}` : ''}`
+            else if (origFlex === 'multi_range' && origRanges?.length)
+              dateText = origRanges.map((r: any, i: number) =>
+                `Opción ${i + 1}: ${fmtShort(r.from)}${r.to ? ` – ${fmtFull(r.to)}` : ''}`
+              ).join(' · ')
+            else if (origFlex === 'month')  dateText = `${MONTHS[(lead.wedding_month || 1) - 1]} ${lead.wedding_year || ''}`
+            else if (origFlex === 'season') dateText = `${lead.wedding_season || ''} ${lead.wedding_year || ''}`
+
+            return (
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--ivory)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Clock size={10} /> Fecha de interés original del lead
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--charcoal)', fontWeight: 500 }}>{dateText}</div>
+              </div>
+            )
+          })()}
         </div>
 
         {/* Footer */}
@@ -1575,6 +2746,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
 
       {tab === 'in_progress' && (<>
         <button className="qa qa-success" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
+        <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'contacted')}><Calendar size={11} /> Cambiar fechas</button>
         <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
         <PresupuestoBtn lead={lead} canProposal={canProposal} onMove={onMove} />
         <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'new')}><RotateCcw size={11} /> Nuevo</button>
@@ -1593,6 +2765,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
 
       {tab === 'post_visit' && (<>
         <button className="qa qa-success" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
+        <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'contacted')}><Calendar size={11} /> Cambiar fechas</button>
         <PresupuestoBtn lead={lead} canProposal={canProposal} onMove={onMove} />
         <button className="qa qa-ghost" onClick={() => onMove(lead.id, 'contacted')}><RotateCcw size={11} /> En seguimiento</button>
         <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
@@ -1757,6 +2930,51 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
               ))}
             </div>
           )}
+
+          {/* Fechas de interés original — solo si están guardadas explícitamente */}
+          {(() => {
+            if (!lead.original_date_flexibility) return null
+
+            const flex   = lead.original_date_flexibility
+            const date1  = lead.original_wedding_date
+            const date2  = lead.original_wedding_date_to
+            const ranges = lead.original_wedding_date_ranges
+
+            const hasData = (flex === 'exact' && date1) || (flex === 'range' && date1) ||
+              (flex === 'multi_range' && ranges?.length) || flex === 'month' || flex === 'season'
+            if (!hasData) return null
+
+            const fmtLong  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+            const fmtShort = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+            const fmtFull  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+
+            let dateText = 'Sin fecha definida'
+            if (flex === 'exact' && date1)                dateText = fmtLong(date1)
+            else if (flex === 'range' && date1)            dateText = `${fmtShort(date1)}${date2 ? ` – ${fmtFull(date2)}` : ''}`
+            else if (flex === 'multi_range' && ranges?.length)
+              dateText = ranges.map((r: any, i: number) =>
+                `Opción ${i + 1}: ${fmtShort(r.from)}${r.to ? ` – ${fmtFull(r.to)}` : ''}`
+              ).join(' · ')
+            else if (flex === 'month')  dateText = `${MONTHS[(lead.wedding_month || 1) - 1]} ${lead.wedding_year || ''}`
+            else if (flex === 'season') dateText = `${lead.wedding_season || ''} ${lead.wedding_year || ''}`
+
+            const datesChanged = lead.original_wedding_date && lead.wedding_date &&
+              lead.original_wedding_date !== lead.wedding_date
+
+            return (
+              <div style={{ marginBottom: 16, padding: '12px 14px', background: '#faf8f5', borderRadius: 10, border: '1px solid var(--ivory)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Clock size={10} /> Fecha de interés original
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--charcoal)' }}>{dateText}</div>
+                {datesChanged && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <AlertTriangle size={10} /> La fecha activa ha cambiado respecto al interés original
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           <div style={{ fontSize: 11, color: 'var(--stone)' }}>
             <Clock size={11} style={{ display: 'inline', marginRight: 4 }} />
@@ -2050,12 +3268,491 @@ function EmptyState({ tab, search, hidePast, onClear, onNew }: {
   )
 }
 
+// ── Mini Calendar Picker ───────────────────────────────────────────────────────
+function MiniCalendarPicker({
+  userId, value, onChange, rangeFrom, rangeTo,
+  highlights, readOnly = false,
+}: {
+  userId: string
+  value?: string
+  onChange?: (date: string) => void
+  rangeFrom?: string
+  rangeTo?: string
+  highlights?: string[]   // extra dates to highlight (other ranges in multi_range)
+  readOnly?: boolean
+}) {
+  const today = new Date().toISOString().slice(0, 10)
+  const initStr = value || rangeFrom || (highlights && highlights.length > 0 ? highlights[0] : today)
+  const initD = new Date(initStr + 'T12:00:00')
+  const [year,  setYear]  = useState(initD.getFullYear())
+  const [month, setMonth] = useState(initD.getMonth())
+  const [entries, setEntries] = useState<Record<string, string>>({})
+
+  const [leadCounts, setLeadCounts] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    const supabase = createClient()
+    const from = `${year}-${String(month + 1).padStart(2, '0')}-01`
+    const to   = new Date(year, month + 1, 0).toISOString().slice(0, 10)
+    Promise.all([
+      supabase.from('calendar_entries').select('date,status')
+        .eq('user_id', userId).gte('date', from).lte('date', to),
+      supabase.from('leads').select('wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility')
+        .eq('user_id', userId).neq('status', 'lost').neq('status', 'won'),
+    ]).then(([entriesRes, leadsRes]) => {
+      if (entriesRes.data) {
+        const m: Record<string, string> = {}
+        entriesRes.data.forEach((e: any) => { m[e.date] = e.status })
+        setEntries(m)
+      }
+      if (leadsRes.data) {
+        const counts: Record<string, number> = {}
+        const addCount = (d: string) => { if (d >= from && d <= to) counts[d] = (counts[d] || 0) + 1 }
+        const expand = (f: string, t: string) => {
+          const cur = new Date(f + 'T12:00:00'), end = new Date((t || f) + 'T12:00:00')
+          while (cur <= end) { addCount(cur.toISOString().slice(0, 10)); cur.setDate(cur.getDate() + 1) }
+        }
+        leadsRes.data.forEach((l: any) => {
+          const flex = l.date_flexibility || 'exact'
+          if (flex === 'exact' && l.wedding_date) expand(l.wedding_date, l.wedding_date_to || l.wedding_date)
+          else if (flex === 'range' && l.wedding_date) expand(l.wedding_date, l.wedding_date_to || l.wedding_date)
+          else if (flex === 'multi_range' && l.wedding_date_ranges?.length)
+            l.wedding_date_ranges.forEach((r: any) => { if (r.from) expand(r.from, r.to || r.from) })
+          else if (flex === 'month' && l.wedding_year && l.wedding_month) {
+            const y = l.wedding_year, mo = l.wedding_month
+            const days = new Date(y, mo, 0).getDate()
+            for (let d = 1; d <= days; d++) addCount(`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`)
+          }
+        })
+        setLeadCounts(counts)
+      }
+    })
+  }, [year, month, userId])
+
+  const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+  const DAYS_ES   = ['L','M','X','J','V','S','D']
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const startDow    = ((new Date(year, month, 1).getDay() + 6) % 7)
+
+  const ds = (day: number) => `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+
+  const isInRange = (d: string) => {
+    const from = rangeFrom || value; const to = rangeTo || value
+    return !!from && !!to && d > from && d < to
+  }
+  const isSelected = (d: string) =>
+    d === value || d === rangeFrom || d === rangeTo || !!(highlights && highlights.includes(d))
+
+  const handleClick = (d: string) => {
+    if (readOnly || d < today) return
+    onChange?.(d)
+  }
+
+  return (
+    <div style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden', marginTop: 8, fontSize: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 12px', background: '#faf8f5', borderBottom: '1px solid var(--ivory)' }}>
+        <button type="button" onClick={() => month === 0 ? (setYear(y => y - 1), setMonth(11)) : setMonth(m => m - 1)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--charcoal)', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>‹</button>
+        <span style={{ fontWeight: 600, color: 'var(--charcoal)', fontSize: 13 }}>{MONTHS_ES[month]} {year}</span>
+        <button type="button" onClick={() => month === 11 ? (setYear(y => y + 1), setMonth(0)) : setMonth(m => m + 1)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--charcoal)', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>›</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#faf8f5', borderBottom: '1px solid var(--ivory)' }}>
+        {DAYS_ES.map(d => <div key={d} style={{ textAlign: 'center', padding: '4px 0', fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '0.06em' }}>{d}</div>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: 4, gap: 1 }}>
+        {Array.from({ length: startDow }).map((_, i) => <div key={`emp${i}`} />)}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1
+          const d   = ds(day)
+          const eSt = entries[d]
+          const sel = isSelected(d)
+          const inR = isInRange(d)
+          const past = d < today
+          const lCount = leadCounts[d] || 0
+          const isRes  = eSt === 'reservado'
+          const isBlk  = eSt === 'bloqueado'
+          const isNeg  = eSt === 'negociacion'
+          const bg    = sel ? '#fde68a' : inR ? '#fde68a'
+                      : isRes ? '#fee2e2' : isBlk ? '#f3f4f6' : isNeg ? '#fefce8' : '#fff'
+          const clr   = sel ? '#78350f' : past ? '#d1d5db'
+                      : isRes ? '#dc2626' : isBlk ? '#9ca3af' : isNeg ? '#ca8a04' : 'var(--charcoal)'
+          return (
+            <button key={day} type="button" onClick={() => handleClick(d)}
+              disabled={readOnly || past}
+              title={eSt ? eSt : ''}
+              style={{ padding: '4px 2px', textAlign: 'center', border: 'none', borderRadius: 5, cursor: readOnly || past ? 'default' : 'pointer', background: bg, color: clr, fontWeight: sel ? 600 : 400, position: 'relative' }}>
+              <div style={{ fontSize: 12, lineHeight: 1.2 }}>{day}</div>
+              {(isRes || isBlk) && <div style={{ fontSize: 16, lineHeight: 1, fontWeight: 700, marginTop: -2 }}>×</div>}
+              {lCount > 0 && !isRes && !isBlk && (
+                <div style={{ fontSize: 8, fontWeight: 700, lineHeight: 1, color: sel ? '#78350f' : '#b45309', marginTop: 1 }}>{lCount}L</div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 10, padding: '5px 12px', background: '#faf8f5', borderTop: '1px solid var(--ivory)', fontSize: 10, color: 'var(--warm-gray)', flexWrap: 'wrap' }}>
+        <span>⬜ Libre</span>
+        <span style={{ color: '#ca8a04' }}>🟡 Negociación</span>
+        <span style={{ color: '#dc2626' }}>× Reservado</span>
+        <span style={{ color: '#9ca3af' }}>× Bloqueado</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Range Calendar Picker ─────────────────────────────────────────────────────
+// Un solo calendario: 1er click = desde, 2º click = hasta
+// Hover preview del rango mientras se selecciona el hasta
+function RangeCalendarPicker({
+  userId, from, to, onChange,
+}: {
+  userId: string
+  from: string
+  to: string
+  onChange: (from: string, to: string) => void
+}) {
+  const today = new Date().toISOString().slice(0, 10)
+  const initStr = from || today
+  const initD   = new Date(initStr + 'T12:00:00')
+  const [year,       setYear]       = useState(initD.getFullYear())
+  const [month,      setMonth]      = useState(initD.getMonth())
+  const [entries,    setEntries]    = useState<Record<string, string>>({})
+  const [leadCounts, setLeadCounts] = useState<Record<string, number>>({})
+  const [hoverDate,  setHoverDate]  = useState('')
+  // 'from' = esperando 1er click, 'to' = esperando 2º click
+  const [phase, setPhase] = useState<'from' | 'to'>(from && !to ? 'to' : 'from')
+
+  useEffect(() => {
+    const supabase = createClient()
+    const mFrom = `${year}-${String(month + 1).padStart(2, '0')}-01`
+    const mTo   = new Date(year, month + 1, 0).toISOString().slice(0, 10)
+    Promise.all([
+      supabase.from('calendar_entries').select('date,status').eq('user_id', userId).gte('date', mFrom).lte('date', mTo),
+      supabase.from('leads').select('wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility').eq('user_id', userId).neq('status', 'lost').neq('status', 'won'),
+    ]).then(([eRes, lRes]) => {
+      if (eRes.data) {
+        const m: Record<string, string> = {}
+        eRes.data.forEach((e: any) => { m[e.date] = e.status })
+        setEntries(m)
+      }
+      if (lRes.data) {
+        const counts: Record<string, number> = {}
+        const addC = (d: string) => { if (d >= mFrom && d <= mTo) counts[d] = (counts[d] || 0) + 1 }
+        const exp  = (f: string, t: string) => { const c = new Date(f + 'T12:00:00'), e = new Date((t || f) + 'T12:00:00'); while (c <= e) { addC(c.toISOString().slice(0, 10)); c.setDate(c.getDate() + 1) } }
+        lRes.data.forEach((l: any) => {
+          const fl = l.date_flexibility || 'exact'
+          if ((fl === 'exact' || fl === 'range') && l.wedding_date) exp(l.wedding_date, l.wedding_date_to || l.wedding_date)
+          else if (fl === 'multi_range' && l.wedding_date_ranges?.length) l.wedding_date_ranges.forEach((r: any) => { if (r.from) exp(r.from, r.to || r.from) })
+          else if (fl === 'month' && l.wedding_year && l.wedding_month) { const days = new Date(l.wedding_year, l.wedding_month, 0).getDate(); for (let d = 1; d <= days; d++) addC(`${l.wedding_year}-${String(l.wedding_month).padStart(2,'0')}-${String(d).padStart(2,'0')}`) }
+        })
+        setLeadCounts(counts)
+      }
+    })
+  }, [year, month, userId])
+
+  const handleClick = (d: string) => {
+    if (d < today) return
+    if (phase === 'from' || (from && to)) {
+      onChange(d, '')
+      setPhase('to')
+    } else {
+      // phase === 'to'
+      if (d >= from) { onChange(from, d); setPhase('from') }
+      else            { onChange(d, '') }
+    }
+  }
+
+  const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+  const DAYS_ES   = ['L','M','X','J','V','S','D']
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const startDow    = (new Date(year, month, 1).getDay() + 6) % 7
+  const ds = (day: number) => `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+
+  // El "hasta" efectivo para el highlight: el real o el hover si estamos eligiendo
+  const effectiveTo = phase === 'to' && from
+    ? (hoverDate && hoverDate >= from ? hoverDate : (to || ''))
+    : to
+
+  const isFrom    = (d: string) => d === from
+  const isTo      = (d: string) => d === effectiveTo && !!effectiveTo
+  const isInRange = (d: string) => !!from && !!effectiveTo && d > from && d < effectiveTo
+  const isHover   = (d: string) => phase === 'to' && from && d === hoverDate && hoverDate >= from
+
+  return (
+    <div style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden', fontSize: 12 }}>
+      {/* Instrucción contextual */}
+      <div style={{ padding: '6px 12px', background: phase === 'to' ? '#fffbeb' : '#f0fdf4', borderBottom: '1px solid var(--ivory)', fontSize: 11, color: phase === 'to' ? '#92400e' : '#15803d', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+        {phase === 'from'
+          ? <><span style={{ background: '#d1fae5', borderRadius: '50%', width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 }}>1</span> Haz clic en la fecha de inicio</>
+          : <><span style={{ background: '#fef3c7', borderRadius: '50%', width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 }}>2</span> Haz clic en la fecha de fin · <strong>{from ? new Date(from + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : ''}</strong> seleccionado</>
+        }
+      </div>
+      {/* Navegación */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 12px', background: '#faf8f5', borderBottom: '1px solid var(--ivory)' }}>
+        <button type="button" onClick={() => month === 0 ? (setYear(y => y - 1), setMonth(11)) : setMonth(m => m - 1)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--charcoal)', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>‹</button>
+        <span style={{ fontWeight: 600, color: 'var(--charcoal)', fontSize: 13 }}>{MONTHS_ES[month]} {year}</span>
+        <button type="button" onClick={() => month === 11 ? (setYear(y => y + 1), setMonth(0)) : setMonth(m => m + 1)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--charcoal)', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>›</button>
+      </div>
+      {/* Cabecera días */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#faf8f5', borderBottom: '1px solid var(--ivory)' }}>
+        {DAYS_ES.map(d => <div key={d} style={{ textAlign: 'center', padding: '4px 0', fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '0.06em' }}>{d}</div>)}
+      </div>
+      {/* Días */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: 4, gap: 1 }}
+        onMouseLeave={() => setHoverDate('')}>
+        {Array.from({ length: startDow }).map((_, i) => <div key={`e${i}`} />)}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day  = i + 1
+          const d    = ds(day)
+          const eSt  = entries[d]
+          const lCnt = leadCounts[d] || 0
+          const past = d < today
+          const selF = isFrom(d); const selT = isTo(d); const inR = isInRange(d); const hov = isHover(d)
+          const sel  = selF || selT || inR
+          const isRes = eSt === 'reservado'; const isBlk = eSt === 'bloqueado'; const isNeg = eSt === 'negociacion'
+          const bg  = sel ? '#fde68a' : hov ? '#fef9c3'
+                    : isRes ? '#fee2e2' : isBlk ? '#f3f4f6' : isNeg ? '#fefce8' : '#fff'
+          const clr = sel ? '#78350f' : past ? '#d1d5db'
+                    : isRes ? '#dc2626' : isBlk ? '#9ca3af' : isNeg ? '#ca8a04' : 'var(--charcoal)'
+          const br  = selF ? '5px 0 0 5px' : selT ? '0 5px 5px 0' : inR ? '0' : '5px'
+          return (
+            <button key={day} type="button"
+              onClick={() => handleClick(d)}
+              onMouseEnter={() => !past && setHoverDate(d)}
+              disabled={past}
+              style={{ padding: '4px 2px', textAlign: 'center', border: 'none', borderRadius: br, cursor: past ? 'default' : 'pointer', background: bg, color: clr, fontWeight: sel ? 600 : 400 }}>
+              <div style={{ fontSize: 12, lineHeight: 1.2 }}>{day}</div>
+              {(isRes || isBlk) && <div style={{ fontSize: 16, lineHeight: 1, fontWeight: 700, marginTop: -2 }}>×</div>}
+              {lCnt > 0 && !isRes && !isBlk && <div style={{ fontSize: 8, fontWeight: 700, color: sel ? '#78350f' : '#b45309' }}>{lCnt}L</div>}
+            </button>
+          )
+        })}
+      </div>
+      {/* Leyenda */}
+      <div style={{ display: 'flex', gap: 10, padding: '5px 12px', background: '#faf8f5', borderTop: '1px solid var(--ivory)', fontSize: 10, color: 'var(--warm-gray)', flexWrap: 'wrap' }}>
+        <span>⬜ Libre</span>
+        <span style={{ color: '#ca8a04' }}>🟡 Negociación</span>
+        <span style={{ color: '#dc2626' }}>× Reservado</span>
+        <span style={{ color: '#9ca3af' }}>× Bloqueado</span>
+        <span style={{ color: '#b45309', marginLeft: 'auto' }}>L = leads interesados</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Multi-Range Calendar Picker ────────────────────────────────────────────────
+// Un solo calendario para seleccionar varios rangos.
+// 1er click = fecha inicio del rango en curso · 2º click = fecha fin → rango completado
+function MultiRangeCalendarPicker({
+  userId, ranges, onChange,
+}: {
+  userId: string
+  ranges: { from: string; to: string }[]
+  onChange: (ranges: { from: string; to: string }[]) => void
+}) {
+  const today    = new Date().toISOString().slice(0, 10)
+  const firstFrom = ranges[0]?.from || today
+  const initD    = new Date(firstFrom + 'T12:00:00')
+  const [year,        setYear]        = useState(initD.getFullYear())
+  const [month,       setMonth]       = useState(initD.getMonth())
+  const [entries,     setEntries]     = useState<Record<string, string>>({})
+  const [leadCounts,  setLeadCounts]  = useState<Record<string, number>>({})
+  const [hoverDate,   setHoverDate]   = useState('')
+  const [pendingFrom, setPendingFrom] = useState('')  // rango en curso: from ya elegido
+
+  const RANGE_COLORS = [
+    { bg: '#fffbeb', sel: '#f59e0b', light: '#fef9c3', border: '#f59e0b' }, // gold
+    { bg: '#f0fdf4', sel: '#22c55e', light: '#dcfce7', border: '#22c55e' }, // green
+    { bg: '#eff6ff', sel: '#3b82f6', light: '#dbeafe', border: '#3b82f6' }, // blue
+    { bg: '#faf5ff', sel: '#a855f7', light: '#f3e8ff', border: '#a855f7' }, // purple
+    { bg: '#fff1f2', sel: '#f43f5e', light: '#ffe4e6', border: '#f43f5e' }, // rose
+  ]
+
+  useEffect(() => {
+    const supabase = createClient()
+    const mFrom = `${year}-${String(month + 1).padStart(2, '0')}-01`
+    const mTo   = new Date(year, month + 1, 0).toISOString().slice(0, 10)
+    Promise.all([
+      supabase.from('calendar_entries').select('date,status').eq('user_id', userId).gte('date', mFrom).lte('date', mTo),
+      supabase.from('leads').select('wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility').eq('user_id', userId).neq('status', 'lost').neq('status', 'won'),
+    ]).then(([eRes, lRes]) => {
+      if (eRes.data) {
+        const m: Record<string, string> = {}
+        eRes.data.forEach((e: any) => { m[e.date] = e.status })
+        setEntries(m)
+      }
+      if (lRes.data) {
+        const counts: Record<string, number> = {}
+        const addC = (d: string) => { if (d >= mFrom && d <= mTo) counts[d] = (counts[d] || 0) + 1 }
+        const exp  = (f: string, t: string) => { const c = new Date(f + 'T12:00:00'), e = new Date((t || f) + 'T12:00:00'); while (c <= e) { addC(c.toISOString().slice(0, 10)); c.setDate(c.getDate() + 1) } }
+        lRes.data.forEach((l: any) => {
+          const fl = l.date_flexibility || 'exact'
+          if ((fl === 'exact' || fl === 'range') && l.wedding_date) exp(l.wedding_date, l.wedding_date_to || l.wedding_date)
+          else if (fl === 'multi_range' && l.wedding_date_ranges?.length) l.wedding_date_ranges.forEach((r: any) => { if (r.from) exp(r.from, r.to || r.from) })
+          else if (fl === 'month' && l.wedding_year && l.wedding_month) { const days = new Date(l.wedding_year, l.wedding_month, 0).getDate(); for (let d = 1; d <= days; d++) addC(`${l.wedding_year}-${String(l.wedding_month).padStart(2,'0')}-${String(d).padStart(2,'0')}`) }
+        })
+        setLeadCounts(counts)
+      }
+    })
+  }, [year, month, userId])
+
+  // Qué rango (índice) contiene esta fecha (para color)
+  const getRangeIdx = (d: string): number => {
+    for (let i = 0; i < ranges.length; i++) {
+      const r = ranges[i]
+      if (!r.from) continue
+      if (d >= r.from && d <= (r.to || r.from)) return i
+    }
+    return -1
+  }
+
+  const handleClick = (d: string) => {
+    if (d < today) return
+    if (!pendingFrom) {
+      setPendingFrom(d)
+    } else {
+      if (d >= pendingFrom) {
+        onChange([...ranges, { from: pendingFrom, to: d }])
+        setPendingFrom('')
+      } else {
+        setPendingFrom(d)
+      }
+    }
+  }
+
+  const removeRange = (i: number) => {
+    onChange(ranges.filter((_, j) => j !== i))
+  }
+
+  const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+  const DAYS_ES   = ['L','M','X','J','V','S','D']
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const startDow    = (new Date(year, month, 1).getDay() + 6) % 7
+  const ds = (day: number) => `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+
+  const previewTo = pendingFrom && hoverDate && hoverDate >= pendingFrom ? hoverDate : ''
+
+  const nextColorIdx = ranges.length % RANGE_COLORS.length
+  const nextColor    = RANGE_COLORS[nextColorIdx]
+
+  return (
+    <div>
+      <div style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden', fontSize: 12 }}>
+        {/* Instrucción */}
+        <div style={{ padding: '6px 12px', background: pendingFrom ? '#fffbeb' : '#f0fdf4', borderBottom: '1px solid var(--ivory)', fontSize: 11, color: pendingFrom ? '#92400e' : '#15803d', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+          {!pendingFrom
+            ? <><span style={{ background: '#d1fae5', borderRadius: '50%', width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 }}>1</span> Haz clic en la fecha de inicio del rango {ranges.length + 1}</>
+            : <><span style={{ background: '#fef3c7', borderRadius: '50%', width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 }}>2</span> Haz clic en la fecha de fin · <strong>{new Date(pendingFrom + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</strong> seleccionado</>
+          }
+        </div>
+        {/* Navegación */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 12px', background: '#faf8f5', borderBottom: '1px solid var(--ivory)' }}>
+          <button type="button" onClick={() => month === 0 ? (setYear(y => y - 1), setMonth(11)) : setMonth(m => m - 1)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--charcoal)', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>‹</button>
+          <span style={{ fontWeight: 600, color: 'var(--charcoal)', fontSize: 13 }}>{MONTHS_ES[month]} {year}</span>
+          <button type="button" onClick={() => month === 11 ? (setYear(y => y + 1), setMonth(0)) : setMonth(m => m + 1)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--charcoal)', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>›</button>
+        </div>
+        {/* Cabecera */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#faf8f5', borderBottom: '1px solid var(--ivory)' }}>
+          {DAYS_ES.map(d => <div key={d} style={{ textAlign: 'center', padding: '4px 0', fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '0.06em' }}>{d}</div>)}
+        </div>
+        {/* Días */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: 4, gap: 1 }}
+          onMouseLeave={() => setHoverDate('')}>
+          {Array.from({ length: startDow }).map((_, i) => <div key={`e${i}`} />)}
+          {Array.from({ length: daysInMonth }).map((_, i) => {
+            const day  = i + 1
+            const d    = ds(day)
+            const past = d < today
+            const eSt  = entries[d]
+            const lCnt = leadCounts[d] || 0
+            const rIdx = getRangeIdx(d)
+            const col  = rIdx >= 0 ? RANGE_COLORS[rIdx % RANGE_COLORS.length] : null
+            const isRangeFrom = rIdx >= 0 && d === ranges[rIdx]?.from
+            const isRangeTo   = rIdx >= 0 && d === (ranges[rIdx]?.to || ranges[rIdx]?.from)
+            const isRangeIn   = rIdx >= 0 && !isRangeFrom && !isRangeTo
+            // Pending range preview
+            const isPendingFrom = d === pendingFrom
+            const isPreviewTo   = d === previewTo
+            const isPreviewIn   = pendingFrom && previewTo && d > pendingFrom && d < previewTo
+
+            const isRes = eSt === 'reservado'; const isBlk = eSt === 'bloqueado'; const isNeg = eSt === 'negociacion'
+            let bg = '#fff', color = past ? '#d1d5db' : 'var(--charcoal)', br = '5px', fw = 400
+            if (col) {
+              bg = col.light; color = col.sel; fw = 600
+              br = isRangeFrom ? '5px 0 0 5px' : isRangeTo ? '0 5px 5px 0' : isRangeIn ? '0' : '5px'
+            } else if (isPendingFrom) { bg = nextColor.light; color = nextColor.sel; fw = 700; br = previewTo ? '5px 0 0 5px' : '5px' }
+            else if (isPreviewTo)     { bg = nextColor.light; color = nextColor.sel; fw = 700; br = '0 5px 5px 0' }
+            else if (isPreviewIn)     { bg = nextColor.light; color = nextColor.sel; br = '0' }
+            else if (isRes)           { bg = '#fee2e2'; color = '#dc2626' }
+            else if (isBlk)           { bg = '#f3f4f6'; color = '#9ca3af' }
+            else if (isNeg)           { bg = '#fefce8'; color = '#ca8a04' }
+
+            return (
+              <button key={day} type="button"
+                onClick={() => handleClick(d)}
+                onMouseEnter={() => !past && setHoverDate(d)}
+                disabled={past}
+                style={{ padding: '4px 2px', textAlign: 'center', border: 'none', borderRadius: br, cursor: past ? 'default' : 'pointer', background: bg, color, fontWeight: fw, position: 'relative' }}>
+                <div style={{ fontSize: 12, lineHeight: 1.2 }}>{day}</div>
+                {(isRes || isBlk) && <div style={{ fontSize: 16, lineHeight: 1, fontWeight: 700, marginTop: -2 }}>×</div>}
+                {lCnt > 0 && !col && !isPendingFrom && !isRes && !isBlk && <div style={{ fontSize: 8, fontWeight: 700, color: '#b45309' }}>{lCnt}L</div>}
+              </button>
+            )
+          })}
+        </div>
+        {/* Leyenda */}
+        <div style={{ display: 'flex', gap: 10, padding: '5px 12px', background: '#faf8f5', borderTop: '1px solid var(--ivory)', fontSize: 10, color: 'var(--warm-gray)', flexWrap: 'wrap' }}>
+          <span>⬜ Libre</span><span style={{ color: '#92400e' }}>🟡 Negociación</span>
+          <span style={{ color: '#be185d' }}>🩷 Reservado</span>
+          <span style={{ color: '#6b7280' }}>⬜ Bloqueado</span>
+          <span style={{ color: '#b45309', marginLeft: 'auto' }}>L = leads interesados</span>
+        </div>
+      </div>
+
+      {/* Lista de rangos completados */}
+      {ranges.length > 0 && (
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {ranges.map((r, i) => {
+            const col = RANGE_COLORS[i % RANGE_COLORS.length]
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: col.light, border: `1px solid ${col.border}`, borderRadius: 7 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: col.sel, flexShrink: 0, display: 'inline-block' }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Rango {i + 1}</span>
+                  <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>
+                    {new Date(r.from + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}
+                    {r.to && r.to !== r.from ? ` – ${new Date(r.to + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}` : ` (${new Date(r.from + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })})`}
+                  </span>
+                </div>
+                <button type="button" onClick={() => removeRange(i)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rose)', fontSize: 16, lineHeight: 1, padding: '0 2px' }}>×</button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {pendingFrom && (
+        <div style={{ marginTop: 6, fontSize: 11, color: '#92400e', padding: '5px 10px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6 }}>
+          Inicio seleccionado: <strong>{new Date(pendingFrom + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}</strong> — haz clic en la fecha de fin
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Form Modal ─────────────────────────────────────────────────────────────────
-function LeadFormModal({ form, setForm, isEdit, saving, onSubmit, onClose }: {
-  form: any; setForm: (f: any) => void; isEdit: boolean
-  saving: boolean; onSubmit: () => void; onClose: () => void
+function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onClose, userId }: {
+  form: any; setForm: (f: any) => void; isEdit: boolean; editLead?: any | null
+  saving: boolean; onSubmit: () => void; onClose: () => void; userId: string
 }) {
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
+  const [originalEditing, setOriginalEditing] = useState(false)
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 600, width: '100%' }} onClick={e => e.stopPropagation()}>
@@ -2085,7 +3782,12 @@ function LeadFormModal({ form, setForm, isEdit, saving, onSubmit, onClose }: {
 
             {/* ── Flexible date ── */}
             <div className="form-group">
-              <label className="form-label">Fecha de boda</label>
+              <label className="form-label">
+                Fecha de boda
+                {(['exact','range','multi_range'].includes(form.date_flexibility)) && (
+                  <span style={{ color: 'var(--rose)', marginLeft: 3 }}>*</span>
+                )}
+              </label>
               {/* Type selector */}
               <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
                 {DATE_FLEX_OPTS.map(opt => (
@@ -2094,73 +3796,110 @@ function LeadFormModal({ form, setForm, isEdit, saving, onSubmit, onClose }: {
                     borderColor: form.date_flexibility === opt.value ? 'var(--gold)' : 'var(--ivory)',
                     background:  form.date_flexibility === opt.value ? 'var(--gold)' : 'transparent',
                     color:       form.date_flexibility === opt.value ? '#fff' : 'var(--warm-gray)',
-                    transition: 'background 0.15s, color 0.15s, border-color 0.15s',
                   }}>{opt.label}</button>
                 ))}
               </div>
 
+              {/* EXACT DATE — siempre 1 día */}
               {form.date_flexibility === 'exact' && (
-                <input className="form-input" type="date" value={form.wedding_date}
-                  onChange={e => set('wedding_date', e.target.value)} />
-              )}
-
-              {form.date_flexibility === 'range' && (
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input className="form-input" type="date" value={form.wedding_date}
-                    onChange={e => set('wedding_date', e.target.value)} />
-                  <span style={{ color: 'var(--warm-gray)', fontSize: 13, whiteSpace: 'nowrap' }}>hasta</span>
-                  <input className="form-input" type="date" value={form.wedding_date_to}
-                    onChange={e => set('wedding_date_to', e.target.value)} />
-                </div>
-              )}
-
-              {form.date_flexibility === 'multi_range' && (
                 <div>
-                  {(form.wedding_date_ranges as { from: string; to: string }[]).map((r, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
-                      <span style={{ fontSize: 11, color: 'var(--warm-gray)', width: 16, textAlign: 'right', flexShrink: 0 }}>{i + 1}.</span>
-                      <input className="form-input" type="date" value={r.from}
-                        onChange={e => { const ranges = [...form.wedding_date_ranges]; ranges[i] = { ...r, from: e.target.value }; set('wedding_date_ranges', ranges) }} />
-                      <span style={{ color: 'var(--warm-gray)', fontSize: 13, whiteSpace: 'nowrap' }}>hasta</span>
-                      <input className="form-input" type="date" value={r.to}
-                        onChange={e => { const ranges = [...form.wedding_date_ranges]; ranges[i] = { ...r, to: e.target.value }; set('wedding_date_ranges', ranges) }} />
-                      <button type="button" onClick={() => set('wedding_date_ranges', (form.wedding_date_ranges as { from: string; to: string }[]).filter((_: { from: string; to: string }, j: number) => j !== i))}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rose)', fontSize: 16, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>×</button>
+                  <MiniCalendarPicker
+                    userId={userId}
+                    value={form.wedding_date}
+                    onChange={d => set('wedding_date', d)}
+                  />
+                  {form.wedding_date && (
+                    <div style={{ marginTop: 6, fontSize: 11, color: 'var(--warm-gray)' }}>
+                      📅 {new Date(form.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                     </div>
-                  ))}
-                  <button type="button"
-                    onClick={() => set('wedding_date_ranges', [...form.wedding_date_ranges, { from: '', to: '' }])}
-                    style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: '1px dashed var(--gold)', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', marginTop: 2 }}>
-                    + Añadir rango
-                  </button>
+                  )}
                 </div>
               )}
 
+              {/* RANGE — un solo calendario, 1er click = desde, 2º click = hasta */}
+              {form.date_flexibility === 'range' && (() => {
+                const rangeDays = form.wedding_date && form.wedding_date_to
+                  ? Math.round((new Date(form.wedding_date_to + 'T12:00:00').getTime() - new Date(form.wedding_date + 'T12:00:00').getTime()) / 86400000) + 1
+                  : 1
+                const maxDur = Math.max(1, rangeDays)
+                const curDur = Math.min(parseInt(form.wedding_duration_days || '1'), maxDur)
+                return (
+                  <div>
+                    <RangeCalendarPicker
+                      userId={userId}
+                      from={form.wedding_date}
+                      to={form.wedding_date_to}
+                      onChange={(f, t) => { set('wedding_date', f); set('wedding_date_to', t) }}
+                    />
+                    {form.wedding_date && form.wedding_date_to && (
+                      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <label style={{ fontSize: 12, color: 'var(--charcoal)', fontWeight: 500, whiteSpace: 'nowrap' }}>Duración de la boda:</label>
+                        <select className="form-input" style={{ width: 'auto' }}
+                          value={curDur}
+                          onChange={e => set('wedding_duration_days', e.target.value)}>
+                          {Array.from({ length: maxDur }, (_, i) => i + 1).map(d => (
+                            <option key={d} value={String(d)}>{d} {d === 1 ? 'día' : 'días'}</option>
+                          ))}
+                        </select>
+                        <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                          📅 {new Date(form.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })} – {new Date(form.wedding_date_to + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* MULTI_RANGE — un solo calendario para todos los rangos */}
+              {form.date_flexibility === 'multi_range' && (
+                <MultiRangeCalendarPicker
+                  userId={userId}
+                  ranges={form.wedding_date_ranges || []}
+                  onChange={r => set('wedding_date_ranges', r)}
+                />
+              )}
+
+              {/* MONTH */}
               {form.date_flexibility === 'month' && (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <select className="form-input" value={form.wedding_month} onChange={e => set('wedding_month', e.target.value)}>
-                    {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
-                  </select>
-                  <select className="form-input" style={{ width: 110 }} value={form.wedding_year} onChange={e => set('wedding_year', e.target.value)}>
-                    {YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
+                <div>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                    <select className="form-input" value={form.wedding_month} onChange={e => set('wedding_month', e.target.value)}>
+                      {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+                    </select>
+                    <select className="form-input" style={{ width: 110 }} value={form.wedding_year} onChange={e => set('wedding_year', e.target.value)}>
+                      {YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
+                  <MiniCalendarPicker
+                    userId={userId}
+                    readOnly
+                    value={undefined}
+                    highlights={(() => {
+                      const y = parseInt(form.wedding_year), mo = parseInt(form.wedding_month)
+                      const days = new Date(y, mo, 0).getDate()
+                      return Array.from({ length: days }, (_, i) => `${y}-${String(mo).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`)
+                    })()}
+                  />
                 </div>
               )}
 
+              {/* SEASON */}
               {form.date_flexibility === 'season' && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {SEASONS.map(s => (
-                    <button key={s.value} type="button" onClick={() => set('wedding_season', s.value)} style={{
-                      padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer', border: '1px solid',
-                      borderColor: form.wedding_season === s.value ? 'var(--gold)' : 'var(--ivory)',
-                      background:  form.wedding_season === s.value ? '#fef9ec' : 'transparent',
-                      color:       form.wedding_season === s.value ? '#92400e' : 'var(--warm-gray)',
-                      fontWeight:  form.wedding_season === s.value ? 600 : 400,
-                    }}>{s.emoji} {s.label}</button>
-                  ))}
-                  <select className="form-input" style={{ width: 110 }} value={form.wedding_year} onChange={e => set('wedding_year', e.target.value)}>
-                    {YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
+                <div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+                    {SEASONS.map(s => (
+                      <button key={s.value} type="button" onClick={() => set('wedding_season', s.value)} style={{
+                        padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer', border: '1px solid',
+                        borderColor: form.wedding_season === s.value ? 'var(--gold)' : 'var(--ivory)',
+                        background:  form.wedding_season === s.value ? '#fef9ec' : 'transparent',
+                        color:       form.wedding_season === s.value ? '#92400e' : 'var(--warm-gray)',
+                        fontWeight:  form.wedding_season === s.value ? 600 : 400,
+                      }}>{s.emoji} {s.label}</button>
+                    ))}
+                    <select className="form-input" style={{ width: 110 }} value={form.wedding_year} onChange={e => set('wedding_year', e.target.value)}>
+                      {YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -2174,11 +3913,11 @@ function LeadFormModal({ form, setForm, isEdit, saving, onSubmit, onClose }: {
             {/* Contact in 2-col */}
             <div className="two-col">
               <div className="form-group">
-                <label className="form-label">Email</label>
+                <label className="form-label">Email <span style={{ color: 'var(--rose)' }}>*</span> <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--warm-gray)' }}>o tel.</span></label>
                 <input className="form-input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="pareja@email.com" />
               </div>
               <div className="form-group">
-                <label className="form-label">Teléfono</label>
+                <label className="form-label">Teléfono <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--warm-gray)' }}>(o email)</span></label>
                 <input className="form-input" value={form.phone} onChange={e => {
                   const val = e.target.value
                   set('phone', val)
@@ -2263,6 +4002,110 @@ function LeadFormModal({ form, setForm, isEdit, saving, onSubmit, onClose }: {
                 onChange={e => set('notes', e.target.value)} placeholder="Observaciones privadas…" />
             </div>
           </div>
+
+          {/* Fechas de interés original — bloqueado por defecto, editable con botón */}
+          {isEdit && (
+            <div style={{ marginTop: 4, marginBottom: 8, padding: '14px 16px', background: '#faf8f5', borderRadius: 10, border: `1px solid ${originalEditing ? 'var(--gold)' : 'var(--ivory)'}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: originalEditing ? 12 : 6 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Clock size={10} /> Fecha de interés original
+                </div>
+                <button type="button" onClick={() => setOriginalEditing(e => !e)}
+                  style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${originalEditing ? 'var(--gold)' : 'var(--ivory)'}`, background: originalEditing ? '#fffbeb' : 'transparent', color: originalEditing ? '#92400e' : 'var(--warm-gray)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Edit2 size={10} /> {originalEditing ? 'Cerrar' : 'Editar'}
+                </button>
+              </div>
+
+              {/* Vista bloqueada — muestra texto formateado */}
+              {!originalEditing && (() => {
+                const flex   = form.original_date_flexibility
+                const date1  = form.original_wedding_date
+                const date2  = form.original_wedding_date_to
+                const ranges = form.original_wedding_date_ranges
+                if (!flex) return <div style={{ fontSize: 12, color: 'var(--stone)', fontStyle: 'italic' }}>Sin fecha original registrada</div>
+                const fmtLong  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                const fmtShort = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+                const fmtFull  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+                let txt = ''
+                if (flex === 'exact' && date1)          txt = fmtLong(date1)
+                else if (flex === 'range' && date1)      txt = `${fmtShort(date1)}${date2 ? ` – ${fmtFull(date2)}` : ''}`
+                else if (flex === 'multi_range' && ranges?.length)
+                  txt = ranges.map((r: any, i: number) => `Opción ${i+1}: ${fmtShort(r.from)}${r.to ? ` – ${fmtFull(r.to)}` : ''}`).join(' · ')
+                else if (flex === 'month')  txt = `${MONTHS[(parseInt(form.original_wedding_date?.slice(5,7) || '6') || 1) - 1]} ${form.original_wedding_date?.slice(0,4) || ''}`
+                else if (flex === 'season') txt = `${SEASONS.find(s => s.value === date1)?.label || date1} ${date2 || ''}`
+                return <div style={{ fontSize: 13, color: 'var(--charcoal)', fontWeight: 500 }}>{txt || '—'}</div>
+              })()}
+
+              {/* Vista editable */}
+              {originalEditing && (<>
+                <div className="form-group" style={{ marginBottom: 10 }}>
+                  <label className="form-label">Tipo</label>
+                  <select className="form-input" value={form.original_date_flexibility}
+                    onChange={e => set('original_date_flexibility', e.target.value)}>
+                    <option value="">Sin definir</option>
+                    {DATE_FLEX_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                {form.original_date_flexibility === 'exact' && (
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Fecha</label>
+                    <input className="form-input" type="date" value={form.original_wedding_date} onChange={e => set('original_wedding_date', e.target.value)} />
+                  </div>
+                )}
+                {form.original_date_flexibility === 'range' && (
+                  <div className="two-col" style={{ marginBottom: 0 }}>
+                    <div className="form-group"><label className="form-label">Desde</label>
+                      <input className="form-input" type="date" value={form.original_wedding_date} onChange={e => set('original_wedding_date', e.target.value)} /></div>
+                    <div className="form-group"><label className="form-label">Hasta</label>
+                      <input className="form-input" type="date" value={form.original_wedding_date_to} onChange={e => set('original_wedding_date_to', e.target.value)} /></div>
+                  </div>
+                )}
+                {form.original_date_flexibility === 'multi_range' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {(form.original_wedding_date_ranges?.length ? form.original_wedding_date_ranges : [{ from: '', to: '' }]).map((r: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                          {i === 0 && <label className="form-label">Desde</label>}
+                          <input className="form-input" type="date" value={r.from} onChange={e => { const rr = [...(form.original_wedding_date_ranges || [])]; rr[i] = { ...rr[i], from: e.target.value }; set('original_wedding_date_ranges', rr) }} />
+                        </div>
+                        <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                          {i === 0 && <label className="form-label">Hasta</label>}
+                          <input className="form-input" type="date" value={r.to} onChange={e => { const rr = [...(form.original_wedding_date_ranges || [])]; rr[i] = { ...rr[i], to: e.target.value }; set('original_wedding_date_ranges', rr) }} />
+                        </div>
+                        {i > 0 && <button type="button" onClick={() => set('original_wedding_date_ranges', form.original_wedding_date_ranges.filter((_: any, j: number) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rose)', padding: '0 4px' }}><X size={14} /></button>}
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => set('original_wedding_date_ranges', [...(form.original_wedding_date_ranges || []), { from: '', to: '' }])}
+                      style={{ fontSize: 12, color: 'var(--warm-gray)', background: 'none', border: '1px dashed var(--ivory)', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Añadir opción</button>
+                  </div>
+                )}
+                {form.original_date_flexibility === 'month' && (
+                  <div className="two-col" style={{ marginBottom: 0 }}>
+                    <div className="form-group"><label className="form-label">Mes</label>
+                      <select className="form-input" value={form.original_wedding_date?.slice(5,7) || '06'} onChange={e => set('original_wedding_date', `${form.original_wedding_date?.slice(0,4) || new Date().getFullYear()+1}-${e.target.value}-01`)}>
+                        {MONTHS.map((m, i) => <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
+                      </select></div>
+                    <div className="form-group"><label className="form-label">Año</label>
+                      <select className="form-input" value={form.original_wedding_date?.slice(0,4) || String(new Date().getFullYear()+1)} onChange={e => set('original_wedding_date', `${e.target.value}-${form.original_wedding_date?.slice(5,7) || '06'}-01`)}>
+                        {YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select></div>
+                  </div>
+                )}
+                {form.original_date_flexibility === 'season' && (
+                  <div className="two-col" style={{ marginBottom: 0 }}>
+                    <div className="form-group"><label className="form-label">Estación</label>
+                      <select className="form-input" value={form.original_wedding_date || 'summer'} onChange={e => set('original_wedding_date', e.target.value)}>
+                        {SEASONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                      </select></div>
+                    <div className="form-group"><label className="form-label">Año</label>
+                      <select className="form-input" value={form.original_wedding_date_to || String(new Date().getFullYear()+1)} onChange={e => set('original_wedding_date_to', e.target.value)}>
+                        {YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select></div>
+                  </div>
+                )}
+              </>)}
+            </div>
+          )}
 
         </div>
 
