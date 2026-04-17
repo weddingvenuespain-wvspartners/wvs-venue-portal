@@ -390,7 +390,7 @@ export default function LandingPage() {
       {/* ─── NAV ─── */}
       <header style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
-        height: 68, padding: '0 40px',
+        height: 64, padding: isMobile ? '0 20px' : '0 40px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: scrolled ? 'rgba(44,38,20,0.97)' : 'transparent',
         backdropFilter: scrolled ? 'blur(16px)' : 'none',
@@ -482,7 +482,7 @@ export default function LandingPage() {
       <section style={{
         minHeight: '100vh', position: 'relative', overflow: 'hidden',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: isMobile ? '110px 28px 80px' : '68px 60px 0',
+        padding: isMobile ? '96px 24px 130px' : '68px 60px 0',
       }}>
         <div style={{ position: 'absolute', inset: 0, zIndex: 0, backgroundImage: `url(${HERO_IMG})`, backgroundSize: 'cover', backgroundPosition: 'center 25%' }} />
         <div style={{
@@ -499,14 +499,14 @@ export default function LandingPage() {
         }}>
           <div style={{ flex: isMobile ? undefined : '0 0 58%', maxWidth: isMobile ? '100%' : 640 }}>
             <h1 style={{ fontFamily: SERIF, margin: 0, lineHeight: 1.02, letterSpacing: '-0.01em' }}>
-              <span style={{ display: 'block', fontSize: isMobile ? 52 : 76, fontWeight: 700, color: C.white }}>{t.hero.line1}</span>
-              <span style={{ display: 'block', fontSize: isMobile ? 52 : 76, fontWeight: 700, color: C.white, fontStyle: 'italic' }}>{t.hero.line2}</span>
-              <span style={{ display: 'block', fontSize: isMobile ? 52 : 76, fontWeight: 700, color: '#D4C49A' }}>{t.hero.line3}</span>
+              <span style={{ display: 'block', fontSize: isMobile ? 46 : 76, fontWeight: 700, color: C.white }}>{t.hero.line1}</span>
+              <span style={{ display: 'block', fontSize: isMobile ? 46 : 76, fontWeight: 700, color: C.white, fontStyle: 'italic' }}>{t.hero.line2}</span>
+              <span style={{ display: 'block', fontSize: isMobile ? 46 : 76, fontWeight: 700, color: '#D4C49A' }}>{t.hero.line3}</span>
             </h1>
-            <p style={{ fontFamily: SANS, fontSize: isMobile ? 16 : 18, color: 'rgba(255,255,255,0.52)', maxWidth: 480, lineHeight: 1.75, marginTop: 24, marginBottom: 0 }}>
+            <p style={{ fontFamily: SANS, fontSize: isMobile ? 15 : 18, color: 'rgba(255,255,255,0.52)', maxWidth: 480, lineHeight: 1.75, marginTop: 20, marginBottom: 0 }}>
               {t.hero.sub}
             </p>
-            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, marginTop: 36, alignItems: isMobile ? 'stretch' : 'center' }}>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 10, marginTop: 32, alignItems: isMobile ? 'stretch' : 'center' }}>
               <Link href="/signup" style={{
                 textDecoration: 'none', fontFamily: SANS, fontSize: 15, fontWeight: 600,
                 color: C.white, background: C.accent, padding: '14px 32px', borderRadius: 6,
@@ -543,11 +543,11 @@ export default function LandingPage() {
         </div>
 
         {isMobile && (
-          <div style={{ position: 'relative', zIndex: 2, display: 'flex', gap: 24, paddingTop: 8, paddingBottom: 16 }}>
-            {t.hero.stats.map(s => (
-              <div key={s.label} style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: SERIF, fontSize: 28, fontWeight: 700, color: '#D4C49A' }}>{s.value}</div>
-                <div style={{ fontFamily: SANS, fontSize: 11, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4 }}>{s.label}</div>
+          <div style={{ position: 'relative', zIndex: 2, display: 'flex', gap: 0, paddingTop: 8, paddingBottom: 8, width: '100%' }}>
+            {t.hero.stats.map((s, i) => (
+              <div key={s.label} style={{ flex: 1, textAlign: 'center', borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none', padding: '0 8px' }}>
+                <div style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 700, color: '#D4C49A' }}>{s.value}</div>
+                <div style={{ fontFamily: SANS, fontSize: 10, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 3, lineHeight: 1.3 }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -555,11 +555,11 @@ export default function LandingPage() {
       </section>
 
       {/* ─── PROBLEMS ─── */}
-      <section style={{ background: C.dark, padding: isMobile ? '80px 28px' : '110px 60px' }}>
+      <section style={{ background: C.dark, padding: isMobile ? '72px 24px' : '110px 60px' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
           <div style={{ marginBottom: isMobile ? 52 : 72 }}>
             <div style={{ fontFamily: SANS, fontSize: 11, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: C.accent, marginBottom: 16 }}>{t.problems.eyebrow}</div>
-            <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 38 : 58, fontWeight: 700, color: C.white, margin: 0, lineHeight: 1.1, maxWidth: 640 }}>{t.problems.title}</h2>
+            <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 32 : 58, fontWeight: 700, color: C.white, margin: 0, lineHeight: 1.1, maxWidth: 640 }}>{t.problems.title}</h2>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {t.problems.items.map((item, i) => (
@@ -573,11 +573,13 @@ export default function LandingPage() {
                   <div style={{ fontFamily: SERIF, fontSize: isMobile ? 22 : 28, fontWeight: 600, color: C.white, lineHeight: 1.25, marginBottom: 10 }}>{item.title}</div>
                   <div style={{ fontFamily: SANS, fontSize: 15, color: 'rgba(255,255,255,0.45)', lineHeight: 1.75 }}>{item.desc}</div>
                 </div>
-                <div style={{ flexShrink: 0 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <ArrowRight size={14} color="rgba(255,255,255,0.3)" />
+                {!isMobile && (
+                  <div style={{ flexShrink: 0 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ArrowRight size={14} color="rgba(255,255,255,0.3)" />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
@@ -585,7 +587,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── HOW IT WORKS ─── */}
-      <section id="como-funciona" style={{ background: C.bg, padding: isMobile ? '80px 28px' : '110px 60px' }}>
+      <section id="como-funciona" style={{ background: C.bg, padding: isMobile ? '72px 24px' : '110px 60px' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 48 : 80, alignItems: isMobile ? 'flex-start' : 'center' }}>
             <div style={{ flex: '0 0 auto', maxWidth: isMobile ? '100%' : 340 }}>
@@ -616,7 +618,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── FEATURES ─── */}
-      <section id="funcionalidades" style={{ background: C.white, padding: isMobile ? '80px 28px' : '110px 60px' }}>
+      <section id="funcionalidades" style={{ background: C.white, padding: isMobile ? '72px 24px' : '110px 60px' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: isMobile ? 52 : 72 }}>
             <div style={{ fontFamily: SANS, fontSize: 11, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: C.accent, marginBottom: 16 }}>{t.features.eyebrow}</div>
@@ -646,7 +648,7 @@ export default function LandingPage() {
                   ))}
                 </div>
               </div>
-              <div style={{ flex: 1, height: isMobile ? 260 : 380, borderRadius: 16, backgroundImage: `url(${IMGS[f.img as keyof typeof IMGS]})`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundColor: C.bg, boxShadow: '0 32px 80px rgba(69,61,35,0.18)', border: `1px solid ${C.border}` }} />
+              <div style={{ flex: 1, height: isMobile ? 220 : 380, borderRadius: isMobile ? 12 : 16, backgroundImage: `url(${IMGS[f.img as keyof typeof IMGS]})`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundColor: C.bg, boxShadow: isMobile ? '0 8px 32px rgba(69,61,35,0.12)' : '0 32px 80px rgba(69,61,35,0.18)', border: `1px solid ${C.border}` }} />
             </div>
           ))}
 
@@ -666,7 +668,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── TESTIMONIALS ─── */}
-      <section style={{ background: C.bg, padding: isMobile ? '80px 28px' : '110px 60px', overflow: 'hidden' }}>
+      <section style={{ background: C.bg, padding: isMobile ? '72px 24px' : '110px 60px', overflow: 'hidden' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
           <div style={{ fontFamily: SANS, fontSize: 11, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: C.accent, marginBottom: 16 }}>{t.testimonials.eyebrow}</div>
           <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 36 : 50, fontWeight: 700, color: C.dark, margin: '0 0 56px', lineHeight: 1.1 }}>
@@ -707,7 +709,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── PRICING ─── */}
-      <section id="planes" style={{ background: C.white, padding: isMobile ? '80px 28px' : '110px 60px' }}>
+      <section id="planes" style={{ background: C.white, padding: isMobile ? '72px 24px' : '110px 60px' }}>
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
             <div style={{ fontFamily: SANS, fontSize: 11, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: C.accent, marginBottom: 16 }}>{t.pricing.eyebrow}</div>
@@ -743,7 +745,7 @@ export default function LandingPage() {
                     : tierMap[f.key] === 'basic'
                 )
                 return (
-                  <div key={plan.id} style={{ borderRadius: 16, padding: '36px 32px', border: isPremium ? `2px solid ${C.accent}` : `1px solid ${C.border}`, background: isPremium ? C.bg : C.white, position: 'relative', boxShadow: isPremium ? '0 12px 40px rgba(121,111,78,0.12)' : undefined }}>
+                  <div key={plan.id} style={{ borderRadius: 16, padding: isMobile ? '28px 22px' : '36px 32px', border: isPremium ? `2px solid ${C.accent}` : `1px solid ${C.border}`, background: isPremium ? C.bg : C.white, position: 'relative', boxShadow: isPremium ? '0 12px 40px rgba(121,111,78,0.12)' : undefined }}>
                     {isPremium && <div style={{ position: 'absolute', top: -1, left: '50%', transform: 'translateX(-50%)', background: C.accent, color: C.white, fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '4px 16px', borderRadius: '0 0 8px 8px' }}>{t.pricing.recommended}</div>}
                     <div style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 700, color: C.dark, marginTop: isPremium ? 10 : 0 }}>{plan.display_name || plan.name}</div>
                     {plan.description && <div style={{ fontFamily: SANS, fontSize: 13, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>{plan.description}</div>}
@@ -773,7 +775,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── FAQ ─── */}
-      <section style={{ background: C.bg, padding: isMobile ? '80px 28px' : '110px 60px' }}>
+      <section style={{ background: C.bg, padding: isMobile ? '72px 24px' : '110px 60px' }}>
         <div style={{ maxWidth: 680, margin: '0 auto' }}>
           <div style={{ fontFamily: SANS, fontSize: 11, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: C.accent, marginBottom: 16 }}>{t.faq.eyebrow}</div>
           <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 36 : 50, fontWeight: 700, color: C.dark, margin: '0 0 44px', lineHeight: 1.1 }}>
@@ -796,7 +798,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── FINAL CTA ─── */}
-      <section style={{ background: C.dark, padding: isMobile ? '80px 28px 100px' : '110px 60px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+      <section style={{ background: C.dark, padding: isMobile ? '80px 24px 140px' : '110px 60px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -160, left: '50%', transform: 'translateX(-50%)', width: 560, height: 560, borderRadius: '50%', background: 'radial-gradient(circle, rgba(121,111,78,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ position: 'relative', zIndex: 1 }}>
           <img src={LOGO_URL} alt="Wedding Venues Spain" style={{ height: 40, display: 'block', margin: '0 auto 36px', opacity: 0.80 }} />
@@ -816,7 +818,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── FOOTER ─── */}
-      <footer id="contacto" style={{ background: C.darkDeep, padding: '44px 40px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <footer id="contacto" style={{ background: C.darkDeep, padding: isMobile ? '40px 24px 100px' : '44px 40px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? 24 : 0 }}>
           <div>
             <img src={LOGO_URL} alt="Wedding Venues Spain" style={{ height: 26, display: 'block', marginBottom: 8, opacity: 0.65 }} />
@@ -835,9 +837,9 @@ export default function LandingPage() {
 
       {/* ─── MOBILE FLOATING CTA ─── */}
       {isMobile && (
-        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 900, background: 'rgba(44,38,20,0.97)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '12px 20px 24px', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', gap: 10 }}>
-          <Link href="/login" style={{ flex: 1, textDecoration: 'none', fontFamily: SANS, fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.70)', textAlign: 'center', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '13px 0' }}>{t.nav.login}</Link>
-          <Link href="/signup" style={{ flex: 2, textDecoration: 'none', fontFamily: SANS, fontSize: 13, fontWeight: 600, color: C.white, textAlign: 'center', background: C.accent, borderRadius: 6, padding: '13px 0' }}>{t.nav.register}</Link>
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 900, background: 'rgba(44,38,20,0.97)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '12px 20px env(safe-area-inset-bottom, 20px)', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', gap: 10 }}>
+          <Link href="/login" style={{ flex: 1, textDecoration: 'none', fontFamily: SANS, fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.70)', textAlign: 'center', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '14px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{t.nav.login}</Link>
+          <Link href="/signup" style={{ flex: 2, textDecoration: 'none', fontFamily: SANS, fontSize: 14, fontWeight: 600, color: C.white, textAlign: 'center', background: C.accent, borderRadius: 8, padding: '14px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{t.nav.register}</Link>
         </div>
       )}
     </div>
