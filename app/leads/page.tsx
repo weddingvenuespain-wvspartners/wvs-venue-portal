@@ -272,8 +272,8 @@ function expandLeadDates(lead: any): string[] {
 const CAL_AVAIL_CFG: Record<string, { bg: string; border: string; dot: string; label: string }> = {
   libre:       { bg: '#fff',    border: '#e5e7eb', dot: '#d1fae5', label: 'Libre' },
   negociacion: { bg: '#fef9ec', border: '#fde68a', dot: '#f59e0b', label: 'En negociación' },
-  reservado:   { bg: '#fdf2f8', border: '#fbcfe8', dot: '#ec4899', label: 'Reservado' },
-  bloqueado:   { bg: '#f3f4f6', border: 'var(--stone)', dot: '#9ca3af', label: 'Bloqueado' },
+  reservado:   { bg: '#fee2e2', border: '#fca5a5', dot: '#ef4444', label: 'Reservado' },
+  bloqueado:   { bg: '#e5e7eb', border: '#9ca3af', dot: '#6b7280', label: 'Bloqueado' },
 }
 
 const emptyForm = {
@@ -518,8 +518,9 @@ export default function LeadsPage() {
     let updatedLead = lead
     if (clearVisit) {
       const supabase = createClient()
-      // Clear visit_date on the lead
-      await supabase.from('leads').update({ visit_date: null }).eq('id', lead.id)
+      // Clear visit_date (+ optional visit_time/visit_duration if columns exist)
+      const { error: clearErr } = await supabase.from('leads').update({ visit_date: null, visit_time: null, visit_duration: null }).eq('id', lead.id)
+      if (clearErr) await supabase.from('leads').update({ visit_date: null }).eq('id', lead.id)
 
       // Also clean up the calendar entry created for the visit date
       if (lead.visit_date) {
@@ -542,7 +543,7 @@ export default function LeadsPage() {
         }
       }
 
-      updatedLead = { ...lead, visit_date: null }
+      updatedLead = { ...lead, visit_date: null, visit_time: null, visit_duration: null }
       setLeads(prev => prev.map(l => l.id === lead.id ? updatedLead : l))
       if (detailLead?.id === lead.id) setDetailLead(updatedLead)
     }
@@ -557,12 +558,16 @@ export default function LeadsPage() {
   }
 
   // Note: requires ALTER TABLE leads ADD COLUMN IF NOT EXISTS wedding_date_history JSONB DEFAULT '[]';
-  const handleDateConfirm = async (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean, halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>) => {
+  const handleDateConfirm = async (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean, halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>, visitTime?: string, visitDuration?: number) => {
     if (!dateConfirmLead || !dateConfirmStatus) return
     const supabase = createClient()
 
     const finalUpdates: any = { status: dateConfirmStatus, ...leadUpdates }
-    if (isVisit && calendarDates.length > 0) finalUpdates.visit_date = calendarDates[0]
+    if (isVisit && calendarDates.length > 0) {
+      finalUpdates.visit_date = calendarDates[0]
+      finalUpdates.visit_time = visitTime ?? null
+      finalUpdates.visit_duration = visitDuration ?? null
+    }
 
     // Si aún no hay fechas originales guardadas, fijarlas ahora antes de cualquier cambio
     // (se hace siempre al primer cambio de estado, cambien o no las fechas)
@@ -576,19 +581,24 @@ export default function LeadsPage() {
     const { data: updatedLead, error: updateErr } = await supabase.from('leads')
       .update(finalUpdates).eq('id', dateConfirmLead.id).select().single()
 
-    // Cascading fallbacks for missing optional columns (original_*, wedding_duration_days, etc.)
+    // Cascading fallbacks for missing optional columns (original_*, wedding_duration_days, visit_time, visit_duration, etc.)
     let resolvedLead = updatedLead
     if (updateErr || !updatedLead) {
-      // 2nd try: drop original_* fields but keep core date fields + status
+      // 2nd try: drop visit_time/visit_duration + original_* but keep core date fields + status
+      // (visit_time/visit_duration columns may not exist yet if migration hasn't been run)
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { wedding_duration_days: _dur, ...coreLeadUpdates } = leadUpdates
+      const fallback2Payload: any = { status: dateConfirmStatus, ...coreLeadUpdates }
+      // Always re-include visit_date in fallback — it's critical for the cancel-visit check
+      if (isVisit && calendarDates.length > 0) fallback2Payload.visit_date = calendarDates[0]
       const { data: fallback2, error: err2 } = await supabase.from('leads')
-        .update({ status: dateConfirmStatus, ...coreLeadUpdates }).eq('id', dateConfirmLead.id).select().single()
+        .update(fallback2Payload).eq('id', dateConfirmLead.id).select().single()
       if (!err2 && fallback2) {
         resolvedLead = fallback2
       } else {
         // 3rd try: just core date fields without duration, without original_*
         const safeFields: any = { status: dateConfirmStatus }
+        if (isVisit && calendarDates.length > 0) safeFields.visit_date = calendarDates[0]
         if (leadUpdates.wedding_date     !== undefined) safeFields.wedding_date     = leadUpdates.wedding_date
         if (leadUpdates.wedding_date_to  !== undefined) safeFields.wedding_date_to  = leadUpdates.wedding_date_to
         if (leadUpdates.date_flexibility !== undefined) safeFields.date_flexibility = leadUpdates.date_flexibility
@@ -1022,7 +1032,17 @@ export default function LeadsPage() {
           onClose={() => { setShowForm(false); setEditLead(null) }} />
       )}
 
-      {dateConfirmLead && dateConfirmStatus && (
+      {dateConfirmLead && dateConfirmStatus && dateConfirmStatus === 'visit_scheduled' && (
+        <VisitScheduleModal
+          key={dateConfirmKey}
+          lead={dateConfirmLead}
+          userId={user!.id}
+          onConfirm={handleDateConfirm}
+          onClose={() => { setDateConfirmLead(null); setDateConfirmStatus(null) }}
+        />
+      )}
+
+      {dateConfirmLead && dateConfirmStatus && dateConfirmStatus !== 'visit_scheduled' && (
         <DateConfirmModal
           key={dateConfirmKey}
           lead={dateConfirmLead}
@@ -1221,7 +1241,7 @@ function DateConfirmModal({
   targetStatus: DbStatus
   userId: string
   allLeads: any[]
-  onConfirm: (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean, halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>) => Promise<void>
+  onConfirm: (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean, halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>, visitTime?: string, visitDuration?: number) => Promise<void>
   onClose: () => void
 }) {
   const isVisitMode = targetStatus === 'visit_scheduled'
@@ -1255,8 +1275,10 @@ function DateConfirmModal({
   }, [allLeads, lead.id])
   const hasRequestedDates = requestedDates.length > 0
 
-  // Open calendar on wedding_date (confirmed or original) if available
-  const firstDate = lead.wedding_date || getLeadFirstDate(lead)
+  // Open calendar on visit_date (if re-scheduling) or wedding_date otherwise
+  const firstDate = (isVisitMode && lead.visit_date)
+    ? lead.visit_date
+    : lead.wedding_date || getLeadFirstDate(lead)
   const initD = firstDate ? new Date(firstDate + 'T12:00:00') : new Date()
   const [viewYear,  setViewYear]  = useState(initD.getFullYear())
   const [viewMonth, setViewMonth] = useState(initD.getMonth())
@@ -1265,7 +1287,10 @@ function DateConfirmModal({
   // selectedAnchors = only the dates the user explicitly clicked (the "wedding days")
   const [selectedAnchors, setSelectedAnchors] = useState<string[]>([])
   const [calEntries,    setCalEntries]    = useState<Record<string, any>>({})
+  const [dateInfo,      setDateInfo]      = useState<string | null>(null) // date whose booking info is shown
   const [saving,        setSaving]        = useState(false)
+  const [visitTime,     setVisitTime]     = useState<string>(lead.visit_time || '')
+  const [visitDuration, setVisitDuration] = useState<number>(lead.visit_duration || 60)
   const [weddingDuration, setWeddingDuration] = useState<number>(lead.wedding_duration_days || 1)
   const [editingDuration, setEditingDuration] = useState(false)
   // Overnight: 1 = selected date is the wedding day (next day = check-out), 2 = selected date is check-out (prev day = wedding)
@@ -1407,6 +1432,11 @@ function DateConfirmModal({
         }
       }
       // On first load: seed the calendar selection
+      if (isFirstLoad.current && isVisitMode) {
+        isFirstLoad.current = false
+        // Pre-select the existing visit_date so it appears with the same style as a fresh selection
+        if (lead.visit_date) setSelectedDates([lead.visit_date])
+      }
       if (isFirstLoad.current && !isVisitMode) {
         isFirstLoad.current = false
         // If the lead has a previously confirmed wedding_date, seed from that anchor
@@ -1453,6 +1483,14 @@ function DateConfirmModal({
     () => selectedDates.filter(d => !requestedDates.includes(d)),
     [selectedDates, requestedDates]
   )
+
+  // Other leads' visit dates — shown as informational in visit mode
+  const otherLeadVisitDates = useMemo(() => {
+    if (!isVisitMode) return new Set<string>()
+    const s = new Set<string>()
+    allLeads.forEach(l => { if (l.id !== lead.id && l.visit_date) s.add(l.visit_date) })
+    return s
+  }, [allLeads, lead.id, isVisitMode])
 
   const toggleDate = (ds: string) => {
     const entry = calEntries[ds]
@@ -1704,7 +1742,7 @@ function DateConfirmModal({
     // Always save duration
     if (!isVisitMode) leadUpdates.wedding_duration_days = weddingDuration
 
-    await onConfirm(leadUpdates, calendarDates, calStatus, isVisitMode, Object.keys(halfDayMap).length > 0 ? halfDayMap : undefined)
+    await onConfirm(leadUpdates, calendarDates, calStatus, isVisitMode, Object.keys(halfDayMap).length > 0 ? halfDayMap : undefined, isVisitMode && visitTime ? visitTime : undefined, isVisitMode ? visitDuration : undefined)
     setSaving(false)
   }
 
@@ -1873,6 +1911,22 @@ function DateConfirmModal({
         </div>
 
         <div style={{ padding: '16px 24px' }}>
+
+          {/* Existing visit notice — shown when re-scheduling a visit that wasn't cancelled */}
+          {isVisitMode && lead.visit_date && (
+            <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 10, background: '#fffbeb', border: '1.5px solid #fde68a', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0, marginTop: 1 }}>📅</span>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 2 }}>Visita ya agendada</div>
+                <div style={{ fontSize: 13, color: '#78350f', fontWeight: 500 }}>
+                  {new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  {lead.visit_time && <span style={{ marginLeft: 8, fontWeight: 400 }}>· {lead.visit_time}h</span>}
+                  {lead.visit_duration && <span style={{ marginLeft: 6, color: '#b45309', fontSize: 12 }}>({lead.visit_duration >= 60 ? `${Math.floor(lead.visit_duration / 60)}h${lead.visit_duration % 60 > 0 ? ` ${lead.visit_duration % 60}min` : ''}` : `${lead.visit_duration} min`})</span>}
+                </div>
+                <div style={{ fontSize: 11, color: '#b45309', marginTop: 3 }}>Selecciona una fecha nueva en el calendario para cambiarla</div>
+              </div>
+            </div>
+          )}
 
           {/* Requested dates — compact pills */}
           {!isVisitMode && hasRequestedDates && (
@@ -2162,9 +2216,10 @@ function DateConfirmModal({
                   const entry = calEntries[ds]
                   const entryStatus = entry?.status || 'libre'
                   const cfg = CAL_AVAIL_CFG[entryStatus] || CAL_AVAIL_CFG.libre
-                  const isRequested   = requestedDates.includes(ds)
-                  const isSelected    = selectedDates.includes(ds)
-                  const isHalfDay     = !!(entry?.note?.startsWith('medio_dia'))
+                  const isRequested      = requestedDates.includes(ds)
+                  const isSelected       = selectedDates.includes(ds)
+                  const isOtherVisit     = isVisitMode && otherLeadVisitDates.has(ds)
+                  const isHalfDay        = !!(entry?.note?.startsWith('medio_dia'))
                   // Half-day entries are NOT fully unavailable — the other half is still free
                   const isUnavailable = !isHalfDay && (entryStatus === 'reservado' || entryStatus === 'bloqueado')
                   const isToday       = ds === todayStr
@@ -2218,13 +2273,22 @@ function DateConfirmModal({
                   const isPkgAvailable = isPackageMode && isPkgAnchorDay && !isUnavailable && !isPast && !isSelected && !isPartOfSpan
 
                   return (
-                    <button key={ds} onClick={() => canClick && toggleDate(ds)}
-                      title={isHalfDay ? (entryStatus === 'reservado' ? '½ Mañana/Tarde reservado — el otro medio está libre' : entryStatus === 'negociacion' ? '½ en negociación — el otro medio está libre' : '½ bloqueado — el otro medio está libre') : isUnavailable ? cfg.label : isPkgBlocked ? 'Este día no es inicio de ningún paquete' : isAlsoBuffer ? 'Boda + buffer del día anterior (doble rol)' : isBufferDay ? 'Día de buffer (regla del venue)' : isRequested ? 'Fecha solicitada — clic para marcar/desmarcar' : isPkgAvailable ? 'Inicio de paquete — disponible' : otherLeadCount > 0 ? `${otherLeadCount} lead(s) interesado(s)` : ''}
+                    <button key={ds} onClick={() => {
+                      if (isPast) return
+                      if (isUnavailable || (isHalfDay && !isSelected)) {
+                        setDateInfo(prev => prev === ds ? null : ds)
+                        return
+                      }
+                      if (canClick) toggleDate(ds)
+                    }}
+                      title={isUnavailable || (isHalfDay && !isSelected) ? 'Ver info de esta reserva' : isOtherVisit ? 'Otro lead tiene visita este día — puedes escoger igualmente' : isHalfDay ? '½ Mañana/Tarde — el otro medio está libre' : isPkgBlocked ? 'Este día no es inicio de ningún paquete' : isAlsoBuffer ? 'Boda + buffer del día anterior (doble rol)' : isBufferDay ? 'Día de buffer (regla del venue)' : isRequested ? 'Fecha solicitada — clic para marcar/desmarcar' : isPkgAvailable ? 'Inicio de paquete — disponible' : otherLeadCount > 0 ? `${otherLeadCount} lead(s) interesado(s)` : ''}
                       style={{
                         minHeight: 60, border: 'none',
                         borderBottom: '1px solid var(--ivory)',
                         borderRight: cellIdx % 7 !== 6 ? '1px solid var(--ivory)' : 'none',
-                        background: isBufferDay
+                        background: isOtherVisit && !isSelected
+                          ? '#eff6ff'
+                          : isBufferDay
                           ? '#fdf6ee'
                           : isHalfDayBuffer
                           ? 'linear-gradient(135deg, #fdf6ee 50%, #ffffff 50%)'
@@ -2247,11 +2311,17 @@ function DateConfirmModal({
                           : entryStatus === 'negociacion' ? '#fffcf0'
                           : isWeekend ? '#faf7f4'
                           : '#fff',
-                        cursor: canClick ? 'pointer' : isPast ? 'default' : 'not-allowed',
+                        cursor: isPast ? 'default' : isPkgBlocked ? 'not-allowed' : 'pointer',
                         opacity: isPast ? 0.35 : 1,
                         display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
                         justifyContent: 'space-between', padding: '7px 7px 5px',
-                        boxShadow: isBufferDay
+                        boxShadow: isUnavailable && entryStatus === 'reservado'
+                          ? 'inset 0 0 0 2px #f87171'
+                          : isUnavailable && entryStatus === 'bloqueado'
+                          ? 'inset 0 0 0 2px #9ca3af'
+                          : isOtherVisit && !isSelected
+                          ? 'inset 0 0 0 1.5px #93c5fd'
+                          : isBufferDay
                           ? 'inset 0 0 0 1.5px #f59e0b'
                           : isHalfDayBuffer
                           ? 'inset 0 0 0 1.5px #f59e0b'
@@ -2264,10 +2334,12 @@ function DateConfirmModal({
                           : isPkgAvailable
                           ? 'none'
                           : isToday ? 'inset 0 0 0 2px var(--gold)'
+                          : dateInfo === ds
+                          ? 'inset 0 0 0 2.5px #6366f1'
                           : isRequested && !isUnavailable ? 'inset 0 0 0 1.5px #fde68a'
                           : 'none',
                         position: 'relative', transition: 'background 0.1s', outline: 'none',
-                      }} disabled={!canClick || isPast}>
+                      }} disabled={isPkgBlocked || isPast}>
                       {/* Day number */}
                       <span style={{
                         fontSize: 15, fontWeight: isToday ? 700 : 500, lineHeight: 1, fontFamily: 'Manrope, sans-serif',
@@ -2295,7 +2367,7 @@ function DateConfirmModal({
                         {(isUnavailable || isHalfDay) && !isPkgBlocked && !isPartOfSpan && (
                           <span
                             title={isUnavailable ? cfg.label : 'Medio día — el otro ½ está libre'}
-                            style={{ fontSize: isUnavailable ? 15 : 9, color: isUnavailable ? (entryStatus === 'reservado' ? '#dc2626' : '#9ca3af') : cfg.dot, fontWeight: 700, lineHeight: 1, marginLeft: 'auto' }}>
+                            style={{ fontSize: isUnavailable ? 16 : 9, color: isUnavailable ? cfg.dot : cfg.dot, fontWeight: 900, lineHeight: 1, marginLeft: 'auto' }}>
                             {isUnavailable ? '×' : '½'}
                           </span>
                         )}
@@ -2308,6 +2380,13 @@ function DateConfirmModal({
                           <span style={{ fontSize: 8, color: '#16a34a', fontWeight: 700, lineHeight: 1, marginLeft: 'auto' }}>+</span>
                         )}
                       </div>
+                      {/* Other lead visit badge — blue circle with 'V' */}
+                      {isOtherVisit && !isSelected && (
+                        <div style={{ position: 'absolute', top: 3, right: 3, width: 15, height: 15, borderRadius: '50%', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Visita de otro lead este día">
+                          <span style={{ fontSize: 8, color: '#fff', fontWeight: 700, lineHeight: 1 }}>V</span>
+                        </div>
+                      )}
                       {/* Buffer day indicator (pure buffer, not also a wedding day) */}
                       {isBufferDay && (
                         <div style={{ position: 'absolute', top: 3, right: 3, width: 15, height: 15, borderRadius: '50%', background: '#f59e0b', opacity: 0.55, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2342,6 +2421,151 @@ function DateConfirmModal({
             </div>
           </div>
 
+          {/* Date info panel — shown when user clicks a reserved/blocked/half-day cell */}
+          {dateInfo && (() => {
+            const infoEntry = calEntries[dateInfo]
+            const infoStatus: string = infoEntry?.status || 'libre'
+            const isInfoVisit = isVisitMode && otherLeadVisitDates.has(dateInfo)
+            // Look up lead: from calEntry lead_id, or from allLeads visit_date (for otherVisit dates)
+            const infoLead = infoEntry?.lead_id
+              ? allLeads.find((l: any) => l.id === infoEntry.lead_id)
+              : isInfoVisit
+              ? allLeads.find((l: any) => l.id !== lead.id && l.visit_date === dateInfo)
+              : null
+            const rawNote: string = infoEntry?.note || ''
+            const displayNote = rawNote.startsWith('medio_dia_')
+              ? (rawNote === 'medio_dia_manana' ? 'Medio día — mañana' : 'Medio día — tarde')
+              : rawNote
+            const statusColor: Record<string, string> = {
+              reservado: '#ef4444', bloqueado: '#6b7280', negociacion: '#f59e0b', libre: '#10b981',
+            }
+            const statusLabel: Record<string, string> = {
+              reservado: 'Reservado', bloqueado: 'Bloqueado', negociacion: 'En negociación', libre: 'Libre',
+            }
+            const borderColor: Record<string, string> = {
+              reservado: '#fca5a5', bloqueado: '#d1d5db', negociacion: '#fde68a', libre: '#bbf7d0',
+            }
+            const bgColor: Record<string, string> = {
+              reservado: '#fff5f5', bloqueado: '#f9fafb', negociacion: '#fffbeb', libre: '#f0fdf4',
+            }
+            const panelBg    = isInfoVisit ? '#eff6ff' : (bgColor[infoStatus] || '#f9fafb')
+            const panelBorder = isInfoVisit ? '#93c5fd' : (borderColor[infoStatus] || '#e5e7eb')
+            const labelColor  = isInfoVisit ? '#1d4ed8' : (statusColor[infoStatus] || '#374151')
+            const statusText  = isInfoVisit ? 'Visita de otro lead' : (statusLabel[infoStatus] || infoStatus)
+            const parsedDate = new Date(dateInfo + 'T12:00:00')
+            const dateStr = parsedDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+            return (
+              <div style={{ margin: '8px 0 4px', padding: '12px 14px', borderRadius: 10, background: panelBg, border: `1.5px solid ${panelBorder}`, position: 'relative' }}>
+                <button type="button" onClick={() => setDateInfo(null)}
+                  style={{ position: 'absolute', top: 8, right: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#9ca3af', padding: 2, lineHeight: 1 }}
+                  title="Cerrar">×</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: labelColor, background: `${labelColor}18`, padding: '2px 8px', borderRadius: 20, border: `1px solid ${labelColor}40` }}>
+                    {statusText}
+                  </span>
+                  <span style={{ fontSize: 12, color: '#374151', fontWeight: 500 }}>{dateStr}</span>
+                </div>
+                {(infoLead || isInfoVisit) && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {infoLead && (
+                      <>
+                        <div style={{ fontSize: 12, color: '#374151' }}>
+                          <span style={{ fontWeight: 600 }}>Pareja: </span>
+                          {infoLead.couple_name || infoLead.name || '—'}
+                        </div>
+                        {infoLead.name && infoLead.couple_name && infoLead.name !== infoLead.couple_name && (
+                          <div style={{ fontSize: 11, color: '#6b7280' }}>
+                            <span style={{ fontWeight: 600 }}>Contacto: </span>
+                            {infoLead.name}
+                          </div>
+                        )}
+                        {infoLead.wedding_date && (
+                          <div style={{ fontSize: 11, color: '#6b7280' }}>
+                            <span style={{ fontWeight: 600 }}>Boda: </span>
+                            {new Date(infoLead.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {isInfoVisit && !infoLead && (
+                      <div style={{ fontSize: 12, color: '#374151' }}>Visita agendada de otro cliente</div>
+                    )}
+                  </div>
+                )}
+                {displayNote && (
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: infoLead ? 4 : 0 }}>
+                    <span style={{ fontWeight: 600 }}>Nota: </span>{displayNote}
+                  </div>
+                )}
+                {!infoLead && !displayNote && !isInfoVisit && (
+                  <div style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic' }}>Sin información adicional</div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Visit time & duration — only in visit mode when a date is selected */}
+          {isVisitMode && selectedDates.length > 0 && (() => {
+            const timeSlots = Array.from({ length: 27 }, (_, i) => {
+              const totalMin = 8 * 60 + i * 30
+              const h = Math.floor(totalMin / 60)
+              const m = totalMin % 60
+              return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+            })
+            const durationOpts: { value: number; label: string }[] = [
+              { value: 30,  label: '30 min'   },
+              { value: 45,  label: '45 min'   },
+              { value: 60,  label: '1 hora'   },
+              { value: 90,  label: '1h 30min' },
+              { value: 120, label: '2 horas'  },
+              { value: 150, label: '2h 30min' },
+              { value: 180, label: '3 horas'  },
+            ]
+            return (
+              <div style={{ margin: '8px 0 10px', padding: '12px 14px', borderRadius: 10, background: '#f0fdf4', border: '1.5px solid #bbf7d0' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+                  Detalles de la visita
+                </div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {/* Time picker */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>Hora</label>
+                    <select
+                      value={visitTime}
+                      onChange={e => setVisitTime(e.target.value)}
+                      style={{ fontSize: 13, padding: '6px 10px', borderRadius: 8, border: '1.5px solid #86efac', background: '#fff', color: visitTime ? '#111827' : '#9ca3af', outline: 'none', cursor: 'pointer', minWidth: 110 }}>
+                      <option value=''>Sin especificar</option>
+                      {timeSlots.map(t => <option key={t} value={t}>{t}h</option>)}
+                    </select>
+                  </div>
+                  {/* Duration picker */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>Duración</label>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {durationOpts.map(opt => (
+                        <button key={opt.value} type='button'
+                          onClick={() => setVisitDuration(opt.value)}
+                          style={{ fontSize: 11, padding: '5px 10px', borderRadius: 20, border: visitDuration === opt.value ? '1.5px solid #16a34a' : '1.5px solid #d1fae5', background: visitDuration === opt.value ? '#16a34a' : '#fff', color: visitDuration === opt.value ? '#fff' : '#374151', cursor: 'pointer', fontWeight: visitDuration === opt.value ? 700 : 400, transition: 'all 0.1s', outline: 'none' }}>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {visitTime && (
+                  <div style={{ fontSize: 11, color: '#15803d', marginTop: 8, fontWeight: 500 }}>
+                    Visita programada: {visitTime}h · {durationOpts.find(o => o.value === visitDuration)?.label || `${visitDuration} min`}
+                    {' · '}hasta {(() => {
+                      const [hh, mm] = visitTime.split(':').map(Number)
+                      const endMin = hh * 60 + mm + visitDuration
+                      return `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}h`
+                    })()}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
           {/* Legend */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, marginTop: 8 }}>
             {/* Libre */}
@@ -2351,14 +2575,14 @@ function DateConfirmModal({
             </div>
             {/* Reservado — full day */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <div style={{ width: 8, height: 8, borderRadius: 2, background: CAL_AVAIL_CFG.reservado.bg, border: `1px solid ${CAL_AVAIL_CFG.reservado.border}` }} />
-              <span style={{ fontSize: 9, color: '#dc2626', fontWeight: 700 }}>×</span>
+              <div style={{ width: 10, height: 10, borderRadius: 2, background: CAL_AVAIL_CFG.reservado.bg, border: `1.5px solid ${CAL_AVAIL_CFG.reservado.border}` }} />
+              <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 900 }}>×</span>
               <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Reservado</span>
             </div>
             {/* Bloqueado — full day */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <div style={{ width: 8, height: 8, borderRadius: 2, background: CAL_AVAIL_CFG.bloqueado.bg, border: `1px solid ${CAL_AVAIL_CFG.bloqueado.border}` }} />
-              <span style={{ fontSize: 9, color: '#9ca3af', fontWeight: 700 }}>×</span>
+              <div style={{ width: 10, height: 10, borderRadius: 2, background: CAL_AVAIL_CFG.bloqueado.bg, border: `1.5px solid ${CAL_AVAIL_CFG.bloqueado.border}` }} />
+              <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 900 }}>×</span>
               <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Bloqueado</span>
             </div>
             {/* Medio día — half available */}
@@ -2382,12 +2606,22 @@ function DateConfirmModal({
                 <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Seleccionada</span>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <div style={{ width: 14, height: 14, borderRadius: 7, background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>2</span>
+            {!isVisitMode && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <div style={{ width: 14, height: 14, borderRadius: 7, background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>2</span>
+                </div>
+                <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Otros leads</span>
               </div>
-              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Otros leads</span>
-            </div>
+            )}
+            {isVisitMode && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <div style={{ width: 14, height: 14, borderRadius: 7, background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>V</span>
+                </div>
+                <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Visita otro lead</span>
+              </div>
+            )}
           </div>
 
           {/* Duration — hidden in packages-rules mode (span is fixed by package); shown in manual mode */}
@@ -4114,6 +4348,453 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
           <button className="btn btn-primary" onClick={onSubmit} disabled={saving}>
             {saving ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear lead'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Visit Schedule Modal — clean, modern UI dedicated to scheduling a venue visit ──
+function VisitScheduleModal({
+  lead, userId, onConfirm, onClose,
+}: {
+  lead: any
+  userId: string
+  onConfirm: (
+    leadUpdates: any,
+    calendarDates: string[],
+    calendarStatus: 'negociacion' | 'reservado',
+    isVisit: boolean,
+    halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>,
+    visitTime?: string,
+    visitDuration?: number,
+  ) => Promise<void>
+  onClose: () => void
+}) {
+  const todayStr = todayIso()
+  const initD = lead.visit_date ? new Date(lead.visit_date + 'T12:00:00')
+    : lead.wedding_date ? new Date(lead.wedding_date + 'T12:00:00')
+    : new Date()
+  const [viewYear,  setViewYear]  = useState(initD.getFullYear())
+  const [viewMonth, setViewMonth] = useState(initD.getMonth())
+  const [selected,  setSelected]  = useState<string | null>(lead.visit_date || null)
+  const [calEntries, setCalEntries] = useState<Record<string, any>>({})
+  const [saving, setSaving] = useState(false)
+  const [visitTime,     setVisitTime]     = useState<string>(lead.visit_time || '')
+  const [visitDuration, setVisitDuration] = useState<number>(lead.visit_duration || 60)
+
+  useEffect(() => {
+    const supabase = createClient()
+    const ym = `${viewYear}-${pad(viewMonth + 1)}`
+    const last = new Date(viewYear, viewMonth + 1, 0).getDate()
+    supabase.from('calendar_entries').select('date,status,note').eq('user_id', userId)
+      .gte('date', `${ym}-01`).lte('date', `${ym}-${pad(last)}`)
+      .then(({ data }) => {
+        const map: Record<string, any> = {}
+        ;(data || []).forEach((e: any) => { if (!map[e.date]) map[e.date] = e })
+        setCalEntries(prev => ({ ...prev, ...map }))
+      })
+  }, [viewYear, viewMonth, userId])
+
+  const isBlocked = (ds: string) => {
+    const e = calEntries[ds]
+    if (!e) return false
+    const isHalf = e.note?.startsWith('medio_dia')
+    return !isHalf && (e.status === 'reservado' || e.status === 'bloqueado')
+  }
+
+  const quickPicks = useMemo(() => {
+    const now = new Date(); now.setHours(12, 0, 0, 0)
+    const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    const add = (n: number) => { const d = new Date(now); d.setDate(d.getDate() + n); return iso(d) }
+    const thisSat = (() => {
+      const d = new Date(now)
+      const diff = (6 - d.getDay() + 7) % 7
+      d.setDate(d.getDate() + diff)
+      return iso(d)
+    })()
+    const nextSat = (() => {
+      const d = new Date(now)
+      let diff = (6 - d.getDay() + 7) % 7
+      if (diff === 0) diff = 7
+      d.setDate(d.getDate() + diff + 7)
+      return iso(d)
+    })()
+    return [
+      { label: 'Hoy',          value: add(0) },
+      { label: 'Mañana',       value: add(1) },
+      { label: 'Este sábado',  value: thisSat },
+      { label: 'Próx. sábado', value: nextSat },
+    ]
+  }, [])
+
+  const timePresets = ['10:00', '11:00', '12:00', '16:00', '17:00', '18:00']
+  const durations   = [
+    { v: 30,  label: '30 min' },
+    { v: 45,  label: '45 min' },
+    { v: 60,  label: '1 h' },
+    { v: 90,  label: '1h 30' },
+    { v: 120, label: '2 h' },
+  ]
+
+  const lastDay = new Date(viewYear, viewMonth + 1, 0).getDate()
+  let startDow = new Date(viewYear, viewMonth, 1).getDay() - 1
+  if (startDow < 0) startDow = 6
+  const cells = [...Array(startDow).fill(null), ...Array.from({ length: lastDay }, (_, i) => i + 1)]
+  const prevMonth = () => { if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) } else setViewMonth(m => m - 1) }
+  const nextMonth = () => { if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) } else setViewMonth(m => m + 1) }
+
+  const initials = ((lead.name || '?').trim().split(/\s+/).slice(0, 2).map((w: string) => (w[0] || '').toUpperCase()).join('')) || '?'
+
+  const jumpTo = (ds: string) => {
+    if (isBlocked(ds) || ds < todayStr) return
+    const d = new Date(ds + 'T12:00:00')
+    setViewYear(d.getFullYear())
+    setViewMonth(d.getMonth())
+    setSelected(ds)
+  }
+
+  const formatLong = (ds: string) =>
+    new Date(ds + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+
+  const handleConfirm = async () => {
+    if (!selected || saving) return
+    setSaving(true)
+    try {
+      await onConfirm({}, [selected], 'negociacion', true, undefined, visitTime || undefined, visitDuration)
+    } finally { setSaving(false) }
+  }
+
+  const weddingInfo = (() => {
+    const flex = lead.date_flexibility || 'exact'
+    if (flex === 'exact' && lead.wedding_date) return formatLong(lead.wedding_date)
+    if (flex === 'range' && lead.wedding_date)
+      return lead.wedding_date_to ? `${formatDateLabel(lead.wedding_date)} – ${formatDateLabel(lead.wedding_date_to)}` : formatDateLabel(lead.wedding_date)
+    if (flex === 'month' && lead.wedding_year && lead.wedding_month) return `${MONTHS[lead.wedding_month - 1]} ${lead.wedding_year}`
+    if (flex === 'season' && lead.wedding_season) return `${lead.wedding_season} ${lead.wedding_year || ''}`.trim()
+    if (flex === 'multi_range' && lead.wedding_date_ranges?.length) return `${lead.wedding_date_ranges.length} opciones`
+    return 'Sin fecha definida'
+  })()
+
+  const phoneDigits = (lead.whatsapp || lead.phone || '').replace(/\D/g, '')
+  const waLink = phoneDigits ? `https://wa.me/${phoneDigits}` : null
+
+  const endTime = (() => {
+    if (!visitTime) return null
+    const [h, m] = visitTime.split(':').map(Number)
+    if (isNaN(h) || isNaN(m)) return null
+    const total = h * 60 + m + visitDuration
+    const eh = Math.floor(total / 60) % 24
+    const em = total % 60
+    return `${pad(eh)}:${pad(em)}`
+  })()
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(17,15,12,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 16 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 580, maxHeight: '94vh', overflowY: 'auto', boxShadow: '0 30px 80px rgba(0,0,0,0.35)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ position: 'relative', padding: '22px 24px 20px', background: 'linear-gradient(135deg, #fef3c7 0%, #fdf6ee 100%)', borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+          <button
+            onClick={onClose}
+            aria-label="Cerrar"
+            style={{ position: 'absolute', top: 14, right: 14, width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.75)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--espresso)' }}
+          >
+            <X size={16} />
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--gold)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, fontFamily: 'Manrope, sans-serif', flexShrink: 0, boxShadow: '0 4px 14px rgba(212,160,60,0.4)' }}>
+              {initials}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Landmark size={11} /> Agendar visita
+              </div>
+              <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 26, fontWeight: 500, color: 'var(--espresso)', lineHeight: 1.1, textTransform: 'capitalize' }}>
+                {lead.name || 'Pareja sin nombre'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: '20px 24px' }}>
+
+          {/* Lead details */}
+          <div style={{ background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 12, padding: '12px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px', marginBottom: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <Calendar size={14} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Boda</div>
+                <div style={{ fontSize: 12, color: 'var(--charcoal)', fontWeight: 500, textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{weddingInfo}</div>
+              </div>
+            </div>
+            {lead.guests != null && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <Users size={14} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Invitados</div>
+                  <div style={{ fontSize: 12, color: 'var(--charcoal)', fontWeight: 500 }}>{lead.guests || '—'}</div>
+                </div>
+              </div>
+            )}
+            {(lead.phone || lead.whatsapp) && (
+              <a
+                href={waLink || `tel:${lead.phone}`}
+                target={waLink ? '_blank' : undefined}
+                rel="noopener"
+                style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, textDecoration: 'none', color: 'inherit' }}
+              >
+                {waLink ? <MessageCircle size={14} style={{ color: '#25D366', flexShrink: 0 }} /> : <Phone size={14} style={{ color: 'var(--gold)', flexShrink: 0 }} />}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{waLink ? 'WhatsApp' : 'Teléfono'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--charcoal)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.whatsapp || lead.phone}</div>
+                </div>
+              </a>
+            )}
+            {lead.email && (
+              <a href={`mailto:${lead.email}`} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, textDecoration: 'none', color: 'inherit' }}>
+                <Mail size={14} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Email</div>
+                  <div style={{ fontSize: 12, color: 'var(--charcoal)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.email}</div>
+                </div>
+              </a>
+            )}
+          </div>
+
+          {/* Step 1 · Date */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--gold)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>1</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>Elige el día</div>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+              {quickPicks.map(q => {
+                const blocked = isBlocked(q.value)
+                const active  = selected === q.value
+                return (
+                  <button
+                    key={q.label}
+                    type="button"
+                    onClick={() => !blocked && jumpTo(q.value)}
+                    disabled={blocked}
+                    style={{
+                      padding: '7px 14px',
+                      borderRadius: 999,
+                      cursor: blocked ? 'not-allowed' : 'pointer',
+                      outline: 'none',
+                      fontSize: 12, fontWeight: 600,
+                      border: `1.5px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`,
+                      background: active ? 'var(--gold)' : '#fff',
+                      color: active ? '#fff' : blocked ? '#cbc8c2' : 'var(--charcoal)',
+                      textDecoration: blocked ? 'line-through' : 'none',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {q.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div style={{ border: '1px solid var(--ivory)', borderRadius: 14, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--cream)', borderBottom: '1px solid var(--ivory)' }}>
+                <button onClick={prevMonth} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
+                  <ChevronLeft size={14} />
+                </button>
+                <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize' }}>
+                  {MONTHS[viewMonth]} {viewYear}
+                </span>
+                <button onClick={nextMonth} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--ivory)' }}>
+                {DAYS_SHORT.map((d, i) => (
+                  <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '0.1em', padding: '10px 0' }}>{d}</div>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+                {cells.map((day, i) => {
+                  if (!day) return <div key={`e-${i}`} style={{ minHeight: 46, borderBottom: '1px solid var(--ivory)', borderRight: i % 7 !== 6 ? '1px solid var(--ivory)' : 'none' }} />
+                  const ds = `${viewYear}-${pad(viewMonth + 1)}-${pad(day)}`
+                  const isPast       = ds < todayStr
+                  const blocked      = isBlocked(ds)
+                  const isToday      = ds === todayStr
+                  const isSelected   = selected === ds
+                  const canClick     = !isPast && !blocked
+
+                  return (
+                    <button
+                      key={ds}
+                      onClick={() => canClick && setSelected(ds)}
+                      disabled={!canClick}
+                      title={blocked ? 'Día reservado o bloqueado' : isPast ? 'Fecha pasada' : ''}
+                      style={{
+                        minHeight: 46,
+                        border: 'none',
+                        borderBottom: '1px solid var(--ivory)',
+                        borderRight: i % 7 !== 6 ? '1px solid var(--ivory)' : 'none',
+                        background: isSelected ? 'var(--gold)' : isPast ? '#fafaf7' : blocked ? '#f9f7f3' : '#fff',
+                        color: isSelected ? '#fff' : isPast ? '#cfcbc3' : blocked ? '#b8b3aa' : 'var(--charcoal)',
+                        cursor: canClick ? 'pointer' : 'default',
+                        fontSize: 14,
+                        fontWeight: isSelected ? 700 : isToday ? 700 : 500,
+                        fontFamily: 'Manrope, sans-serif',
+                        boxShadow: isSelected
+                          ? 'inset 0 0 0 2px var(--gold)'
+                          : isToday ? 'inset 0 0 0 1.5px var(--gold)' : 'none',
+                        textDecoration: blocked ? 'line-through' : 'none',
+                        transition: 'background 0.12s, color 0.12s',
+                        outline: 'none',
+                      }}
+                    >
+                      {day}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Step 2 · Time & duration */}
+          <div style={{ marginBottom: 16, opacity: selected ? 1 : 0.5, pointerEvents: selected ? 'auto' : 'none', transition: 'opacity 0.2s' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', background: selected ? 'var(--gold)' : 'var(--ivory)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>2</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>Hora y duración <span style={{ fontWeight: 400, color: 'var(--warm-gray)' }}>(opcional)</span></div>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, alignItems: 'center' }}>
+              <Clock size={13} style={{ color: 'var(--warm-gray)', marginRight: 2 }} />
+              {timePresets.map(t => {
+                const active = visitTime === t
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setVisitTime(active ? '' : t)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 999,
+                      cursor: 'pointer',
+                      outline: 'none',
+                      fontSize: 12, fontWeight: 600,
+                      border: `1.5px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`,
+                      background: active ? 'var(--gold)' : '#fff',
+                      color: active ? '#fff' : 'var(--charcoal)',
+                      transition: 'all 0.15s',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {t}
+                  </button>
+                )
+              })}
+              <input
+                type="time"
+                value={visitTime}
+                onChange={e => setVisitTime(e.target.value)}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  border: '1.5px solid var(--ivory)',
+                  fontSize: 12,
+                  color: 'var(--charcoal)',
+                  fontFamily: 'Manrope, sans-serif',
+                  outline: 'none',
+                  width: 110,
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {durations.map(d => {
+                const active = visitDuration === d.v
+                return (
+                  <button
+                    key={d.v}
+                    type="button"
+                    onClick={() => setVisitDuration(d.v)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 999,
+                      cursor: 'pointer',
+                      outline: 'none',
+                      fontSize: 12, fontWeight: 600,
+                      border: `1.5px solid ${active ? 'var(--espresso)' : 'var(--ivory)'}`,
+                      background: active ? 'var(--espresso)' : '#fff',
+                      color: active ? '#fff' : 'var(--charcoal)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {d.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Summary */}
+          <div
+            style={{
+              borderRadius: 14,
+              padding: '16px 18px',
+              background: selected ? 'linear-gradient(135deg, #fef3c7 0%, #fdf6ee 100%)' : 'var(--cream)',
+              border: `1.5px solid ${selected ? 'var(--gold)' : 'var(--ivory)'}`,
+              display: 'flex', alignItems: 'center', gap: 14,
+              transition: 'all 0.2s',
+            }}
+          >
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: selected ? 'var(--gold)' : '#fff', border: selected ? 'none' : '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Calendar size={20} style={{ color: selected ? '#fff' : 'var(--warm-gray)' }} />
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              {selected ? (
+                <>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2 }}>
+                    Resumen de la visita
+                  </div>
+                  <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize', lineHeight: 1.2 }}>
+                    {formatLong(selected)}
+                  </div>
+                  {visitTime && (
+                    <div style={{ fontSize: 12, color: 'var(--charcoal)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, fontVariantNumeric: 'tabular-nums' }}>
+                      <Clock size={12} style={{ color: 'var(--gold)' }} />
+                      {visitTime}{endTime ? ` – ${endTime}` : ''} <span style={{ color: 'var(--warm-gray)' }}>· {durations.find(d => d.v === visitDuration)?.label}</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2 }}>
+                    Sin fecha
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>
+                    Elige una fecha en el calendario para agendar la visita.
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 24px 18px', borderTop: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button
+            className="btn btn-primary"
+            onClick={handleConfirm}
+            disabled={!selected || saving}
+            style={{ opacity: !selected || saving ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <Calendar size={13} />
+            {saving ? 'Guardando…' : 'Confirmar visita'}
           </button>
         </div>
       </div>
