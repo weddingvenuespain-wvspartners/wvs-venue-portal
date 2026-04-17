@@ -489,7 +489,7 @@ function TemplateSwitcher({ active, onChange }: { active: number; onChange: (n: 
               }}
             >
               <span>{t.icon}</span>
-              <span style={{ display: window.innerWidth > 600 ? 'inline' : 'none' }}>{t.name}</span>
+              <span>{t.name}</span>
             </button>
           ))}
         </div>
