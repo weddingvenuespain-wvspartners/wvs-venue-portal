@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Palette, Upload, Trash2, AlertCircle, Lock, Zap, Sparkles, ClipboardList, MessageCircle, Target } from 'lucide-react'
+import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Upload, Trash2, AlertCircle, AlertTriangle, Lock, Zap, Sparkles, ClipboardList, MessageCircle, Target, Info, Loader2, ChevronDown } from 'lucide-react'
 import type { SectionsData } from '@/lib/proposal-types'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import { usePlanFeatures } from '@/lib/use-plan-features'
@@ -50,6 +50,7 @@ type Proposal = {
   wedding_date: string | null
   price_estimate: number | null
   personal_message: string | null
+  couple_email: string | null
   show_availability: boolean
   show_price_estimate: boolean
   status: 'draft' | 'sent' | 'viewed' | 'expired'
@@ -102,6 +103,7 @@ const PRESET_COLORS = [
 const emptyForm = {
   lead_id:              '',
   couple_name:          '',
+  couple_email:         '',
   guest_count:          '',
   wedding_date:         '',
   price_estimate:       '',
@@ -177,13 +179,23 @@ function PropuestasPageContent() {
   const [form,         setForm]         = useState({ ...emptyForm })
   const [sections,     setSections]     = useState<SectionsData>(emptySections)
   const [activeTab,    setActiveTab]    = useState<'datos' | 'visual' | 'secciones'>('datos')
+  const [openSecs,     setOpenSecs]     = useState<Set<string>>(new Set())
   const [saving,      setSaving]      = useState(false)
-  const [uploading,   setUploading]   = useState(false)
+  const [uploading,       setUploading]       = useState(false)
+  const [uploadingHero,   setUploadingHero]   = useState(false)
+  const [uploadingGallery,setUploadingGallery]= useState(false)
   const [copied,      setCopied]      = useState<string | null>(null)
   const [success,     setSuccess]     = useState('')
   const [error,       setError]       = useState('')
   const [limitWarn,   setLimitWarn]   = useState('')
-  const fileInputRef  = useRef<HTMLInputElement>(null)
+  const [sendModal,      setSendModal]      = useState<Proposal | null>(null)
+  const [sendEmail,      setSendEmail]      = useState('')
+  const [sendingId,      setSendingId]      = useState<string | null>(null)
+  const [sendErrAlert,   setSendErrAlert]   = useState(false)
+  const [smtpConfigured, setSmtpConfigured] = useState<boolean | null>(null)
+  const fileInputRef       = useRef<HTMLInputElement>(null)
+  const heroInputRef       = useRef<HTMLInputElement>(null)
+  const galleryInputRef    = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -230,12 +242,14 @@ function PropuestasPageContent() {
   // ── Carga propuestas + leads + plantillas + contenido venue
   const load = async () => {
     const supabase = createClient()
-    const [{ data: props }, { data: leadsData }, { data: tplData }, { data: vcRows }] = await Promise.all([
+    const [{ data: props }, { data: leadsData }, { data: tplData }, { data: vcRows }, { data: venueRow }] = await Promise.all([
       supabase.from('proposals').select('*, branding:proposal_branding(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('leads').select('id, name, guests').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('leads').select('id, name, guests, email').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('proposal_web_templates').select('*').eq('user_id', user.id).order('created_at'),
       supabase.from('venue_content').select('*').eq('user_id', user.id),
+      supabase.from('venue_onboarding').select('smtp_from_email').eq('user_id', user.id).maybeSingle(),
     ])
+    setSmtpConfigured(!!(venueRow as any)?.smtp_from_email)
     if (props)     setProposals(props as Proposal[])
     if (leadsData) setLeads(leadsData)
     if (tplData)   setTemplates(tplData as ProposalTemplate[])
@@ -306,26 +320,56 @@ function PropuestasPageContent() {
     setTimeout(() => { setSuccess(''); setError('') }, 3500)
   }
 
+  const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+
   const closeModal = () => {
     setShowForm(false)
     setEditingId(null)
     setActiveTab('datos')
+    setOpenSecs(new Set())
   }
 
-  // ── Subir logo a Supabase Storage
-  const handleLogoUpload = async (file: File) => {
-    if (!file) return
-    setUploading(true)
+  // ── Helper: subir imagen a Supabase Storage
+  const uploadImage = async (file: File, folder: string): Promise<string | null> => {
     const supabase = createClient()
     const ext = file.name.split('.').pop()
-    const path = `${user.id}/${Date.now()}.${ext}`
-    const { data, error: uploadErr } = await supabase.storage
-      .from('proposal-assets')
-      .upload(path, file, { upsert: true })
-    if (uploadErr) { notify('Error al subir el logo', true); setUploading(false); return }
+    const path = `${user.id}/${folder}/${Date.now()}.${ext}`
+    const { error: uploadErr } = await supabase.storage.from('proposal-assets').upload(path, file, { upsert: true })
+    if (uploadErr) {
+      console.error('[upload]', uploadErr)
+      notify(`Error al subir imagen: ${uploadErr.message}`, true)
+      return null
+    }
     const { data: { publicUrl } } = supabase.storage.from('proposal-assets').getPublicUrl(path)
-    setForm(f => ({ ...f, logo_url: publicUrl }))
+    return publicUrl
+  }
+
+  // ── Subir logo
+  const handleLogoUpload = async (file: File) => {
+    setUploading(true)
+    const url = await uploadImage(file, 'logos')
+    if (url) setForm(f => ({ ...f, logo_url: url }))
     setUploading(false)
+  }
+
+  // ── Subir foto principal (hero)
+  const handleHeroUpload = async (file: File) => {
+    setUploadingHero(true)
+    const url = await uploadImage(file, 'hero')
+    if (url) setSections(s => ({ ...s, hero_image_url: url }))
+    setUploadingHero(false)
+  }
+
+  // ── Subir fotos de galería (múltiples)
+  const handleGalleryUpload = async (files: FileList) => {
+    setUploadingGallery(true)
+    const urls: string[] = []
+    for (const file of Array.from(files)) {
+      const url = await uploadImage(file, 'gallery')
+      if (url) urls.push(url)
+    }
+    if (urls.length) setSections(s => ({ ...s, gallery_urls: [...(s.gallery_urls ?? []), ...urls] }))
+    setUploadingGallery(false)
   }
 
   // ── Crear o editar propuesta
@@ -349,10 +393,12 @@ function PropuestasPageContent() {
       testimonials: sections.testimonials?.filter(x => x.names.trim() || x.text.trim()) ?? [],
     }
 
-    const proposalPayload = {
+    // couple_email se guarda aparte para no romper la inserción si la columna no existe aún
+    const { couple_email: coupleEmailValue, ...corePayload } = {
       user_id:             user.id,
       lead_id:             form.lead_id || null,
       couple_name:         form.couple_name,
+      couple_email:        form.couple_email || null,
       personal_message:    form.personal_message || null,
       guest_count:         form.guest_count ? parseInt(form.guest_count) : null,
       wedding_date:        form.wedding_date || null,
@@ -368,24 +414,30 @@ function PropuestasPageContent() {
     if (editingId) {
       const { error: updErr } = await supabase
         .from('proposals')
-        .update(proposalPayload)
+        .update(corePayload)
         .eq('id', editingId)
       if (updErr) { notify('Error al guardar', true); setSaving(false); return }
     } else {
       const slug = generateSlug(form.couple_name)
       let { data, error: insErr } = await supabase
         .from('proposals')
-        .insert({ ...proposalPayload, slug, status: 'draft' })
+        .insert({ ...corePayload, slug, status: 'draft' })
         .select()
         .single()
       // Retry without unknown columns (42703 = undefined_column)
       if (insErr && insErr.code === '42703') {
-        const { sections_data: _s, template_id: _t, show_price_estimate: _p, ...basePayload } = proposalPayload as any
+        const { sections_data: _s, template_id: _t, show_price_estimate: _p, ...basePayload } = corePayload as any
         const r = await supabase.from('proposals').insert({ ...basePayload, slug, status: 'draft' }).select().single()
         data = r.data; insErr = r.error
       }
       if (insErr || !data) { notify(`Error al crear la propuesta: ${insErr?.message ?? 'desconocido'}`, true); setSaving(false); return }
       proposalId = data.id
+    }
+
+    // Guardar couple_email por separado (la columna puede no existir todavía)
+    if (coupleEmailValue !== undefined) {
+      await supabase.from('proposals').update({ couple_email: coupleEmailValue }).eq('id', proposalId!)
+      // ignoramos el error si la columna no existe
     }
 
     // Guardar branding (upsert) — retry without font_family if column missing
@@ -415,6 +467,7 @@ function PropuestasPageContent() {
     setForm({
       lead_id:             p.lead_id ?? '',
       couple_name:         p.couple_name,
+      couple_email:        p.couple_email ?? '',
       guest_count:         p.guest_count?.toString() ?? '',
       wedding_date:        p.wedding_date ?? '',
       price_estimate:      p.price_estimate?.toString() ?? '',
@@ -438,10 +491,49 @@ function PropuestasPageContent() {
     setProposals(prev => prev.filter(p => p.id !== id))
   }
 
-  const markSent = async (id: string) => {
-    const supabase = createClient()
-    await supabase.from('proposals').update({ status: 'sent' }).eq('id', id)
-    setProposals(prev => prev.map(p => p.id === id ? { ...p, status: 'sent' } : p))
+  const resolveLeadEmail = (proposal: Proposal) =>
+    leads.find(l => l.id === proposal.lead_id)?.email ?? ''
+
+  const markSent = (proposal: Proposal) => {
+    const email = proposal.couple_email || resolveLeadEmail(proposal)
+    if (!email) {
+      setSendEmail('')
+      setSendModal(proposal)
+      return
+    }
+    doSend(proposal.id, email)
+  }
+
+  const doSend = async (id: string, emailOverride?: string) => {
+    setSendingId(id)
+    setSendErrAlert(false)
+    const ctrl = new AbortController()
+    const tid = setTimeout(() => ctrl.abort(), 5000)
+    try {
+      const res = await fetch(`/api/proposals/${id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailOverride ?? null }),
+        signal: ctrl.signal,
+      })
+      clearTimeout(tid)
+      const json = await res.json()
+      setSendModal(null)
+      if (!res.ok) { notify(json.error ?? 'Error al enviar', true); return }
+      setProposals(prev => prev.map(p => p.id === id ? { ...p, status: 'sent' } : p))
+      if (json.emailSent) notify(`Email enviado a ${json.recipientEmail}`)
+      else if (json.emailError) notify(`Error al enviar: ${json.emailError}`, true)
+      else notify('Marcada como enviada — copia la URL y envíasela')
+    } catch (err: any) {
+      clearTimeout(tid)
+      if (err?.name === 'AbortError') {
+        setSendErrAlert(true)
+      } else {
+        notify('Error de red al enviar la propuesta', true)
+      }
+    } finally {
+      setSendingId(null)
+    }
   }
 
   const copyUrl = (slug: string) => {
@@ -455,9 +547,10 @@ function PropuestasPageContent() {
     const lead = leads.find(l => l.id === leadId)
     setForm(f => ({
       ...f,
-      lead_id:     leadId,
-      couple_name: lead ? lead.name : f.couple_name,
-      guest_count: lead?.guests ? String(lead.guests) : f.guest_count,
+      lead_id:      leadId,
+      couple_name:  lead ? lead.name : f.couple_name,
+      couple_email: lead?.email ?? f.couple_email,
+      guest_count:  lead?.guests ? String(lead.guests) : f.guest_count,
     }))
   }
 
@@ -601,9 +694,70 @@ function PropuestasPageContent() {
           </button>
         </div>
 
+        {/* ── Toast lateral ── */}
+        {(success || error) && (
+          <div style={{
+            position: 'fixed', bottom: 28, right: 28, zIndex: 9999,
+            background: error ? '#fef2f2' : '#f0fdf4',
+            border: `1px solid ${error ? '#fca5a5' : '#86efac'}`,
+            color: error ? '#991b1b' : '#15803d',
+            padding: '12px 16px', borderRadius: 10,
+            boxShadow: '0 4px 20px rgba(0,0,0,.13)',
+            fontSize: 13, maxWidth: 380, minWidth: 240,
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+          }}>
+            {error ? <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} /> : <Check size={15} style={{ flexShrink: 0, marginTop: 1 }} />}
+            <span style={{ flex: 1, lineHeight: 1.5 }}>{error || success}</span>
+            <button onClick={() => { setError(''); setSuccess('') }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: .5, padding: 0, lineHeight: 1 }}>
+              <X size={13} />
+            </button>
+          </div>
+        )}
+
+        {/* ── Popup error de envío SMTP ── */}
+        {sendErrAlert && (
+          <div className="modal-overlay" onClick={() => setSendErrAlert(false)}>
+            <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
+                <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#92400e' }}>
+                  <AlertTriangle size={17} style={{ flexShrink: 0 }} /> No se pudo enviar el email
+                </div>
+                <button onClick={() => setSendErrAlert(false)}
+                  style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6, display: 'flex', alignItems: 'center', borderRadius: 6 }}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <p style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text)' }}>
+                  No hemos podido enviar el email. Posibles causas:
+                </p>
+                <ul style={{ fontSize: 13, lineHeight: 1.85, paddingLeft: 20, color: 'var(--warm-gray)', margin: 0, listStyleType: 'disc' }}>
+                  <li>Las credenciales SMTP son incorrectas (usuario, contraseña o servidor)</li>
+                  <li>El puerto o el host no coinciden con los de tu hosting</li>
+                  <li>El email de la pareja no es válido</li>
+                </ul>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-ghost" onClick={() => setSendErrAlert(false)}>Cerrar</button>
+                <a href="/perfil" className="btn btn-primary">Revisar configuración de correo</a>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="page-content">
-          {success   && <div className="alert alert-success">{success}</div>}
-          {error     && <div className="alert alert-error">{error}</div>}
+          {smtpConfigured === false && (
+            <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <AlertCircle size={15} style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: 13 }}>
+                No tienes configurado el correo de envío. Los emails de propuestas saldrán desde el servidor de Wedding Venues Spain.{' '}
+                <a href="/perfil" style={{ color: 'inherit', fontWeight: 600, textDecoration: 'underline' }}>
+                  Configurar ahora →
+                </a>
+              </span>
+            </div>
+          )}
           {limitWarn && (
             <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
               <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
@@ -669,7 +823,7 @@ function PropuestasPageContent() {
                       const atLimit = leadProposalCount !== null && leadProposalCount >= MAX_PROPOSALS_PER_LEAD
                       const linkedLeadName = leads.find(l => l.id === p.lead_id)?.name
                       return (
-                    <tr key={p.id}>
+                    <tr key={p.id} onClick={() => handleEdit(p)} style={{ cursor: 'pointer' }}>
                       <td>
                         <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
                           {p.couple_name}
@@ -719,30 +873,41 @@ function PropuestasPageContent() {
                       <td style={{ fontSize: 12, color: 'var(--warm-gray)' }}>
                         {new Date(p.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
                       </td>
-                      <td>
+                      <td onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <button className="btn btn-ghost btn-sm" onClick={() => copyUrl(p.slug)}>
+                          <button className="btn btn-ghost btn-sm" onClick={() => copyUrl(p.slug)} style={{ height: 34 }}>
                             {copied === p.slug
                               ? <><Check size={12} style={{ color: 'var(--sage)' }} /> Copiado</>
                               : <><Copy size={12} /> Copiar URL</>}
                           </button>
-                          <a href={`/proposal/${p.slug}`} target="_blank" rel="noopener" className="btn btn-ghost btn-sm" title="Ver landing">
+                          <a href={`/proposal/${p.slug}`} target="_blank" rel="noopener" className="btn btn-ghost btn-sm" title="Ver landing" style={{ height: 34, width: 34, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                             <ExternalLink size={11} />
                           </a>
                         </div>
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn btn-ghost btn-sm" onClick={() => handleEdit(p)} title="Editar">
-                            <Palette size={11} />
+                      <td onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => { if (smtpConfigured !== false && sendingId !== p.id) markSent(p) }}
+                            title={smtpConfigured === false
+                              ? 'Configura el correo de envío en Perfil → Correo para propuestas'
+                              : p.status === 'draft' ? 'Enviar propuesta' : 'Reenviar propuesta'
+                            }
+                            style={{
+                              height: 34, minWidth: 100,
+                              ...(smtpConfigured === false || sendingId === p.id
+                                ? { opacity: 0.45, cursor: 'not-allowed' }
+                                : {}),
+                            }}
+                          >
+                            {sendingId === p.id ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />} {sendingId === p.id ? 'Enviando' : p.status === 'draft' ? 'Enviar' : 'Reenviar'}
                           </button>
-                          {p.status === 'draft' && (
-                            <button className="btn btn-primary btn-sm" onClick={() => markSent(p.id)} title="Marcar como enviada">
-                              <Send size={11} /> Enviar
-                            </button>
-                          )}
-                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id)}>
-                            <X size={11} />
+                          <button className="btn btn-ghost btn-sm" onClick={() => handleEdit(p)} title="Editar propuesta" style={{ height: 34, width: 34, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Pencil size={11} />
+                          </button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id)} title="Eliminar propuesta" style={{ height: 34, width: 34, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Trash2 size={11} />
                           </button>
                         </div>
                       </td>
@@ -815,6 +980,19 @@ function PropuestasPageContent() {
                         onChange={e => setForm(f => ({ ...f, couple_name: e.target.value }))}
                         placeholder="Ej: Laura & Carlos"
                       />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Email de la pareja</label>
+                      <input
+                        className="form-input" type="email"
+                        value={form.couple_email}
+                        onChange={e => setForm(f => ({ ...f, couple_email: e.target.value }))}
+                        placeholder="Ej: laura@gmail.com"
+                        style={form.couple_email && !isValidEmail(form.couple_email) ? { borderColor: 'var(--error, #e53e3e)' } : {}}
+                      />
+                      {form.couple_email && !isValidEmail(form.couple_email) && (
+                        <div style={{ fontSize: 11, color: 'var(--error, #e53e3e)', marginTop: 4 }}>Email no válido</div>
+                      )}
                     </div>
                     <div className="form-group">
                       <label className="form-label">Nº invitados estimado</label>
@@ -966,30 +1144,20 @@ function PropuestasPageContent() {
                     {/* Logo */}
                     <div className="form-group">
                       <label className="form-label">Logo del venue</label>
-                      {form.logo_url ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <img src={form.logo_url} alt="logo" style={{ height: 36, maxWidth: 100, objectFit: 'contain', borderRadius: 4, border: '1px solid var(--border)' }} />
-                          <button className="btn btn-ghost btn-sm" onClick={() => setForm(f => ({ ...f, logo_url: null }))} title="Eliminar logo">
-                            <Trash2 size={11} />
+                      <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                        onChange={e => e.target.files?.[0] && handleLogoUpload(e.target.files[0])} />
+                      {form.logo_url && (
+                        <div style={{ marginBottom: 8, position: 'relative', display: 'inline-block' }}>
+                          <img src={form.logo_url} alt="logo" style={{ height: 64, maxWidth: 180, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--border)', background: '#f8f7f4', padding: '6px 10px', display: 'block' }} />
+                          <button onClick={() => setForm(f => ({ ...f, logo_url: null }))} title="Eliminar logo"
+                            style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#ef4444', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <X size={11} style={{ color: '#fff' }} />
                           </button>
                         </div>
-                      ) : (
-                        <>
-                          <input
-                            ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-                            onChange={e => e.target.files?.[0] && handleLogoUpload(e.target.files[0])}
-                          />
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={uploading}
-                            style={{ width: '100%', justifyContent: 'center' }}
-                          >
-                            <Upload size={12} />
-                            {uploading ? 'Subiendo...' : 'Subir logo (PNG/SVG)'}
-                          </button>
-                        </>
                       )}
+                      <button className="btn btn-ghost btn-sm" onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{ width: '100%', justifyContent: 'center' }}>
+                        <Upload size={12} /> {uploading ? 'Subiendo...' : form.logo_url ? 'Cambiar logo' : 'Subir logo (PNG/SVG)'}
+                      </button>
                     </div>
                   </div>
 
@@ -1027,21 +1195,6 @@ function PropuestasPageContent() {
                     </div>
                   </div>
 
-                  {/* Preview mini */}
-                  <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', fontSize: 11, marginTop: 8 }}>
-                    <div style={{ background: form.primary_color, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {form.logo_url
-                        ? <img src={form.logo_url} alt="" style={{ height: 18, maxWidth: 60, objectFit: 'contain' }} />
-                        : <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Tu venue</div>
-                      }
-                      <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, fontFamily: form.font_family }}>
-                        {form.couple_name || 'Nombre de la pareja'}
-                      </div>
-                    </div>
-                    <div style={{ background: 'var(--surface)', padding: '8px 14px', color: 'var(--warm-gray)', fontSize: 11 }}>
-                      Preview de la cabecera de la landing
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -1075,26 +1228,74 @@ function PropuestasPageContent() {
                     const isOn = isSectionOn(secId)
                     const isLibrary = LIBRARY_SECTIONS.includes(secId)
 
+                    const isOpen = openSecs.has(secId)
                     return (
-                      <div key={secId} style={{ ...secBox, opacity: isOn ? 1 : 0.5 }}>
+                      <div key={secId} className="sec-row" style={{ opacity: isOn ? 1 : 0.55 }}>
 
-                        {/* Section header with toggle */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: isOn ? 8 : 0 }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1 }}>
-                            <input type="checkbox" checked={isOn} onChange={e => toggleSec(secId, e.target.checked)} />
-                            <span style={{ ...secLabel, marginBottom: 0 }}>{label}</span>
-                          </label>
+                        {/* Section header */}
+                        <div
+                          className="sec-header"
+                          onClick={() => setOpenSecs(s => { const n = new Set(s); n.has(secId) ? n.delete(secId) : n.add(secId); return n })}
+                        >
+                          <div
+                            onClick={e => { e.stopPropagation(); toggleSec(secId, !isOn) }}
+                            style={{ width: 34, height: 19, borderRadius: 10, background: isOn ? 'var(--gold)' : '#d1c9b8', position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0 }}
+                          >
+                            <div style={{ position: 'absolute', top: 2, left: isOn ? 15 : 2, width: 15, height: 15, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)', flex: 1, userSelect: 'none' }}>{label}</span>
+                          <ChevronDown size={14} style={{ color: 'var(--warm-gray)', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
                         </div>
 
                         {/* Library section content — editable per proposal */}
-                        {isOn && isLibrary && (() => {
+                        {isOpen && isOn && isLibrary && (<div className="sec-open-content" style={{ padding: '12px 14px 14px' }}>{(() => {
                           const vc = venueContent
                           const chipStyle: React.CSSProperties = { fontSize: 11, color: 'var(--charcoal)', background: '#fff', border: '1px solid var(--ivory)', borderRadius: 6, padding: '3px 9px' }
                           const emptyHint = (msg: string) => <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic' }}>{msg}</div>
 
                           // Static sections — no editing
-                          if (secId === 'hero')    return <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Foto principal del venue</div>
-                          if (secId === 'gallery') return <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Galería de fotos del venue</div>
+                          if (secId === 'hero') return (
+                            <div>
+                              <input ref={heroInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                                onChange={e => e.target.files?.[0] && handleHeroUpload(e.target.files[0])} />
+                              {sections.hero_image_url && (
+                                <div style={{ marginBottom: 8, position: 'relative', display: 'inline-block' }}>
+                                  <img src={sections.hero_image_url} alt="hero" style={{ width: '100%', maxWidth: 340, height: 120, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', display: 'block' }} />
+                                  <button onClick={() => setSections(s => ({ ...s, hero_image_url: undefined }))} title="Eliminar imagen"
+                                    style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#ef4444', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <X size={11} style={{ color: '#fff' }} />
+                                  </button>
+                                </div>
+                              )}
+                              <button className="btn btn-ghost btn-sm" onClick={() => heroInputRef.current?.click()} disabled={uploadingHero}
+                                style={{ width: '100%', justifyContent: 'center' }}>
+                                <Upload size={12} /> {uploadingHero ? 'Subiendo...' : sections.hero_image_url ? 'Cambiar imagen' : 'Subir foto principal'}
+                              </button>
+                            </div>
+                          )
+                          if (secId === 'gallery') return (
+                            <div>
+                              <input ref={galleryInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+                                onChange={e => e.target.files?.length && handleGalleryUpload(e.target.files)} />
+                              {(sections.gallery_urls ?? []).length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                                  {(sections.gallery_urls ?? []).map((url, i) => (
+                                    <div key={i} style={{ position: 'relative' }}>
+                                      <img src={url} alt="" style={{ width: 72, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', display: 'block' }} />
+                                      <button onClick={() => setSections(s => ({ ...s, gallery_urls: (s.gallery_urls ?? []).filter((_, idx) => idx !== i) }))}
+                                        style={{ position: 'absolute', top: -5, right: -5, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <X size={9} style={{ color: '#fff' }} />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <button className="btn btn-ghost btn-sm" onClick={() => galleryInputRef.current?.click()} disabled={uploadingGallery}
+                                style={{ width: '100%', justifyContent: 'center' }}>
+                                <Upload size={12} /> {uploadingGallery ? 'Subiendo...' : 'Añadir fotos'}
+                              </button>
+                            </div>
+                          )
                           if (secId === 'cta')     return <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Botón de reserva al final de la propuesta</div>
                           if (secId === 'contact') return <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Datos de contacto del venue</div>
 
@@ -1392,10 +1593,12 @@ function PropuestasPageContent() {
                           }
 
                           return null
-                        })()}
+                        })()}</div>)}
 
                         {/* Per-section content editors (only if on and not a library section) */}
-                        {isOn && secId === 'video' && (
+                        {!isLibrary && isOpen && (
+                        <div className="sec-open-content" style={{ padding: '12px 14px 14px' }}>
+                        {isOpen && isOn && secId === 'video' && (
                           <div className="two-col">
                             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                               <label className="form-label">URL del vídeo (YouTube o Vimeo)</label>
@@ -1408,14 +1611,14 @@ function PropuestasPageContent() {
                           </div>
                         )}
 
-                        {isOn && secId === 'welcome' && (
+                        {isOpen && isOn && secId === 'welcome' && (
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label className="form-label">Mensaje personalizado para esta pareja</label>
                             <textarea className="form-textarea" style={{ minHeight: 80 }} value={form.personal_message ?? ''} onChange={e => setForm(f => ({ ...f, personal_message: e.target.value }))} placeholder="Escribe aquí el mensaje de bienvenida para esta pareja..." />
                           </div>
                         )}
 
-                        {isOn && secId === 'techspecs' && (
+                        {isOpen && isOn && secId === 'techspecs' && (
                           <div className="two-col">
                             {([['sqm','Superficie (m²)','800 m²'],['ceiling','Altura techo','6 m'],['parking','Parking','200 plazas'],['accessibility','Accesibilidad','Acceso silla de ruedas'],['ceremony_spaces','Espacios ceremonia','Jardín, capilla'],['extra','Otros datos','Generador propio']] as [string,string,string][]).map(([key,lbl,ph]) => (
                               <div className="form-group" key={key}>
@@ -1426,7 +1629,7 @@ function PropuestasPageContent() {
                           </div>
                         )}
 
-                        {isOn && secId === 'accommodation' && (
+                        {isOpen && isOn && secId === 'accommodation' && (
                           <div className="two-col">
                             {([['rooms','Habitaciones','20 habitaciones'],['description','Descripción','Descripción del alojamiento'],['price_info','Info de precio','Desde 120€/noche'],['nearby','Alojamiento cercano','Hotel a 5 min']] as [string,string,string][]).map(([key,lbl,ph]) => (
                               <div className="form-group" key={key}>
@@ -1437,7 +1640,7 @@ function PropuestasPageContent() {
                           </div>
                         )}
 
-                        {isOn && secId === 'map' && (
+                        {isOpen && isOn && secId === 'map' && (
                           <div className="two-col">
                             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                               <label className="form-label">URL embed del mapa (Google Maps)</label>
@@ -1454,7 +1657,7 @@ function PropuestasPageContent() {
                           </div>
                         )}
 
-                        {isOn && secId === 'testimonials' && (
+                        {isOpen && isOn && secId === 'testimonials' && (
                           <div>
                             {(sections.testimonials ?? []).map((item, i) => (
                               <div key={i} style={itemCard}>
@@ -1470,14 +1673,14 @@ function PropuestasPageContent() {
                           </div>
                         )}
 
-                        {isOn && secId === 'chat' && (
+                        {isOpen && isOn && secId === 'chat' && (
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label className="form-label">Texto introductorio del formulario</label>
                             <input className="form-input" value={sections.chat_intro ?? ''} onChange={e => setSections(s => ({ ...s, chat_intro: e.target.value }))} placeholder="¿Tienes alguna pregunta? Escríbenos..." />
                           </div>
                         )}
 
-                        {isOn && secId === 'nextsteps' && (
+                        {isOpen && isOn && secId === 'nextsteps' && (
                           <div>
                             {(sections.nextsteps ?? []).map((item, i) => (
                               <div key={i} style={itemCard}>
@@ -1493,7 +1696,7 @@ function PropuestasPageContent() {
                           </div>
                         )}
 
-                        {isOn && secId === 'timeline' && (
+                        {isOpen && isOn && secId === 'timeline' && (
                           <div>
                             <div className="form-group">
                               <label className="form-label">Introducción (opcional)</label>
@@ -1513,12 +1716,13 @@ function PropuestasPageContent() {
                           </div>
                         )}
 
-                        {isOn && secId === 'availability' && (
+                        {isOpen && isOn && secId === 'availability' && (
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label className="form-label">Mensaje de disponibilidad</label>
                             <textarea className="form-textarea" style={{ minHeight: 70 }} value={sections.availability_message ?? ''} onChange={e => setSections(s => ({ ...s, availability_message: e.target.value }))} placeholder="Ej: Actualmente tenemos disponibilidad para los meses de..." />
                           </div>
                         )}
+                        </div>)}
 
                       </div>
                     )
@@ -1535,6 +1739,46 @@ function PropuestasPageContent() {
               <button className="btn btn-ghost" onClick={closeModal}>Cancelar</button>
               <button className="btn btn-primary" onClick={handleSave} disabled={saving || uploading}>
                 {saving ? 'Guardando...' : editingId ? 'Guardar cambios' : 'Crear propuesta →'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: enviar sin email ── */}
+      {sendModal && (
+        <div className="modal-overlay" onClick={() => setSendModal(null)}>
+          <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">Enviar propuesta</div>
+              <div className="modal-sub">La propuesta de <strong>{sendModal.couple_name}</strong> no tiene email guardado.</div>
+            </div>
+            <div className="modal-body">
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Email de la pareja</label>
+                <input
+                  className="form-input"
+                  type="email"
+                  autoFocus
+                  value={sendEmail}
+                  onChange={e => setSendEmail(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && isValidEmail(sendEmail) && doSend(sendModal.id, sendEmail)}
+                  placeholder="pareja@email.com"
+                  style={sendEmail && !isValidEmail(sendEmail) ? { borderColor: 'var(--error, #e53e3e)' } : {}}
+                />
+                {sendEmail && !isValidEmail(sendEmail) && (
+                  <div style={{ fontSize: 11, color: 'var(--error, #e53e3e)', marginTop: 4 }}>Email no válido</div>
+                )}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setSendModal(null)}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                disabled={!isValidEmail(sendEmail) || sendingId === sendModal.id}
+                onClick={() => doSend(sendModal.id, sendEmail)}
+              >
+                {sendingId === sendModal.id ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} {sendingId === sendModal.id ? 'Enviando…' : 'Enviar propuesta'}
               </button>
             </div>
           </div>

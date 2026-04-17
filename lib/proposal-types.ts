@@ -18,6 +18,9 @@ export type SectionsData = {
   menu_prices_override?:    Array<{ name: string; price_per_person: string; description?: string; min_guests?: number }> | null
   experience_override?:     { title: string; body: string } | null
   testimonials_override?:   Array<{ couple_name?: string; names?: string; wedding_date?: string; date?: string; text: string; rating?: number; photo_url?: string }> | null
+  // Per-proposal image overrides
+  hero_image_url?: string
+  gallery_urls?: string[]
   // Visual template selection (1–5)
   visual_template_id?: number
   // Legacy fields used by propuestas/page.tsx

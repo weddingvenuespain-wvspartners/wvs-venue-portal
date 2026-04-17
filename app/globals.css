@@ -320,3 +320,35 @@ table.data-table tr:hover td { background: #fafaf9; }
   border-color: #6b4f1a;
   color: var(--charcoal);
 }
+
+/* ── Section dropdowns (propuestas modal) ── */
+@keyframes secOpen {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: none; }
+}
+.sec-row {
+  border: 1px solid var(--ivory);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: border-color .15s;
+}
+.sec-row:hover {
+  border-color: #c5bba8;
+}
+.sec-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 11px 14px;
+  transition: background .15s;
+  user-select: none;
+}
+.sec-header:hover {
+  background: var(--cream);
+}
+.sec-open-content {
+  animation: secOpen .28s ease;
+  border-top: 1px solid var(--ivory);
+}

@@ -13,7 +13,7 @@ import {
   Star, Zap, Clock, Receipt, LogOut, Globe, HelpCircle,
   Download, Shield, BarChart2, Mail, ExternalLink,
   ChevronRight, AlertTriangle, Database, FileText,
-  CircleCheckBig, BookOpen, Video, MessageCircle,
+  CircleCheckBig, BookOpen, Video, MessageCircle, Info, Loader2,
 } from 'lucide-react'
 
 type Section = 'perfil' | 'seguridad' | 'preferencias' | 'privacidad' | 'plan' | 'facturacion' | 'notificaciones' | 'soporte'
@@ -168,6 +168,15 @@ function PerfilPageContent() {
     marketing:      false,
   })
 
+  // SMTP
+  const [smtpFromEmail,   setSmtpFromEmail]   = useState('')
+  const [smtpHost,        setSmtpHost]        = useState('')
+  const [smtpPort,        setSmtpPort]        = useState('465')
+  const [smtpUser,        setSmtpUser]        = useState('')
+  const [smtpPass,        setSmtpPass]        = useState('')
+  const [showSmtpPass,    setShowSmtpPass]    = useState(false)
+  const [smtpSaving,      setSmtpSaving]      = useState(false)
+
   // Billing
   const [payments, setPayments]           = useState<PaymentEvent[]>([])
   const [paymentsLoaded, setPaymentsLoaded] = useState(false)
@@ -215,6 +224,18 @@ function PerfilPageContent() {
     setLoading(false)
 
     const supabase = createClient()
+    supabase.from('venue_onboarding')
+      .select('name, smtp_from_email, smtp_host, smtp_port, smtp_user, smtp_pass')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return
+        if (data.smtp_from_email) setSmtpFromEmail(data.smtp_from_email)
+        if (data.smtp_host)       setSmtpHost(data.smtp_host)
+        if (data.smtp_port)       setSmtpPort(String(data.smtp_port))
+        if (data.smtp_user)       setSmtpUser(data.smtp_user)
+        if (data.smtp_pass)       setSmtpPass(data.smtp_pass)
+      })
     supabase.from('venue_payment_history').select('*').eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .then(({ data }) => { if (data) setPayments(data); setPaymentsLoaded(true) })
@@ -314,6 +335,21 @@ function PerfilPageContent() {
       setTimeout(() => setPassSuccess(false), 5000)
     }
     setSaving(false)
+  }
+
+  const handleSaveSmtp = async () => {
+    setSmtpSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from('venue_onboarding').update({
+      smtp_from_email: smtpFromEmail || null,
+      smtp_host:       smtpHost        || null,
+      smtp_port:       smtpPort        ? parseInt(smtpPort) : null,
+      smtp_user:       smtpUser        || null,
+      smtp_pass:       smtpPass        || null,
+    }).eq('user_id', user!.id)
+    if (error) notify('Error al guardar la configuración de email', true)
+    else notify('Configuración de email guardada')
+    setSmtpSaving(false)
   }
 
   const handleSavePreferences = async () => {
@@ -624,6 +660,98 @@ function PerfilPageContent() {
                         </span>
                       )}
                     </div>
+                  </Section>
+
+                  <Section title="Correo para propuestas" description="Los emails de propuestas se enviarán desde esta cuenta. Sin configurar, se usa el servidor de Wedding Venues Spain.">
+                    <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)', marginBottom: 16, fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.6 }}>
+                      El nombre del remitente se toma automáticamente del campo <strong>Nombre del venue</strong> en <a href="/ficha" style={{ color: 'var(--gold)' }}>Mi ficha</a>.
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Email de envío (From)</label>
+                      <input
+                        className="form-input" type="email"
+                        value={smtpFromEmail}
+                        onChange={e => setSmtpFromEmail(e.target.value)}
+                        placeholder="eventos@tuvenue.com"
+                        style={smtpFromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(smtpFromEmail) ? { borderColor: 'var(--error, #e53e3e)' } : {}}
+                      />
+                      {smtpFromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(smtpFromEmail)
+                        ? <div style={{ fontSize: 11, color: 'var(--error, #e53e3e)', marginTop: 4 }}>Email no válido</div>
+                        : <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4 }}>La pareja verá este email como remitente.</div>
+                      }
+                    </div>
+                    <div className="two-col">
+                      <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          Servidor SMTP
+                          <span title="Dirección del servidor de correo saliente. Lo encuentras en el cPanel de tu hosting. Suele ser mail.tudominio.com" style={{ cursor: 'help', color: 'var(--warm-gray)', display: 'flex' }}>
+                            <Info size={12} />
+                          </span>
+                        </label>
+                        <input
+                          className="form-input"
+                          value={smtpHost}
+                          onChange={e => setSmtpHost(e.target.value)}
+                          placeholder="mail.tuvenue.com"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          Puerto
+                          <span title="465 usa SSL (recomendado). 587 usa TLS. Consulta tu hosting si no sabes cuál usar." style={{ cursor: 'help', color: 'var(--warm-gray)', display: 'flex' }}>
+                            <Info size={12} />
+                          </span>
+                        </label>
+                        <input
+                          className="form-input" type="number"
+                          value={smtpPort}
+                          onChange={e => setSmtpPort(e.target.value)}
+                          placeholder="465"
+                        />
+                      </div>
+                    </div>
+                    <div className="two-col">
+                      <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          Usuario
+                          <span title="Normalmente es el mismo email completo: eventos@tuvenue.com" style={{ cursor: 'help', color: 'var(--warm-gray)', display: 'flex' }}>
+                            <Info size={12} />
+                          </span>
+                        </label>
+                        <input
+                          className="form-input"
+                          value={smtpUser}
+                          onChange={e => setSmtpUser(e.target.value)}
+                          placeholder="eventos@tuvenue.com"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Contraseña</label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            className="form-input"
+                            type={showSmtpPass ? 'text' : 'password'}
+                            value={smtpPass}
+                            onChange={e => setSmtpPass(e.target.value)}
+                            placeholder="••••••••"
+                            style={{ paddingRight: 40 }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSmtpPass(v => !v)}
+                            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 0 }}
+                          >
+                            {showSmtpPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)', marginBottom: 16, fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.6 }}>
+                      Puedes encontrar estos datos en el cPanel de tu hosting, en la sección <strong>Cuentas de correo</strong>.
+                    </div>
+                    <button className="btn btn-primary" onClick={handleSaveSmtp} disabled={smtpSaving} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center', minWidth: 160 }}>
+                      {smtpSaving ? <><Loader2 size={14} className="animate-spin" /> Guardando…</> : 'Guardar configuración'}
+                    </button>
                   </Section>
                 </>
               )}

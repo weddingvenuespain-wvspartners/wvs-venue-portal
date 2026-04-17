@@ -10,6 +10,127 @@ const transporter = nodemailer.createTransport({
   },
 })
 
+type SmtpConfig = {
+  host: string
+  port: number
+  user: string
+  pass: string
+  fromEmail: string
+}
+
+export async function sendProposalEmail({
+  to,
+  coupleName,
+  venueName,
+  venueEmail,
+  proposalUrl,
+  logoUrl,
+  primaryColor,
+  smtpConfig,
+}: {
+  to: string
+  coupleName: string
+  venueName: string
+  venueEmail?: string | null
+  proposalUrl: string
+  logoUrl?: string | null
+  primaryColor?: string | null
+  smtpConfig?: SmtpConfig | null
+}) {
+  const color = primaryColor || '#2d4a7a'
+
+  // Usar SMTP del venue si está configurado, si no el de la plataforma
+  const activeTransporter = smtpConfig
+    ? nodemailer.createTransport({
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.port === 465,
+        auth: { user: smtpConfig.user, pass: smtpConfig.pass },
+        connectionTimeout: 10_000,
+        greetingTimeout:   10_000,
+        socketTimeout:     15_000,
+      })
+    : transporter
+
+  const fromAddress = smtpConfig
+    ? `"${venueName}" <${smtpConfig.fromEmail}>`
+    : `"${venueName}" <noreply@weddingvenuesspain.com>`
+
+  await activeTransporter.sendMail({
+    from: fromAddress,
+    ...(!smtpConfig && venueEmail ? { replyTo: `"${venueName}" <${venueEmail}>` } : {}),
+    to,
+    subject: `${coupleName} — Tu propuesta de boda en ${venueName}`,
+    html: `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#F5F3ED;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F3ED;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+
+        <tr>
+          <td align="center" style="padding-bottom:28px;">
+            ${logoUrl
+              ? `<img src="${logoUrl}" alt="${venueName}" style="height:40px;display:block;">`
+              : `<span style="font-size:18px;font-weight:700;color:#453D23;letter-spacing:-0.3px;">${venueName}</span>`
+            }
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:44px 40px;box-shadow:0 2px 16px rgba(69,61,35,0.08);">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding-bottom:20px;">
+                  <h1 style="margin:0;font-size:22px;font-weight:700;color:#453D23;letter-spacing:-0.3px;">
+                    Hola, ${coupleName} 💌
+                  </h1>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding-bottom:32px;">
+                  <p style="margin:0;font-size:15px;color:#796F4E;line-height:1.7;">
+                    Hemos preparado una propuesta personalizada para vuestra boda en
+                    <strong style="color:#453D23;">${venueName}</strong>.
+                    Aquí podéis ver todos los detalles, paquetes y opciones que hemos pensado para vosotros.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding-bottom:36px;">
+                  <a href="${proposalUrl}"
+                    style="display:inline-block;background:${color};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:16px 44px;border-radius:10px;letter-spacing:0.2px;">
+                    Ver mi propuesta →
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding-bottom:24px;">
+                  <p style="margin:0;font-size:13px;color:#9A8F78;line-height:1.6;text-align:center;">
+                    ¿El botón no funciona? <a href="${proposalUrl}" style="color:#796F4E;">Haz click en este enlace</a>
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-top:1px solid #F0EDE6;padding-top:24px;">
+                  <p style="margin:0;font-size:12px;color:#9A8F78;text-align:center;line-height:1.6;">
+                    Este email ha sido enviado desde el portal de ${venueName}<br>a través de Wedding Venues Spain.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+  })
+}
+
 export async function sendActivationEmail(to: string, venueName: string) {
   const portalUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.weddingvenuesspain.com'
 
