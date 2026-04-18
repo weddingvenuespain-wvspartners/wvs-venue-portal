@@ -1906,7 +1906,7 @@ function ProposalTab({ templates, userId, content, onRefresh }: {
               <div style={{ padding: '12px 16px', background: '#fef9ec', border: '1px solid #fde68a', borderRadius: 10, fontSize: 12, color: 'var(--espresso)' }}>
                 <strong>💡 Ver propuesta real</strong><br />
                 <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Ve a </span>
-                <a href="/propuestas" target="_blank" style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 600 }}>Propuestas →</a>
+                <a href="/proposals" target="_blank" style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 600 }}>Propuestas →</a>
                 <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}> abre cualquier propuesta con el icono 🔗 para ver la landing en vivo.</span>
               </div>
 

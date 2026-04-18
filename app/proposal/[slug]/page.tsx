@@ -106,8 +106,10 @@ export async function generateMetadata(
 
 // ─── Page (Server Component) ──────────────────────────────────────────────────
 
-export default async function ProposalPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ProposalPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: Promise<{ preview?: string }> }) {
   const { slug } = await params
+  const sp = searchParams ? await searchParams : {}
+  const preview = sp?.preview === '1'
   const supabase = await createPublicClient()
 
   // 1. Obtener propuesta
@@ -175,5 +177,5 @@ export default async function ProposalPage({ params }: { params: Promise<{ slug:
     venueContent,
   }
 
-  return <ProposalLanding data={proposalData} />
+  return <ProposalLanding data={proposalData} preview={preview} />
 }

@@ -2898,7 +2898,7 @@ function EnSeguimientoBtn({ lead, canProposal, onDateConfirm }: {
             <ChevronRight size={11} /> Mover a en seguimiento
           </button>
           {canProposal
-            ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} className="qa qa-ghost"
+            ? <a href={`/proposals/new?lead_id=${lead.id}`} className="qa qa-ghost"
                 style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
                 onClick={() => setOpen(false)}>
                 <Zap size={11} /> PDF digital
@@ -2935,7 +2935,7 @@ function PresupuestoBtn({ lead, canProposal, onMove }: {
             <ChevronRight size={11} /> Mover a presupuesto
           </button>
           {canProposal
-            ? <a href={`/propuestas?lead_id=${lead.id}&create=1`} className="qa qa-ghost"
+            ? <a href={`/proposals/new?lead_id=${lead.id}`} className="qa qa-ghost"
                 style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
                 onClick={() => setOpen(false)}>
                 <Zap size={11} /> Presupuesto digital
@@ -3017,7 +3017,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
 
       {tab === 'confirmed' && (<>
         {canProposal
-          ? <a href="/propuestas" className="qa qa-ghost"><ExternalLink size={11} /> Propuesta</a>
+          ? <a href="/proposals" className="qa qa-ghost"><ExternalLink size={11} /> Propuesta</a>
           : <LockedProposalBtn label="Propuesta" />}
         <button className="qa qa-ghost" onClick={() => onEdit(lead)}><Edit2 size={11} /> Editar</button>
         <button className="qa qa-danger" onClick={() => onMove(lead.id, 'lost')}>Cancelar boda</button>
@@ -3238,7 +3238,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {canProposal ? (
-              <a href={`/propuestas?lead_id=${lead.id}&create=1`}
+              <a href={`/proposals/new?lead_id=${lead.id}`}
                 style={{ flex: 1, fontSize: 12, padding: '8px', borderRadius: 6, border: '1px solid var(--gold)', color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 500 }}>
                 <FileText size={12} /> Crear propuesta
               </a>

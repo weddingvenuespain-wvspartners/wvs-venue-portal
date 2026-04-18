@@ -1448,7 +1448,7 @@ function DayModal({
                       <a href="/leads" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                         <User size={12} /> Ver lead
                       </a>
-                      <a href="/propuestas" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                      <a href="/proposals" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                         <FileText size={12} /> Propuesta
                       </a>
                       <button onClick={() => setShowCancelWedding(true)}
@@ -1956,7 +1956,7 @@ function DayModal({
               <a href="/leads" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                 <User size={12} /> Ver lead completo
               </a>
-              <a href="/propuestas" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <a href="/proposals" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                 <FileText size={12} /> Crear propuesta
               </a>
             </div>
@@ -1994,7 +1994,7 @@ function DayModal({
                       <a href="/leads" style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
                         <User size={10} /> Ver lead
                       </a>
-                      <a href="/propuestas" style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <a href="/proposals" style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
                         <FileText size={10} /> Nueva propuesta
                       </a>
                       <button
