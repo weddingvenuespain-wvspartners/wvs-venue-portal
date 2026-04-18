@@ -189,10 +189,19 @@ table.data-table tr:hover td { background: #fafaf9; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 24px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 440px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; box-shadow: 0 24px 80px rgba(0,0,0,0.22); overflow: hidden; }
 .modal-header { flex-shrink: 0; padding: 24px 28px 16px; border-bottom: 1px solid var(--ivory); }
-.modal-body { flex: 1; overflow-y: auto; padding: 20px 28px; scrollbar-width: thin; scrollbar-color: var(--ivory) transparent; }
+.modal-body { flex: 1; overflow-y: auto; padding: 20px 28px; scrollbar-width: thin; scrollbar-color: var(--gold-light) transparent; }
 .modal-footer { flex-shrink: 0; padding: 16px 28px; border-top: 1px solid var(--ivory); display: flex; gap: 10px; justify-content: flex-end; }
 .modal-title { font-family: 'Manrope', sans-serif; font-size: 20px; color: var(--espresso); margin-bottom: 4px; }
 .modal-sub { font-size: 12px; color: var(--warm-gray); margin-bottom: 0; }
+
+/* ── Custom scrollbar — todos los elementos scrollables ─── */
+*::-webkit-scrollbar               { width: 5px; height: 5px; }
+*::-webkit-scrollbar-track         { background: transparent; }
+*::-webkit-scrollbar-thumb         { background: var(--gold-light); border-radius: 99px; }
+*::-webkit-scrollbar-thumb:hover   { background: var(--gold); }
+*::-webkit-scrollbar-corner        { background: transparent; }
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: var(--gold-light) transparent; }
 
 /* ── Rich text editor content styles ───────────────────────────────────────── */
 [contenteditable] p { margin: 0 0 4px 0; }
@@ -206,6 +215,9 @@ table.data-table tr:hover td { background: #fafaf9; }
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* ── Spinner ─────────────────────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Ficha tabs ───────────────────────────────────────────────────────────── */
 .ficha-tab { position: relative; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; border: none; transition: background 0.15s, color 0.15s; font-family: 'Manrope', sans-serif; display: inline-flex; align-items: center; gap: 5px; background: transparent; color: var(--warm-gray); font-weight: 500; }

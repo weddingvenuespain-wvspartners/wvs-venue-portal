@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import {
   ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
-  FileText, Calendar, Search, AlertCircle, Settings, Info, Trash2, RotateCcw, Flower2
+  FileText, Calendar, Search, AlertCircle, Settings, Info, Trash2, RotateCcw, Flower2, Edit2,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -39,6 +39,8 @@ type Lead = {
   budget?: string
   ceremony_type?: string
   visit_date?: string
+  visit_time?: string
+  visit_duration?: number
   notes?: string
 }
 
@@ -211,7 +213,7 @@ export default function CalendarioPage() {
 
     const [entriesRes, leadsRes, settingsRes] = await Promise.all([
       supabase.from('calendar_entries').select('*').eq('user_id', user!.id).gte('date', from).lte('date', to),
-      supabase.from('leads').select('id,name,email,phone,whatsapp,wedding_date,wedding_date_to,wedding_date_ranges,date_flexibility,wedding_year,wedding_month,guests,status,budget,ceremony_type,visit_date,notes').eq('user_id', user!.id).order('wedding_date', { ascending: true }),
+      supabase.from('leads').select('id,name,email,phone,whatsapp,wedding_date,wedding_date_to,wedding_date_ranges,date_flexibility,wedding_year,wedding_month,guests,status,budget,ceremony_type,visit_date,visit_time,visit_duration,notes').eq('user_id', user!.id).order('wedding_date', { ascending: true }),
       supabase.from('venue_settings').select('date_rules').eq('user_id', user!.id).maybeSingle(),
     ])
 
@@ -811,17 +813,22 @@ export default function CalendarioPage() {
                                 )}
                               </div>
                             )}
-                            {matchesFilter && hasVisits && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} title={`Visita: ${visitLeads.map(v => v.name).join(', ')}`} />
-                                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#059669', whiteSpace: 'nowrap' }}>
-                                  Visita
-                                </span>
-                                {visitLeads.length > 1 && (
-                                  <span style={{ fontSize: 8, color: '#10b981', fontWeight: 700 }}>+{visitLeads.length}</span>
-                                )}
-                              </div>
-                            )}
+                            {matchesFilter && hasVisits && (() => {
+                              const sorted = [...visitLeads].sort((a: any, b: any) => ((a as any).visit_time || 'zz').localeCompare((b as any).visit_time || 'zz'))
+                              const firstTime = (sorted[0] as any).visit_time as string | undefined
+                              const tipParts = sorted.map((v: any) => `${v.name}${v.visit_time ? ' · ' + v.visit_time : ''}`).join(' · ')
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={`Visita: ${tipParts}`}>
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
+                                  <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#059669', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                                    {firstTime ? `Visita ${firstTime}` : 'Visita'}
+                                  </span>
+                                  {visitLeads.length > 1 && (
+                                    <span style={{ fontSize: 8, color: '#10b981', fontWeight: 700 }}>+{visitLeads.length - 1}</span>
+                                  )}
+                                </div>
+                              )
+                            })()}
                             {(!status || status === 'libre') && !hasVisits ? (
                               <>
                                 {hasUnlinkedLeads && (
@@ -1645,21 +1652,70 @@ function DayModal({
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
                 Visitas programadas
               </div>
-              {visitsOnDate.map(l => {
+              {[...visitsOnDate].sort((a, b) => (a.visit_time || 'zz').localeCompare(b.visit_time || 'zz')).map(l => {
                 const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
+                const dur = l.visit_duration || 60
+                let endTime: string | null = null
+                if (l.visit_time) {
+                  const [h, m] = l.visit_time.split(':').map(Number)
+                  if (!isNaN(h) && !isNaN(m)) {
+                    const total = h * 60 + m + dur
+                    endTime = `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+                  }
+                }
                 return (
-                  <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 8, marginBottom: 6 }}>
-                    <Calendar size={14} style={{ color: '#10b981', flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#065f46' }}>{l.name}</div>
-                      <div style={{ fontSize: 11, color: '#059669' }}>
-                        {l.guests ? `${l.guests} inv.` : ''}
-                        {l.guests && (l.budget && l.budget !== 'sin_definir') ? ' · ' : ''}
-                        {l.budget && l.budget !== 'sin_definir' ? BUDGET_LABEL[l.budget] || l.budget : ''}
-                        {l.wedding_date ? ` · Boda: ${new Date(l.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
-                      </div>
+                  <div key={l.id} style={{ display: 'flex', alignItems: 'stretch', gap: 0, padding: 0, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
+                    {/* Time block */}
+                    <div style={{
+                      width: 64, flexShrink: 0,
+                      background: l.visit_time ? '#10b981' : 'rgba(16,185,129,0.18)',
+                      color: l.visit_time ? '#fff' : '#047857',
+                      display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center',
+                      padding: '8px 4px',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}>
+                      {l.visit_time ? (
+                        <>
+                          <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1, fontFamily: 'Manrope, sans-serif' }}>{l.visit_time}</div>
+                          {endTime && (
+                            <div style={{ fontSize: 9, fontWeight: 500, opacity: 0.85, marginTop: 3, lineHeight: 1 }}>– {endTime}</div>
+                          )}
+                          <div style={{ fontSize: 8, fontWeight: 600, opacity: 0.85, marginTop: 4, letterSpacing: '0.05em' }}>{dur} MIN</div>
+                        </>
+                      ) : (
+                        <>
+                          <Calendar size={16} />
+                          <div style={{ fontSize: 8, fontWeight: 700, marginTop: 4, letterSpacing: '0.05em' }}>SIN HORA</div>
+                        </>
+                      )}
                     </div>
-                    <span style={{ fontSize: 11, color: st.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{st.label}</span>
+                    {/* Details */}
+                    <div style={{ flex: 1, minWidth: 0, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#065f46' }}>{l.name}</div>
+                        <div style={{ fontSize: 11, color: '#059669' }}>
+                          {l.guests ? `${l.guests} inv.` : ''}
+                          {l.guests && (l.budget && l.budget !== 'sin_definir') ? ' · ' : ''}
+                          {l.budget && l.budget !== 'sin_definir' ? BUDGET_LABEL[l.budget] || l.budget : ''}
+                          {l.wedding_date ? ` · Boda: ${new Date(l.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 11, color: st.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{st.label}</span>
+                      <a
+                        href={`/leads?openVisit=${l.id}`}
+                        title="Editar visita"
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '5px 10px', borderRadius: 6,
+                          background: '#10b981', color: '#fff',
+                          textDecoration: 'none', fontSize: 11, fontWeight: 600,
+                          whiteSpace: 'nowrap', flexShrink: 0,
+                        }}
+                      >
+                        <Edit2 size={11} /> Editar
+                      </a>
+                    </div>
                   </div>
                 )
               })}
