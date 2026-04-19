@@ -364,3 +364,56 @@ table.data-table tr:hover td { background: #fafaf9; }
   animation: secOpen .28s ease;
   border-top: 1px solid var(--ivory);
 }
+
+/* ── Starter template picker cards ── */
+.starter-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  transition: border-color .2s, background .2s, transform .2s, box-shadow .2s;
+}
+.starter-card:hover {
+  border-color: var(--gold);
+  background: var(--cream);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(196,151,90,.14);
+}
+.starter-card:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(196,151,90,.12); }
+.starter-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--gold);
+  transition: background .2s, color .2s;
+}
+.starter-card:hover .starter-card-icon {
+  background: var(--gold);
+  color: #fff;
+}
+.starter-card-arrow {
+  flex-shrink: 0;
+  font-size: 18px;
+  color: var(--warm-gray);
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity .2s, transform .2s, color .2s;
+  padding-left: 8px;
+}
+.starter-card:hover .starter-card-arrow {
+  opacity: 1;
+  transform: translateX(0);
+  color: var(--gold);
+}

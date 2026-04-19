@@ -5,6 +5,7 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { Loader2, AlertCircle } from 'lucide-react'
+import { getStarterTemplate } from '@/lib/proposal-starter-templates'
 
 const MAX_PROPOSALS_PER_LEAD = 6
 
@@ -28,13 +29,15 @@ function NuevaPropuestaContent() {
     if (!user) { router.push('/login'); return }
 
     const leadId = searchParams.get('lead_id')
+    const starter = getStarterTemplate(searchParams.get('template'))
+
     const createDraft = async () => {
       const supabase = createClient()
 
-      // If a lead is linked, enforce max proposals per lead
-      let coupleName = 'Nueva propuesta'
+      // If a lead is linked, enforce max proposals per lead and pre-fill couple data
+      let coupleName = starter?.couple_name ?? 'Nueva propuesta'
       let coupleEmail: string | null = null
-      let guestCount: number | null = null
+      let guestCount: number | null = starter?.guest_count ?? null
 
       if (leadId) {
         const { count } = await supabase
@@ -53,13 +56,14 @@ function NuevaPropuestaContent() {
           .eq('user_id', user.id)
           .maybeSingle()
         if (lead) {
+          // Lead data siempre prevalece sobre el starter
           coupleName = lead.name ?? coupleName
           coupleEmail = lead.email ?? null
-          guestCount = lead.guests ?? null
+          guestCount = lead.guests ?? guestCount
         }
       }
 
-      // Get default template
+      // Get default web template (for the visual layout / template_id)
       const { data: defTpl } = await supabase
         .from('proposal_web_templates')
         .select('id')
@@ -76,10 +80,12 @@ function NuevaPropuestaContent() {
         guest_count: guestCount,
         lead_id: leadId || null,
         status: 'draft',
-        show_availability: true,
-        show_price_estimate: true,
-        sections_data: { visual_template_id: 1 },
+        show_availability: starter?.show_availability ?? true,
+        show_price_estimate: starter?.show_price_estimate ?? true,
+        sections_data: starter?.sections_data ?? { visual_template_id: 1 },
         template_id: defTpl?.id ?? null,
+        ...(starter?.personal_message ? { personal_message: starter.personal_message } : {}),
+        ...(starter?.price_estimate ? { price_estimate: starter.price_estimate } : {}),
       }
 
       let { data, error: insErr } = await supabase.from('proposals').insert(payload).select().single()
@@ -92,6 +98,18 @@ function NuevaPropuestaContent() {
       if (insErr || !data) {
         setError(`No se pudo crear la propuesta: ${insErr?.message ?? 'desconocido'}`)
         return
+      }
+
+      // Seed branding from starter when present (only if no row yet for this proposal)
+      if (starter?.branding) {
+        try {
+          await supabase.from('proposal_branding').upsert({
+            proposal_id: data.id,
+            user_id: user.id,
+            primary_color: starter.branding.primary_color,
+            font_family: starter.branding.font_family,
+          }, { onConflict: 'proposal_id' })
+        } catch { /* noop — branding is optional */ }
       }
 
       router.replace(`/proposals/${data.id}/edit`)

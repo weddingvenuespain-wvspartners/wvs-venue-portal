@@ -5,8 +5,14 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Lock, Loader2 } from 'lucide-react'
+import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Lock, Loader2, FileText, Building2, UtensilsCrossed, type LucideIcon } from 'lucide-react'
 import { usePlanFeatures } from '@/lib/use-plan-features'
+import { STARTER_TEMPLATES, type StarterTemplateId, type StarterTemplateIcon } from '@/lib/proposal-starter-templates'
+
+const STARTER_ICON: Record<StarterTemplateIcon, LucideIcon> = {
+  'building-2': Building2,
+  'utensils-crossed': UtensilsCrossed,
+}
 
 const MAX_PROPOSALS_PER_LEAD = 6
 
@@ -57,6 +63,7 @@ function PropuestasPageContent() {
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [sendErrAlert, setSendErrAlert] = useState(false)
   const [smtpConfigured, setSmtpConfigured] = useState<boolean | null>(null)
+  const [newModalOpen, setNewModalOpen] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -93,7 +100,12 @@ function PropuestasPageContent() {
   const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 
   const handleNew = () => {
-    router.push('/proposals/new')
+    setNewModalOpen(true)
+  }
+
+  const createFromStarter = (tpl: StarterTemplateId | null) => {
+    setNewModalOpen(false)
+    router.push(tpl ? `/proposals/new?template=${tpl}` : '/proposals/new')
   }
 
   const handleEdit = (p: Proposal) => {
@@ -398,6 +410,59 @@ function PropuestasPageContent() {
           </div>
         </div>
       </div>
+
+      {newModalOpen && (
+        <div className="modal-overlay" onClick={() => setNewModalOpen(false)}>
+          <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
+              <div className="modal-title">Nueva propuesta</div>
+              <div className="modal-sub">Elige cómo quieres empezar</div>
+              <button onClick={() => setNewModalOpen(false)} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6, display: 'flex', alignItems: 'center', borderRadius: 6 }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => createFromStarter(null)}
+                className="starter-card"
+              >
+                <div className="starter-card-icon">
+                  <FileText size={20} strokeWidth={1.6} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>En blanco</div>
+                  <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>Propuesta vacía para rellenar desde cero.</div>
+                </div>
+                <div className="starter-card-arrow" aria-hidden="true">→</div>
+              </button>
+              {STARTER_TEMPLATES.map(tpl => {
+                const Icon = STARTER_ICON[tpl.icon]
+                return (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => createFromStarter(tpl.id)}
+                    className="starter-card"
+                  >
+                    <div className="starter-card-icon">
+                      <Icon size={20} strokeWidth={1.6} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        Plantilla · {tpl.label}
+                        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--gold)', background: 'rgba(196,151,90,.1)', padding: '2px 7px', borderRadius: 100 }}>Ejemplo</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>{tpl.description} Incluye secciones, zonas, inclusiones, testimonios y más — todo editable.</div>
+                    </div>
+                    <div className="starter-card-arrow" aria-hidden="true">→</div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {sendModal && (
         <div className="modal-overlay" onClick={() => setSendModal(null)}>
