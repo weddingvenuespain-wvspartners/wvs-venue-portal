@@ -195,9 +195,11 @@ function PropuestasPageContent() {
       <div className="main-layout">
         <div className="topbar">
           <div className="topbar-title">Propuestas</div>
-          <button className="btn btn-primary btn-sm" onClick={handleNew}>
-            <Plus size={13} /> Nueva propuesta
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn btn-primary btn-sm" onClick={handleNew}>
+              <Plus size={13} /> Nueva propuesta
+            </button>
+          </div>
         </div>
 
         {(success || error) && (

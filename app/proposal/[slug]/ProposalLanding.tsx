@@ -5,8 +5,6 @@
 
 import { useEffect, useState } from 'react'
 import type { ProposalData } from './page'
-export type { SectionsData } from './tpl/shared'
-
 import T1Impacto     from './tpl/T1Impacto'
 import T2Emocion     from './tpl/T2Emocion'
 import T3TodoClaro   from './tpl/T3TodoClaro'

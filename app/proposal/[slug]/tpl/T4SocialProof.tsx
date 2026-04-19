@@ -7,10 +7,14 @@ import { useEffect, useRef, useState } from 'react'
 import type { ProposalData } from '../page'
 import {
   extractData, formatDate, formatPrice, isDark, toRgb,
-  getEmbedUrl, FadeUp, FadeIn, useReveal,
-  ConversionBlock, FloatingWhatsApp, AvailabilityBanner, Gallery,
-  IcoCalendar, IcoUsers, IcoBuilding,
+  FadeUp, FadeIn, useReveal,
+  FloatingWhatsApp, AvailabilityBanner, Gallery,
+  IcoCalendar, IcoUsers, IcoBuilding, IcoChat,
+  formatZoneCapacities, formatZoneFeatures, ivaLabel,
+  InclusionIcon, StarRating, resolveContact, VenueRentalGrid,
 } from './shared'
+import { buildSingleFontUrl } from '@/lib/fonts'
+import { WeddingProposal } from './WeddingProposal'
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const CREAM  = '#FFFAF4'
@@ -22,7 +26,7 @@ const MUTED  = '#9C7B6A'
 const INK    = '#2A1F1A'
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
-const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
+const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) => `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
@@ -55,9 +59,13 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
   }
   .t4-nav-cta:hover { opacity: .85 }
 
+  /* ── First screen wrapper: hero + stats fit in exactly 100vh ── */
+  .t4-first-screen {
+    min-height: 100vh; display: flex; flex-direction: column;
+  }
   /* ── Hero ── */
   .t4-hero {
-    position: relative; height: 92vh; min-height: 580px;
+    position: relative; flex: 1 1 auto; min-height: 520px;
     overflow: hidden; display: flex; align-items: flex-end;
   }
   .t4-hero-img {
@@ -75,7 +83,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
     max-width: 760px;
   }
   .t4-hero-couple {
-    font-family: 'Playfair Display', serif; font-weight: 400; font-style: italic;
+    font-family: ${font}; font-weight: 400; font-style: italic;
     font-size: clamp(3rem, 7vw, 5.5rem);
     color: #fff; line-height: 1.05;
     text-shadow: 0 2px 30px rgba(0,0,0,.3);
@@ -104,12 +112,12 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
   }
   .t4-stat {
     display: flex; flex-direction: column; align-items: center;
-    padding: 22px 48px; gap: 4px;
+    padding: 18px 44px; gap: 4px;
     border-right: 1px solid rgba(${darkPri ? '255,255,255' : '0,0,0'},.15);
   }
   .t4-stat:last-child { border-right: none }
   .t4-stat-num {
-    font-family: 'Playfair Display', serif; font-weight: 600;
+    font-family: ${font}; font-weight: 600;
     font-size: 1.9rem; line-height: 1;
   }
   .t4-stat-lbl {
@@ -119,22 +127,24 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
 
   /* ── Section shells ── */
   .t4-section { padding: 88px 0 }
-  .t4-inner { max-width: 1100px; margin: 0 auto; padding: 0 48px }
+  .t4-inner { max-width: 1180px; margin: 0 auto; padding: 0 48px }
+  .t4-section-head { text-align: center; margin-bottom: 48px }
   .t4-section-label {
-    display: inline-block;
+    display: block; text-align: center;
     font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
     color: ${TERRA}; margin-bottom: 12px;
   }
   .t4-section-title {
-    font-family: 'Playfair Display', serif; font-weight: 400;
+    font-family: ${font}; font-weight: 400;
     font-size: clamp(1.8rem, 3.5vw, 2.8rem);
     color: ${INK}; line-height: 1.2; margin-bottom: 10px;
+    text-align: center;
   }
   .t4-section-sub {
-    font-size: .93rem; color: ${MUTED}; line-height: 1.7; max-width: 560px;
+    font-size: .93rem; color: ${MUTED}; line-height: 1.7; max-width: 560px; margin: 0 auto;
   }
   .t4-divider {
-    width: 48px; height: 2px; background: ${pri}; margin: 18px 0 44px;
+    width: 48px; height: 2px; background: ${pri}; margin: 18px auto 0;
   }
 
   /* ── Testimonials ── */
@@ -152,7 +162,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
     border-bottom: 3px solid ${pri};
   }
   .t4-test-quote-mark {
-    font-family: 'Playfair Display', serif;
+    font-family: ${font};
     font-size: 7rem; line-height: 0.6;
     color: ${pri}; opacity: .15;
     position: absolute; top: 16px; left: 24px;
@@ -163,7 +173,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
     font-size: .9rem;
   }
   .t4-test-text {
-    font-family: 'Playfair Display', serif; font-style: italic;
+    font-family: ${font}; font-style: italic;
     font-size: 1.02rem; line-height: 1.75; color: ${INK};
     position: relative; z-index: 1;
   }
@@ -181,7 +191,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
     background: linear-gradient(135deg, ${pri}, ${TERRA});
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
-    font-family: 'Playfair Display', serif; color: #fff;
+    font-family: ${font}; color: #fff;
     font-size: 1.1rem; font-weight: 600;
   }
   .t4-test-couple { font-weight: 600; font-size: .88rem; color: ${INK} }
@@ -217,7 +227,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
   }
   .t4-gallery-item:hover .t4-gallery-caption { opacity: 1 }
   .t4-gallery-caption-name {
-    font-family: 'Playfair Display', serif; font-style: italic;
+    font-family: ${font}; font-style: italic;
     font-size: .9rem; font-weight: 600;
   }
   .t4-gallery-caption-date { font-size: .72rem; opacity: .75; margin-top: 2px }
@@ -229,7 +239,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
   }
   .t4-msg-icon { font-size: 2rem; margin-bottom: 20px }
   .t4-msg-title {
-    font-family: 'Playfair Display', serif; font-size: 1.6rem;
+    font-family: ${font}; font-size: 1.6rem;
     color: ${INK}; margin-bottom: 20px;
   }
   .t4-msg-text {
@@ -283,12 +293,12 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
     padding: 4px 12px; border-radius: 0 0 4px 4px;
   }
   .t4-pkg-name {
-    font-family: 'Playfair Display', serif; font-size: 1.3rem;
+    font-family: ${font}; font-size: 1.3rem;
     color: ${INK}; margin-bottom: 6px;
   }
   .t4-pkg-sub { font-size: .82rem; color: ${MUTED}; margin-bottom: 18px }
   .t4-pkg-price {
-    font-family: 'Playfair Display', serif; font-size: 2.2rem;
+    font-family: ${font}; font-size: 2.2rem;
     font-weight: 600; color: ${pri}; line-height: 1;
     margin-bottom: 20px;
   }
@@ -312,13 +322,15 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
   .t4-inclusions-bg { background: ${WARM} }
   .t4-inc-grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr));
-    gap: 16px; margin-top: 48px;
+    gap: 16px; margin-top: 48px; align-items: stretch;
   }
+  .t4-inc-grid > * { height: 100% }
   .t4-inc-item {
     background: #fff; border-radius: 4px;
     padding: 24px 20px; text-align: center;
     box-shadow: 0 1px 12px rgba(0,0,0,.05);
     transition: transform .25s, box-shadow .25s;
+    height: 100%; display: flex; flex-direction: column; align-items: center;
   }
   .t4-inc-item:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,.08) }
   .t4-inc-emoji { font-size: 1.8rem; display: block; margin-bottom: 10px }
@@ -344,7 +356,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
     font-size: 3rem;
   }
   .t4-zone-info { padding: 36px 32px; display: flex; flex-direction: column; gap: 10px }
-  .t4-zone-name { font-family: 'Playfair Display', serif; font-size: 1.4rem; color: ${INK} }
+  .t4-zone-name { font-family: ${font}; font-size: 1.4rem; color: ${INK} }
   .t4-zone-desc { font-size: .87rem; color: ${MUTED}; line-height: 1.7 }
   .t4-zone-cap { font-size: .8rem; color: ${TERRA}; font-weight: 600 }
   .t4-zone-price { font-size: .9rem; font-weight: 600; color: ${INK} }
@@ -397,7 +409,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
   }
   .t4-cta-left {}
   .t4-cta-headline {
-    font-family: 'Playfair Display', serif; font-style: italic;
+    font-family: ${font}; font-style: italic;
     font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 400;
     color: #fff; line-height: 1.2; margin-bottom: 20px;
   }
@@ -426,7 +438,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
     display: flex; flex-direction: column; gap: 16px;
   }
   .t4-form-title {
-    font-family: 'Playfair Display', serif;
+    font-family: ${font};
     font-size: 1.2rem; color: #fff; margin-bottom: 8px;
     text-align: center;
   }
@@ -491,15 +503,18 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
 function StatsBar({ count, primary, darkPri }: { count: number; primary: string; darkPri: boolean }) {
   const stats = [
     { num: `${count}+`, lbl: 'Bodas celebradas' },
-    { num: '4.9★', lbl: 'Valoración media' },
+    { num: '4.9', lbl: 'Valoración media', isRating: true },
     { num: '12+', lbl: 'Años de experiencia' },
     { num: '98%', lbl: 'Recomendarían el espacio' },
   ]
   return (
     <div className="t4-stats">
-      {stats.map((s, i) => (
+      {stats.map((s: any, i: number) => (
         <div key={i} className="t4-stat">
-          <span className="t4-stat-num">{s.num}</span>
+          <span className="t4-stat-num" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4 }}>
+            {s.num}
+            {s.isRating && <StarRating rating={5} size={14} color="currentColor" />}
+          </span>
           <span className="t4-stat-lbl">{s.lbl}</span>
         </div>
       ))}
@@ -513,7 +528,7 @@ function TestCard({ t, i }: { t: any; i: number }) {
   return (
     <div ref={ref} className="t4-test-card" style={{ opacity: vis ? 1 : 0, transform: vis ? 'none' : 'translateY(24px)', transition: `opacity .6s ${i * .1}s ease, transform .6s ${i * .1}s ease` }}>
       <div className="t4-test-quote-mark">"</div>
-      <div className="t4-test-stars">{'★★★★★'.slice(0, t.rating ?? 5)}</div>
+      <div className="t4-test-stars"><StarRating rating={t.rating ?? 5} size={16} color="#F5A623" /></div>
       <p className="t4-test-text">"{t.text}"</p>
       <div className="t4-test-footer">
         {t.photo_url
@@ -548,13 +563,16 @@ function FaqItem({ q, a, idx }: { q: string; a: string; idx: number }) {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function T4SocialProof({ data }: { data: ProposalData }) {
-  const { sec, on, packagesShow, zonesShow, inclusionsShow, faqShow, expShow, testsShow } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, zonesShow, inclusionsShow, faqShow, expShow, testsShow, menuShow, menusStructured, menuExtras, appetizersBase, seasonsShow, collabsShow, extrasShow, accom } = extractData(data)
 
   const branding  = data.branding
   const primary   = branding?.primary_color || TERRA
   const priRgb    = toRgb(primary)
   const darkPri   = isDark(primary)
+  const font      = (branding as any)?.font_family || "'Playfair Display', Georgia, serif"
   const venueName = data.venue?.name || ''
+  const contact   = resolveContact(data)
+  const contactOn = on('contact') && (contact.phone || contact.email)
   const photos    = data.venue?.photo_urls || []
   const secData   = (data as any).sections_data || {}
 
@@ -571,18 +589,14 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' })
-  const [submitted, setSubmitted] = useState(false)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const { createClient } = await import('@/lib/supabase')
-      const sb = createClient()
-      await sb.from('proposal_contacts').insert({ proposal_id: data.id, ...formData })
-    } catch {}
-    setSubmitted(true)
-  }
+  // Load branded font from Google Fonts when it changes
+  useEffect(() => {
+    const url = buildSingleFontUrl(font); if (!url) return
+    const ex = document.querySelector('link[data-gf-p]')
+    if (ex) { ex.setAttribute('href', url); return }
+    const l = document.createElement('link'); l.rel='stylesheet'; l.href=url; l.setAttribute('data-gf-p','1')
+    document.head.appendChild(l)
+  }, [font])
 
   const testCount = testsShow.length
   const heroPhoto = secData.hero_image_url || photos[0] || ''
@@ -598,51 +612,53 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
 
   return (
     <div className="t4">
-      <style dangerouslySetInnerHTML={{ __html: buildCss(primary, priRgb, darkPri) }} />
+      <style dangerouslySetInnerHTML={{ __html: buildCss(primary, priRgb, darkPri, font) }} />
 
       {/* NAV */}
       <nav className={`t4-nav ${scrolled ? 'scrolled' : ''}`}>
         {branding?.logo_url
           ? <img src={branding.logo_url} className="t4-logo" alt={venueName} />
-          : <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', fontWeight: 600, color: scrolled ? INK : '#fff' }}>{venueName}</span>
+          : <span style={{ fontFamily: font, fontSize: '1.1rem', fontWeight: 600, color: scrolled ? INK : '#fff' }}>{venueName}</span>
         }
-        <button className="t4-nav-cta" onClick={() => document.getElementById('t4-cta')?.scrollIntoView({ behavior: 'smooth' })}>
-          Ver disponibilidad
+        <button className="t4-nav-cta" onClick={() => (document.getElementById(hasCatering ? 'menu' : 't4-cta') ?? document.getElementById('t4-cta'))?.scrollIntoView({ behavior: 'smooth' })}>
+          {hasCatering ? 'Ver menús' : 'Contactar'}
         </button>
       </nav>
 
-      {/* HERO */}
-      <section className="t4-hero">
-        {heroPhoto && <img ref={heroImgRef} src={heroPhoto} className="t4-hero-img" alt={venueName} />}
-        <div className="t4-hero-overlay" />
-        <div className="t4-hero-content">
-          <FadeIn>
-            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '.72rem', fontWeight: 600, letterSpacing: '.14em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>
-              Propuesta exclusiva para
-            </p>
-            <h1 className="t4-hero-couple">{data.couple_name}</h1>
-          </FadeIn>
-          <FadeIn delay={0.3}>
-            <div className="t4-hero-meta">
-              {data.wedding_date && (
-                <span className="t4-hero-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IcoCalendar width={12} height={12} /> {formatDate(data.wedding_date)}</span>
-              )}
-              {data.guest_count && (
-                <span className="t4-hero-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IcoUsers width={12} height={12} /> {data.guest_count} invitados</span>
-              )}
-              {data.show_price_estimate && data.price_estimate && (
-                <span className="t4-hero-pill pri-pill">Desde {formatPrice(data.price_estimate)}</span>
-              )}
-            </div>
-          </FadeIn>
-        </div>
-      </section>
+      {/* FIRST SCREEN — hero + stats lock to 100vh */}
+      <div className="t4-first-screen">
+        <section className="t4-hero">
+          {heroPhoto && <img ref={heroImgRef} src={heroPhoto} className="t4-hero-img" alt={venueName} />}
+          <div className="t4-hero-overlay" />
+          <div className="t4-hero-content">
+            <FadeIn>
+              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '.72rem', fontWeight: 600, letterSpacing: '.14em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>
+                Propuesta exclusiva para
+              </p>
+              <h1 className="t4-hero-couple">{data.couple_name}</h1>
+            </FadeIn>
+            <FadeIn delay={0.3}>
+              <div className="t4-hero-meta">
+                {data.wedding_date && (
+                  <span className="t4-hero-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IcoCalendar width={12} height={12} /> {formatDate(data.wedding_date)}</span>
+                )}
+                {data.guest_count && (
+                  <span className="t4-hero-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IcoUsers width={12} height={12} /> {data.guest_count} invitados</span>
+                )}
+                {data.show_price_estimate && data.price_estimate && (
+                  <span className="t4-hero-pill pri-pill">Desde {formatPrice(data.price_estimate)}{ivaLabel(sec, true) ? ` · ${ivaLabel(sec, true)}` : ''}</span>
+                )}
+              </div>
+            </FadeIn>
+          </div>
+        </section>
 
-      {/* STATS BAR */}
-      <StatsBar count={Math.max(testCount * 3, 47)} primary={primary} darkPri={darkPri} />
+        {/* STATS BAR — part of first screen */}
+        <StatsBar count={Math.max(testCount * 3, 47)} primary={primary} darkPri={darkPri} />
+      </div>
 
       {/* ── AVAILABILITY BANNER ── */}
-      {sec.show_availability_msg && sec.availability_message && (
+      {on('availability') && sec.availability_message && (
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />
       )}
 
@@ -679,7 +695,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       )}
 
       {/* PERSONAL MESSAGE */}
-      {data.personal_message && (
+      {on('welcome') && data.personal_message && (
         <section className="t4-msg-bg">
           <FadeUp>
             <div className="t4-msg-wrap">
@@ -690,9 +706,6 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           </FadeUp>
         </section>
       )}
-
-      {/* ── CONVERSION BLOCK ── */}
-      <ConversionBlock data={data} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} ctaId="t4-cta" />
 
       {/* EXPERIENCE */}
       {expShow && on('experience') && (
@@ -728,7 +741,9 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
               {inclusionsShow.map((inc: any, i: number) => (
                 <FadeUp key={i} delay={i * .04}>
                   <div className="t4-inc-item">
-                    <span className="t4-inc-emoji">{inc.emoji || '✦'}</span>
+                    <span className="t4-inc-emoji" style={{ display: 'inline-flex', color: primary }}>
+                      <InclusionIcon name={inc.icon || inc.emoji || 'check'} size={28} color={primary} strokeWidth={1.5} />
+                    </span>
                     <div className="t4-inc-title">{inc.title}</div>
                     {inc.description && <div className="t4-inc-desc">{inc.description}</div>}
                   </div>
@@ -792,6 +807,8 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             <div className="t4-zones">
               {zonesShow.map((z: any, i: number) => {
                 const zPhoto = z.photos?.[0] || photos[i + 2]
+                const caps = formatZoneCapacities(z)
+                const feats = formatZoneFeatures(z)
                 return (
                   <FadeUp key={i} delay={0.1}>
                     <div className="t4-zone">
@@ -804,17 +821,200 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
                       <div className="t4-zone-info">
                         <div className="t4-zone-name">{z.name}</div>
                         {z.description && <div className="t4-zone-desc">{z.description}</div>}
-                        {(z.capacity_min || z.capacity_max) && (
-                          <div className="t4-zone-cap">
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IcoUsers width={11} height={11} /> {z.capacity_min}{z.capacity_min && z.capacity_max ? '–' : ''}{z.capacity_max} personas</span>
+                        {caps.length > 0 && (
+                          <div className="t4-zone-cap" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {caps.map((c, ci) => (
+                              <span key={ci} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IcoUsers width={11} height={11} /> {c}</span>
+                            ))}
                           </div>
                         )}
+                        {feats.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+                            {feats.map((f, fi) => (
+                              <span key={fi} style={{ fontSize: '.7rem', padding: '3px 9px', border: `1px solid rgba(${priRgb},.25)`, borderRadius: 999, color: primary, letterSpacing: '.03em' }}>{f}</span>
+                            ))}
+                          </div>
+                        )}
+                        {z.notes && <div style={{ fontSize: '.76rem', color: MUTED, marginTop: 6, fontStyle: 'italic' }}>{z.notes}</div>}
                         {z.price && <div className="t4-zone-price">{z.price}</div>}
                       </div>
                     </div>
                   </FadeUp>
                 )
               })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* VENUE RENTAL — grid temporada × día */}
+      {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+        <section className="t4-section" style={{ background: CREAM }}>
+          <div className="t4-inner">
+            <FadeUp>
+              <span className="t4-section-label">{sec.venue_rental.title || 'Tarifas de alquiler'}</span>
+              <h2 className="t4-section-title">Elegid vuestra fecha</h2>
+              <div className="t4-divider" />
+            </FadeUp>
+            <FadeUp delay={.1}>
+              <div style={{ marginTop: 40 }}>
+                <VenueRentalGrid data={sec.venue_rental} primary={primary} />
+              </div>
+            </FadeUp>
+          </div>
+        </section>
+      )}
+
+      {/* SEASON PRICES */}
+      {on('season_prices') && seasonsShow.length > 0 && (
+        <section className="t4-section" style={{ background: SAND }}>
+          <div className="t4-inner">
+            <FadeUp>
+              <span className="t4-section-label">Tarifas por temporada</span>
+              <h2 className="t4-section-title">Precios según la fecha</h2>
+              <div className="t4-divider" />
+            </FadeUp>
+            <div style={{ marginTop: 40, background: '#fff', borderRadius: 4, overflow: 'hidden' }}>
+              {seasonsShow.map((s: any, i: number) => (
+                <FadeUp key={i} delay={i * .05}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 16, alignItems: 'center', padding: '20px 28px', borderBottom: i < seasonsShow.length - 1 ? `1px solid ${SAND}` : 'none' }}>
+                    <div style={{ fontFamily: font, fontSize: 18, color: INK }}>{s.label || s.season}</div>
+                    <div>
+                      <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: primary, marginBottom: 3 }}>{s.date_range}</div>
+                      {s.notes && <div style={{ fontSize: 12, color: MUTED }}>{s.notes}</div>}
+                    </div>
+                    <div style={{ fontFamily: font, fontSize: 20, fontWeight: 600, color: primary, textAlign: 'right', whiteSpace: 'nowrap' }}>{s.price_modifier}</div>
+                  </div>
+                </FadeUp>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* WeddingProposal — configuración interactiva */}
+      {hasCatering && on('menu') && (menusStructured?.length || menuExtras?.length || appetizersBase?.length || menuShow.length > 0) && (
+        <WeddingProposal
+          data={data}
+          menus={menusStructured}
+          extras={menuExtras}
+          appetizers={appetizersBase}
+          legacyMenus={menuShow}
+          primary={primary}
+          onPrimary={darkPri ? '#fff' : '#111'}
+        />
+      )}
+
+      {/* ACCOMMODATION */}
+      {on('accommodation') && accom && (
+        <section className="t4-section" style={{ background: CREAM }}>
+          <div className="t4-inner">
+            <FadeUp>
+              <span className="t4-section-label">Alojamiento</span>
+              <h2 className="t4-section-title">Quedaos a dormir</h2>
+              <div className="t4-divider" />
+            </FadeUp>
+            <div style={{ marginTop: 48, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 32, alignItems: 'start' }}>
+              <FadeUp>
+                <div>
+                  {accom.description && <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 15, color: MUTED, lineHeight: 1.85, marginBottom: 16 }}>{accom.description}</p>}
+                  {accom.rooms && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {accom.rooms.split('·').map((r: string, i: number) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'Inter,sans-serif', fontSize: 14, color: INK }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: primary, flexShrink: 0 }} />{r.trim()}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </FadeUp>
+              <FadeUp delay={.1}>
+                {Array.isArray(accom.options) && accom.options.length > 0 ? (
+                  <div style={{ background: '#fff', borderRadius: 4, padding: 24, display: 'flex', flexDirection: 'column', gap: 18, boxShadow: '0 2px 20px rgba(0,0,0,.04)' }}>
+                    {accom.options.map((opt: any, oi: number) => (
+                      <div key={oi} style={{ borderLeft: `3px solid ${primary}`, paddingLeft: 14 }}>
+                        <div style={{ fontFamily: font, fontSize: 18, color: INK }}>{opt.label}</div>
+                        {opt.description && <div style={{ fontSize: 13, color: MUTED, marginTop: 3 }}>{opt.description}</div>}
+                        {opt.included ? (
+                          <div style={{ fontSize: 12.5, color: primary, fontWeight: 600, marginTop: 5 }}>✓ Incluido en la tarifa del venue</div>
+                        ) : opt.price_info ? (
+                          <div style={{ fontSize: 14, color: INK, marginTop: 4 }}>{opt.price_info}</div>
+                        ) : Array.isArray(opt.prices) && opt.prices.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 6 }}>
+                            {opt.prices.map((p: any, pi: number) => (
+                              <div key={pi} style={{ display: 'flex', gap: 10, fontSize: 13, color: INK }}>
+                                <span style={{ flex: 1 }}>{p.season}</span>
+                                <span style={{ fontFamily: font, color: primary }}>{p.price}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : accom.price_info ? (
+                  <div style={{ background: '#fff', borderRadius: 4, padding: 24, boxShadow: '0 2px 20px rgba(0,0,0,.04)' }}>
+                    <p style={{ fontSize: 14, color: INK, lineHeight: 1.8 }}>{accom.price_info}</p>
+                  </div>
+                ) : null}
+                {accom.nearby && (
+                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${SAND}` }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: TERRA, marginBottom: 6 }}>Alojamientos cercanos</div>
+                    <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.7 }}>{accom.nearby}</p>
+                  </div>
+                )}
+              </FadeUp>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* EXTRA SERVICES */}
+      {on('extra_services') && extrasShow.length > 0 && (
+        <section className="t4-section" style={{ background: WARM }}>
+          <div className="t4-inner">
+            <FadeUp>
+              <span className="t4-section-label">Personaliza</span>
+              <h2 className="t4-section-title">Servicios adicionales</h2>
+              <div className="t4-divider" />
+            </FadeUp>
+            <div style={{ marginTop: 40, background: '#fff', borderRadius: 4, overflow: 'hidden' }}>
+              {extrasShow.map((svc: any, i: number) => (
+                <FadeUp key={i} delay={i * .04}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: i < extrasShow.length - 1 ? `1px solid ${SAND}` : 'none', gap: 20 }}>
+                    <div>
+                      <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 15, fontWeight: 500, color: INK }}>{svc.name}</div>
+                      {svc.description && <div style={{ fontSize: 13, color: MUTED, marginTop: 3 }}>{svc.description}</div>}
+                    </div>
+                    {svc.price && <span style={{ fontFamily: font, fontSize: 20, fontWeight: 600, color: primary, whiteSpace: 'nowrap' }}>{svc.price}</span>}
+                  </div>
+                </FadeUp>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* COLLABORATORS */}
+      {on('collaborators') && collabsShow.length > 0 && (
+        <section className="t4-section" style={{ background: CREAM }}>
+          <div className="t4-inner">
+            <FadeUp>
+              <span className="t4-section-label">Proveedores de confianza</span>
+              <h2 className="t4-section-title">Nuestros colaboradores</h2>
+              <div className="t4-divider" />
+            </FadeUp>
+            <div style={{ marginTop: 40, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
+              {collabsShow.map((c: any, i: number) => (
+                <FadeUp key={i} delay={(i % 4) * .04}>
+                  <div style={{ background: '#fff', borderRadius: 4, padding: '20px 22px', boxShadow: '0 1px 12px rgba(0,0,0,.04)', height: '100%' }}>
+                    <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: TERRA, marginBottom: 8 }}>{c.category}</div>
+                    <div style={{ fontFamily: font, fontSize: 18, color: INK, marginBottom: 4 }}>{c.name}</div>
+                    {c.description && <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.55 }}>{c.description}</div>}
+                  </div>
+                </FadeUp>
+              ))}
             </div>
           </div>
         </section>
@@ -838,7 +1038,30 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         </section>
       )}
 
-      {/* CTA */}
+      {/* MAPA */}
+      {on('map') && (sec.map_embed_url || (data.venueContent.map_info as any)?.embed_url) && (() => {
+        const embed = sec.map_embed_url || (data.venueContent.map_info as any).embed_url
+        const address = sec.map_address || (data.venueContent.map_info as any)?.address
+        return (
+          <section className="t4-section" style={{ background: SAND }}>
+            <div className="t4-inner">
+              <FadeUp>
+                <span className="t4-section-label">Ubicación</span>
+                <h2 className="t4-section-title">Cómo llegar</h2>
+                <div className="t4-divider" />
+                {address && <p style={{ textAlign: 'center', fontSize: 14, color: MUTED, marginTop: 18 }}>{address}</p>}
+              </FadeUp>
+              <FadeUp delay={.1}>
+                <div style={{ marginTop: 40, overflow: 'hidden', borderRadius: 4, boxShadow: '0 2px 20px rgba(0,0,0,.06)' }}>
+                  <iframe src={embed} width="100%" height="380" style={{ border: 'none', display: 'block' }} loading="lazy" allowFullScreen />
+                </div>
+              </FadeUp>
+            </div>
+          </section>
+        )
+      })()}
+
+      {/* CTA — social proof + contact */}
       <section className="t4-cta-bg" id="t4-cta">
         <div className="t4-cta-inner">
           <FadeUp>
@@ -847,7 +1070,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
                 Más de {Math.max(testCount * 3, 47)} parejas ya confiaron en nosotros
               </h2>
               <p className="t4-cta-sub">
-                Vuestra historia merece un escenario excepcional. Contactadnos para comprobar disponibilidad y reservar vuestra fecha.
+                ¿Tenéis dudas sobre la propuesta o el menú? Escribidnos por WhatsApp o email y os respondemos en menos de 24 horas.
               </p>
               {testsShow.length > 0 && (
                 <div className="t4-cta-social-proof">
@@ -868,47 +1091,44 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
               )}
             </div>
           </FadeUp>
-          <FadeUp delay={0.2}>
-            {submitted ? (
-              <div style={{ textAlign: 'center', color: '#fff', padding: '48px 0' }}>
-                <div style={{ fontSize: '3rem', marginBottom: 16 }}>🥂</div>
-                <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.6rem', marginBottom: 10 }}>¡Recibido!</h3>
-                <p style={{ color: 'rgba(255,255,255,.65)', fontSize: '.93rem' }}>Nos ponemos en contacto en menos de 24h.</p>
+          {contactOn && (
+            <FadeUp delay={0.2}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'stretch', minWidth: 280 }}>
+                {contact.phone && (
+                  <a href={`https://wa.me/${contact.phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola, he visto la propuesta para ${data.couple_name} y me gustaría hablar con vosotros.`)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px', background: '#25D366', color: '#fff', border: 'none', borderRadius: 8, textDecoration: 'none' }}>
+                    <IcoChat width={22} height={22} style={{ flexShrink: 0 }} />
+                    <div style={{ lineHeight: 1.2 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.04em' }}>Escríbenos por WhatsApp</div>
+                      <div style={{ fontSize: 12, opacity: .9, marginTop: 2 }}>{contact.phone}</div>
+                    </div>
+                  </a>
+                )}
+                {contact.email && (
+                  <a href={`mailto:${contact.email}?subject=${encodeURIComponent(`Propuesta ${data.couple_name}`)}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px', background: primary, color: darkPri ? '#fff' : INK, border: 'none', borderRadius: 8, textDecoration: 'none' }}>
+                    <InclusionIcon name="mail" size={22} color={darkPri ? '#fff' : INK} strokeWidth={1.8} />
+                    <div style={{ lineHeight: 1.2 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.04em' }}>Escríbenos por email</div>
+                      <div style={{ fontSize: 12, opacity: .85, marginTop: 2, wordBreak: 'break-all' }}>{contact.email}</div>
+                    </div>
+                  </a>
+                )}
               </div>
-            ) : (
-              <form className="t4-form" onSubmit={handleSubmit}>
-                <p className="t4-form-title">Consultar disponibilidad</p>
-                <div className="t4-form-field">
-                  <label className="t4-form-label">Vuestros nombres</label>
-                  <input className="t4-form-input" placeholder="Laura & Carlos" value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} required />
-                </div>
-                <div className="t4-form-field">
-                  <label className="t4-form-label">Email</label>
-                  <input className="t4-form-input" type="email" placeholder="hola@vosotros.com" value={formData.email} onChange={e => setFormData(p => ({ ...p, email: e.target.value }))} required />
-                </div>
-                <div className="t4-form-field">
-                  <label className="t4-form-label">Teléfono (opcional)</label>
-                  <input className="t4-form-input" placeholder="+34 600 000 000" value={formData.phone} onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))} />
-                </div>
-                <div className="t4-form-field">
-                  <label className="t4-form-label">Mensaje</label>
-                  <textarea className="t4-form-input t4-form-textarea" placeholder="Contadnos vuestra idea…" value={formData.message} onChange={e => setFormData(p => ({ ...p, message: e.target.value }))} />
-                </div>
-                <button type="submit" className="t4-form-btn">Solicitar disponibilidad →</button>
-              </form>
-            )}
-          </FadeUp>
+            </FadeUp>
+          )}
         </div>
       </section>
 
       {/* FOOTER */}
       {/* ── FLOATING WHATSAPP ── */}
-      <FloatingWhatsApp phone={data.venue?.contact_phone || ''} coupleName={data.couple_name} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />
+      {contactOn && <FloatingWhatsApp phone={contact.phone} coupleName={data.couple_name} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />}
 
       <footer className="t4-footer">
         {branding?.logo_url
           ? <img src={branding.logo_url} className="t4-footer-logo" alt={venueName} />
-          : <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '1rem', color: 'rgba(255,255,255,.5)' }}>{venueName}</span>
+          : <span style={{ fontFamily: font, fontSize: '1rem', color: 'rgba(255,255,255,.5)' }}>{venueName}</span>
         }
         <div className="t4-footer-links">
           {data.venue?.website && <a href={data.venue.website} target="_blank" rel="noopener">Web</a>}

@@ -7,7 +7,7 @@ import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { Metadata } from 'next'
 import ProposalLanding from './ProposalLanding'
-import type { SectionsData } from './ProposalLanding'
+import type { SectionsData } from '@/lib/proposal-types'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -58,6 +58,7 @@ export type ProposalData = {
   branding: {
     logo_url: string | null
     primary_color: string
+    font_family?: string | null
   } | null
 }
 
@@ -136,7 +137,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
   // 3. Obtener branding
   const { data: brandingData } = await supabase
     .from('proposal_branding')
-    .select('logo_url, primary_color')
+    .select('logo_url, primary_color, font_family')
     .eq('proposal_id', proposal.id)
     .single()
 

@@ -131,6 +131,122 @@ export async function sendProposalEmail({
   })
 }
 
+// ─── Menu selection notification (para el venue cuando el invitado envía su selección) ───
+
+export async function sendMenuSelectionEmail({
+  to,
+  venueName,
+  coupleName,
+  proposalUrl,
+  selectedMenuName,
+  guestCount,
+  originalGuestCount,
+  guestCountChanged,
+  estimatedTotal,
+  courseChoices,
+  selectedExtras,
+  comments,
+  smtpConfig,
+}: {
+  to: string
+  venueName: string
+  coupleName: string
+  proposalUrl: string
+  selectedMenuName: string | null
+  guestCount: number | null
+  originalGuestCount: number | null
+  guestCountChanged: boolean
+  estimatedTotal: number | null
+  courseChoices: Record<string, string[]>
+  selectedExtras: Array<{ name: string; category?: string }>
+  comments: string | null
+  smtpConfig?: SmtpConfig | null
+}) {
+  const activeTransporter = smtpConfig
+    ? nodemailer.createTransport({
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.port === 465,
+        auth: { user: smtpConfig.user, pass: smtpConfig.pass },
+        connectionTimeout: 10_000,
+        greetingTimeout:   10_000,
+        socketTimeout:     15_000,
+      })
+    : transporter
+
+  const fromAddress = smtpConfig
+    ? `"${venueName}" <${smtpConfig.fromEmail}>`
+    : `"Wedding Venues Spain" <noreply@weddingvenuesspain.com>`
+
+  const formatEuro = (n: number) =>
+    new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
+
+  const courseChoicesHtml = Object.keys(courseChoices).length
+    ? Object.entries(courseChoices)
+        .map(([k, picks]) => `<li><strong>${k}:</strong> ${picks.join(' · ')}</li>`)
+        .join('')
+    : '<li style="color:#9A8F78;">Sin opciones variables</li>'
+
+  const extrasHtml = selectedExtras.length
+    ? selectedExtras.map(e => `<li>${e.name}${e.category ? ` <em style="color:#9A8F78;">(${e.category})</em>` : ''}</li>`).join('')
+    : '<li style="color:#9A8F78;">Ninguno</li>'
+
+  const guestsBlock = guestCountChanged
+    ? `<span style="color:#c92e2e;"><strong>${guestCount}</strong></span> <span style="color:#9A8F78;">(estimación inicial: ${originalGuestCount})</span>`
+    : `<strong>${guestCount ?? '—'}</strong>`
+
+  await activeTransporter.sendMail({
+    from: fromAddress,
+    to,
+    subject: `Nueva selección de menú · ${coupleName}`,
+    html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#F5F3ED;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F3ED;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+        <tr><td style="background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 2px 16px rgba(69,61,35,0.08);">
+          <h1 style="margin:0 0 12px;font-size:22px;color:#453D23;">Nueva selección recibida</h1>
+          <p style="margin:0 0 28px;font-size:14px;color:#796F4E;line-height:1.6;">
+            <strong>${coupleName}</strong> ha configurado su boda en la propuesta.
+          </p>
+
+          <div style="background:#F9F7F2;border-radius:10px;padding:20px 24px;margin-bottom:20px;">
+            <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9A8F78;">Resumen</p>
+            <table cellpadding="4" style="font-size:14px;color:#453D23;">
+              <tr><td style="color:#796F4E;">Menú elegido:</td><td><strong>${selectedMenuName ?? '—'}</strong></td></tr>
+              <tr><td style="color:#796F4E;">Invitados:</td><td>${guestsBlock}</td></tr>
+              <tr><td style="color:#796F4E;">Total estimado:</td><td><strong>${estimatedTotal != null ? formatEuro(estimatedTotal) : '—'}</strong></td></tr>
+            </table>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9A8F78;">Elecciones del menú</p>
+            <ul style="margin:0;padding-left:18px;font-size:13px;color:#453D23;line-height:1.8;">${courseChoicesHtml}</ul>
+          </div>
+
+          <div style="margin-bottom:24px;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9A8F78;">Extras seleccionados</p>
+            <ul style="margin:0;padding-left:18px;font-size:13px;color:#453D23;line-height:1.8;">${extrasHtml}</ul>
+          </div>
+
+          ${comments ? `
+          <div style="background:#FFF9E8;border-left:3px solid #E5C76B;padding:14px 18px;border-radius:6px;margin-bottom:24px;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9A8F78;">Comentarios de la pareja</p>
+            <p style="margin:0;font-size:14px;color:#453D23;line-height:1.65;white-space:pre-wrap;">${comments.replace(/</g, '&lt;')}</p>
+          </div>` : ''}
+
+          <a href="${proposalUrl}" style="display:inline-block;background:#453D23;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
+            Ver propuesta →
+          </a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`,
+  })
+}
+
 export async function sendActivationEmail(to: string, venueName: string) {
   const portalUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.weddingvenuesspain.com'
 

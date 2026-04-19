@@ -3,44 +3,62 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ProposalData } from '../page'
-export type { ProposalData }
+import type { Menu, MenuExtra, AppetizerGroup, SectionsData } from '@/lib/proposal-types'
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
-export type SectionsData = {
-  video_url?: string; video_title?: string
-  show_chat?: boolean; chat_intro?: string
-  show_nextsteps?: boolean
-  nextsteps?: Array<{ title: string; description: string }>
-  show_availability_msg?: boolean; availability_message?: string
-  sections_enabled?: Record<string, boolean>
-  packages_override?:       Array<{ name: string; subtitle?: string; price?: string; description?: string; includes?: string[]; is_recommended?: boolean; min_guests?: number; max_guests?: number; is_active?: boolean }> | null
-  zones_override?:          Array<{ name: string; description?: string; capacity_min?: number; capacity_max?: number; price?: string; photos?: string[] }> | null
-  season_prices_override?:  Array<{ label?: string; season?: string; date_range?: string; price_modifier?: string; notes?: string }> | null
-  inclusions_override?:     Array<{ title: string; emoji?: string; description?: string }> | null
-  faq_override?:            Array<{ question: string; answer: string }> | null
-  collaborators_override?:  Array<{ name: string; category: string; description?: string; website?: string }> | null
-  extra_services_override?: Array<{ name: string; price?: string; description?: string }> | null
-  menu_prices_override?:    Array<{ name: string; price_per_person: string; description?: string; min_guests?: number }> | null
-  experience_override?:     { title: string; body: string } | null
-  testimonials_override?:   Array<{ couple_name?: string; names?: string; wedding_date?: string; date?: string; text: string; rating?: number; photo_url?: string }> | null
-  // Per-proposal image overrides
-  hero_image_url?: string
-  gallery_urls?: string[]
-  // Visual template selection (1–5)
-  visual_template_id?: number
-  // Legacy fields used by propuestas/page.tsx
-  show_timeline?: boolean; timeline_intro?: string
-  timeline?: Array<{ time: string; title: string; description?: string }>
-  show_testimonials?: boolean
-  testimonials?: Array<{ names: string; couple_name?: string; date?: string; wedding_date?: string; guests?: number; text: string; rating?: number; photo_url?: string }>
-  show_map?: boolean; map_embed_url?: string; map_address?: string; map_notes?: string
-  show_techspecs?: boolean
-  techspecs?: { sqm?: string; ceiling?: string; parking?: string; accessibility?: string; ceremony_spaces?: string; extra?: string }
-  show_accommodation?: boolean
-  accommodation?: { rooms?: string; description?: string; price_info?: string; nearby?: string }
-}
+export type { ProposalData }
+export type { MenuItem, MenuCourse, Menu, MenuExtra, AppetizerGroup, SectionsData } from '@/lib/proposal-types'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
+
+const ZONE_CAP_LABELS: Record<string, string> = {
+  ceremony: 'Ceremonia', cocktail: 'Coctel', banquet: 'Banquete', party: 'Fiesta', other: '',
+}
+const ZONE_COVERED_LABELS: Record<string, string> = {
+  indoor: 'Interior', outdoor: 'Exterior', 'covered-outdoor': 'Exterior cubierto',
+}
+
+export function formatZoneCapacities(z: any): string[] {
+  const out: string[] = []
+  if (Array.isArray(z?.capacities) && z.capacities.length) {
+    z.capacities.forEach((c: any) => {
+      if (!c || (!c.count && !c.label)) return
+      const typeLabel = c.label || ZONE_CAP_LABELS[c.type] || ''
+      if (c.count && typeLabel) out.push(`${typeLabel}: ${c.count} pax`)
+      else if (c.count) out.push(`${c.count} pax`)
+      else if (typeLabel) out.push(typeLabel)
+    })
+  } else if (z?.capacity_min || z?.capacity_max) {
+    if (z.capacity_min && z.capacity_max) out.push(`${z.capacity_min}–${z.capacity_max} pax`)
+    else if (z.capacity_max) out.push(`hasta ${z.capacity_max} pax`)
+    else if (z.capacity_min) out.push(`desde ${z.capacity_min} pax`)
+  }
+  return out
+}
+
+export function resolveContact(data: ProposalData) {
+  const sec = (data as any).sections_data as SectionsData | undefined
+  const override = sec?.contact
+  return {
+    phone: (override?.phone?.trim() || data.venue?.contact_phone || '').trim(),
+    email: (override?.email?.trim() || data.venue?.contact_email || '').trim(),
+  }
+}
+
+export function ivaLabel(sec: SectionsData | undefined | null, short = false): string {
+  if (!sec || sec.iva_included === undefined) return short ? '' : ''
+  if (sec.iva_included) return short ? 'IVA incl.' : 'IVA incluido'
+  return short ? 'IVA no incl.' : 'IVA no incluido'
+}
+
+export function formatZoneFeatures(z: any): string[] {
+  const out: string[] = []
+  if (z?.sqm) out.push(`${z.sqm} m²`)
+  if (z?.climatized) out.push('Climatizado')
+  if (z?.plan_b) out.push('Plan B cubierto')
+  if (z?.covered && ZONE_COVERED_LABELS[z.covered]) out.push(ZONE_COVERED_LABELS[z.covered])
+  return out
+}
+
 export function formatDate(iso: string | null) {
   if (!iso) return null
   return new Date(iso).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -58,15 +76,6 @@ export function toRgb(hex: string) {
   if (c.length < 6) return '20,20,20'
   return `${parseInt(c.slice(0,2),16)},${parseInt(c.slice(2,4),16)},${parseInt(c.slice(4,6),16)}`
 }
-export function getEmbedUrl(url: string): string | null {
-  if (!url) return null
-  const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
-  if (yt) return `https://www.youtube.com/embed/${yt[1]}?rel=0&modestbranding=1`
-  const v = url.match(/vimeo\.com\/(\d+)/)
-  if (v) return `https://player.vimeo.com/video/${v[1]}?title=0&byline=0&portrait=0`
-  return null
-}
-
 // ─── Reveal hook ───────────────────────────────────────────────────────────────
 export function useReveal(threshold = 0.07) {
   const ref = useRef<HTMLDivElement>(null)
@@ -97,6 +106,112 @@ export function FadeIn({ children, delay = 0 }: { children: React.ReactNode; del
   )
 }
 
+// ─── Icon resolver for inclusions / testimonials (uses lucide-react) ──────────
+import {
+  Check, Clock, Shield, Wifi, ParkingCircle, Music, Lightbulb, Umbrella,
+  Sparkles as SparklesIco, Bed, Utensils, Wine, Heart, CalendarCheck, Accessibility,
+  TreePine, Mountain, Users as UsersIco, Key, Speaker, Camera, Moon, Sun, Leaf,
+  MapPin as MapPinIco, Phone as PhoneIco, Mail, Building as BuildingIco,
+  DoorOpen, Flame, Snowflake, Star, Car, Flower2, HeartHandshake,
+  Briefcase, Disc3, GlassWater, PartyPopper, FileCheck, ShieldCheck, Soup,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+
+const INCLUSION_ICONS: Record<string, LucideIcon> = {
+  check: Check, clock: Clock, time: Clock, hours: Clock,
+  shield: Shield, security: ShieldCheck, 'shield-check': ShieldCheck,
+  wifi: Wifi, parking: ParkingCircle, car: Car,
+  music: Music, sound: Speaker, speaker: Speaker, dj: Disc3, disco: Disc3, nightclub: Disc3,
+  lightbulb: Lightbulb, light: Lightbulb, lighting: Lightbulb,
+  umbrella: Umbrella, 'plan-b': Umbrella, planb: Umbrella, rain: Umbrella,
+  sparkles: SparklesIco, clean: SparklesIco, cleaning: SparklesIco,
+  bed: Bed, bedroom: Bed, suite: Bed, accommodation: Bed,
+  utensils: Utensils, food: Utensils, dining: Utensils, kitchen: Utensils,
+  wine: Wine, bar: GlassWater, drink: GlassWater, cocktail: GlassWater,
+  heart: Heart, love: Heart, 'heart-shake': HeartHandshake, recommend: HeartHandshake,
+  calendar: CalendarCheck, date: CalendarCheck, event: CalendarCheck,
+  accessibility: Accessibility, adapted: Accessibility,
+  tree: TreePine, garden: TreePine, olive: Leaf, leaf: Leaf,
+  mountain: Mountain, view: Mountain, outdoor: Mountain,
+  users: UsersIco, guests: UsersIco, people: UsersIco, staff: Briefcase,
+  key: Key, exclusive: Key, exclusivity: Key,
+  camera: Camera, photo: Camera, photography: Camera,
+  moon: Moon, night: Moon, 'night-club': Disc3,
+  sun: Sun, morning: Sun, day: Sun,
+  mappin: MapPinIco, location: MapPinIco, map: MapPinIco,
+  phone: PhoneIco, mail: Mail, email: Mail,
+  building: BuildingIco, venue: BuildingIco, masia: BuildingIco, finca: BuildingIco,
+  door: DoorOpen, access: DoorOpen,
+  flame: Flame, fire: Flame, cozy: Flame,
+  snowflake: Snowflake, snow: Snowflake, ac: Snowflake, climate: Snowflake, climatized: Snowflake,
+  star: Star, rating: Star, premium: Star,
+  flower: Flower2, flowers: Flower2, florist: Flower2,
+  sgae: FileCheck, license: FileCheck, papers: FileCheck,
+  party: PartyPopper, celebration: PartyPopper,
+  soup: Soup, menu: Soup, 'menu-special': Soup,
+}
+
+// List of icon names useful for inclusion pickers (curated)
+export const INCLUSION_ICON_CHOICES: Array<{ value: string; label: string }> = [
+  { value: 'check',         label: 'Check' },
+  { value: 'key',           label: 'Exclusividad / Llave' },
+  { value: 'clock',         label: 'Horario / Tiempo' },
+  { value: 'shield-check',  label: 'Seguridad' },
+  { value: 'wifi',          label: 'WiFi' },
+  { value: 'parking',       label: 'Parking' },
+  { value: 'music',         label: 'Música' },
+  { value: 'disco',         label: 'DJ / Discoteca' },
+  { value: 'lightbulb',     label: 'Iluminación' },
+  { value: 'umbrella',      label: 'Plan B / Lluvia' },
+  { value: 'sparkles',      label: 'Limpieza / Brillo' },
+  { value: 'bed',           label: 'Alojamiento / Cama' },
+  { value: 'utensils',      label: 'Comida / Cubertería' },
+  { value: 'wine',          label: 'Vino' },
+  { value: 'cocktail',      label: 'Coctel / Bar' },
+  { value: 'heart',         label: 'Atención / Amor' },
+  { value: 'calendar',      label: 'Fecha' },
+  { value: 'accessibility', label: 'Accesibilidad' },
+  { value: 'tree',          label: 'Jardín / Árbol' },
+  { value: 'mountain',      label: 'Vistas / Naturaleza' },
+  { value: 'users',         label: 'Invitados' },
+  { value: 'camera',        label: 'Fotografía' },
+  { value: 'moon',          label: 'Noche' },
+  { value: 'sun',           label: 'Día' },
+  { value: 'location',      label: 'Ubicación' },
+  { value: 'phone',         label: 'Teléfono' },
+  { value: 'mail',          label: 'Email' },
+  { value: 'building',      label: 'Edificio / Venue' },
+  { value: 'door',          label: 'Acceso' },
+  { value: 'flame',         label: 'Chimenea' },
+  { value: 'snowflake',     label: 'Climatización' },
+  { value: 'star',          label: 'Destacado' },
+  { value: 'flower',        label: 'Flores' },
+  { value: 'sgae',          label: 'SGAE / Licencia' },
+  { value: 'party',         label: 'Fiesta' },
+]
+
+export function InclusionIcon({ name, size = 22, color, strokeWidth = 1.6 }: {
+  name?: string; size?: number; color?: string; strokeWidth?: number
+}) {
+  if (!name) return null
+  const key = name.toLowerCase().replace(/[_\s]/g, '-')
+  const Comp = INCLUSION_ICONS[key] || INCLUSION_ICONS[key.replace(/-/g, '')]
+  if (!Comp) return null
+  return <Comp size={size} color={color} strokeWidth={strokeWidth} />
+}
+
+export function StarRating({ rating = 5, size = 14, color }: {
+  rating?: number; size?: number; color?: string
+}) {
+  return (
+    <span style={{ display: 'inline-flex', gap: 2, color }}>
+      {Array.from({ length: Math.max(0, Math.min(5, rating)) }).map((_, i) => (
+        <Star key={i} size={size} fill="currentColor" strokeWidth={0} />
+      ))}
+    </span>
+  )
+}
+
 // ─── Inline SVG icons (replace emojis for consistent rendering) ───────────────
 const SVG = (p: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -124,125 +239,11 @@ export function IcoX(p: React.SVGProps<SVGSVGElement>) {
   return <SVG {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></SVG>
 }
 
-// ─── Conversion Block — 3 CTAs: visita / chat / reservar ──────────────────────
-export function ConversionBlock({
-  data, primary, onPrimary, dark = true, ctaId = 'cta',
-}: {
-  data: ProposalData
-  primary: string
-  onPrimary: string
-  dark?: boolean
-  ctaId?: string
-}) {
-  const phone   = data.venue?.contact_phone || ''
-  const waMsg   = encodeURIComponent(`Hola 👋 acabo de ver la propuesta para ${data.couple_name} y me gustaría hablar con vosotros.`)
-  const waLink  = phone ? `https://wa.me/${phone.replace(/\D/g, '')}?text=${waMsg}` : null
-  const mailTo  = data.venue?.contact_email ? `mailto:${data.venue.contact_email}` : null
-  const txt      = dark ? 'rgba(255,255,255,.55)' : '#64748b'
-  const cardBg   = dark ? 'rgba(255,255,255,.05)' : '#ffffff'
-  const cardHov  = dark ? 'rgba(255,255,255,.09)' : '#f8f8f8'
-  const cardBord = dark ? 'rgba(255,255,255,.09)' : 'rgba(0,0,0,.09)'
-  const headCol  = dark ? '#fff' : '#111'
-  const secBg    = dark ? 'rgba(0,0,0,.35)' : 'rgba(0,0,0,.03)'
-  const shadow   = dark ? 'none' : '0 2px 16px rgba(0,0,0,.07)'
-  const iconBg   = dark ? 'rgba(255,255,255,.06)' : `rgba(${toRgb(primary)},.1)`
-
-  return (
-    <section style={{ background: secBg, padding: '56px 32px' }}>
-      <div style={{ maxWidth: 1060, margin: '0 auto' }}>
-
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <span style={{ fontSize: '.6rem', fontWeight: 700, letterSpacing: '.22em', textTransform: 'uppercase', color: primary }}>
-            ¿Qué queréis hacer ahora?
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-
-          {/* ① Agendar visita — accent card */}
-          <div style={{ background: primary, borderRadius: 16, flex: '1.15 1 260px', padding: '36px 32px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(0,0,0,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <IcoBuilding width={22} height={22} style={{ color: onPrimary }} />
-            </div>
-            <div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: onPrimary, marginBottom: 6 }}>Agendar una visita</div>
-              <p style={{ fontSize: '.82rem', color: onPrimary, opacity: .78, lineHeight: 1.7, margin: 0 }}>
-                La mayoría de parejas toman la decisión durante la primera visita. ¿Cuándo os vendría bien?
-              </p>
-            </div>
-            <button
-              onClick={() => document.getElementById(ctaId)?.scrollIntoView({ behavior: 'smooth' })}
-              style={{ marginTop: 'auto', background: 'rgba(0,0,0,.22)', border: '1px solid rgba(255,255,255,.25)', color: onPrimary, padding: '11px 20px', fontSize: '.72rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer', borderRadius: 8, alignSelf: 'flex-start' }}>
-              Reservar visita →
-            </button>
-          </div>
-
-          {/* ② WhatsApp/Chat */}
-          <div
-            style={{ background: cardBg, border: `1px solid ${cardBord}`, borderRadius: 16, boxShadow: shadow, flex: '1 1 220px', padding: '36px 28px', display: 'flex', flexDirection: 'column', gap: 14, transition: 'background .2s', cursor: waLink || mailTo ? 'pointer' : 'default' }}
-            onClick={() => (waLink || mailTo) && window.open(waLink || mailTo!, '_blank')}
-            onMouseEnter={e => (e.currentTarget.style.background = cardHov)}
-            onMouseLeave={e => (e.currentTarget.style.background = cardBg)}
-          >
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <IcoChat width={22} height={22} style={{ color: primary }} />
-            </div>
-            <div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: headCol, marginBottom: 6 }}>Hablar con nosotros</div>
-              <p style={{ fontSize: '.82rem', color: txt, lineHeight: 1.65, margin: 0 }}>
-                ¿Tenéis dudas? Nuestro equipo os responde por WhatsApp en minutos.
-              </p>
-            </div>
-            {(waLink || mailTo) && (
-              <a href={waLink || mailTo!} target="_blank" rel="noopener"
-                style={{ marginTop: 'auto', fontSize: '.72rem', fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: primary, textDecoration: 'none' }}
-                onClick={e => e.stopPropagation()}>
-                {waLink ? 'Abrir WhatsApp →' : 'Enviar email →'}
-              </a>
-            )}
-          </div>
-
-          {/* ③ Reservar fecha */}
-          <div
-            style={{ background: cardBg, border: `1px solid ${cardBord}`, borderRadius: 16, boxShadow: shadow, flex: '1 1 220px', padding: '36px 28px', display: 'flex', flexDirection: 'column', gap: 14, transition: 'background .2s', cursor: 'pointer' }}
-            onClick={() => document.getElementById(ctaId)?.scrollIntoView({ behavior: 'smooth' })}
-            onMouseEnter={e => (e.currentTarget.style.background = cardHov)}
-            onMouseLeave={e => (e.currentTarget.style.background = cardBg)}
-          >
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <IcoCalendar width={22} height={22} style={{ color: primary }} />
-            </div>
-            <div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: headCol, marginBottom: 6 }}>Reservar fecha</div>
-              <p style={{ fontSize: '.82rem', color: txt, lineHeight: 1.65, margin: 0 }}>
-                Si ya lo tenéis claro, podéis reservar vuestra fecha directamente.
-              </p>
-            </div>
-            <button
-              onClick={e => { e.stopPropagation(); document.getElementById(ctaId)?.scrollIntoView({ behavior: 'smooth' }) }}
-              style={{ marginTop: 'auto', background: 'none', border: `1px solid ${cardBord}`, color: headCol, padding: '10px 16px', fontSize: '.72rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer', borderRadius: 8, alignSelf: 'flex-start' }}>
-              Confirmar reserva →
-            </button>
-          </div>
-
-        </div>
-      </div>
-    </section>
-  )
-}
-
 // ─── Floating WhatsApp button ─────────────────────────────────────────────────
 export function FloatingWhatsApp({ phone, coupleName, primary, onPrimary }: {
   phone: string; coupleName: string; primary: string; onPrimary: string
 }) {
-  const [open, setOpen]       = useState(false)
-  const [visible, setVisible] = useState(false)
-
-  useEffect(() => {
-    const fn = () => setVisible(window.scrollY > 300)
-    window.addEventListener('scroll', fn, { passive: true })
-    return () => window.removeEventListener('scroll', fn)
-  }, [])
+  const [open, setOpen] = useState(false)
 
   if (!phone) return null
   const waMsg  = encodeURIComponent(`Hola 👋 he visto la propuesta para ${coupleName} y me gustaría hablar con vosotros.`)
@@ -250,10 +251,7 @@ export function FloatingWhatsApp({ phone, coupleName, primary, onPrimary }: {
 
   return (
     <div style={{
-      position: 'fixed', bottom: 88, right: 20, zIndex: 9000,
-      opacity: visible ? 1 : 0, transform: visible ? 'none' : 'translateY(16px)',
-      transition: 'opacity .3s, transform .3s',
-      pointerEvents: visible ? 'auto' : 'none',
+      position: 'fixed', bottom: 24, right: 20, zIndex: 9000,
     }}>
       {open && (
         <div style={{
@@ -307,10 +305,18 @@ export function Gallery({
 }) {
   const [idx, setIdx] = useState(0)
   const [paused, setPaused] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const n = photos.length
-  const VISIBLE = 4
+  const VISIBLE = isMobile ? 2 : 4
   const maxIdx = Math.max(0, n - VISIBLE)
   const canSlide = n > VISIBLE
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   useEffect(() => {
     if (!canSlide || paused) return
@@ -320,12 +326,14 @@ export function Gallery({
 
   if (!n) return null
 
-  // 1–3 images → same-height equal grid
+  // 1–3 images → equal grid, colapsa a 1 columna en móvil
   if (n <= 3) {
+    const cols = isMobile ? 1 : n
+    const ratio = n === 1 ? '21/9' : (isMobile ? '3/2' : '4/2')
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${n}, 1fr)`, gap: 3 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 3 }}>
         {photos.map((url, i) => (
-          <div key={i} style={{ overflow: 'hidden', aspectRatio: n === 1 ? '21/9' : '4/2' }}>
+          <div key={i} style={{ overflow: 'hidden', aspectRatio: ratio }}>
             <img src={url} alt="" loading="lazy"
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .7s ease' }}
               onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.04)')}
@@ -352,7 +360,7 @@ export function Gallery({
         transition: 'transform .55s cubic-bezier(.22,1,.36,1)',
       }}>
         {photos.map((url, i) => (
-          <div key={i} style={{ flex: '0 0 25%', height: 240, overflow: 'hidden', padding: '0 1.5px' }}>
+          <div key={i} style={{ flex: `0 0 ${isMobile ? '50%' : '25%'}`, height: isMobile ? 180 : 240, overflow: 'hidden', padding: '0 1.5px' }}>
             <img src={url} alt="" loading={i < 5 ? 'eager' : 'lazy'}
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .7s ease' }}
               onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.04)')}
@@ -369,6 +377,69 @@ export function Gallery({
       {idx < maxIdx && (
         <button onClick={() => { setPaused(true); setIdx(i => Math.min(maxIdx, i + 1)) }} aria-label="Siguiente"
           style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', zIndex: 4, width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,.4)', border: 'none', backdropFilter: 'blur(4px)', color: '#fff', fontSize: '.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>→</button>
+      )}
+    </div>
+  )
+}
+
+// ─── Venue Rental Grid — tarifas temporada × día ─────────────────────────────
+export function VenueRentalGrid({
+  data, primary, dark = false,
+}: {
+  data: SectionsData['venue_rental']
+  primary: string
+  dark?: boolean
+}) {
+  if (!data) return null
+  const rows = data.rows ?? []
+  const tiers = data.day_tiers ?? []
+  if (!rows.length || !tiers.length) return null
+  const txtMuted = dark ? 'rgba(255,255,255,.5)' : '#6a6560'
+  const txt = dark ? '#fff' : '#181410'
+  const line = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
+  const accent = dark ? 'rgba(255,255,255,.04)' : 'rgba(0,0,0,.02)'
+
+  return (
+    <div>
+      {data.title && (
+        <div style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.2em', textTransform: 'uppercase', color: primary, marginBottom: 8 }}>
+          {data.title}
+        </div>
+      )}
+      {data.intro && <p style={{ fontSize: '.88rem', color: txtMuted, lineHeight: 1.7, marginBottom: 20, maxWidth: 640 }}>{data.intro}</p>}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.88rem' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', padding: '12px 14px', borderBottom: `1px solid ${line}`, fontWeight: 600, color: txtMuted, fontSize: '.72rem', letterSpacing: '.12em', textTransform: 'uppercase' }}>
+                Temporada
+              </th>
+              {tiers.map((t, i) => (
+                <th key={i} style={{ textAlign: 'right', padding: '12px 14px', borderBottom: `1px solid ${line}`, fontWeight: 600, color: txtMuted, fontSize: '.72rem', letterSpacing: '.08em' }}>
+                  {t}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, ri) => (
+              <tr key={ri} style={{ background: ri % 2 === 1 ? accent : 'transparent' }}>
+                <td style={{ padding: '12px 14px', color: txt, fontWeight: 500 }}>{r.season}</td>
+                {tiers.map((_, ci) => {
+                  const v = r.prices?.[ci]
+                  return (
+                    <td key={ci} style={{ padding: '12px 14px', textAlign: 'right', color: v ? txt : txtMuted, fontVariantNumeric: 'tabular-nums' }}>
+                      {v || '—'}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {data.notes && (
+        <div style={{ fontSize: '.75rem', color: txtMuted, marginTop: 12, fontStyle: 'italic' }}>{data.notes}</div>
       )}
     </div>
   )
@@ -393,6 +464,7 @@ export function extractData(data: ProposalData) {
   const vc = data.venueContent
   return {
     sec,
+    hasCatering: sec.has_catering !== false,
     on: (id: string) => sec.sections_enabled?.[id] !== false,
     packagesShow:   so.packages_override    != null ? so.packages_override    : vc.packages      ?? [],
     zonesShow:      so.zones_override       != null ? so.zones_override       : vc.zones          ?? [],
@@ -402,10 +474,15 @@ export function extractData(data: ProposalData) {
     collabsShow:    so.collaborators_override != null ? so.collaborators_override : vc.collaborators ?? [],
     extrasShow:     so.extra_services_override != null ? so.extra_services_override : vc.extra_services ?? [],
     menuShow:       so.menu_prices_override != null ? so.menu_prices_override : vc.menu_prices    ?? [],
+    menusStructured: (so.menus_override ?? null) as Menu[] | null,
+    menuExtras:      (so.menu_extras_override ?? null) as MenuExtra[] | null,
+    appetizersBase:  (so.appetizers_base_override ?? null) as AppetizerGroup[] | null,
     expShow:        so.experience_override  != null ? so.experience_override  : vc.experience,
-    testsShow:      so.testimonials_override != null ? so.testimonials_override : vc.testimonials   ?? [],
+    testsShow:      so.testimonials_override != null
+                      ? so.testimonials_override
+                      : (sec.testimonials && sec.testimonials.length ? sec.testimonials : (vc.testimonials ?? [])),
     techspecs:      vc.techspecs,
-    accom:          vc.accommodation_info,
+    accom:          (so.accommodation && Object.keys(so.accommodation).length > 0) ? so.accommodation : vc.accommodation_info,
     mapVC:          vc.map_info,
     budgetSim:      vc.budget_simulator,
   }

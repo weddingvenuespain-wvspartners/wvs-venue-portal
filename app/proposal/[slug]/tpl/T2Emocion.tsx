@@ -6,24 +6,26 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { buildSingleFontUrl } from '@/lib/fonts'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, ConversionBlock, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoChat, type ProposalData } from './shared'
+import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, type ProposalData } from './shared'
+import { WeddingProposal } from './WeddingProposal'
 
 export default function T2Emocion({ data }: { data: ProposalData }) {
-  const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, ctas, venue, branding } = data
-  const { sec, on, packagesShow, inclusionsShow, testsShow, extrasShow, expShow, faqShow } = extractData(data)
+  const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, testsShow, extrasShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, collabsShow, accom } = extractData(data)
 
   const primary = branding?.primary_color ?? '#6B4F3A'
   const rgb     = toRgb(primary)
   const onPri   = isDark(primary) ? '#fff' : '#111'
   const logo    = branding?.logo_url ?? null
   const font    = (branding as any)?.font_family || 'Cormorant Garamond,Georgia,serif'
+  const contact = resolveContact(data)
+  const contactOn = on('contact') && (contact.phone || contact.email)
+  const photoList = venue?.photo_urls ?? []
+  const scrollToContact = () => document.getElementById('cta')?.scrollIntoView({ behavior: 'smooth' })
 
   const [heroLoaded, setHeroLoaded] = useState(false)
   const heroImgRef = useRef<HTMLImageElement>(null)
   useEffect(() => { if (heroImgRef.current?.complete) setHeroLoaded(true) }, [])
-  const [ctaF, setCtaF]   = useState({ name:'', email:'', phone:'', message:'' })
-  const [ctaSent, setCtaSent] = useState(false)
-  const [sending, setSending] = useState(false)
   const [openFaq, setOpenFaq] = useState<number|null>(null)
 
   useEffect(() => {
@@ -37,17 +39,10 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
     document.head.appendChild(l)
   }, [font])
 
-  const submitCta = async (type: string) => {
-    if (!ctaF.name || !ctaF.email) return; setSending(true)
-    await createClient().from('proposal_cta_requests').insert({ proposal_id: data.id, type, name: ctaF.name, email: ctaF.email, phone: ctaF.phone||null, message: ctaF.message||null })
-    setCtaSent(true); setSending(false)
-  }
-
   const wDate   = formatDate(wedding_date)
   const photos  = venue?.photo_urls ?? []
   const hero    = sec.hero_image_url ?? photos[0] ?? null
   const gallery = sec.gallery_urls?.length ? sec.gallery_urls : photos.slice(1, 7)
-  const showCtas = Array.isArray(ctas) && ctas.length > 0
   const pkgs    = packagesShow.filter((p:any) => p.is_active !== false)
 
   const CREAM = '#FEF8F0'
@@ -103,21 +98,27 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           <>
             <img ref={heroImgRef} src={hero} alt="" onLoad={() => setHeroLoaded(true)}
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 25%', zIndex: 0, transition: 'opacity 1.8s ease', opacity: heroLoaded ? 1 : 0 }} />
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(20,14,8,.38)', zIndex: 1 }} />
-            {/* Vignette */}
-            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,.35) 100%)', zIndex: 2 }} />
+            {/* Darker overlay + vertical gradient for readable text on bright images */}
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(20,14,8,.35) 0%, rgba(20,14,8,.55) 50%, rgba(20,14,8,.65) 100%)', zIndex: 1 }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,.5) 100%)', zIndex: 2 }} />
           </>
         ) : (
           <div style={{ position: 'absolute', inset: 0, background: '#1a0e08' }} />
         )}
 
+        {/* Top-left logo */}
+        {logo && (
+          <div className="hc1" style={{ position: 'absolute', top: 28, left: 32, zIndex: 11 }}>
+            <img src={logo} alt="" style={{ height: 32, objectFit: 'contain', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,.7))' }} />
+          </div>
+        )}
+
         {/* Centered content */}
         <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', padding: '0 24px' }}>
-          {logo && <div className="hc1" style={{ marginBottom: 32 }}><img src={logo} alt="" style={{ height: 32, objectFit: 'contain', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,.7))' }} /></div>}
           <div className="hc1 sans" style={{ fontSize: 10, letterSpacing: '.3em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 20 }}>
             Una propuesta especial para
           </div>
-          <h1 className="hc2 serif" style={{ fontSize: 'clamp(52px,9vw,96px)', fontWeight: 300, color: '#fff', lineHeight: 1.0, letterSpacing: '-.01em', marginBottom: 28, fontStyle: 'italic' }}>
+          <h1 className="hc2 serif" style={{ fontSize: 'clamp(52px,9vw,96px)', fontWeight: 300, color: '#fff', lineHeight: 1.0, letterSpacing: '-.01em', marginBottom: 28, fontStyle: 'italic', textShadow: '0 2px 24px rgba(0,0,0,.5)' }}>
             {couple_name}
           </h1>
           <div className="hc3" style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 20 }}>
@@ -136,7 +137,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
 
 
       {/* ── AVAILABILITY BANNER ── */}
-      {sec.show_availability_msg && sec.availability_message && (
+      {on('availability') && sec.availability_message && (
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} />
       )}
 
@@ -155,7 +156,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       {/* ══════════════════════════════════════════
           PERSONAL MESSAGE — editorial quote
       ══════════════════════════════════════════ */}
-      {personal_message && (
+      {on('welcome') && personal_message && (
         <section style={{ background: '#fff', padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
@@ -173,11 +174,6 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
         </section>
       )}
 
-
-      {/* ── CONVERSION BLOCK ── */}
-      <FadeIn>
-        <ConversionBlock data={data} primary={primary} onPrimary={onPri} dark={false} ctaId="cta" />
-      </FadeIn>
 
       {/* ══════════════════════════════════════════
           EXPERIENCE — full width editorial text
@@ -206,6 +202,108 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
 
 
       {/* ══════════════════════════════════════════
+          ZONES
+      ══════════════════════════════════════════ */}
+      {on('zones') && zonesShow.length > 0 && (
+        <section style={{ background: CREAM, padding: '100px 0' }}>
+          <div className="w-full">
+            <FadeUp>
+              <div style={{ textAlign: 'center', marginBottom: 56 }}>
+                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Los espacios</div>
+                <h2 className="serif" style={{ fontSize: 'clamp(30px,4vw,46px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Cada rincón del venue</h2>
+              </div>
+            </FadeUp>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px,1fr))', gap: 24, alignItems: 'stretch' }}>
+              {zonesShow.map((z: any, i: number) => {
+                const zPhoto = z.photos?.[0] || photoList[i + 2]
+                const caps = formatZoneCapacities(z)
+                const feats = formatZoneFeatures(z)
+                return (
+                  <FadeUp key={i} delay={(i % 3) * .08} style={{ height: '100%', display: 'flex' }}>
+                    <div style={{ background: '#fff', borderRadius: 4, overflow: 'hidden', border: `1px solid rgba(${rgb},.1)`, display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
+                      <div style={{ position: 'relative', aspectRatio: '4/3', overflow: 'hidden', background: WARM, flexShrink: 0 }}>
+                        {zPhoto
+                          ? <img src={zPhoto} alt={z.name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                          : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: `rgba(${rgb},.3)` }}><IcoBuilding width={48} height={48} /></div>
+                        }
+                      </div>
+                      <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+                        <h3 className="serif" style={{ fontSize: 22, fontWeight: 400, color: '#2c2418', fontStyle: 'italic' }}>{z.name}</h3>
+                        {z.description && <p className="sans" style={{ fontSize: 13, color: '#6a5a4a', lineHeight: 1.7 }}>{z.description}</p>}
+                        {caps.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: primary, fontWeight: 600 }}>
+                            {caps.map((c, ci) => <span key={ci} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IcoUsers width={11} height={11} /> {c}</span>)}
+                          </div>
+                        )}
+                        {feats.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 4 }}>
+                            {feats.map((f, fi) => (
+                              <span key={fi} className="sans" style={{ fontSize: 11, padding: '3px 9px', border: `1px solid rgba(${rgb},.2)`, borderRadius: 999, color: `rgba(${rgb},.7)`, letterSpacing: '.03em' }}>{f}</span>
+                            ))}
+                          </div>
+                        )}
+                        {z.notes && <div className="sans" style={{ fontSize: 12, color: '#8a7060', fontStyle: 'italic', marginTop: 4 }}>{z.notes}</div>}
+                        {z.price && <div className="serif" style={{ fontSize: 16, color: primary, marginTop: 4 }}>{z.price}</div>}
+                      </div>
+                    </div>
+                  </FadeUp>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════════
+          VENUE RENTAL — grid temporada × día
+      ══════════════════════════════════════════ */}
+      {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+        <section style={{ background: '#fff', padding: '100px 0' }}>
+          <div className="w">
+            <FadeUp>
+              <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>{sec.venue_rental.title || 'Tarifas de alquiler'}</div>
+                <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Elegid vuestra fecha</h2>
+              </div>
+            </FadeUp>
+            <FadeUp delay={.1}>
+              <VenueRentalGrid data={sec.venue_rental} primary={primary} />
+            </FadeUp>
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════════
+          SEASON PRICES
+      ══════════════════════════════════════════ */}
+      {on('season_prices') && seasonsShow.length > 0 && (
+        <section style={{ background: WARM, padding: '100px 0' }}>
+          <div className="w">
+            <FadeUp>
+              <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Temporadas</div>
+                <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Precios según la fecha</h2>
+              </div>
+            </FadeUp>
+            <div style={{ background: '#fff', borderRadius: 4 }}>
+              {seasonsShow.map((s: any, i: number) => (
+                <FadeUp key={i} delay={i * .06}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 20, alignItems: 'center', padding: '20px 28px', borderBottom: i < seasonsShow.length - 1 ? `1px solid rgba(${rgb},.08)` : 'none' }}>
+                    <div className="serif" style={{ fontSize: 17, color: '#2c2418', fontWeight: 400 }}>{s.label || s.season}</div>
+                    <div>
+                      <div className="sans" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: primary, marginBottom: 3 }}>{s.date_range}</div>
+                      {s.notes && <div className="sans" style={{ fontSize: 12, color: '#8a7060' }}>{s.notes}</div>}
+                    </div>
+                    <div className="serif" style={{ fontSize: 18, color: primary, textAlign: 'right', whiteSpace: 'nowrap' }}>{s.price_modifier}</div>
+                  </div>
+                </FadeUp>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════════
           TESTIMONIALS — large editorial quotes
       ══════════════════════════════════════════ */}
       {on('testimonials') && testsShow.length > 0 && (
@@ -223,7 +321,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
               {testsShow.map((t:any, i:number) => (
                 <FadeUp key={i} delay={i*.08}>
                   <div style={{ maxWidth: 700, margin: i%2===0?'0 0 0 auto':'0 auto 0 0', textAlign: i%2===0?'right':'left' }}>
-                    <div style={{ color: '#C9A96E', fontSize: 16, letterSpacing: 4, marginBottom: 20 }}>{'★'.repeat(t.rating??5)}</div>
+                    <div style={{ marginBottom: 20 }}><StarRating rating={t.rating ?? 5} size={16} color="#C9A96E" /></div>
                     <p className="serif" style={{ fontSize: 'clamp(20px,3vw,26px)', fontWeight: 300, fontStyle: 'italic', color: '#2c2418', lineHeight: 1.75, marginBottom: 28 }}>
                       &ldquo;{t.text}&rdquo;
                     </p>
@@ -259,7 +357,9 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
               {inclusionsShow.map((inc:any, i:number) => (
                 <FadeUp key={i} delay={(i%4)*.06}>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 32, marginBottom: 14 }}>{inc.emoji || '✦'}</div>
+                    <div style={{ display: 'inline-flex', marginBottom: 14, color: primary }}>
+                      <InclusionIcon name={inc.icon || inc.emoji || 'check'} size={32} color={primary} strokeWidth={1.4} />
+                    </div>
                     <div className="serif" style={{ fontSize: 17, fontWeight: 500, color: '#2c2418', marginBottom: 6 }}>{inc.title}</div>
                     {inc.description && <div className="sans" style={{ fontSize: 12, color: `rgba(${rgb},.65)`, lineHeight: 1.6 }}>{inc.description}</div>}
                   </div>
@@ -318,9 +418,201 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
 
 
       {/* ══════════════════════════════════════════
-          CTA — romantic, soft
+          CONFIGURA VUESTRA BODA (WeddingProposal)
       ══════════════════════════════════════════ */}
-      {showCtas && (
+      {hasCatering && on('menu') && (menusStructured?.length || menuExtras?.length || appetizersBase?.length || menuShow.length > 0) && (
+        <WeddingProposal
+          data={data}
+          menus={menusStructured}
+          extras={menuExtras}
+          appetizers={appetizersBase}
+          legacyMenus={menuShow}
+          primary={primary}
+          onPrimary={onPri}
+        />
+      )}
+
+      {/* ══════════════════════════════════════════
+          ACCOMMODATION
+      ══════════════════════════════════════════ */}
+      {on('accommodation') && accom && (
+        <section style={{ background: WARM, padding: '100px 0' }}>
+          <div className="w">
+            <FadeUp>
+              <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Alojamiento</div>
+                <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Quedaos a dormir</h2>
+              </div>
+            </FadeUp>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px,1fr))', gap: 32, alignItems: 'start' }}>
+              <FadeUp>
+                <div>
+                  {accom.description && <p className="serif" style={{ fontSize: 16, color: '#5a4a3a', lineHeight: 1.85, fontStyle: 'italic', marginBottom: 18 }}>{accom.description}</p>}
+                  {accom.rooms && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {accom.rooms.split('·').map((r: string, i: number) => (
+                        <div key={i} className="sans" style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#5a4a3a' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: primary, flexShrink: 0 }} />{r.trim()}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </FadeUp>
+              <FadeUp delay={.1}>
+                {Array.isArray(accom.options) && accom.options.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {accom.options.map((opt: any, oi: number) => (
+                      <div key={oi} style={{ borderLeft: `2px solid ${primary}`, paddingLeft: 14 }}>
+                        <div className="serif" style={{ fontSize: 17, color: '#2c2418' }}>{opt.label}</div>
+                        {opt.description && <div className="sans" style={{ fontSize: 13, color: '#8a7060', marginTop: 3 }}>{opt.description}</div>}
+                        {opt.included ? (
+                          <div className="sans" style={{ fontSize: 12, color: primary, fontWeight: 600, marginTop: 5 }}>✓ Incluido en la tarifa del venue</div>
+                        ) : opt.price_info ? (
+                          <div className="sans" style={{ fontSize: 13, color: '#5a4a3a', marginTop: 4 }}>{opt.price_info}</div>
+                        ) : Array.isArray(opt.prices) && opt.prices.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 6 }}>
+                            {opt.prices.map((p: any, pi: number) => (
+                              <div key={pi} className="sans" style={{ display: 'flex', gap: 10, fontSize: 13, color: '#5a4a3a' }}>
+                                <span style={{ flex: 1 }}>{p.season}</span>
+                                <span className="serif" style={{ color: primary }}>{p.price}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : accom.price_info ? (
+                  <p className="sans" style={{ fontSize: 14, color: '#5a4a3a', lineHeight: 1.8 }}>{accom.price_info}</p>
+                ) : null}
+                {accom.nearby && (
+                  <div style={{ marginTop: 18, paddingTop: 18, borderTop: `1px solid rgba(${rgb},.15)` }}>
+                    <div className="sans" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: `rgba(${rgb},.5)`, marginBottom: 8 }}>Alojamientos cercanos</div>
+                    <p className="sans" style={{ fontSize: 13, color: '#8a7060', lineHeight: 1.7 }}>{accom.nearby}</p>
+                  </div>
+                )}
+              </FadeUp>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════════
+          EXTRA SERVICES
+      ══════════════════════════════════════════ */}
+      {on('extra_services') && extrasShow.length > 0 && (
+        <section style={{ background: '#fff', padding: '100px 0' }}>
+          <div className="w">
+            <FadeUp>
+              <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Servicios adicionales</div>
+                <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Personaliza tu celebración</h2>
+              </div>
+            </FadeUp>
+            {extrasShow.map((svc: any, i: number) => (
+              <FadeUp key={i} delay={i * .04}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 0', borderBottom: `1px solid rgba(${rgb},.1)`, gap: 20 }}>
+                  <div>
+                    <div className="serif" style={{ fontSize: 17, fontWeight: 400, color: '#2c2418' }}>{svc.name}</div>
+                    {svc.description && <div className="sans" style={{ fontSize: 13, color: '#8a7060', marginTop: 3 }}>{svc.description}</div>}
+                  </div>
+                  {svc.price && <span className="serif" style={{ fontSize: 20, color: primary, whiteSpace: 'nowrap' }}>{svc.price}</span>}
+                </div>
+              </FadeUp>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════════
+          COLLABORATORS
+      ══════════════════════════════════════════ */}
+      {on('collaborators') && collabsShow.length > 0 && (
+        <section style={{ background: WARM, padding: '100px 0' }}>
+          <div className="w-full">
+            <FadeUp>
+              <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Proveedores de confianza</div>
+                <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Nuestros colaboradores</h2>
+              </div>
+            </FadeUp>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}>
+              {collabsShow.map((c: any, i: number) => (
+                <FadeUp key={i} delay={(i % 4) * .05}>
+                  <div style={{ background: '#fff', padding: '22px 24px', borderRadius: 4, border: `1px solid rgba(${rgb},.1)`, height: '100%' }}>
+                    <div className="sans" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: primary, marginBottom: 8 }}>{c.category}</div>
+                    <div className="serif" style={{ fontSize: 17, fontWeight: 400, color: '#2c2418', marginBottom: 4 }}>{c.name}</div>
+                    {c.description && <div className="sans" style={{ fontSize: 12, color: '#8a7060', lineHeight: 1.6 }}>{c.description}</div>}
+                  </div>
+                </FadeUp>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════════
+          FAQ
+      ══════════════════════════════════════════ */}
+      {on('faq') && faqShow.length > 0 && (
+        <section style={{ background: '#fff', padding: '100px 0' }}>
+          <div className="w">
+            <FadeUp>
+              <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Dudas frecuentes</div>
+                <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Preguntas y respuestas</h2>
+              </div>
+            </FadeUp>
+            <div>
+              {faqShow.map((item: any, i: number) => (
+                <FadeUp key={i} delay={i * .04}>
+                  <div style={{ borderBottom: `1px solid rgba(${rgb},.12)` }}>
+                    <button onClick={() => setOpenFaq(openFaq === i ? null : i)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', gap: 16 }}>
+                      <span className="serif" style={{ fontSize: 17, fontWeight: 400, color: openFaq === i ? primary : '#2c2418', fontStyle: 'italic' }}>{item.question}</span>
+                      <span style={{ fontSize: 22, color: primary, flexShrink: 0, fontWeight: 200, transform: openFaq === i ? 'rotate(45deg)' : 'none', transition: 'transform .25s' }}>+</span>
+                    </button>
+                    <div style={{ overflow: 'hidden', maxHeight: openFaq === i ? 400 : 0, transition: 'max-height .35s cubic-bezier(.4,0,.2,1)' }}>
+                      <p className="sans" style={{ fontSize: 14, color: '#6a5a4a', lineHeight: 1.8, paddingBottom: 22 }}>{item.answer}</p>
+                    </div>
+                  </div>
+                </FadeUp>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════════
+          MAPA
+      ══════════════════════════════════════════ */}
+      {on('map') && (sec.map_embed_url || (data.venueContent.map_info as any)?.embed_url) && (() => {
+        const embed = sec.map_embed_url || (data.venueContent.map_info as any).embed_url
+        const address = sec.map_address || (data.venueContent.map_info as any)?.address
+        return (
+          <section style={{ background: WARM, padding: '100px 0' }}>
+            <div className="w">
+              <FadeUp>
+                <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                  <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Ubicación</div>
+                  <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Cómo llegar</h2>
+                  {address && <p className="sans" style={{ fontSize: 13, color: '#8a7060', marginTop: 14 }}>{address}</p>}
+                </div>
+              </FadeUp>
+              <FadeUp delay={.1}>
+                <div style={{ overflow: 'hidden', borderRadius: 4, border: `1px solid rgba(${rgb},.12)` }}>
+                  <iframe src={embed} width="100%" height="360" style={{ border: 'none', display: 'block' }} loading="lazy" allowFullScreen />
+                </div>
+              </FadeUp>
+            </div>
+          </section>
+        )
+      })()}
+
+      {/* ══════════════════════════════════════════
+          CTA — romantic, soft (contacto directo)
+      ══════════════════════════════════════════ */}
+      {contactOn && (
         <section id="cta" style={{ position: 'relative', padding: '120px 0', overflow: 'hidden' }}>
           {hero && (
             <>
@@ -331,55 +623,38 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           {!hero && <div style={{ position: 'absolute', inset: 0, background: `rgba(${rgb},.85)` }} />}
 
           <div className="w" style={{ position: 'relative', zIndex: 10 }}>
-            {!ctaSent ? (
-              <>
-                <FadeUp>
-                  <div style={{ textAlign: 'center', marginBottom: 64 }}>
-                    <p className="serif" style={{ fontSize: 'clamp(30px,5vw,58px)', fontWeight: 300, fontStyle: 'italic', color: '#fff', lineHeight: 1.15, marginBottom: 20 }}>
-                      ¿Comenzamos a planear vuestro día?
-                    </p>
-                    <p className="sans" style={{ fontSize: 14, color: 'rgba(255,255,255,.5)' }}>Dejadnos vuestros datos y os contactamos pronto.</p>
-                  </div>
-                </FadeUp>
-                <FadeUp delay={.12}>
-                  <div style={{ maxWidth: 520, margin: '0 auto' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }} className="two-col">
-                      {[{k:'name',ph:'Vuestro nombre'},{k:'email',ph:'Correo electrónico'},{k:'phone',ph:'Teléfono'},{k:'message',ph:'Un mensaje...'}].map(f=>(
-                        <div key={f.k}><input className="inp" value={(ctaF as any)[f.k]} onChange={e=>setCtaF(p=>({...p,[f.k]:e.target.value}))} placeholder={f.ph} /></div>
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', marginTop: 12 }}>
-                      {ctas.includes('visit') && (
-                        <button className="btn-em" style={{ borderColor: 'rgba(255,255,255,.5)', color: '#fff' }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='rgba(255,255,255,.1)' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='' }}
-                          onClick={()=>submitCta('visit')} disabled={sending||!ctaF.name||!ctaF.email}>
-                          {sending?'Enviando…':'Solicitar visita'}
-                        </button>
-                      )}
-                      {ctas.includes('whatsapp') && venue?.contact_phone && (
-                        <a href={`https://wa.me/${venue.contact_phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola, me ha llegado la propuesta para ${couple_name}.`)}`}
-                          target="_blank" rel="noopener noreferrer"
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '16px 36px', border: '1.5px solid rgba(37,211,102,.5)', color: '#25D366', background: 'none', fontSize: 12, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', textDecoration: 'none', fontFamily: 'Inter,sans-serif' }}>
-                          <IcoChat width={14} height={14} /> WhatsApp
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </FadeUp>
-              </>
-            ) : (
-              <div style={{ textAlign: 'center' }}>
-                <p className="serif" style={{ fontSize: 48, fontWeight: 300, fontStyle: 'italic', color: '#fff', marginBottom: 16 }}>¡Perfecto!</p>
-                <p className="sans" style={{ fontSize: 15, color: 'rgba(255,255,255,.5)' }}>Os contactaremos muy pronto.</p>
+            <FadeUp>
+              <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 14 }}>Datos de contacto</div>
+                <p className="serif" style={{ fontSize: 'clamp(30px,5vw,58px)', fontWeight: 300, fontStyle: 'italic', color: '#fff', lineHeight: 1.15, marginBottom: 20 }}>
+                  Estamos aquí para ayudaros
+                </p>
+                <p className="sans" style={{ fontSize: 14, color: 'rgba(255,255,255,.55)' }}>Estamos a vuestra disposición para resolver lo que necesitéis.</p>
               </div>
-            )}
+            </FadeUp>
+            <FadeUp delay={.12}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {contact.phone && (
+                  <a href={`https://wa.me/${contact.phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola, he visto la propuesta para ${couple_name}.`)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '16px 36px', border: '1.5px solid rgba(37,211,102,.5)', color: '#25D366', background: 'none', fontSize: 12, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', textDecoration: 'none', fontFamily: 'Inter,sans-serif' }}>
+                    <IcoChat width={14} height={14} /> WhatsApp
+                  </a>
+                )}
+                {contact.email && (
+                  <a href={`mailto:${contact.email}?subject=${encodeURIComponent(`Propuesta ${couple_name}`)}`}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '16px 36px', border: '1.5px solid rgba(255,255,255,.5)', color: '#fff', background: 'none', fontSize: 12, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', textDecoration: 'none', fontFamily: 'Inter,sans-serif' }}>
+                    Enviar email
+                  </a>
+                )}
+              </div>
+            </FadeUp>
           </div>
         </section>
       )}
 
       {/* ── FLOATING WHATSAPP ── */}
-      <FloatingWhatsApp phone={venue?.contact_phone || ''} coupleName={couple_name} primary={primary} onPrimary={onPri} />
+      {contactOn && <FloatingWhatsApp phone={contact.phone} coupleName={couple_name} primary={primary} onPrimary={onPri} />}
 
       {/* Footer */}
       <footer style={{ background: '#1a0e08', padding: '48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20 }}>

@@ -5,27 +5,32 @@
 //            → Qué incluye → Testimoniales → Colaboradores → Extras → FAQ → CTA
 
 import { useEffect, useRef, useState } from 'react'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, ConversionBlock, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, type ProposalData } from './shared'
+import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, StarRating, resolveContact, type ProposalData } from './shared'
+import { buildSingleFontUrl } from '@/lib/fonts'
+import { WeddingProposal } from './WeddingProposal'
 
 export default function T1Impacto({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date,
           price_estimate, show_price_estimate, venue, branding } = data
-  const { sec, on, packagesShow, inclusionsShow, extrasShow, faqShow,
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow,
           testsShow, zonesShow, seasonsShow, collabsShow, menuShow,
+          menusStructured, menuExtras, appetizersBase,
           expShow, techspecs, accom } = extractData(data)
 
   const primary = branding?.primary_color ?? '#8B6914'
   const rgb     = toRgb(primary)
   const onPri   = isDark(primary) ? '#fff' : '#111'
   const logo    = branding?.logo_url ?? null
-  const FONT    = "'Cormorant Garamond', Georgia, serif"
+  const FONT    = (branding as any)?.font_family || "'Cormorant Garamond', Georgia, serif"
+  const contact = resolveContact(data)
+  const contactOn = on('contact') && (contact.phone || contact.email)
+  const waHref = contact.phone ? `https://wa.me/${contact.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, he visto la propuesta para ${couple_name} y me gustaría hablar con vosotros.`)}` : ''
+  const mailHref = contact.email ? `mailto:${contact.email}?subject=${encodeURIComponent(`Propuesta ${couple_name}`)}` : ''
+  const scrollToContact = () => document.getElementById('t1-cta')?.scrollIntoView({ behavior: 'smooth' })
 
   const [scrolled, setScrolled]     = useState(false)
   const [ctaBar, setCtaBar]         = useState(false)
   const [openFaq, setOpenFaq]       = useState<number | null>(null)
-  const [ctaF, setCtaF]             = useState({ name: '', email: '', phone: '', message: '' })
-  const [ctaSent, setCtaSent]       = useState(false)
-  const [sending, setSending]       = useState(false)
   const heroRef                     = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
@@ -39,17 +44,14 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     return () => window.removeEventListener('scroll', fn)
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!ctaF.name || !ctaF.email) return
-    setSending(true)
-    try {
-      const { createClient } = await import('@/lib/supabase')
-      await createClient().from('proposal_contacts').insert({ proposal_id: data.id, ...ctaF })
-    } catch {}
-    setCtaSent(true)
-    setSending(false)
-  }
+  // Load branded font from Google Fonts when it changes
+  useEffect(() => {
+    const url = buildSingleFontUrl(FONT); if (!url) return
+    const ex = document.querySelector('link[data-gf-p]')
+    if (ex) { ex.setAttribute('href', url); return }
+    const l = document.createElement('link'); l.rel='stylesheet'; l.href=url; l.setAttribute('data-gf-p','1')
+    document.head.appendChild(l)
+  }, [FONT])
 
   const photos       = venue?.photo_urls ?? []
   const hero         = sec.hero_image_url ?? photos[0] ?? ''
@@ -98,7 +100,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     }
 
     /* ── Hero ── */
-    .t1-hero{position:relative;height:100svh;min-height:620px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+    .t1-hero{position:relative;height:100svh;min-height:620px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;background:radial-gradient(circle at 30% 40%,rgba(${rgb},.35),#0a0a0a 65%)}
     .t1-hero-img{position:absolute;inset:0;width:100%;height:120%;object-fit:cover;object-position:center 20%;transform-origin:center top}
     .t1-hero-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.15) 0%,rgba(0,0,0,.0) 30%,rgba(0,0,0,.7) 72%,rgba(0,0,0,.98) 100%)}
     @keyframes zoom{from{transform:scale(1.06) translateY(0)}to{transform:scale(1.0) translateY(0)}}
@@ -121,10 +123,11 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     /* ── Story section ── */
     .t1-story{display:grid;grid-template-columns:1fr 1fr;gap:0;align-items:stretch}
     .t1-story-text{padding:80px 64px;background:#0e0e0e}
-    .t1-story-body{font-size:.97rem;color:rgba(255,255,255,.5);line-height:1.9;white-space:pre-wrap;margin-top:4px}
-    .t1-story-img{overflow:hidden;min-height:500px;position:relative}
+    .t1-story-body{font-size:.97rem;color:rgba(255,255,255,.5);line-height:1.9;white-space:pre-wrap;margin-top:4px;overflow-wrap:break-word}
+    .t1-story-img{overflow:hidden;min-height:500px;position:relative;background:linear-gradient(135deg,rgba(${rgb},.25),#1a1a1a 70%,#0a0a0a)}
     .t1-story-img img{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(.8);transition:transform .8s ease}
     .t1-story-img:hover img{transform:scale(1.04)}
+    @media(max-width:900px){.t1-story-text{padding:48px 28px}.t1-story-img{min-height:260px;aspect-ratio:16/10}}
 
     /* ── Gallery mosaic ── */
     .t1-mosaic{display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:340px 260px;gap:3px;background:#000}
@@ -134,16 +137,16 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-mosaic-item.span-2{grid-row:span 2}
 
     /* ── Zones / Spaces ── */
-    .t1-zones{display:flex;flex-direction:column;gap:2px}
-    .t1-zone{display:grid;grid-template-columns:1fr 1fr;background:#111;overflow:hidden}
-    .t1-zone:nth-child(even) .t1-zone-img{order:2}
-    .t1-zone:nth-child(even) .t1-zone-info{order:1}
-    .t1-zone-img{overflow:hidden;min-height:320px}
-    .t1-zone-img img{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(.8);transition:transform .7s ease,filter .4s}
-    .t1-zone:hover .t1-zone-img img{transform:scale(1.04);filter:brightness(.95)}
-    .t1-zone-ph{width:100%;height:100%;min-height:320px;background:#1a1a1a;display:flex;align-items:center;justify-content:center;font-size:3rem;opacity:.3}
-    .t1-zone-info{padding:52px 48px;display:flex;flex-direction:column;gap:12px}
-    .t1-zone-name{font-family:${FONT};font-size:1.9rem;font-weight:300;color:#fff}
+    .t1-zones{display:flex;flex-direction:column;gap:0;max-width:1200px;margin:0 auto}
+    .t1-zone{display:grid;grid-template-columns:1fr 1fr;background:#111;overflow:hidden;align-items:stretch}
+    .t1-zone-reverse .t1-zone-img{order:2}
+    .t1-zone-reverse .t1-zone-info{order:1}
+    .t1-zone-img{position:relative;overflow:hidden;min-height:360px;height:100%;background:linear-gradient(135deg,rgba(${rgb},.2),#1a1a1a 70%,#0a0a0a)}
+    .t1-zone-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;filter:brightness(.85);transition:transform .7s ease,filter .4s}
+    .t1-zone:hover .t1-zone-img img{transform:scale(1.04);filter:brightness(1)}
+    .t1-zone-ph{width:100%;height:100%;background:#1a1a1a;display:flex;align-items:center;justify-content:center;opacity:.3}
+    .t1-zone-info{padding:56px 52px;display:flex;flex-direction:column;gap:14px;justify-content:center}
+    .t1-zone-name{font-family:${FONT};font-size:2rem;font-weight:300;color:#fff;line-height:1.15;letter-spacing:-.01em}
     .t1-zone-desc{font-size:.88rem;color:rgba(255,255,255,.45);line-height:1.85}
     .t1-zone-cap{font-size:.78rem;font-weight:600;letter-spacing:.06em;color:${primary};text-transform:uppercase}
     .t1-zone-price{font-size:.85rem;color:rgba(255,255,255,.3)}
@@ -153,14 +156,15 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-pkg{background:#111;padding:40px 36px;display:flex;flex-direction:column;transition:background .25s}
     .t1-pkg:hover{background:#151515}
     .t1-pkg.rec{border-top:2px solid ${primary}}
-    .t1-pkg-badge{font-size:.58rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${primary};margin-bottom:14px}
+    .t1-pkg-badge{display:inline-flex;align-items:center;gap:6px;font-size:.58rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:${primary};background:rgba(${rgb},.12);padding:4px 10px;border-radius:100px;margin-bottom:14px;align-self:flex-start}
+    .t1-pkg-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:${primary}}
     .t1-pkg-name{font-family:${FONT};font-size:1.7rem;font-weight:300;color:#fff;margin-bottom:4px}
     .t1-pkg-sub{font-size:.78rem;color:rgba(255,255,255,.3);margin-bottom:20px}
     .t1-pkg-price{font-family:${FONT};font-size:clamp(2.8rem,5vw,4.2rem);font-weight:300;color:${primary};line-height:1;margin:8px 0 28px}
     .t1-pkg-price small{font-size:1rem;color:rgba(255,255,255,.3);font-family:'Inter',sans-serif;font-weight:300}
     .t1-pkg-includes{list-style:none;display:flex;flex-direction:column;gap:9px;flex:1}
-    .t1-pkg-includes li{font-size:.82rem;color:rgba(255,255,255,.5);display:flex;align-items:baseline;gap:9px}
-    .t1-pkg-includes li::before{content:'✦';color:${primary};font-size:.5rem;flex-shrink:0}
+    .t1-pkg-includes li{font-size:.82rem;color:rgba(255,255,255,.55);display:flex;align-items:flex-start;gap:9px}
+    .t1-pkg-includes li::before{content:'';width:5px;height:5px;border-radius:50%;background:${primary};flex-shrink:0;margin-top:7px}
     .t1-pkg-guests{margin-top:20px;padding-top:18px;border-top:1px solid #222;font-size:.75rem;color:rgba(255,255,255,.22)}
 
     /* ── Season pricing ── */
@@ -173,11 +177,13 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-season-price{font-family:${FONT};font-size:1.3rem;font-weight:300;color:${primary};text-align:right}
 
     /* ── Inclusions ── */
-    .t1-inc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0}
-    .t1-inc{display:flex;align-items:flex-start;gap:14px;padding:20px 0;border-bottom:1px solid #181818}
-    .t1-inc-emoji{font-size:1.4rem;flex-shrink:0;opacity:.85;margin-top:1px}
-    .t1-inc-title{font-size:.9rem;font-weight:500;color:rgba(255,255,255,.82);margin-bottom:3px}
-    .t1-inc-desc{font-size:.78rem;color:rgba(255,255,255,.35);line-height:1.55}
+    .t1-inc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;align-items:stretch}
+    .t1-inc-grid > *{height:100%}
+    .t1-inc{display:flex;align-items:flex-start;gap:14px;padding:22px 20px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.02);transition:border-color .2s,background .2s;height:100%}
+    .t1-inc:hover{border-color:rgba(${rgb},.35);background:rgba(${rgb},.05)}
+    .t1-inc-emoji{flex-shrink:0;margin-top:2px;width:36px;height:36px;border-radius:10px;background:rgba(${rgb},.14);display:flex;align-items:center;justify-content:center}
+    .t1-inc-title{font-size:.92rem;font-weight:500;color:rgba(255,255,255,.88);margin-bottom:3px}
+    .t1-inc-desc{font-size:.78rem;color:rgba(255,255,255,.45);line-height:1.55}
 
     /* ── Menu ── */
     .t1-menu-row{display:flex;align-items:center;justify-content:space-between;padding:20px 0;border-bottom:1px solid #181818;gap:20px}
@@ -186,21 +192,21 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-menu-price{font-family:${FONT};font-size:1.6rem;font-weight:300;color:${primary};white-space:nowrap}
 
     /* ── Testimonials ── */
-    .t1-tests{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:2px}
-    .t1-test{background:#111;padding:44px 40px;display:flex;flex-direction:column;gap:20px;position:relative;overflow:hidden}
-    .t1-test-qmark{position:absolute;top:-10px;left:24px;font-family:${FONT};font-size:10rem;color:${primary};opacity:.08;line-height:1;user-select:none}
-    .t1-test-stars{color:#F5A623;font-size:.85rem;letter-spacing:2px}
-    .t1-test-text{font-family:${FONT};font-style:italic;font-size:1.05rem;line-height:1.85;color:rgba(255,255,255,.7);position:relative;z-index:1}
-    .t1-test-foot{display:flex;align-items:center;gap:14px;padding-top:16px;border-top:1px solid #1e1e1e}
-    .t1-test-av{width:44px;height:44px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#222;border:1px solid #333}
-    .t1-test-av img{width:100%;height:100%;object-fit:cover}
-    .t1-test-av-ph{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,${primary},rgba(${rgb},.4));display:flex;align-items:center;justify-content:center;font-family:${FONT};font-size:1rem;color:#fff;flex-shrink:0}
-    .t1-test-couple{font-size:.85rem;font-weight:600;color:rgba(255,255,255,.7)}
-    .t1-test-date{font-size:.73rem;color:rgba(255,255,255,.28);margin-top:1px}
+    .t1-tests{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:24px;align-items:stretch}
+    .t1-tests > *{height:100%}
+    .t1-test{background:#111;display:flex;flex-direction:column;padding:32px 32px 28px;border-radius:4px;border:1px solid rgba(255,255,255,.06);transition:border-color .3s,transform .3s;height:100%;gap:18px;position:relative;overflow:hidden}
+    .t1-test:hover{border-color:rgba(${rgb},.35);transform:translateY(-3px)}
+    .t1-test-qmark{position:absolute;top:8px;right:20px;font-family:${FONT};font-size:7rem;line-height:.7;color:${primary};opacity:.1;user-select:none;pointer-events:none}
+    .t1-test-stars{color:#F5A623;font-size:.8rem;letter-spacing:2px;display:flex;align-items:center;gap:4px;position:relative;z-index:1}
+    .t1-test-text{font-family:${FONT};font-style:italic;font-size:1.02rem;line-height:1.75;color:rgba(255,255,255,.75);flex:1;position:relative;z-index:1;padding-left:16px;border-left:2px solid ${primary}}
+    .t1-test-foot{display:flex;flex-direction:column;gap:3px;padding-top:18px;border-top:1px solid rgba(255,255,255,.08);margin-top:auto;position:relative;z-index:1}
+    .t1-test-couple{font-size:.92rem;font-weight:600;color:#fff;letter-spacing:.01em}
+    .t1-test-date{font-size:.72rem;color:${primary};font-weight:500;letter-spacing:.08em;text-transform:uppercase}
 
     /* ── Collaborators ── */
-    .t1-collabs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1px;background:#1a1a1a}
-    .t1-collab{background:#0e0e0e;padding:28px 28px;border-bottom:none}
+    .t1-collabs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1px;background:#1a1a1a;align-items:stretch}
+    .t1-collabs-grid > *{height:100%}
+    .t1-collab{background:#0e0e0e;padding:28px 28px;border-bottom:none;height:100%;display:flex;flex-direction:column;gap:4px}
     .t1-collab-cat{font-size:.6rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${primary};margin-bottom:8px}
     .t1-collab-name{font-size:.95rem;font-weight:600;color:rgba(255,255,255,.8);margin-bottom:4px}
     .t1-collab-desc{font-size:.77rem;color:rgba(255,255,255,.3);line-height:1.55}
@@ -285,9 +291,11 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           ? <img src={logo} alt={venue?.name || ''} style={{ height: 28, objectFit: 'contain' }} />
           : <span className="t1-nav-logo">{venue?.name}</span>
         }
-        <button className="t1-nav-cta" onClick={() => document.getElementById('t1-cta')?.scrollIntoView({ behavior: 'smooth' })}>
-          Ver disponibilidad
-        </button>
+        {(hasCatering || contactOn) && (
+          <button className="t1-nav-cta" onClick={() => hasCatering ? document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' }) : scrollToContact()}>
+            {hasCatering ? 'Ver menús' : 'Contactar'}
+          </button>
+        )}
       </nav>
 
       {/* ── STICKY BAR ── */}
@@ -298,12 +306,17 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         </div>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           {show_price_estimate && price_estimate && (
-            <span style={{ fontFamily: FONT, fontSize: '1.5rem', fontWeight: 300 }}>{formatPrice(price_estimate)}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1 }}>
+              <span style={{ fontFamily: FONT, fontSize: '1.5rem', fontWeight: 300 }}>{formatPrice(price_estimate)}</span>
+              {ivaLabel(sec, true) && <span style={{ fontSize: '.6rem', opacity: .55, letterSpacing: '.08em', marginTop: 3 }}>{ivaLabel(sec, true)}</span>}
+            </div>
           )}
-          <button style={{ background: 'rgba(255,255,255,.1)', color: '#fff', border: '1px solid rgba(255,255,255,.2)', padding: '9px 20px', fontSize: '.72rem', fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
-            onClick={() => document.getElementById('t1-cta')?.scrollIntoView({ behavior: 'smooth' })}>
-            Reservar →
-          </button>
+          {(hasCatering || contactOn) && (
+            <button style={{ background: 'rgba(255,255,255,.1)', color: '#fff', border: '1px solid rgba(255,255,255,.2)', padding: '9px 20px', fontSize: '.72rem', fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
+              onClick={() => hasCatering ? document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' }) : scrollToContact()}>
+              {hasCatering ? 'Ver menús' : 'Contactar'} →
+            </button>
+          )}
         </div>
       </div>
 
@@ -313,17 +326,12 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       <section className="t1-hero">
         {hero && (
           <>
-            <img ref={heroRef} src={hero} alt="" className="t1-hero-img" style={{ animation: 'zoom 14s ease both' }} />
+            <img ref={heroRef} src={hero} alt="" className="t1-hero-img"
+              style={{ animation: 'zoom 14s ease both' }}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
             <div className="t1-hero-overlay" />
           </>
         )}
-        {/* Top bar */}
-        <div className="ha" style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '24px 48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, animationDelay: '.1s' }}>
-          {logo
-            ? <img src={logo} alt="" style={{ height: 26, objectFit: 'contain', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,.7))' }} />
-            : <span style={{ fontSize: '.65rem', letterSpacing: '.26em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)' }}>{venue?.name}</span>
-          }
-        </div>
         {/* Content */}
         <div style={{ position: 'relative', zIndex: 10, padding: '0 48px 80px' }}>
           <div className="ha" style={{ width: 36, height: 1.5, background: primary, marginBottom: 24, animationDelay: '.15s' }} />
@@ -338,8 +346,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
             {wDate && <span style={{ fontSize: '.82rem', color: 'rgba(255,255,255,.4)', display: 'flex', alignItems: 'center', gap: 5 }}><IcoCalendar width={12} height={12} /> {wDate}</span>}
             {guest_count && <span style={{ fontSize: '.82rem', color: 'rgba(255,255,255,.4)', display: 'flex', alignItems: 'center', gap: 5 }}><IcoUsers width={12} height={12} /> {guest_count} invitados</span>}
             {show_price_estimate && price_estimate && (
-              <span style={{ fontFamily: FONT, fontSize: '2rem', fontWeight: 300, color: '#fff', borderLeft: `2px solid ${primary}`, paddingLeft: 20, marginLeft: 4, lineHeight: 1 }}>
+              <span style={{ fontFamily: FONT, fontSize: '2rem', fontWeight: 300, color: '#fff', borderLeft: `2px solid ${primary}`, paddingLeft: 20, marginLeft: 4, lineHeight: 1, display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                 {formatPrice(price_estimate)}
+                {ivaLabel(sec, true) && <span style={{ fontSize: '.6rem', opacity: .55, letterSpacing: '.08em', marginTop: 4, fontFamily: "'Inter', sans-serif" }}>{ivaLabel(sec, true)}</span>}
               </span>
             )}
           </div>
@@ -352,7 +361,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       </section>
 
       {/* ── AVAILABILITY BANNER ── */}
-      {sec.show_availability_msg && sec.availability_message && (
+      {on('availability') && sec.availability_message && (
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} />
       )}
 
@@ -376,7 +385,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           MENSAJE PERSONAL + CONVERSION BLOCK
       ════════════════════════════════════════════ */}
-      {personal_message && (
+      {on('welcome') && personal_message && (
         <section className="t1-sec" style={{ background: '#080808' }}>
           <FadeUp>
             <div className="t1-msg">
@@ -387,11 +396,6 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           </FadeUp>
         </section>
       )}
-
-      {/* ── CONVERSION BLOCK ── */}
-      <FadeIn>
-        <ConversionBlock data={data} primary={primary} onPrimary={onPri} dark ctaId="t1-cta" />
-      </FadeIn>
 
       {/* ════════════════════════════════════════════
           HISTORIA / EXPERIENCE
@@ -411,7 +415,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
             </FadeUp>
             {(sec.gallery_urls?.[0] ?? photos[1]) && (
               <div className="t1-story-img">
-                <img src={sec.gallery_urls?.[0] ?? photos[1]} alt="El espacio" loading="lazy" />
+                <img src={sec.gallery_urls?.[0] ?? photos[1]} alt="El espacio" loading="lazy"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '40px 32px 28px', background: 'linear-gradient(to top, rgba(0,0,0,.8), transparent)' }}>
                   <div style={{ fontFamily: FONT, fontSize: '.85rem', fontStyle: 'italic', color: 'rgba(255,255,255,.6)' }}>{venue?.name} · {venue?.city}, {venue?.region}</div>
                 </div>
@@ -444,12 +449,16 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <div className="t1-zones">
             {zonesShow.map((z: any, i: number) => {
               const zPhoto = z.photos?.[0] || photos[i + 2]
+              const caps = formatZoneCapacities(z)
+              const feats = formatZoneFeatures(z)
+              const reverse = i % 2 === 1
               return (
                 <FadeIn key={i} delay={0.05}>
-                  <div className="t1-zone">
+                  <div className={`t1-zone${reverse ? ' t1-zone-reverse' : ''}`}>
                     <div className="t1-zone-img">
                       {zPhoto
-                        ? <img src={zPhoto} alt={z.name} loading="lazy" />
+                        ? <img src={zPhoto} alt={z.name} loading="lazy"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
                         : <div className="t1-zone-ph"><IcoBuilding width={48} height={48} style={{ opacity: .3, color: '#fff' }} /></div>
                       }
                     </div>
@@ -457,11 +466,19 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                       <div style={{ fontSize: '.62rem', fontWeight: 700, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,.25)' }}>Espacio {String(i + 1).padStart(2, '0')}</div>
                       <div className="t1-zone-name">{z.name}</div>
                       {z.description && <p className="t1-zone-desc">{z.description}</p>}
-                      {(z.capacity_min || z.capacity_max) && (
-                        <div className="t1-zone-cap">
-                          {z.capacity_min && `${z.capacity_min}`}{z.capacity_min && z.capacity_max ? ' – ' : ''}{z.capacity_max && `${z.capacity_max}`} personas
+                      {caps.length > 0 && (
+                        <div className="t1-zone-cap" style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          {caps.map((c, ci) => <span key={ci}>{c}</span>)}
                         </div>
                       )}
+                      {feats.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                          {feats.map((f, fi) => (
+                            <span key={fi} style={{ fontSize: '.7rem', padding: '3px 9px', border: '1px solid rgba(255,255,255,.15)', borderRadius: 999, color: 'rgba(255,255,255,.55)', letterSpacing: '.04em' }}>{f}</span>
+                          ))}
+                        </div>
+                      )}
+                      {z.notes && <div style={{ fontSize: '.72rem', color: 'rgba(255,255,255,.4)', marginTop: 8, fontStyle: 'italic' }}>{z.notes}</div>}
                       {z.price && <div className="t1-zone-price">{z.price}</div>}
                     </div>
                   </div>
@@ -486,7 +503,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               {pkgs.map((pkg: any, i: number) => (
                 <FadeUp key={i} delay={i * .08}>
                   <div className={`t1-pkg${pkg.is_recommended ? ' rec' : ''}`}>
-                    {pkg.is_recommended && <div className="t1-pkg-badge">★ Más elegido</div>}
+                    {pkg.is_recommended && <div className="t1-pkg-badge">Más elegido</div>}
                     <div className="t1-pkg-name">{pkg.name}</div>
                     {pkg.subtitle && <div className="t1-pkg-sub">{pkg.subtitle}</div>}
                     {pkg.price && (
@@ -510,11 +527,30 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 </FadeUp>
               ))}
             </div>
-            <FadeUp delay={.2} style={{ marginTop: 48, textAlign: 'center' }}>
-              <button style={{ background: primary, color: onPri, border: 'none', padding: '15px 44px', fontSize: '.78rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}
-                onClick={() => document.getElementById('t1-cta')?.scrollIntoView({ behavior: 'smooth' })}>
-                Consultar disponibilidad →
-              </button>
+            {(hasCatering || contactOn) && (
+              <FadeUp delay={.2} style={{ marginTop: 48, textAlign: 'center' }}>
+                <button style={{ background: primary, color: onPri, border: 'none', padding: '15px 44px', fontSize: '.78rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}
+                  onClick={() => hasCatering ? document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' }) : scrollToContact()}>
+                  {hasCatering ? 'Ver menús' : 'Solicitar información'} →
+                </button>
+              </FadeUp>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ════════════════════════════════════════════
+          TARIFAS DE ALQUILER (grid temporada × día)
+      ════════════════════════════════════════════ */}
+      {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+        <section className="t1-sec">
+          <div className="w">
+            <FadeUp>
+              <span className="t1-label">{sec.venue_rental.title || 'Tarifas de alquiler'}</span>
+              <h2 className="t1-h2">Elegid vuestra fecha</h2>
+            </FadeUp>
+            <FadeUp delay={.1}>
+              <VenueRentalGrid data={sec.venue_rental} primary={primary} dark />
             </FadeUp>
           </div>
         </section>
@@ -562,7 +598,13 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               {inclusionsShow.map((inc: any, i: number) => (
                 <FadeUp key={i} delay={(i % 4) * .05}>
                   <div className="t1-inc">
-                    <span className="t1-inc-emoji">{inc.emoji || '✦'}</span>
+                    <span className="t1-inc-emoji" style={{ color: primary, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {inc.icon
+                        ? <InclusionIcon name={inc.icon} size={24} color={primary} />
+                        : inc.emoji && !/\p{Extended_Pictographic}/u.test(inc.emoji)
+                          ? <InclusionIcon name={inc.emoji} size={24} color={primary} />
+                          : <InclusionIcon name="check" size={24} color={primary} />}
+                    </span>
                     <div>
                       <div className="t1-inc-title">{inc.title}</div>
                       {inc.description && <div className="t1-inc-desc">{inc.description}</div>}
@@ -576,29 +618,19 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       )}
 
       {/* ════════════════════════════════════════════
-          MENÚS
+          CONFIGURA VUESTRA BODA (WeddingProposal)
       ════════════════════════════════════════════ */}
-      {on('menu') && menuShow.length > 0 && (
-        <section className="t1-sec">
-          <div className="w">
-            <FadeUp>
-              <span className="t1-label">Gastronomía</span>
-              <h2 className="t1-h2">Nuestros menús</h2>
-            </FadeUp>
-            {menuShow.map((m: any, i: number) => (
-              <FadeUp key={i} delay={i * .06}>
-                <div className="t1-menu-row">
-                  <div>
-                    <div className="t1-menu-name">{m.name}</div>
-                    {m.description && <div className="t1-menu-desc">{m.description}</div>}
-                    {m.min_guests && <div style={{ fontSize: '.72rem', color: 'rgba(255,255,255,.22)', marginTop: 3 }}>Mín. {m.min_guests} comensales</div>}
-                  </div>
-                  <div className="t1-menu-price">{m.price_per_person}<span style={{ fontSize: '.75rem', color: 'rgba(255,255,255,.3)', fontFamily: 'Inter,sans-serif', fontWeight: 300 }}>/pers.</span></div>
-                </div>
-              </FadeUp>
-            ))}
-          </div>
-        </section>
+      {hasCatering && on('menu') && (menusStructured?.length || menuExtras?.length || appetizersBase?.length || menuShow.length > 0) && (
+        <WeddingProposal
+          data={data}
+          menus={menusStructured}
+          extras={menuExtras}
+          appetizers={appetizersBase}
+          legacyMenus={menuShow}
+          primary={primary}
+          onPrimary={onPri}
+          dark
+        />
       )}
 
       {/* ════════════════════════════════════════════
@@ -613,22 +645,18 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
             </FadeUp>
             <div className="t1-tests">
               {testsShow.map((t: any, i: number) => {
-                const initials = (t.couple_name || t.names || '?').split(/[\s&+y]/).filter(Boolean).slice(0, 2).map((w: string) => w[0]?.toUpperCase()).join('')
+                const name = t.couple_name || t.names || ''
+                const rawDate = t.wedding_date || t.date
+                const dateStr = rawDate && /^\d{4}-\d{2}-\d{2}/.test(rawDate) ? formatDate(rawDate) : rawDate
                 return (
                   <FadeUp key={i} delay={i * .1}>
                     <div className="t1-test">
                       <div className="t1-test-qmark">"</div>
-                      <div className="t1-test-stars">{'★'.repeat(t.rating ?? 5)}</div>
+                      <div className="t1-test-stars"><StarRating rating={t.rating ?? 5} size={14} color="#F5A623" /></div>
                       <p className="t1-test-text">"{t.text}"</p>
                       <div className="t1-test-foot">
-                        {t.photo_url
-                          ? <div className="t1-test-av"><img src={t.photo_url} alt={t.couple_name} /></div>
-                          : <div className="t1-test-av-ph">{initials}</div>
-                        }
-                        <div>
-                          <div className="t1-test-couple">{t.couple_name || t.names}</div>
-                          {(t.wedding_date || t.date) && <div className="t1-test-date">{t.wedding_date || t.date}</div>}
-                        </div>
+                        <div className="t1-test-couple">{name}</div>
+                        {dateStr && <div className="t1-test-date">{dateStr}</div>}
                       </div>
                     </div>
                   </FadeUp>
@@ -691,12 +719,38 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 </div>
               </FadeUp>
               <FadeUp delay={.1}>
-                {accom.price_info && (
+                {Array.isArray(accom.options) && accom.options.length > 0 ? (
+                  <div>
+                    <div style={{ fontSize: '.62rem', fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,.25)', marginBottom: 16 }}>Tarifas</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                      {accom.options.map((opt: any, oi: number) => (
+                        <div key={oi} style={{ borderLeft: `2px solid ${primary}`, paddingLeft: 14 }}>
+                          <div style={{ fontFamily: FONT, fontSize: '1.1rem', fontWeight: 400, color: '#fff', marginBottom: 4 }}>{opt.label}</div>
+                          {opt.description && <div style={{ fontSize: '.82rem', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>{opt.description}</div>}
+                          {opt.included ? (
+                            <div style={{ fontSize: '.78rem', color: primary, fontWeight: 500, letterSpacing: '.04em' }}>✓ Incluido en la tarifa del venue</div>
+                          ) : opt.price_info ? (
+                            <div style={{ fontSize: '.88rem', color: 'rgba(255,255,255,.55)' }}>{opt.price_info}</div>
+                          ) : Array.isArray(opt.prices) && opt.prices.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              {opt.prices.map((p: any, pi: number) => (
+                                <div key={pi} style={{ display: 'flex', gap: 10, fontSize: '.82rem', color: 'rgba(255,255,255,.55)' }}>
+                                  <span style={{ flex: 1 }}>{p.season}</span>
+                                  <span style={{ fontFamily: FONT, color: '#fff' }}>{p.price}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : accom.price_info ? (
                   <div>
                     <div style={{ fontSize: '.62rem', fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,.25)', marginBottom: 16 }}>Tarifas</div>
                     <p style={{ fontSize: '.88rem', color: 'rgba(255,255,255,.45)', lineHeight: 1.85 }}>{accom.price_info}</p>
                   </div>
-                )}
+                ) : null}
                 {accom.nearby && (
                   <div style={{ marginTop: 28 }}>
                     <div style={{ fontSize: '.62rem', fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,.25)', marginBottom: 12 }}>Alojamientos cercanos</div>
@@ -762,60 +816,62 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       )}
 
       {/* ════════════════════════════════════════════
-          CTA
+          MAPA
       ════════════════════════════════════════════ */}
-      <section className="t1-cta" id="t1-cta">
-        <div className="w">
-          {ctaSent ? (
-            <FadeUp>
-              <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                <div style={{ fontFamily: FONT, fontSize: '4rem', color: primary, marginBottom: 20, opacity: .6 }}>✦</div>
-                <h2 style={{ fontFamily: FONT, fontSize: '3rem', fontWeight: 300, color: '#fff', marginBottom: 14 }}>¡Perfecto!</h2>
-                <p style={{ fontSize: '.95rem', color: 'rgba(255,255,255,.4)' }}>Os contactaremos en menos de 24 horas.</p>
-              </div>
-            </FadeUp>
-          ) : (
-            <div className="t1-cta-grid">
+      {on('map') && (sec.map_embed_url || (data.venueContent.map_info as any)?.embed_url) && (() => {
+        const embed = sec.map_embed_url || (data.venueContent.map_info as any).embed_url
+        const address = sec.map_address || (data.venueContent.map_info as any)?.address
+        return (
+          <section className="t1-sec">
+            <div className="w">
               <FadeUp>
-                <span className="t1-label">Siguiente paso</span>
-                <h2 className="t1-cta-h">Hablemos de vuestra boda</h2>
-                <p className="t1-cta-sub">
-                  Os mostraremos la finca personalmente y resolveremos todas vuestras dudas. Respuesta garantizada en menos de 24 horas.
-                </p>
-                <div className="t1-cta-contact">
-                  {venue?.contact_email && <div>✉ {venue.contact_email}</div>}
-                  {venue?.contact_phone && <div>✆ {venue.contact_phone}</div>}
-                  {venue?.website && <div>🌐 {venue.website}</div>}
+                <span className="t1-label">Ubicación</span>
+                <h2 className="t1-h2">Cómo llegar</h2>
+                {address && <p style={{ fontSize: '.92rem', color: 'rgba(255,255,255,.5)', marginTop: -32, marginBottom: 40 }}>{address}</p>}
+              </FadeUp>
+              <FadeUp delay={.1}>
+                <div style={{ overflow: 'hidden', border: '1px solid #181818', borderRadius: 4 }}>
+                  <iframe src={embed} width="100%" height="360" style={{ border: 'none', display: 'block', filter: 'invert(.92) hue-rotate(180deg)' }} loading="lazy" allowFullScreen />
                 </div>
               </FadeUp>
-              <FadeUp delay={.15}>
-                <form className="t1-form" onSubmit={handleSubmit}>
-                  {[
-                    { k: 'name',    label: 'Vuestro nombre',    ph: couple_name,           type: 'text'  },
-                    { k: 'email',   label: 'Email de contacto', ph: 'hola@ejemplo.com',    type: 'email' },
-                    { k: 'phone',   label: 'Teléfono',          ph: '+34 600 000 000',     type: 'tel'   },
-                    { k: 'message', label: 'Mensaje',           ph: 'Alguna pregunta...', type: 'text'  },
-                  ].map(f => (
-                    <div key={f.k}>
-                      <label className="t1-field-label">{f.label}</label>
-                      {f.k === 'message'
-                        ? <textarea className="t1-input" rows={3} style={{ resize: 'vertical' }} placeholder={f.ph} value={(ctaF as any)[f.k]} onChange={e => setCtaF(p => ({ ...p, [f.k]: e.target.value }))} />
-                        : <input className="t1-input" type={f.type} placeholder={f.ph} value={(ctaF as any)[f.k]} onChange={e => setCtaF(p => ({ ...p, [f.k]: e.target.value }))} />
-                      }
-                    </div>
-                  ))}
-                  <button type="submit" className="t1-btn" disabled={sending || !ctaF.name || !ctaF.email}>
-                    {sending ? 'Enviando…' : 'Solicitar disponibilidad →'}
-                  </button>
-                </form>
-              </FadeUp>
             </div>
-          )}
-        </div>
-      </section>
+          </section>
+        )
+      })()}
+
+      {/* ════════════════════════════════════════════
+          CONTACTO
+      ════════════════════════════════════════════ */}
+      {contactOn && (
+        <section className="t1-cta" id="t1-cta">
+          <div className="w" style={{ maxWidth: 680, textAlign: 'center' }}>
+            <FadeUp>
+              <span className="t1-label" style={{ display: 'block' }}>Datos de contacto</span>
+              <h2 className="t1-cta-h">Estamos aquí para ayudaros</h2>
+              <p className="t1-cta-sub" style={{ maxWidth: 520, margin: '0 auto 40px' }}>
+                Si tenéis cualquier pregunta sobre la propuesta, escribidnos. Respondemos en menos de 24 horas.
+              </p>
+              <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+                {contact.phone && (
+                  <a href={waHref} target="_blank" rel="noopener" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: primary, color: onPri, border: 'none', padding: '15px 32px', fontSize: '.82rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer', textDecoration: 'none' }}>
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.007-.371-.009-.57-.009-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                    WhatsApp
+                  </a>
+                )}
+                {contact.email && (
+                  <a href={mailHref} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'transparent', color: '#fff', border: `1px solid ${primary}`, padding: '15px 32px', fontSize: '.82rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer', textDecoration: 'none' }}>
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    Email
+                  </a>
+                )}
+              </div>
+            </FadeUp>
+          </div>
+        </section>
+      )}
 
       {/* ── FLOATING WHATSAPP ── */}
-      <FloatingWhatsApp phone={venue?.contact_phone || ''} coupleName={couple_name} primary={primary} onPrimary={onPri} />
+      {contactOn && <FloatingWhatsApp phone={contact.phone} coupleName={couple_name} primary={primary} onPrimary={onPri} />}
 
       {/* ── FOOTER ── */}
       <footer className="t1-footer">

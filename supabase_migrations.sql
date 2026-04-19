@@ -135,3 +135,50 @@ ALTER TABLE venue_profiles
 ALTER TABLE venue_profiles
   ADD CONSTRAINT venue_profiles_status_check
     CHECK (status IN ('active', 'inactive', 'pending', 'trial_expired'));
+
+-- ── 11. proposal_menu_selections ──────────────────────────────
+--    Stores what invitees picked from the WeddingProposal block
+--    (menu + course picks + extras + comments).
+--    Run in Supabase → SQL Editor.
+
+CREATE TABLE IF NOT EXISTS proposal_menu_selections (
+  id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  proposal_id          UUID        NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,
+  selected_menu_id     TEXT,
+  selected_menu_name   TEXT,
+  guest_count          INT,
+  original_guest_count INT,
+  guest_count_changed  BOOLEAN     NOT NULL DEFAULT false,
+  course_choices       JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  selected_extras      JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  comments             TEXT,
+  estimated_total      NUMERIC,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS proposal_menu_selections_proposal_id_idx
+  ON proposal_menu_selections(proposal_id);
+
+ALTER TABLE proposal_menu_selections ENABLE ROW LEVEL SECURITY;
+
+-- Public insert (el invitado envía sin autenticarse)
+DROP POLICY IF EXISTS "public_insert_menu_selections" ON proposal_menu_selections;
+CREATE POLICY "public_insert_menu_selections"
+  ON proposal_menu_selections
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+-- El venue dueño de la propuesta puede leer sus selecciones
+DROP POLICY IF EXISTS "owner_select_menu_selections" ON proposal_menu_selections;
+CREATE POLICY "owner_select_menu_selections"
+  ON proposal_menu_selections
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM proposals p
+      WHERE p.id = proposal_menu_selections.proposal_id
+        AND p.user_id = auth.uid()
+    )
+  );

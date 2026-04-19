@@ -3,11 +3,13 @@ import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Check, X, Upload, AlertCircle, Zap, Sparkles, ClipboardList, MessageCircle, Target, Loader2, ChevronDown, ArrowLeft, Copy } from 'lucide-react'
+import { Check, X, Upload, AlertCircle, Zap, Sparkles, ClipboardList, MessageCircle, Target, ChevronDown, ArrowLeft, Copy } from 'lucide-react'
 import type { SectionsData } from '@/lib/proposal-types'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes'
 import ProposalPreview from './ProposalPreview'
+import ProposalMenuEditor from './ProposalMenuEditor'
+import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,25 +20,6 @@ type ProposalTemplate = {
   accent_color: string
   font_family?: string
   is_default: boolean
-}
-
-type VenueContent = {
-  video_default: any
-  techspecs: any
-  accommodation_info: any
-  map_info: any
-  chat_settings: any
-  testimonials: any[]
-  packages: any[]
-  zones: any[]
-  season_prices: any[]
-  inclusions: any[]
-  exclusions: any[]
-  faq: any[]
-  collaborators: any[]
-  extra_services: any[]
-  menu_prices: any[]
-  experience: any | null
 }
 
 export type EditorProposal = {
@@ -61,31 +44,28 @@ export type EditorProposal = {
 
 const PRESET_COLORS = ['#2d4a7a', '#7a5c3c', '#6b2d42', '#2a6b4a', '#4a4a4a', '#8b6914']
 
-const LIBRARY_SECTIONS = ['gallery', 'packages', 'season_prices', 'inclusions', 'extra_services', 'menu_prices', 'experience', 'collaborators', 'faq', 'zones', 'hero', 'cta', 'contact']
-
 const SECTION_LABELS: Record<string, string> = {
-  hero: 'Foto principal', welcome: 'Mensaje de bienvenida', video: 'Video del venue',
-  gallery: 'Galería de fotos', techspecs: 'Ficha técnica', zones: 'Zonas del venue',
-  packages: 'Paquetes y precios', season_prices: 'Desglose / Temporadas',
-  inclusions: 'Qué incluye', extra_services: 'Servicios adicionales',
-  menu_prices: 'Catering y menú', accommodation: 'Alojamiento', experience: 'La experiencia',
-  map: 'Mapa y ubicación', testimonials: 'Testimonios', collaborators: 'Colaboradores',
-  faq: 'Preguntas frecuentes', chat: 'Chat en vivo', nextsteps: 'Próximos pasos',
-  timeline: 'Línea de tiempo', availability: 'Disponibilidad', cta: 'Botón de reserva',
+  hero: 'Foto principal',
+  availability: 'Disponibilidad',
+  welcome: 'Mensaje de bienvenida',
+  experience: 'La experiencia',
+  gallery: 'Galería de fotos',
+  zones: 'Zonas del venue',
+  venue_rental: 'Tarifas de alquiler (grid temporada × día)',
+  inclusions: 'Qué incluye',
+  testimonials: 'Testimonios',
+  collaborators: 'Colaboradores',
+  accommodation: 'Alojamiento',
+  extra_services: 'Servicios adicionales',
+  faq: 'Preguntas frecuentes',
+  map: 'Mapa y ubicación',
   contact: 'Datos de contacto',
 }
 
 const emptySections: SectionsData = {
   visual_template_id: 1,
-  video_url: '', video_title: '',
-  show_chat: false, chat_intro: '',
-  show_nextsteps: false, nextsteps: [],
-  show_timeline: false, timeline_intro: '', timeline: [],
-  show_testimonials: false, testimonials: [],
-  show_map: false, map_embed_url: '', map_address: '', map_notes: '',
-  show_techspecs: false, techspecs: {},
-  show_accommodation: false, accommodation: {},
-  show_availability_msg: false, availability_message: '',
+  availability_message: '',
+  accommodation: {},
   sections_enabled: {},
 }
 
@@ -98,10 +78,6 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   const [proposal, setProposal] = useState<EditorProposal>(initial)
   const [leads, setLeads] = useState<any[]>([])
   const [templates, setTemplates] = useState<ProposalTemplate[]>([])
-  const [venueContent, setVenueContent] = useState<VenueContent>({
-    video_default: null, techspecs: null, accommodation_info: null, map_info: null, chat_settings: null,
-    testimonials: [], packages: [], zones: [], season_prices: [], inclusions: [], exclusions: [], faq: [], collaborators: [], extra_services: [], menu_prices: [], experience: null,
-  })
   const [venue, setVenue] = useState<any>(null)
 
   const [form, setForm] = useState({
@@ -120,8 +96,13 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     template_id: initial.template_id ?? '',
   })
   const [sections, setSections] = useState<SectionsData>({ ...emptySections, ...(initial.sections_data ?? {}) })
-  const [activeTab, setActiveTab] = useState<'datos' | 'visual' | 'secciones'>('datos')
+  const [activeTab, setActiveTab] = useState<'datos' | 'visual' | 'secciones' | 'menus'>('datos')
   const [openSecs, setOpenSecs] = useState<Set<string>>(new Set())
+
+  // Si desactivan catering y estaban en la tab de menús, volver a secciones
+  useEffect(() => {
+    if (activeTab === 'menus' && sections.has_catering === false) setActiveTab('secciones')
+  }, [activeTab, sections.has_catering])
 
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -139,43 +120,19 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   const isDirty = JSON.stringify({ form, sections }) !== savedSnapshotRef.current
   const { confirmLeave } = useUnsavedChanges(isDirty)
 
-  // Load secondary data (leads, templates, venue content) once
+  // Load secondary data (leads, templates, venue) once
   useEffect(() => {
     if (!user) return
     const supabase = createClient()
     ;(async () => {
-      const [{ data: leadsData }, { data: tplData }, { data: vcRows }, { data: venueRow }] = await Promise.all([
+      const [{ data: leadsData }, { data: tplData }, { data: venueRow }] = await Promise.all([
         supabase.from('leads').select('id, name, guests, email').eq('user_id', user.id).order('created_at', { ascending: false }),
         supabase.from('proposal_web_templates').select('*').eq('user_id', user.id).order('created_at'),
-        supabase.from('venue_content').select('*').eq('user_id', user.id),
         supabase.from('venue_onboarding').select('name, city, region, contact_email, contact_phone, website, photo_urls').eq('user_id', user.id).maybeSingle(),
       ])
       if (leadsData) setLeads(leadsData)
       if (tplData) setTemplates(tplData as ProposalTemplate[])
       if (venueRow) setVenue(venueRow)
-      if (vcRows) {
-        const rows = vcRows as any[]
-        const findOne = (sec: string) => { const r = rows.find(r => r.section === sec); return r ? { ...r.data } : null }
-        const findMany = (sec: string) => rows.filter(r => r.section === sec).map(r => ({ id: r.id, ...r.data }))
-        setVenueContent({
-          video_default: findOne('video_default'),
-          techspecs: findOne('techspecs'),
-          accommodation_info: findOne('accommodation_info'),
-          map_info: findOne('map_info'),
-          chat_settings: findOne('chat_settings'),
-          experience: findOne('experience'),
-          testimonials: findMany('testimonial'),
-          packages: findMany('package'),
-          zones: findMany('zone'),
-          season_prices: findMany('season_price'),
-          inclusions: findMany('inclusion'),
-          exclusions: findMany('exclusion'),
-          faq: findMany('faq'),
-          collaborators: findMany('collaborator'),
-          extra_services: findMany('extra_service'),
-          menu_prices: findMany('menu_price'),
-        })
-      }
     })()
     if (!document.querySelector('link[data-gf-editor]')) {
       const link = document.createElement('link')
@@ -191,35 +148,6 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     setTimeout(() => setToast(null), 3500)
   }
   const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
-
-  // ── Apply template: pre-fill sections from venue content
-  const applyTemplate = (tplId: string, vc: VenueContent) => {
-    const tpl = templates.find(t => t.id === tplId) ?? templates.find(t => t.is_default)
-    if (!tpl) return
-    const sectionIds = (tpl.sections || []).filter((s: any) => s.enabled !== false).map((s: any) => s.id)
-    const enabled: Record<string, boolean> = {}
-    sectionIds.forEach(id => { enabled[id] = true })
-    setSections(prev => ({
-      ...prev,
-      sections_enabled: enabled,
-      video_url: sectionIds.includes('video') && vc.video_default?.url ? vc.video_default.url : prev.video_url,
-      video_title: sectionIds.includes('video') && vc.video_default?.title ? vc.video_default.title : prev.video_title,
-      show_techspecs: sectionIds.includes('techspecs') ? true : prev.show_techspecs,
-      techspecs: sectionIds.includes('techspecs') && vc.techspecs ? { sqm: vc.techspecs.sqm, ceiling: vc.techspecs.ceiling, parking: vc.techspecs.parking, accessibility: vc.techspecs.accessibility, ceremony_spaces: vc.techspecs.ceremony_spaces, extra: vc.techspecs.extra } : prev.techspecs,
-      show_accommodation: sectionIds.includes('accommodation') ? true : prev.show_accommodation,
-      accommodation: sectionIds.includes('accommodation') && vc.accommodation_info ? { rooms: vc.accommodation_info.rooms, description: vc.accommodation_info.description, price_info: vc.accommodation_info.price_info, nearby: vc.accommodation_info.nearby } : prev.accommodation,
-      show_map: sectionIds.includes('map') ? true : prev.show_map,
-      map_embed_url: sectionIds.includes('map') && vc.map_info?.embed_url ? vc.map_info.embed_url : prev.map_embed_url,
-      map_address: sectionIds.includes('map') && vc.map_info?.address ? vc.map_info.address : prev.map_address,
-      map_notes: sectionIds.includes('map') && vc.map_info?.notes ? vc.map_info.notes : prev.map_notes,
-      show_chat: sectionIds.includes('chat') ? (vc.chat_settings?.enabled ?? true) : prev.show_chat,
-      chat_intro: sectionIds.includes('chat') && vc.chat_settings?.intro_text ? vc.chat_settings.intro_text : prev.chat_intro,
-      show_testimonials: sectionIds.includes('testimonials') ? true : prev.show_testimonials,
-      testimonials: sectionIds.includes('testimonials') && vc.testimonials?.length ? vc.testimonials.slice(0, 3).map((t: any) => ({ names: t.couple_name || '', date: t.wedding_date || '', guests: t.guests, text: t.text || '', photo_url: t.photo_url || '' })) : prev.testimonials,
-    }))
-    if (tpl.accent_color) setForm(f => ({ ...f, primary_color: tpl.accent_color }))
-    if (tpl.font_family) setForm(f => ({ ...f, font_family: tpl.font_family! }))
-  }
 
   // ── Upload helper
   const uploadImage = async (file: File, folder: string): Promise<string | null> => {
@@ -261,12 +189,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     setSaving(true)
     const supabase = createClient()
 
-    const cleanSections: SectionsData = {
-      ...sections,
-      nextsteps: sections.nextsteps?.filter(x => x.title.trim()) ?? [],
-      timeline: sections.timeline?.filter(x => x.time.trim() || x.title.trim()) ?? [],
-      testimonials: sections.testimonials?.filter(x => x.names.trim() || x.text.trim()) ?? [],
-    }
+    const cleanSections: SectionsData = { ...sections }
 
     const { couple_email: coupleEmailValue, ...corePayload } = {
       user_id: user.id,
@@ -327,22 +250,9 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // ── Sections array helpers
-  const addTimeline = () => setSections(s => ({ ...s, timeline: [...(s.timeline ?? []), { time: '', title: '', description: '' }] }))
-  const updateTimeline = (i: number, key: string, val: string) => setSections(s => ({ ...s, timeline: (s.timeline ?? []).map((x, idx) => idx === i ? { ...x, [key]: val } : x) }))
-  const removeTimeline = (i: number) => setSections(s => ({ ...s, timeline: (s.timeline ?? []).filter((_, idx) => idx !== i) }))
-  const addTestimonial = () => setSections(s => ({ ...s, testimonials: [...(s.testimonials ?? []), { names: '', text: '', date: '', guests: undefined, photo_url: '' }] }))
-  const updateTestimonial = (i: number, key: string, val: any) => setSections(s => ({ ...s, testimonials: (s.testimonials ?? []).map((x, idx) => idx === i ? { ...x, [key]: val } : x) }))
-  const removeTestimonial = (i: number) => setSections(s => ({ ...s, testimonials: (s.testimonials ?? []).filter((_, idx) => idx !== i) }))
-  const addNextstep = () => setSections(s => ({ ...s, nextsteps: [...(s.nextsteps ?? []), { title: '', description: '' }] }))
-  const updateNextstep = (i: number, key: string, val: string) => setSections(s => ({ ...s, nextsteps: (s.nextsteps ?? []).map((x, idx) => idx === i ? { ...x, [key]: val } : x) }))
-  const removeNextstep = (i: number) => setSections(s => ({ ...s, nextsteps: (s.nextsteps ?? []).filter((_, idx) => idx !== i) }))
-
   // ── Per-proposal content overrides
-  const hasOverride = (key: string) => (sections as any)[key] != null
   const getOverride = (key: string) => (sections as any)[key] as any[]
   const setOverride = (key: string, val: any) => setSections((s: any) => ({ ...s, [key]: val }))
-  const clearOverride = (key: string) => setSections((s: any) => { const n = { ...s }; delete n[key]; return n })
   const updateOverrideItem = (key: string, i: number, field: string, val: any) => {
     const items = [...((sections as any)[key] ?? [])]
     items[i] = { ...items[i], [field]: val }
@@ -350,36 +260,10 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   }
   const removeOverrideItem = (key: string, i: number) => setOverride(key, ((sections as any)[key] ?? []).filter((_: any, idx: number) => idx !== i))
   const addOverrideItem = (key: string, template: any) => setOverride(key, [...((sections as any)[key] ?? []), template])
-  const initOverride = (secId: string) => {
-    const vc = venueContent
-    const libData: Record<string, any[]> = {
-      packages: vc.packages.map((p: any) => ({ name: p.name ?? '', subtitle: p.subtitle ?? '', price: p.price ?? '', description: p.description ?? '', includes: p.includes ? [...p.includes] : [] })),
-      zones: vc.zones.map((z: any) => ({ name: z.name ?? '', description: z.description ?? '', capacity_min: z.capacity_min, capacity_max: z.capacity_max, price: z.price ?? '' })),
-      season_prices: vc.season_prices.map((s: any) => ({ label: s.label ?? s.season ?? '', date_range: s.date_range ?? '', price_modifier: s.price_modifier ?? '', notes: s.notes ?? '' })),
-      inclusions: vc.inclusions.map((x: any) => ({ title: x.title ?? '', emoji: x.emoji ?? '', description: x.description ?? '' })),
-      exclusions: vc.exclusions?.map((x: any) => ({ title: x.title ?? '', description: x.description ?? '' })) ?? [],
-      faq: vc.faq.map((f: any) => ({ question: f.question ?? '', answer: f.answer ?? '' })),
-      collaborators: vc.collaborators.map((c: any) => ({ name: c.name ?? '', category: c.category ?? '', description: c.description ?? '', website: c.website ?? '' })),
-      extra_services: vc.extra_services.map((s: any) => ({ name: s.name ?? '', price: s.price ?? '', description: s.description ?? '' })),
-      menu_prices: vc.menu_prices.map((m: any) => ({ name: m.name ?? '', price_per_person: m.price_per_person ?? '', description: m.description ?? '', min_guests: m.min_guests })),
-      testimonials: vc.testimonials.map((t: any) => ({ couple_name: t.couple_name ?? '', text: t.text ?? '', wedding_date: t.wedding_date ?? '', rating: t.rating })),
-    }
-    if (secId === 'experience') {
-      const exp = vc.experience
-      setOverride('experience_override', { title: exp?.title ?? '', body: exp?.body ?? '' })
-      return
-    }
-    setOverride(`${secId}_override`, libData[secId] ?? [])
-  }
 
   // ── Build preview patch — what the iframe sees as the live state
   const previewPatch = useMemo(() => {
-    const cleanSections: SectionsData = {
-      ...sections,
-      nextsteps: sections.nextsteps?.filter(x => x.title.trim()) ?? [],
-      timeline: sections.timeline?.filter(x => x.time.trim() || x.title.trim()) ?? [],
-      testimonials: sections.testimonials?.filter(x => x.names.trim() || x.text.trim()) ?? [],
-    }
+    const cleanSections: SectionsData = { ...sections }
     return {
       couple_name: form.couple_name,
       personal_message: form.personal_message || null,
@@ -392,6 +276,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       branding: {
         logo_url: form.logo_url || null,
         primary_color: form.primary_color,
+        font_family: form.font_family,
       },
     }
   }, [form, sections])
@@ -441,7 +326,9 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
         {/* Tabs */}
         <div style={{ flexShrink: 0, display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 14px', gap: 4 }}>
-          {(['datos', 'visual', 'secciones'] as const).map(tab => (
+          {(['datos', 'visual', 'secciones', 'menus'] as const)
+            .filter(tab => tab !== 'menus' || sections.has_catering !== false)
+            .map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -452,7 +339,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 textTransform: 'capitalize', letterSpacing: '0.03em',
               }}
             >
-              {tab === 'datos' ? 'Datos' : tab === 'visual' ? 'Visual' : 'Secciones'}
+              {tab === 'datos' ? 'Datos' : tab === 'visual' ? 'Visual' : tab === 'secciones' ? 'Secciones' : 'Menús'}
             </button>
           ))}
         </div>
@@ -505,6 +392,55 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 <input type="checkbox" checked={form.show_availability} onChange={e => setForm(f => ({ ...f, show_availability: e.target.checked }))} />
                 Mostrar disponibilidad
               </label>
+
+              <div className="form-group" style={{ marginTop: 14 }}>
+                <label className="form-label">Tipo de servicio</label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {[
+                    { v: true,  label: 'Con catering / menú', desc: 'Incluye sección de menús y aperitivos' },
+                    { v: false, label: 'Solo venue', desc: 'Sin menús — solo alquiler del espacio' },
+                  ].map(opt => {
+                    const active = (sections.has_catering ?? true) === opt.v
+                    return (
+                      <button key={String(opt.v)} type="button"
+                        onClick={() => setSections(s => ({ ...s, has_catering: opt.v }))}
+                        style={{ flex: 1, padding: '10px 12px', fontSize: 12, fontWeight: 500, borderRadius: 6, cursor: 'pointer', textAlign: 'left',
+                          border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                          background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
+                          color: active ? 'var(--charcoal)' : 'var(--warm-gray)' }}>
+                        <div style={{ fontWeight: 600 }}>{opt.label}</div>
+                        <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 2, fontWeight: 400 }}>{opt.desc}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: 14 }}>
+                <label className="form-label">IVA en los precios</label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {[
+                    { v: false, label: 'IVA no incluido' },
+                    { v: true,  label: 'IVA incluido' },
+                  ].map(opt => {
+                    const active = (sections.iva_included ?? false) === opt.v
+                    return (
+                      <button key={String(opt.v)} type="button"
+                        onClick={() => setSections(s => ({ ...s, iva_included: opt.v }))}
+                        style={{ flex: 1, padding: '8px 12px', fontSize: 12, fontWeight: 500, borderRadius: 6, cursor: 'pointer',
+                          border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                          background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
+                          color: active ? 'var(--charcoal)' : 'var(--warm-gray)' }}>
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4, lineHeight: 1.5 }}>
+                  Se mostrará junto a los precios de la propuesta.
+                </div>
+              </div>
+
             </div>
           )}
 
@@ -542,40 +478,6 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                   })}
                 </div>
               </div>
-
-              {templates.length > 0 && (
-                <div className="form-group" style={{ marginBottom: 16 }}>
-                  <label className="form-label">Plantilla de propuesta</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {templates.map(t => {
-                      const isActive = form.template_id === t.id
-                      return (
-                        <button key={t.id} type="button"
-                          onClick={() => { setForm(f => ({ ...f, template_id: t.id })); applyTemplate(t.id, venueContent) }}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                            borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                            border: `2px solid ${isActive ? 'var(--gold)' : 'var(--border)'}`,
-                            background: isActive ? 'rgba(196,151,90,0.08)' : 'var(--surface)',
-                          }}>
-                          <div style={{ width: 10, height: 10, borderRadius: 3, background: t.accent_color || 'var(--gold)', flexShrink: 0 }} />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>{t.name}</div>
-                            <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{(t.sections || []).filter((s: any) => s.enabled !== false).length} secciones · {t.font_family?.split(',')[0].replace(/"/g, '') || 'Georgia'}</div>
-                          </div>
-                          {t.is_default && <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: 8 }}>Por defecto</span>}
-                          {isActive && <Check size={14} style={{ color: 'var(--gold)', flexShrink: 0 }} />}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-              {templates.length === 0 && (
-                <div style={{ padding: '10px 14px', background: 'var(--cream)', borderRadius: 8, fontSize: 12, color: 'var(--warm-gray)', marginBottom: 16, border: '1px dashed var(--border)' }}>
-                  No tienes plantillas aún. <a href="/comunicacion" target="_blank" style={{ color: 'var(--gold)' }}>Crea una en Comunicación →</a>
-                </div>
-              )}
 
               <div className="form-group">
                 <label className="form-label">Color principal</label>
@@ -646,29 +548,30 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
           {/* ══ TAB: SECCIONES ══ */}
           {activeTab === 'secciones' && (() => {
-            const tpl = templates.find(t => t.id === form.template_id) ?? templates.find(t => t.is_default)
-            const tplSections = tpl ? (tpl.sections || []).filter((s: any) => s.enabled !== false).map((s: any) => s.id) : []
+            // Sections in the same order the templates render them
+            const ALL_SECTION_IDS = [
+              'hero',
+              'availability',
+              'welcome',
+              'experience',
+              'gallery',
+              'zones',
+              'venue_rental',
+              'inclusions',
+              'testimonials',
+              'collaborators',
+              'accommodation',
+              'extra_services',
+              'faq',
+              'map',
+              'contact',
+            ]
+            const tplSections: string[] = ALL_SECTION_IDS
             const toggleSec = (id: string, val: boolean) => setSections(s => ({ ...s, sections_enabled: { ...(s.sections_enabled ?? {}), [id]: val } }))
             const isSectionOn = (id: string) => {
               const e = sections.sections_enabled
               return e ? (e[id] !== false) : true
             }
-            const chipStyle: React.CSSProperties = { fontSize: 11, color: 'var(--charcoal)', background: '#fff', border: '1px solid var(--ivory)', borderRadius: 6, padding: '3px 9px' }
-            const emptyHint = (msg: string) => <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic' }}>{msg}</div>
-            const customizeBtn = (secId: string) => (
-              <div style={{ marginTop: 8 }}>
-                <button type="button" onClick={() => initOverride(secId)} style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: '1px dashed var(--gold)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer' }}>
-                  Personalizar para esta pareja →
-                </button>
-              </div>
-            )
-            const restoreBtn = (key: string) => (
-              <button type="button" onClick={() => clearOverride(key)} style={{ fontSize: 11, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0, marginTop: 6 }}>
-                ← Usar contenido de la biblioteca
-              </button>
-            )
-            const overrideBadge = <div style={{ fontSize: 10, color: 'var(--gold)', fontWeight: 600, marginBottom: 6, letterSpacing: '0.04em' }}>✦ PERSONALIZADO PARA ESTA PAREJA</div>
-
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                 {tplSections.length === 0 && (
@@ -680,10 +583,8 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 {tplSections.map(secId => {
                   const label = SECTION_LABELS[secId] || secId
                   const isOn = isSectionOn(secId)
-                  const isLibrary = LIBRARY_SECTIONS.includes(secId)
                   const isOpen = openSecs.has(secId)
                   const overrideKey = `${secId}_override`
-                  const vc = venueContent
 
                   return (
                     <div key={secId} className="sec-row" style={{ opacity: isOn ? 1 : 0.55 }}>
@@ -696,7 +597,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                         <ChevronDown size={14} style={{ color: 'var(--warm-gray)', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
                       </div>
 
-                      {isOpen && isOn && isLibrary && (
+                      {isOpen && (
                         <div className="sec-open-content" style={{ padding: '12px 14px 14px' }}>
                           {secId === 'hero' && (
                             <div>
@@ -736,132 +637,177 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                               </button>
                             </div>
                           )}
-                          {secId === 'cta' && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Botón de reserva al final de la propuesta</div>}
-                          {secId === 'contact' && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Datos de contacto del venue</div>}
-
-                          {/* PACKAGES */}
-                          {secId === 'packages' && (hasOverride(overrideKey) ? (
-                            <div>
-                              {overrideBadge}
-                              {(getOverride(overrideKey) ?? []).map((pkg: any, i: number) => (
-                                <div key={i} style={itemCard}>
-                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                    <input className="form-input" placeholder="Nombre *" value={pkg.name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'name', e.target.value)} />
-                                    <input className="form-input" style={{ width: 100, flexShrink: 0 }} placeholder="Precio" value={pkg.price ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'price', e.target.value)} />
-                                    <button type="button" style={removeBtn} onClick={() => removeOverrideItem(overrideKey, i)}><X size={13} /></button>
-                                  </div>
-                                  <input className="form-input" placeholder="Subtítulo" value={pkg.subtitle ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'subtitle', e.target.value)} />
-                                  <textarea className="form-textarea" style={{ minHeight: 50 }} placeholder="Descripción" value={pkg.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
+                          {secId === 'contact' && (() => {
+                            const c: any = sections.contact ?? {}
+                            const patch = (p: any) => setSections(s => ({ ...s, contact: { ...(s.contact ?? {}), ...p } }))
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Teléfono (WhatsApp)</label>
+                                  <input className="form-input" placeholder="+34 600 000 000" value={c.phone ?? ''} onChange={e => patch({ phone: e.target.value })} />
                                 </div>
-                              ))}
-                              <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { name: '', price: '', subtitle: '', description: '', includes: [] })}>+ Añadir paquete</button>
-                              {restoreBtn(overrideKey)}
-                            </div>
-                          ) : (
-                            <div>
-                              {vc.packages.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{vc.packages.map((p: any, i: number) => <span key={i} style={chipStyle}>{p.name}{p.price ? ` · ${p.price}` : ''}</span>)}</div> : emptyHint('Sin paquetes en biblioteca')}
-                              {customizeBtn(secId)}
-                            </div>
-                          ))}
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Email</label>
+                                  <input className="form-input" type="email" placeholder="eventos@venue.com" value={c.email ?? ''} onChange={e => patch({ email: e.target.value })} />
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                                  Estos datos aparecerán como botones de WhatsApp y email al final de la propuesta y en el botón flotante. Si se dejan vacíos y el venue tiene contacto configurado, se usará el del venue.
+                                </div>
+                              </div>
+                            )
+                          })()}
 
                           {/* ZONES */}
-                          {secId === 'zones' && (hasOverride(overrideKey) ? (
+                          {secId === 'zones' && (
                             <div>
-                              {overrideBadge}
-                              {(getOverride(overrideKey) ?? []).map((z: any, i: number) => (
-                                <div key={i} style={itemCard}>
-                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                    <input className="form-input" placeholder="Nombre *" value={z.name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'name', e.target.value)} />
-                                    <input className="form-input" style={{ width: 80, flexShrink: 0 }} type="number" placeholder="Min" value={z.capacity_min ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'capacity_min', e.target.value ? Number(e.target.value) : undefined)} />
-                                    <input className="form-input" style={{ width: 80, flexShrink: 0 }} type="number" placeholder="Max" value={z.capacity_max ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'capacity_max', e.target.value ? Number(e.target.value) : undefined)} />
-                                    <button type="button" style={removeBtn} onClick={() => removeOverrideItem(overrideKey, i)}><X size={13} /></button>
-                                  </div>
-                                  <input className="form-input" placeholder="Descripción" value={z.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
-                                </div>
-                              ))}
-                              <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { name: '', description: '', price: '' })}>+ Añadir zona</button>
-                              {restoreBtn(overrideKey)}
+                              {(getOverride(overrideKey) ?? []).map((z: any, i: number) => {
+                                const caps = Array.isArray(z.capacities) ? z.capacities : []
+                                const updateCaps = (newCaps: any[]) => updateOverrideItem(overrideKey, i, 'capacities', newCaps)
+                                const photo = z.photos?.[0]
+                                const handleUpload = async (file: File) => {
+                                  if (!user) return
+                                  const supabase = createClient()
+                                  const path = `${user.id}/zones/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+                                  const { error } = await supabase.storage.from('proposal-assets').upload(path, file, { upsert: true })
+                                  if (error) return
+                                  const { data } = supabase.storage.from('proposal-assets').getPublicUrl(path)
+                                  updateOverrideItem(overrideKey, i, 'photos', [data.publicUrl])
+                                }
+                                return (
+                                  <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8, overflow: 'hidden', background: 'var(--surface)' }}>
+                                    <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
+                                      <ChevronDown size={12} style={{ color: 'var(--warm-gray)' }} />
+                                      <span style={{ flex: 1 }}>{z.name || <em style={{ color: 'var(--warm-gray)' }}>Nueva zona</em>}</span>
+                                      <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeOverrideItem(overrideKey, i) }}><X size={13} /></button>
+                                    </summary>
+                                    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                        <input className="form-input" placeholder="Nombre *" value={z.name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'name', e.target.value)} />
+                                        <input className="form-input" style={{ width: 80, flexShrink: 0 }} type="number" placeholder="m²" value={z.sqm ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'sqm', e.target.value ? Number(e.target.value) : undefined)} />
+                                      </div>
+                                      <input className="form-input" placeholder="Descripción breve" value={z.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
+
+                                      {/* Image upload */}
+                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        {photo ? (
+                                          <>
+                                            <img src={photo} alt="" style={{ width: 80, height: 54, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
+                                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => updateOverrideItem(overrideKey, i, 'photos', [])}>Quitar</button>
+                                            <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
+                                              Cambiar
+                                              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleUpload(e.target.files[0])} />
+                                            </label>
+                                          </>
+                                        ) : (
+                                          <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
+                                            <Upload size={12} /> Subir imagen (opcional)
+                                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleUpload(e.target.files[0])} />
+                                          </label>
+                                        )}
+                                        <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Si no subes una, se usará una foto de la galería del venue.</div>
+                                      </div>
+
+                                      {/* Capacidades múltiples */}
+                                      <div style={{ background: 'var(--cream)', borderRadius: 6, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>Capacidades</div>
+                                        {caps.map((c: any, ci: number) => (
+                                          <div key={ci} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                                            <select className="form-input" style={{ flex: 1 }} value={c.type ?? 'other'}
+                                              onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, type: e.target.value } : x))}>
+                                              <option value="ceremony">Ceremonia</option>
+                                              <option value="cocktail">Coctel</option>
+                                              <option value="banquet">Banquete</option>
+                                              <option value="party">Fiesta</option>
+                                              <option value="other">Otro</option>
+                                            </select>
+                                            <input className="form-input" type="number" placeholder="pax" style={{ width: 80 }} value={c.count ?? ''}
+                                              onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, count: e.target.value ? Number(e.target.value) : undefined } : x))} />
+                                            <input className="form-input" placeholder="Etiqueta (opc.)" style={{ flex: 1 }} value={c.label ?? ''}
+                                              onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, label: e.target.value } : x))} />
+                                            <button type="button" style={{ ...removeBtn, width: 22, height: 22 }} onClick={() => updateCaps(caps.filter((_: any, j: number) => j !== ci))}><X size={11} /></button>
+                                          </div>
+                                        ))}
+                                        <button type="button" style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 0' }}
+                                          onClick={() => updateCaps([...caps, { type: 'banquet', count: undefined }])}>
+                                          + Añadir capacidad
+                                        </button>
+                                      </div>
+
+                                      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, color: 'var(--charcoal)' }}>
+                                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                                          <input type="checkbox" checked={!!z.climatized} onChange={e => updateOverrideItem(overrideKey, i, 'climatized', e.target.checked)} />
+                                          Climatizado
+                                        </label>
+                                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                                          <input type="checkbox" checked={!!z.plan_b} onChange={e => updateOverrideItem(overrideKey, i, 'plan_b', e.target.checked)} />
+                                          Plan B (cubierto)
+                                        </label>
+                                        <select className="form-input" style={{ width: 170 }} value={z.covered ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'covered', e.target.value || undefined)}>
+                                          <option value="">— tipo —</option>
+                                          <option value="indoor">Interior</option>
+                                          <option value="outdoor">Exterior</option>
+                                          <option value="covered-outdoor">Exterior cubierto</option>
+                                        </select>
+                                      </div>
+
+                                      <input className="form-input" placeholder="Notas adicionales (ej. *Opción haima +coste)" value={z.notes ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'notes', e.target.value)} />
+                                    </div>
+                                  </details>
+                                )
+                              })}
+                              <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { name: '', description: '', capacities: [] })}>+ Añadir zona</button>
                             </div>
-                          ) : (
-                            <div>
-                              {vc.zones.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{vc.zones.map((z: any, i: number) => <span key={i} style={chipStyle}>{z.name}{z.capacity_max ? ` · hasta ${z.capacity_max} inv.` : ''}</span>)}</div> : emptyHint('Sin zonas en biblioteca')}
-                              {customizeBtn(secId)}
-                            </div>
-                          ))}
+                          )}
 
                           {/* INCLUSIONS */}
-                          {secId === 'inclusions' && (hasOverride(overrideKey) ? (
+                          {secId === 'inclusions' && (
                             <div>
-                              {overrideBadge}
                               {(getOverride(overrideKey) ?? []).map((x: any, i: number) => (
-                                <div key={i} style={{ ...itemCard, flexDirection: 'row', alignItems: 'center' }}>
-                                  <input className="form-input" style={{ width: 44, flexShrink: 0 }} placeholder="✓" value={x.emoji ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'emoji', e.target.value)} />
-                                  <input className="form-input" placeholder="Título *" value={x.title ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'title', e.target.value)} />
-                                  <input className="form-input" placeholder="Descripción" value={x.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
-                                  <button type="button" style={removeBtn} onClick={() => removeOverrideItem(overrideKey, i)}><X size={13} /></button>
-                                </div>
+                                <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8, overflow: 'hidden', background: 'var(--surface)' }}>
+                                  <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
+                                    <ChevronDown size={12} style={{ color: 'var(--warm-gray)' }} />
+                                    <span style={{ flex: 1 }}>{x.title || <em style={{ color: 'var(--warm-gray)' }}>Nueva inclusión</em>}</span>
+                                    <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeOverrideItem(overrideKey, i) }}><X size={13} /></button>
+                                  </summary>
+                                  <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                      <select className="form-input" style={{ width: 200, flexShrink: 0 }} value={x.icon ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'icon', e.target.value)}>
+                                        <option value="">— icono —</option>
+                                        {INCLUSION_ICON_CHOICES.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                      </select>
+                                      <input className="form-input" placeholder="Título *" value={x.title ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'title', e.target.value)} />
+                                    </div>
+                                    <input className="form-input" placeholder="Descripción (opcional)" value={x.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
+                                  </div>
+                                </details>
                               ))}
-                              <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { title: '', emoji: '', description: '' })}>+ Añadir inclusión</button>
-                              {restoreBtn(overrideKey)}
+                              <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { title: '', icon: 'check', description: '' })}>+ Añadir inclusión</button>
                             </div>
-                          ) : (
-                            <div>
-                              {vc.inclusions.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{vc.inclusions.map((x: any, i: number) => <span key={i} style={chipStyle}>{x.emoji || '✓'} {x.title}</span>)}</div> : emptyHint('Sin inclusiones en biblioteca')}
-                              {customizeBtn(secId)}
-                            </div>
-                          ))}
+                          )}
 
                           {/* FAQ */}
-                          {secId === 'faq' && (hasOverride(overrideKey) ? (
+                          {secId === 'faq' && (
                             <div>
-                              {overrideBadge}
                               {(getOverride(overrideKey) ?? []).map((f: any, i: number) => (
-                                <div key={i} style={itemCard}>
-                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8, overflow: 'hidden', background: 'var(--surface)' }}>
+                                  <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
+                                    <ChevronDown size={12} style={{ color: 'var(--warm-gray)' }} />
+                                    <span style={{ flex: 1 }}>{f.question || <em style={{ color: 'var(--warm-gray)' }}>Nueva pregunta</em>}</span>
+                                    <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeOverrideItem(overrideKey, i) }}><X size={13} /></button>
+                                  </summary>
+                                  <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
                                     <input className="form-input" placeholder="Pregunta *" value={f.question ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'question', e.target.value)} />
-                                    <button type="button" style={removeBtn} onClick={() => removeOverrideItem(overrideKey, i)}><X size={13} /></button>
+                                    <textarea className="form-textarea" style={{ minHeight: 70 }} placeholder="Respuesta *" value={f.answer ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'answer', e.target.value)} />
                                   </div>
-                                  <textarea className="form-textarea" style={{ minHeight: 60 }} placeholder="Respuesta *" value={f.answer ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'answer', e.target.value)} />
-                                </div>
+                                </details>
                               ))}
                               <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { question: '', answer: '' })}>+ Añadir pregunta</button>
-                              {restoreBtn(overrideKey)}
                             </div>
-                          ) : (
-                            <div>
-                              {vc.faq.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{vc.faq.slice(0, 4).map((f: any, i: number) => <span key={i} style={chipStyle}>{f.question}</span>)}{vc.faq.length > 4 && <span style={{ ...chipStyle, background: 'var(--cream)' }}>+{vc.faq.length - 4} más</span>}</div> : emptyHint('Sin FAQs en biblioteca')}
-                              {customizeBtn(secId)}
-                            </div>
-                          ))}
-
-                          {/* MENU PRICES */}
-                          {secId === 'menu_prices' && (hasOverride(overrideKey) ? (
-                            <div>
-                              {overrideBadge}
-                              {(getOverride(overrideKey) ?? []).map((m: any, i: number) => (
-                                <div key={i} style={itemCard}>
-                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                    <input className="form-input" placeholder="Nombre *" value={m.name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'name', e.target.value)} />
-                                    <input className="form-input" style={{ width: 110, flexShrink: 0 }} placeholder="Precio/p. *" value={m.price_per_person ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'price_per_person', e.target.value)} />
-                                    <button type="button" style={removeBtn} onClick={() => removeOverrideItem(overrideKey, i)}><X size={13} /></button>
-                                  </div>
-                                  <input className="form-input" placeholder="Descripción" value={m.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
-                                </div>
-                              ))}
-                              <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { name: '', price_per_person: '', description: '' })}>+ Añadir menú</button>
-                              {restoreBtn(overrideKey)}
-                            </div>
-                          ) : (
-                            <div>
-                              {vc.menu_prices.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{vc.menu_prices.map((m: any, i: number) => <span key={i} style={chipStyle}>{m.name}{m.price_per_person ? ` · ${m.price_per_person}/p.` : ''}</span>)}</div> : emptyHint('Sin menús en biblioteca')}
-                              {customizeBtn(secId)}
-                            </div>
-                          ))}
+                          )}
 
                           {/* EXTRA SERVICES */}
-                          {secId === 'extra_services' && (hasOverride(overrideKey) ? (
+                          {secId === 'extra_services' && (
                             <div>
-                              {overrideBadge}
                               {(getOverride(overrideKey) ?? []).map((s: any, i: number) => (
                                 <div key={i} style={{ ...itemCard, flexDirection: 'row', alignItems: 'center' }}>
                                   <input className="form-input" placeholder="Nombre *" value={s.name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'name', e.target.value)} />
@@ -871,222 +817,235 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                 </div>
                               ))}
                               <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { name: '', price: '', description: '' })}>+ Añadir servicio</button>
-                              {restoreBtn(overrideKey)}
                             </div>
-                          ) : (
-                            <div>
-                              {vc.extra_services.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{vc.extra_services.map((x: any, i: number) => <span key={i} style={chipStyle}>{x.name}{x.price ? ` · ${x.price}` : ''}</span>)}</div> : emptyHint('Sin servicios en biblioteca')}
-                              {customizeBtn(secId)}
-                            </div>
-                          ))}
+                          )}
 
-                          {/* SEASON PRICES */}
-                          {secId === 'season_prices' && (hasOverride(overrideKey) ? (
-                            <div>
-                              {overrideBadge}
-                              {(getOverride(overrideKey) ?? []).map((s: any, i: number) => (
-                                <div key={i} style={itemCard}>
-                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                    <input className="form-input" placeholder="Etiqueta *" value={s.label ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'label', e.target.value)} />
-                                    <input className="form-input" style={{ width: 110, flexShrink: 0 }} placeholder="Modificador" value={s.price_modifier ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'price_modifier', e.target.value)} />
-                                    <button type="button" style={removeBtn} onClick={() => removeOverrideItem(overrideKey, i)}><X size={13} /></button>
-                                  </div>
-                                  <input className="form-input" placeholder="Rango fechas" value={s.date_range ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'date_range', e.target.value)} />
+                          {/* VENUE RENTAL GRID (temporada × día) */}
+                          {secId === 'venue_rental' && (() => {
+                            const vr: any = sections.venue_rental ?? {}
+                            const tiers: string[] = Array.isArray(vr.day_tiers) ? vr.day_tiers : []
+                            const rows: any[] = Array.isArray(vr.rows) ? vr.rows : []
+                            const patchVr = (patch: any) => setSections(s => ({ ...s, venue_rental: { ...(s.venue_rental ?? {}), ...patch } }))
+                            const tierCount = Math.max(tiers.length, 1)
+                            return (
+                              <div>
+                                <input className="form-input" placeholder="Título (ej. Tarifas de alquiler)" value={vr.title ?? ''} onChange={e => patchVr({ title: e.target.value })} style={{ marginBottom: 6 }} />
+                                <input className="form-input" placeholder="Intro breve (opc.)" value={vr.intro ?? ''} onChange={e => patchVr({ intro: e.target.value })} style={{ marginBottom: 10 }} />
+
+                                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 4 }}>Columnas (días)</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+                                  {tiers.map((t: string, ti: number) => (
+                                    <div key={ti} style={{ display: 'flex', gap: 5 }}>
+                                      <input className="form-input" placeholder="Ej. Sábados y festivos" value={t} onChange={e => patchVr({ day_tiers: tiers.map((x, i) => i === ti ? e.target.value : x) })} />
+                                      <button type="button" style={{ ...removeBtn, width: 22, height: 22 }} onClick={() => patchVr({
+                                        day_tiers: tiers.filter((_, i) => i !== ti),
+                                        rows: rows.map(r => ({ ...r, prices: (r.prices ?? []).filter((_: any, i: number) => i !== ti) })),
+                                      })}><X size={11} /></button>
+                                    </div>
+                                  ))}
+                                  <button type="button" style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 0' }}
+                                    onClick={() => patchVr({ day_tiers: [...tiers, ''] })}>+ Añadir columna</button>
                                 </div>
-                              ))}
-                              <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { label: '', price_modifier: '', date_range: '' })}>+ Añadir temporada</button>
-                              {restoreBtn(overrideKey)}
-                            </div>
-                          ) : (
-                            <div>
-                              {vc.season_prices.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{vc.season_prices.map((s: any, i: number) => <span key={i} style={chipStyle}>{s.label || s.season}{s.price_modifier ? ` · ${s.price_modifier}` : ''}</span>)}</div> : emptyHint('Sin temporadas en biblioteca')}
-                              {customizeBtn(secId)}
-                            </div>
-                          ))}
+
+                                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 4 }}>Filas (temporadas)</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
+                                  {rows.map((row: any, ri: number) => (
+                                    <div key={ri} style={{ background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 6, padding: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                      <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                                        <input className="form-input" placeholder="Temporada (ej. Junio, Julio)" value={row.season ?? ''} onChange={e => patchVr({ rows: rows.map((r, i) => i === ri ? { ...r, season: e.target.value } : r) })} />
+                                        <button type="button" style={removeBtn} onClick={() => patchVr({ rows: rows.filter((_, i) => i !== ri) })}><X size={13} /></button>
+                                      </div>
+                                      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${tierCount}, 1fr)`, gap: 5 }}>
+                                        {Array.from({ length: tierCount }).map((_, ci) => (
+                                          <input key={ci} className="form-input" placeholder={tiers[ci] || `Col ${ci + 1}`} value={row.prices?.[ci] ?? ''}
+                                            onChange={e => {
+                                              const newPrices = [...(row.prices ?? [])]
+                                              while (newPrices.length < tierCount) newPrices.push('')
+                                              newPrices[ci] = e.target.value
+                                              patchVr({ rows: rows.map((r, i) => i === ri ? { ...r, prices: newPrices } : r) })
+                                            }} />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <button type="button" style={addBtn} onClick={() => patchVr({ rows: [...rows, { season: '', prices: Array(tierCount).fill('') }] })}>+ Añadir temporada</button>
+                                </div>
+
+                                <input className="form-input" placeholder="Notas al pie (opc. ej. '21% IVA no incluido')" value={vr.notes ?? ''} onChange={e => patchVr({ notes: e.target.value })} />
+                              </div>
+                            )
+                          })()}
 
                           {/* COLLABORATORS */}
-                          {secId === 'collaborators' && (hasOverride(overrideKey) ? (
+                          {secId === 'collaborators' && (
                             <div>
-                              {overrideBadge}
                               {(getOverride(overrideKey) ?? []).map((c: any, i: number) => (
-                                <div key={i} style={itemCard}>
-                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                    <input className="form-input" placeholder="Nombre *" value={c.name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'name', e.target.value)} />
-                                    <input className="form-input" style={{ width: 120, flexShrink: 0 }} placeholder="Categoría" value={c.category ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'category', e.target.value)} />
-                                    <button type="button" style={removeBtn} onClick={() => removeOverrideItem(overrideKey, i)}><X size={13} /></button>
+                                <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8, overflow: 'hidden', background: 'var(--surface)' }}>
+                                  <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
+                                    <ChevronDown size={12} style={{ color: 'var(--warm-gray)' }} />
+                                    <span style={{ flex: 1 }}>{c.name || <em style={{ color: 'var(--warm-gray)' }}>Nuevo colaborador</em>}{c.category ? <span style={{ color: 'var(--warm-gray)', fontSize: 11, marginLeft: 6 }}>· {c.category}</span> : null}</span>
+                                    <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeOverrideItem(overrideKey, i) }}><X size={13} /></button>
+                                  </summary>
+                                  <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                      <input className="form-input" placeholder="Nombre *" value={c.name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'name', e.target.value)} />
+                                      <input className="form-input" style={{ width: 160, flexShrink: 0 }} placeholder="Categoría (ej. Catering)" value={c.category ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'category', e.target.value)} />
+                                    </div>
+                                    <input className="form-input" placeholder="Descripción" value={c.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
+                                    <input className="form-input" placeholder="Web (opcional)" value={c.website ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'website', e.target.value)} />
                                   </div>
-                                  <input className="form-input" placeholder="Descripción" value={c.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
-                                  <input className="form-input" placeholder="Web" value={c.website ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'website', e.target.value)} />
-                                </div>
+                                </details>
                               ))}
                               <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { name: '', category: '', description: '', website: '' })}>+ Añadir colaborador</button>
-                              {restoreBtn(overrideKey)}
                             </div>
-                          ) : (
-                            <div>
-                              {vc.collaborators.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{vc.collaborators.map((c: any, i: number) => <span key={i} style={chipStyle}>{c.name}{c.category ? ` · ${c.category}` : ''}</span>)}</div> : emptyHint('Sin colaboradores en biblioteca')}
-                              {customizeBtn(secId)}
-                            </div>
-                          ))}
+                          )}
 
                           {/* EXPERIENCE */}
-                          {secId === 'experience' && (hasOverride('experience_override') ? (
-                            <div>
-                              {overrideBadge}
-                              <input className="form-input" placeholder="Título" value={(sections as any).experience_override?.title ?? ''} onChange={e => setOverride('experience_override', { ...((sections as any).experience_override ?? {}), title: e.target.value })} style={{ marginBottom: 6 }} />
-                              <textarea className="form-textarea" style={{ minHeight: 100 }} placeholder="Descripción..." value={(sections as any).experience_override?.body ?? ''} onChange={e => setOverride('experience_override', { ...((sections as any).experience_override ?? {}), body: e.target.value })} />
-                              {restoreBtn('experience_override')}
+                          {secId === 'experience' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              <input className="form-input" placeholder="Título (ej. Una finca del siglo XVII...)" value={(sections as any).experience_override?.title ?? ''} onChange={e => setOverride('experience_override', { ...((sections as any).experience_override ?? {}), title: e.target.value })} />
+                              <textarea className="form-textarea" style={{ minHeight: 120 }} placeholder="Texto de la experiencia / historia del venue..." value={(sections as any).experience_override?.body ?? ''} onChange={e => setOverride('experience_override', { ...((sections as any).experience_override ?? {}), body: e.target.value })} />
                             </div>
-                          ) : (
-                            <div>
-                              {vc.experience?.body ? <div style={{ fontSize: 11, color: 'var(--charcoal)', fontStyle: 'italic', lineHeight: 1.5 }}>"{(vc.experience.body).slice(0, 100)}…"</div> : emptyHint('Sin texto de experiencia en biblioteca')}
-                              {customizeBtn(secId)}
-                            </div>
-                          ))}
+                          )}
 
-                          {/* TESTIMONIALS override */}
-                          {secId === 'testimonials' && (hasOverride(overrideKey) ? (
-                            <div>
-                              {overrideBadge}
-                              {(getOverride(overrideKey) ?? []).map((t: any, i: number) => (
-                                <div key={i} style={itemCard}>
-                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                    <input className="form-input" placeholder="Nombres pareja" value={t.couple_name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'couple_name', e.target.value)} />
-                                    <input className="form-input" style={{ width: 110, flexShrink: 0 }} type="date" value={t.wedding_date ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'wedding_date', e.target.value)} />
-                                    <button type="button" style={removeBtn} onClick={() => removeOverrideItem(overrideKey, i)}><X size={13} /></button>
-                                  </div>
-                                  <textarea className="form-textarea" style={{ minHeight: 60 }} placeholder="Testimonio..." value={t.text ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'text', e.target.value)} />
-                                </div>
-                              ))}
-                              <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { couple_name: '', text: '', wedding_date: '', rating: 5 })}>+ Añadir testimonio</button>
-                              {restoreBtn(overrideKey)}
-                            </div>
-                          ) : (
-                            <div>
-                              {vc.testimonials.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{vc.testimonials.slice(0, 3).map((t: any, i: number) => <span key={i} style={chipStyle}>{t.couple_name}</span>)}{vc.testimonials.length > 3 && <span style={{ ...chipStyle, background: 'var(--cream)' }}>+{vc.testimonials.length - 3} más</span>}</div> : emptyHint('Sin testimonios en biblioteca')}
-                              {customizeBtn(secId)}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {!isLibrary && isOpen && isOn && (
-                        <div className="sec-open-content" style={{ padding: '12px 14px 14px' }}>
-                          {secId === 'video' && (
-                            <>
-                              <div className="form-group">
-                                <label className="form-label">URL del vídeo</label>
-                                <input className="form-input" value={sections.video_url ?? ''} onChange={e => setSections(s => ({ ...s, video_url: e.target.value }))} placeholder="https://www.youtube.com/watch?v=..." />
-                              </div>
-                              <div className="form-group">
-                                <label className="form-label">Título</label>
-                                <input className="form-input" value={sections.video_title ?? ''} onChange={e => setSections(s => ({ ...s, video_title: e.target.value }))} placeholder="Conoce nuestro venue" />
-                              </div>
-                            </>
-                          )}
-                          {secId === 'welcome' && (
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label className="form-label">Mensaje de bienvenida</label>
-                              <textarea className="form-textarea" style={{ minHeight: 80 }} value={form.personal_message ?? ''} onChange={e => setForm(f => ({ ...f, personal_message: e.target.value }))} />
-                            </div>
-                          )}
-                          {secId === 'techspecs' && (
-                            <>
-                              {([['sqm', 'Superficie (m²)', '800 m²'], ['ceiling', 'Altura techo', '6 m'], ['parking', 'Parking', '200 plazas'], ['accessibility', 'Accesibilidad', 'Acceso silla de ruedas'], ['ceremony_spaces', 'Espacios ceremonia', 'Jardín, capilla'], ['extra', 'Otros datos', '']] as [string, string, string][]).map(([key, lbl, ph]) => (
-                                <div className="form-group" key={key}>
-                                  <label className="form-label">{lbl}</label>
-                                  <input className="form-input" value={(sections.techspecs as any)?.[key] ?? ''} onChange={e => setSections(s => ({ ...s, techspecs: { ...(s.techspecs ?? {}), [key]: e.target.value } }))} placeholder={ph} />
-                                </div>
-                              ))}
-                            </>
-                          )}
-                          {secId === 'accommodation' && (
-                            <>
-                              {([['rooms', 'Habitaciones', '20 habitaciones'], ['description', 'Descripción', ''], ['price_info', 'Info de precio', 'Desde 120€/noche'], ['nearby', 'Alojamiento cercano', '']] as [string, string, string][]).map(([key, lbl, ph]) => (
-                                <div className="form-group" key={key}>
-                                  <label className="form-label">{lbl}</label>
-                                  <input className="form-input" value={(sections.accommodation as any)?.[key] ?? ''} onChange={e => setSections(s => ({ ...s, accommodation: { ...(s.accommodation ?? {}), [key]: e.target.value } }))} placeholder={ph} />
-                                </div>
-                              ))}
-                            </>
-                          )}
-                          {secId === 'map' && (
-                            <>
-                              <div className="form-group">
-                                <label className="form-label">URL embed del mapa</label>
-                                <input className="form-input" value={sections.map_embed_url ?? ''} onChange={e => setSections(s => ({ ...s, map_embed_url: e.target.value }))} placeholder="https://maps.google.com/..." />
-                              </div>
-                              <div className="form-group">
-                                <label className="form-label">Dirección</label>
-                                <input className="form-input" value={sections.map_address ?? ''} onChange={e => setSections(s => ({ ...s, map_address: e.target.value }))} />
-                              </div>
-                              <div className="form-group">
-                                <label className="form-label">Notas</label>
-                                <input className="form-input" value={sections.map_notes ?? ''} onChange={e => setSections(s => ({ ...s, map_notes: e.target.value }))} />
-                              </div>
-                            </>
-                          )}
+                          {/* TESTIMONIALS */}
                           {secId === 'testimonials' && (
                             <div>
-                              {(sections.testimonials ?? []).map((item, i) => (
-                                <div key={i} style={itemCard}>
-                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                    <input className="form-input" value={item.names} onChange={e => updateTestimonial(i, 'names', e.target.value)} placeholder="Nombre pareja" />
-                                    <input className="form-input" style={{ width: 110, flexShrink: 0 }} type="date" value={item.date ?? ''} onChange={e => updateTestimonial(i, 'date', e.target.value)} />
-                                    <button style={removeBtn} onClick={() => removeTestimonial(i)}><X size={13} /></button>
+                              {(getOverride(overrideKey) ?? []).map((t: any, i: number) => (
+                                <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8, overflow: 'hidden', background: 'var(--surface)' }}>
+                                  <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
+                                    <ChevronDown size={12} style={{ color: 'var(--warm-gray)' }} />
+                                    <span style={{ flex: 1 }}>{t.couple_name || <em style={{ color: 'var(--warm-gray)' }}>Nuevo testimonio</em>}{t.wedding_date ? <span style={{ color: 'var(--warm-gray)', fontSize: 11, marginLeft: 6 }}>· {t.wedding_date}</span> : null}</span>
+                                    <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeOverrideItem(overrideKey, i) }}><X size={13} /></button>
+                                  </summary>
+                                  <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                      <input className="form-input" placeholder="Nombres pareja (ej. Marina & David)" value={t.couple_name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'couple_name', e.target.value)} />
+                                      <input className="form-input" type="date" style={{ width: 160, flexShrink: 0 }} value={t.wedding_date ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'wedding_date', e.target.value)} />
+                                    </div>
+                                    <textarea className="form-textarea" style={{ minHeight: 80 }} placeholder="Testimonio..." value={t.text ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'text', e.target.value)} />
+                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
+                                      <label style={{ color: 'var(--warm-gray)' }}>Estrellas:</label>
+                                      <input className="form-input" type="number" min={1} max={5} style={{ width: 70 }} value={t.rating ?? 5} onChange={e => updateOverrideItem(overrideKey, i, 'rating', Number(e.target.value) || 5)} />
+                                    </div>
                                   </div>
-                                  <textarea className="form-textarea" style={{ minHeight: 60 }} value={item.text} onChange={e => updateTestimonial(i, 'text', e.target.value)} placeholder="Testimonio..." />
-                                </div>
+                                </details>
                               ))}
-                              <button style={addBtn} onClick={addTestimonial}>+ Añadir testimonio</button>
+                              <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { couple_name: '', text: '', wedding_date: '', rating: 5 })}>+ Añadir testimonio</button>
                             </div>
                           )}
-                          {secId === 'chat' && (
+
+                          {secId === 'welcome' && (
                             <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label className="form-label">Texto introductorio</label>
-                              <input className="form-input" value={sections.chat_intro ?? ''} onChange={e => setSections(s => ({ ...s, chat_intro: e.target.value }))} placeholder="¿Tienes alguna pregunta?..." />
+                              <textarea className="form-textarea" style={{ minHeight: 80 }} placeholder="Mensaje personalizado para la pareja..." value={form.personal_message ?? ''} onChange={e => setForm(f => ({ ...f, personal_message: e.target.value }))} />
                             </div>
                           )}
-                          {secId === 'nextsteps' && (
-                            <div>
-                              {(sections.nextsteps ?? []).map((item, i) => (
-                                <div key={i} style={itemCard}>
-                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                    <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
-                                    <input className="form-input" value={item.title} onChange={e => updateNextstep(i, 'title', e.target.value)} placeholder="Título" />
-                                    <button style={removeBtn} onClick={() => removeNextstep(i)}><X size={13} /></button>
-                                  </div>
-                                  <input className="form-input" value={item.description} onChange={e => updateNextstep(i, 'description', e.target.value)} placeholder="Descripción" />
-                                </div>
-                              ))}
-                              <button style={addBtn} onClick={addNextstep}>+ Añadir paso</button>
-                            </div>
-                          )}
-                          {secId === 'timeline' && (
-                            <div>
-                              <div className="form-group">
-                                <label className="form-label">Introducción</label>
-                                <input className="form-input" value={sections.timeline_intro ?? ''} onChange={e => setSections(s => ({ ...s, timeline_intro: e.target.value }))} />
-                              </div>
-                              {(sections.timeline ?? []).map((item, i) => (
-                                <div key={i} style={itemCard}>
-                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                    <input className="form-input" style={{ width: 80, flexShrink: 0 }} value={item.time} onChange={e => updateTimeline(i, 'time', e.target.value)} placeholder="12:00" />
-                                    <input className="form-input" value={item.title} onChange={e => updateTimeline(i, 'title', e.target.value)} placeholder="Momento" />
-                                    <button style={removeBtn} onClick={() => removeTimeline(i)}><X size={13} /></button>
-                                  </div>
-                                  <input className="form-input" value={item.description ?? ''} onChange={e => updateTimeline(i, 'description', e.target.value)} placeholder="Descripción" />
-                                </div>
-                              ))}
-                              <button style={addBtn} onClick={addTimeline}>+ Añadir momento</button>
-                            </div>
-                          )}
+
                           {secId === 'availability' && (
                             <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label className="form-label">Mensaje</label>
-                              <textarea className="form-textarea" style={{ minHeight: 70 }} value={sections.availability_message ?? ''} onChange={e => setSections(s => ({ ...s, availability_message: e.target.value }))} />
+                              <textarea className="form-textarea" style={{ minHeight: 70 }} placeholder="Ej. Fecha disponible, confirmación prioritaria..." value={sections.availability_message ?? ''} onChange={e => setSections(s => ({ ...s, availability_message: e.target.value }))} />
                             </div>
                           )}
+
+                          {secId === 'map' && (() => {
+                            const extractEmbedSrc = (raw: string): string => {
+                              const trimmed = raw.trim()
+                              if (!trimmed) return ''
+                              // Si pegan el iframe HTML completo, extraer el src
+                              const m = trimmed.match(/src\s*=\s*["']([^"']+)["']/i)
+                              if (m) return m[1]
+                              return trimmed
+                            }
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Código embed de Google Maps</label>
+                                  <textarea className="form-textarea" style={{ minHeight: 70, fontFamily: 'ui-monospace, monospace', fontSize: 11 }}
+                                    placeholder={'Pega aquí el <iframe src="..."> de Google Maps'}
+                                    value={sections.map_embed_url ?? ''}
+                                    onChange={e => setSections(s => ({ ...s, map_embed_url: extractEmbedSrc(e.target.value) }))} />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Dirección</label>
+                                  <input className="form-input" placeholder="Calle, ciudad" value={sections.map_address ?? ''} onChange={e => setSections(s => ({ ...s, map_address: e.target.value }))} />
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.6, background: 'var(--cream)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border)' }}>
+                                  <strong style={{ color: 'var(--charcoal)' }}>Cómo obtener el embed:</strong><br />
+                                  1. Ve a <a href="https://www.google.com/maps" target="_blank" rel="noopener" style={{ color: 'var(--gold)' }}>Google Maps</a> y busca tu venue<br />
+                                  2. Clica <strong>Compartir</strong> → pestaña <strong>Insertar un mapa</strong><br />
+                                  3. Copia el <code style={{ background: 'var(--surface)', padding: '1px 4px', borderRadius: 3 }}>&lt;iframe src="…"&gt;</code> completo y pégalo arriba
+                                </div>
+                              </div>
+                            )
+                          })()}
+
+                          {secId === 'accommodation' && (() => {
+                            const acc: any = sections.accommodation ?? {}
+                            const setAcc = (patch: any) => setSections(s => ({ ...s, accommodation: { ...(s.accommodation ?? {}), ...patch } }))
+                            const options: any[] = Array.isArray(acc.options) ? acc.options : []
+                            const setOptions = (next: any[]) => setAcc({ options: next })
+                            return (
+                              <>
+                                <div className="form-group">
+                                  <label className="form-label">Descripción general</label>
+                                  <textarea className="form-textarea" style={{ minHeight: 70 }} value={acc.description ?? ''} onChange={e => setAcc({ description: e.target.value })} placeholder="La masía dispone de…" />
+                                </div>
+                                <div className="form-group">
+                                  <label className="form-label">Nº de habitaciones / descripción corta</label>
+                                  <input className="form-input" value={acc.rooms ?? ''} onChange={e => setAcc({ rooms: e.target.value })} placeholder="5 suites dobles · 1 suite nupcial" />
+                                </div>
+
+                                {/* Opciones estructuradas con precios por temporada */}
+                                <div className="form-group" style={{ background: 'var(--cream)', padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
+                                  <label className="form-label" style={{ fontSize: 11 }}>Opciones de alojamiento con precios</label>
+                                  {options.map((opt: any, oi: number) => {
+                                    const prices: any[] = Array.isArray(opt.prices) ? opt.prices : []
+                                    const patchOpt = (p: any) => setOptions(options.map((o, i) => i === oi ? { ...o, ...p } : o))
+                                    return (
+                                      <div key={oi} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                          <input className="form-input" placeholder="Etiqueta * (ej. Suite Nupcial)" value={opt.label ?? ''} onChange={e => patchOpt({ label: e.target.value })} />
+                                          <button type="button" style={removeBtn} onClick={() => setOptions(options.filter((_, i) => i !== oi))}><X size={13} /></button>
+                                        </div>
+                                        <input className="form-input" placeholder="Descripción breve (opcional)" value={opt.description ?? ''} onChange={e => patchOpt({ description: e.target.value })} />
+                                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--charcoal)', cursor: 'pointer' }}>
+                                          <input type="checkbox" checked={!!opt.included} onChange={e => patchOpt({ included: e.target.checked })} />
+                                          Incluido en la tarifa del venue
+                                        </label>
+                                        {!opt.included && (
+                                          <>
+                                            <input className="form-input" placeholder="Precio libre (opc. ej. 'Desde 120€/noche')" value={opt.price_info ?? ''} onChange={e => patchOpt({ price_info: e.target.value })} />
+                                            <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase', marginTop: 2 }}>Precios por temporada</div>
+                                            {prices.map((p: any, pi: number) => (
+                                              <div key={pi} style={{ display: 'flex', gap: 5 }}>
+                                                <input className="form-input" placeholder="Temporada (ej. Alta / May-Oct)" value={p.season ?? ''} onChange={e => patchOpt({ prices: prices.map((x, i) => i === pi ? { ...x, season: e.target.value } : x) })} />
+                                                <input className="form-input" placeholder="Precio (ej. 4.000€/noche)" style={{ width: 170 }} value={p.price ?? ''} onChange={e => patchOpt({ prices: prices.map((x, i) => i === pi ? { ...x, price: e.target.value } : x) })} />
+                                                <button type="button" style={{ ...removeBtn, width: 22, height: 22 }} onClick={() => patchOpt({ prices: prices.filter((_, i) => i !== pi) })}><X size={11} /></button>
+                                              </div>
+                                            ))}
+                                            <button type="button" style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 0' }}
+                                              onClick={() => patchOpt({ prices: [...prices, { season: '', price: '' }] })}>
+                                              + Añadir temporada
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+                                  <button type="button" style={addBtn} onClick={() => setOptions([...options, { label: '', prices: [] }])}>+ Añadir opción de alojamiento</button>
+                                </div>
+
+                                <div className="form-group">
+                                  <label className="form-label">Info de precio (fallback libre)</label>
+                                  <input className="form-input" value={acc.price_info ?? ''} onChange={e => setAcc({ price_info: e.target.value })} placeholder="Si no usas opciones, texto libre. Ej: Desde 120€/noche" />
+                                </div>
+                                <div className="form-group">
+                                  <label className="form-label">Alojamiento cercano</label>
+                                  <textarea className="form-textarea" style={{ minHeight: 50 }} value={acc.nearby ?? ''} onChange={e => setAcc({ nearby: e.target.value })} placeholder="Hoteles y turismo rural cercanos" />
+                                </div>
+                              </>
+                            )
+                          })()}
                         </div>
                       )}
                     </div>
@@ -1095,6 +1054,11 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               </div>
             )
           })()}
+
+          {/* ══ TAB: MENÚS ══ */}
+          {activeTab === 'menus' && (
+            <ProposalMenuEditor sections={sections} setSections={setSections} />
+          )}
         </div>
 
         {/* Footer save */}

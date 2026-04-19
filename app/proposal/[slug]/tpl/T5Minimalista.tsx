@@ -7,9 +7,14 @@ import { useEffect, useRef, useState } from 'react'
 import type { ProposalData } from '../page'
 import {
   extractData, formatDate, formatPrice, isDark, toRgb,
-  getEmbedUrl, FadeUp, FadeIn,
-  ConversionBlock, FloatingWhatsApp, AvailabilityBanner, Gallery,
+  FadeUp, FadeIn,
+  FloatingWhatsApp, AvailabilityBanner, Gallery,
+  IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating,
+  resolveContact, VenueRentalGrid,
+  formatZoneCapacities, formatZoneFeatures,
 } from './shared'
+import { buildSingleFontUrl } from '@/lib/fonts'
+import { WeddingProposal } from './WeddingProposal'
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const WHITE = '#FFFFFF'
@@ -20,7 +25,7 @@ const MUTED = '#888888'
 const LINE  = '#E8E8E8'
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
-const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
+const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) => `
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
@@ -80,7 +85,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
     color: ${pri}; margin-bottom: 24px;
   }
   .t5-hero-couple {
-    font-family: 'DM Serif Display', serif; font-size: clamp(2.8rem, 5vw, 4.4rem);
+    font-family: ${font}; font-size: clamp(2.8rem, 5vw, 4.4rem);
     line-height: 1.05; color: ${INK}; margin-bottom: 28px;
   }
   .t5-hero-couple em { font-style: italic; color: ${pri} }
@@ -110,7 +115,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
   }
   .t5-hero-datum { display: flex; flex-direction: column; gap: 4px }
   .t5-hero-datum-val {
-    font-family: 'DM Serif Display', serif; font-size: 1.8rem; color: ${INK};
+    font-family: ${font}; font-size: 1.8rem; color: ${INK};
   }
   .t5-hero-datum-lbl { font-size: .72rem; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: ${MUTED} }
 
@@ -163,7 +168,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
     color: rgba(${darkPri ? '255,255,255' : '0,0,0'},.5); margin-bottom: 12px;
   }
   .t5-inc-title {
-    font-family: 'DM Serif Display', serif;
+    font-family: ${font};
     font-size: clamp(2rem, 3.5vw, 3rem);
     color: ${darkPri ? '#fff' : INK}; line-height: 1.15;
   }
@@ -174,12 +179,14 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
   .t5-inc-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 2px;
+    gap: 2px; align-items: stretch;
   }
+  .t5-inc-grid > * { height: 100% }
   .t5-inc-item {
     padding: 28px 24px;
     background: rgba(${darkPri ? '255,255,255' : '0,0,0'},.06);
     transition: background .2s;
+    height: 100%; display: flex; flex-direction: column;
   }
   .t5-inc-item:hover { background: rgba(${darkPri ? '255,255,255' : '0,0,0'},.1) }
   .t5-inc-emoji { font-size: 1.5rem; margin-bottom: 12px; display: block }
@@ -202,7 +209,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
     color: ${pri}; margin-bottom: 14px;
   }
   .t5-pricing-title {
-    font-family: 'DM Serif Display', serif; font-size: clamp(2rem, 4vw, 3rem);
+    font-family: ${font}; font-size: clamp(2rem, 4vw, 3rem);
     color: ${INK}; line-height: 1.15; margin-bottom: 48px;
   }
   .t5-receipt {
@@ -212,7 +219,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
     background: ${INK}; color: #fff;
     padding: 20px 32px; display: flex; justify-content: space-between; align-items: center;
   }
-  .t5-receipt-header-venue { font-family: 'DM Serif Display', serif; font-size: 1.1rem }
+  .t5-receipt-header-venue { font-family: ${font}; font-size: 1.1rem }
   .t5-receipt-header-date { font-size: .78rem; color: rgba(255,255,255,.5) }
   .t5-receipt-couple {
     padding: 24px 32px 18px;
@@ -242,7 +249,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
   }
   .t5-receipt-total-lbl { font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; opacity: .6 }
   .t5-receipt-total-val {
-    font-family: 'DM Serif Display', serif;
+    font-family: ${font};
     font-size: 2.2rem; color: ${pri};
   }
   .t5-receipt-note {
@@ -256,7 +263,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
   .t5-pkg-section { padding: 96px 0; background: ${WHITE} }
   .t5-pkg-inner { max-width: 1100px; margin: 0 auto; padding: 0 56px }
   .t5-pkg-tag { font-size: .68rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: ${pri}; margin-bottom: 14px }
-  .t5-pkg-title { font-family: 'DM Serif Display', serif; font-size: clamp(2rem, 3.5vw, 3rem); color: ${INK}; margin-bottom: 56px }
+  .t5-pkg-title { font-family: ${font}; font-size: clamp(2rem, 3.5vw, 3rem); color: ${INK}; margin-bottom: 56px }
   .t5-pkgs {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1px; background: ${LINE};
@@ -270,19 +277,22 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
   .t5-pkg.recommended { background: ${INK} }
   .t5-pkg.recommended:hover { background: rgba(0,0,0,.92) }
   .t5-pkg-badge {
-    font-size: .62rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-    color: ${pri}; margin-bottom: 10px; display: block;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: .6rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: ${pri}; background: rgba(${priRgb}, .12); padding: 4px 10px; border-radius: 100px;
+    margin-bottom: 10px;
   }
-  .t5-pkg.recommended .t5-pkg-badge { color: ${pri} }
+  .t5-pkg-badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: ${pri} }
+  .t5-pkg.recommended .t5-pkg-badge { background: rgba(${priRgb}, .22) }
   .t5-pkg-name {
-    font-family: 'DM Serif Display', serif; font-size: 1.4rem;
+    font-family: ${font}; font-size: 1.4rem;
     color: ${INK}; margin-bottom: 6px;
   }
   .t5-pkg.recommended .t5-pkg-name { color: #fff }
   .t5-pkg-sub { font-size: .8rem; color: ${MUTED}; margin-bottom: 20px }
   .t5-pkg.recommended .t5-pkg-sub { color: rgba(255,255,255,.5) }
   .t5-pkg-price {
-    font-family: 'DM Serif Display', serif; font-size: 2.6rem;
+    font-family: ${font}; font-size: 2.6rem;
     line-height: 1; margin-bottom: 6px; color: ${pri};
   }
   .t5-pkg-price-note { font-size: .75rem; color: ${MUTED}; margin-bottom: 24px }
@@ -323,7 +333,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
     padding-bottom: 80px; border-bottom: 1px solid ${LINE};
   }
   .t5-cta-heading {
-    font-family: 'DM Serif Display', serif; font-style: italic;
+    font-family: ${font}; font-style: italic;
     font-size: clamp(2.4rem, 5vw, 4rem); line-height: 1.1; color: ${INK};
   }
   .t5-cta-heading span { color: ${pri}; font-style: normal }
@@ -338,7 +348,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
   }
   .t5-form-title {
     background: ${INK}; color: #fff; padding: 22px 28px;
-    font-family: 'DM Serif Display', serif; font-size: 1.2rem;
+    font-family: ${font}; font-size: 1.2rem;
   }
   .t5-form-body { padding: 28px; display: flex; flex-direction: column; gap: 0 }
   .t5-form-row { display: flex; flex-direction: column }
@@ -400,13 +410,16 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean) => `
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 export default function T5Minimalista({ data }: { data: ProposalData }) {
-  const { sec, on, packagesShow, inclusionsShow, expShow, faqShow } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, testsShow, collabsShow, extrasShow, accom } = extractData(data)
 
   const branding  = data.branding
   const primary   = branding?.primary_color || '#1A1A1A'
   const priRgb    = toRgb(primary)
   const darkPri   = isDark(primary)
+  const font      = (branding as any)?.font_family || "'DM Sans', sans-serif"
   const venueName = data.venue?.name || ''
+  const contact   = resolveContact(data)
+  const contactOn = on('contact') && (contact.phone || contact.email)
   const photos    = data.venue?.photo_urls || []
   const secData   = (data as any).sections_data || {}
   const heroPhoto = secData.hero_image_url || photos[0] || ''
@@ -430,25 +443,22 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const [form, setForm]         = useState({ name: '', email: '', phone: '', message: '' })
-  const [submitted, setSubmitted] = useState(false)
-  const [faqOpen, setFaqOpen]   = useState<number | null>(null)
+  // Load branded font from Google Fonts when it changes
+  useEffect(() => {
+    const url = buildSingleFontUrl(font); if (!url) return
+    const ex = document.querySelector('link[data-gf-p]')
+    if (ex) { ex.setAttribute('href', url); return }
+    const l = document.createElement('link'); l.rel='stylesheet'; l.href=url; l.setAttribute('data-gf-p','1')
+    document.head.appendChild(l)
+  }, [font])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const { createClient } = await import('@/lib/supabase')
-      const sb = createClient()
-      await sb.from('proposal_contacts').insert({ proposal_id: data.id, ...form })
-    } catch {}
-    setSubmitted(true)
-  }
+  const [faqOpen, setFaqOpen]   = useState<number | null>(null)
 
   const activePkgs = packagesShow.filter((p: any) => p.is_active !== false)
 
   return (
     <div className="t5">
-      <style dangerouslySetInnerHTML={{ __html: buildCss(primary, priRgb, darkPri) }} />
+      <style dangerouslySetInnerHTML={{ __html: buildCss(primary, priRgb, darkPri, font) }} />
 
       {/* SCROLL PROGRESS */}
       <div className="t5-progress" style={{ width: `${progress}%` }} />
@@ -457,7 +467,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       <nav className={`t5-nav ${scrolled ? 'scrolled' : ''}`}>
         {branding?.logo_url
           ? <img src={branding.logo_url} className="t5-logo" alt={venueName} />
-          : <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: '1.1rem' }}>{venueName}</span>
+          : <span style={{ fontFamily: font, fontSize: '1.1rem' }}>{venueName}</span>
         }
         <div className="t5-nav-right">
           {inclusionsShow.length > 0 && (
@@ -470,8 +480,8 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
               Paquetes
             </button>
           )}
-          <button className="t5-nav-cta" onClick={() => document.getElementById('t5-cta')?.scrollIntoView({ behavior: 'smooth' })}>
-            Reservar
+          <button className="t5-nav-cta" onClick={() => (document.getElementById(hasCatering ? 'menu' : 't5-cta') ?? document.getElementById('t5-cta'))?.scrollIntoView({ behavior: 'smooth' })}>
+            {hasCatering ? 'Ver menús' : 'Contactar'}
           </button>
         </div>
       </nav>
@@ -496,8 +506,8 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
               <p className="t5-hero-desc">{data.personal_message.slice(0, 200)}{data.personal_message.length > 200 ? '…' : ''}</p>
             )}
             <div className="t5-hero-actions">
-              <button className="t5-hero-btn-primary" onClick={() => document.getElementById('t5-cta')?.scrollIntoView({ behavior: 'smooth' })}>
-                Confirmar fecha <span>→</span>
+              <button className="t5-hero-btn-primary" onClick={() => (document.getElementById(hasCatering ? 'menu' : 't5-cta') ?? document.getElementById('t5-cta'))?.scrollIntoView({ behavior: 'smooth' })}>
+                {hasCatering ? 'Ver menús' : 'Solicitar info'} <span>→</span>
               </button>
               {activePkgs.length > 0 && (
                 <button className="t5-hero-btn-secondary" onClick={() => document.getElementById('t5-pkg')?.scrollIntoView({ behavior: 'smooth' })}>
@@ -543,7 +553,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       </section>
 
       {/* ── AVAILABILITY BANNER ── */}
-      {sec.show_availability_msg && sec.availability_message && (
+      {on('availability') && sec.availability_message && (
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />
       )}
 
@@ -554,18 +564,77 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
           <p className="t5-urgency-text">
             <strong>Fecha disponible</strong> — Las fechas de temporada alta se agotan rápido. Reserva con prioridad.
           </p>
-          <button className="t5-urgency-cta" onClick={() => document.getElementById('t5-cta')?.scrollIntoView({ behavior: 'smooth' })}>
-            Asegurar fecha
+          <button className="t5-urgency-cta" onClick={() => (document.getElementById(hasCatering ? 'menu' : 't5-cta') ?? document.getElementById('t5-cta'))?.scrollIntoView({ behavior: 'smooth' })}>
+            {hasCatering ? 'Ver menús' : 'Solicitar información'}
           </button>
         </div>
       )}
 
-      {/* ── CONVERSION BLOCK ── */}
-      <ConversionBlock data={data} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} ctaId="t5-cta" />
+      {/* EXPERIENCE */}
+      {on('experience') && expShow && (expShow as any).body && (
+        <section style={{ padding: '80px 0', background: WHITE }}>
+          <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 56px' }}>
+            <FadeUp>
+              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>La experiencia</p>
+              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 24 }}>{(expShow as any).title || 'Vuestro día especial'}</h2>
+              <p style={{ fontSize: '1rem', color: MUTED, lineHeight: 1.85, whiteSpace: 'pre-wrap' }}>{(expShow as any).body}</p>
+            </FadeUp>
+          </div>
+        </section>
+      )}
 
       {/* GALLERY */}
       {on('gallery') && galleryPhotos.length > 0 && (
         <Gallery photos={galleryPhotos} primary={primary} dark={false} />
+      )}
+
+      {/* ZONES */}
+      {on('zones') && zonesShow.length > 0 && (
+        <section style={{ padding: '80px 0', background: OFF }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
+            <FadeUp>
+              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Los espacios</p>
+              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 48 }}>Cada rincón del venue</h2>
+            </FadeUp>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 1, background: LINE, border: `1px solid ${LINE}` }}>
+              {zonesShow.map((z: any, i: number) => {
+                const zPhoto = z.photos?.[0] || photos[i + 2]
+                const caps = formatZoneCapacities(z)
+                const feats = formatZoneFeatures(z)
+                return (
+                  <FadeUp key={i} delay={(i % 3) * .06}>
+                    <div style={{ background: WHITE, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                      <div style={{ position: 'relative', aspectRatio: '4/3', overflow: 'hidden', background: GRAY }}>
+                        {zPhoto
+                          ? <img src={zPhoto} alt={z.name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                          : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED }}><IcoBuilding width={40} height={40} /></div>
+                        }
+                      </div>
+                      <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                        <h3 style={{ fontFamily: font, fontSize: 20, color: INK }}>{z.name}</h3>
+                        {z.description && <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.65 }}>{z.description}</p>}
+                        {caps.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: primary, fontWeight: 600, marginTop: 2 }}>
+                            {caps.map((c, ci) => <span key={ci} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IcoUsers width={10} height={10} />{c}</span>)}
+                          </div>
+                        )}
+                        {feats.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                            {feats.map((f, fi) => (
+                              <span key={fi} style={{ fontSize: 10.5, padding: '2px 8px', border: `1px solid ${LINE}`, color: MUTED, letterSpacing: '.02em' }}>{f}</span>
+                            ))}
+                          </div>
+                        )}
+                        {z.notes && <div style={{ fontSize: 11.5, color: MUTED, fontStyle: 'italic', marginTop: 4 }}>{z.notes}</div>}
+                        {z.price && <div style={{ fontFamily: font, fontSize: 16, color: primary, marginTop: 4 }}>{z.price}</div>}
+                      </div>
+                    </div>
+                  </FadeUp>
+                )
+              })}
+            </div>
+          </div>
+        </section>
       )}
 
       {/* INCLUSIONS — bloque de color primario */}
@@ -587,7 +656,9 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
               {inclusionsShow.map((inc: any, i: number) => (
                 <FadeUp key={i} delay={i * .03}>
                   <div className="t5-inc-item">
-                    <span className="t5-inc-emoji">{inc.emoji || '✦'}</span>
+                    <span className="t5-inc-emoji" style={{ display: 'inline-flex', color: primary }}>
+                      <InclusionIcon name={inc.icon || inc.emoji || 'check'} size={26} color={primary} strokeWidth={1.5} />
+                    </span>
                     <div className="t5-inc-name">{inc.title}</div>
                     {inc.description && <div className="t5-inc-desc">{inc.description}</div>}
                   </div>
@@ -632,7 +703,12 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
                   {inclusionsShow.slice(0, 4).map((inc: any, i: number) => (
                     <div key={i} className="t5-receipt-row">
                       <div>
-                        <div className="t5-receipt-row-name">{inc.emoji} {inc.title}</div>
+                        <div className="t5-receipt-row-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ color: primary, display: 'inline-flex' }}>
+                            <InclusionIcon name={inc.icon || inc.emoji || 'check'} size={14} color={primary} />
+                          </span>
+                          {inc.title}
+                        </div>
                       </div>
                       <div className="t5-receipt-row-price" style={{ color: primary }}>Incluido</div>
                     </div>
@@ -663,7 +739,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
               {activePkgs.map((pkg: any, i: number) => (
                 <FadeUp key={i} delay={i * .1}>
                   <div className={`t5-pkg ${pkg.is_recommended ? 'recommended' : ''}`}>
-                    {pkg.is_recommended && <span className="t5-pkg-badge">★ Más elegido</span>}
+                    {pkg.is_recommended && <span className="t5-pkg-badge">Más elegido</span>}
                     <div className="t5-pkg-name">{pkg.name}</div>
                     {pkg.subtitle && <div className="t5-pkg-sub">{pkg.subtitle}</div>}
                     {pkg.price && (
@@ -682,13 +758,51 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
                     )}
                     <button
                       className="t5-pkg-cta"
-                      onClick={() => {
-                        setForm(p => ({ ...p, message: `Me interesa el paquete: ${pkg.name}` }))
-                        document.getElementById('t5-cta')?.scrollIntoView({ behavior: 'smooth' })
-                      }}
+                      onClick={() => (document.getElementById(hasCatering ? 'menu' : 't5-cta') ?? document.getElementById('t5-cta'))?.scrollIntoView({ behavior: 'smooth' })}
                     >
-                      Elegir este paquete
+                      {hasCatering ? 'Ver menús' : 'Solicitar info'}
                     </button>
+                  </div>
+                </FadeUp>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* VENUE RENTAL — grid temporada × día */}
+      {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+        <section style={{ padding: '80px 0', background: OFF }}>
+          <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 56px' }}>
+            <FadeUp>
+              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>{sec.venue_rental.title || 'Tarifas de alquiler'}</p>
+              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Elegid vuestra fecha</h2>
+            </FadeUp>
+            <FadeUp delay={.1}>
+              <VenueRentalGrid data={sec.venue_rental} primary={primary} />
+            </FadeUp>
+          </div>
+        </section>
+      )}
+
+      {/* SEASON PRICES */}
+      {on('season_prices') && seasonsShow.length > 0 && (
+        <section style={{ padding: '80px 0', background: WHITE }}>
+          <div style={{ maxWidth: 780, margin: '0 auto', padding: '0 56px' }}>
+            <FadeUp>
+              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Temporadas</p>
+              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Precios según la fecha</h2>
+            </FadeUp>
+            <div style={{ border: `1px solid ${LINE}` }}>
+              {seasonsShow.map((s: any, i: number) => (
+                <FadeUp key={i} delay={i * .04}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 16, alignItems: 'center', padding: '18px 28px', borderBottom: i < seasonsShow.length - 1 ? `1px solid ${LINE}` : 'none' }}>
+                    <div style={{ fontFamily: font, fontSize: 18, color: INK }}>{s.label || s.season}</div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: primary, marginBottom: 3 }}>{s.date_range}</div>
+                      {s.notes && <div style={{ fontSize: 12, color: MUTED }}>{s.notes}</div>}
+                    </div>
+                    <div style={{ fontFamily: font, fontSize: 22, color: primary, textAlign: 'right', whiteSpace: 'nowrap' }}>{s.price_modifier}</div>
                   </div>
                 </FadeUp>
               ))}
@@ -703,7 +817,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
           <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 40px' }}>
             <FadeUp>
               <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>FAQ</p>
-              <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: '2rem', color: INK, marginBottom: 40 }}>Preguntas frecuentes</h2>
+              <h2 style={{ fontFamily: font, fontSize: '2rem', color: INK, marginBottom: 40 }}>Preguntas frecuentes</h2>
             </FadeUp>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {faqShow.map((f: any, i: number) => (
@@ -731,70 +845,228 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         </section>
       )}
 
-      {/* CTA — la más prominente */}
+      {/* WeddingProposal — configuración interactiva */}
+      {hasCatering && on('menu') && (menusStructured?.length || menuExtras?.length || appetizersBase?.length || menuShow.length > 0) && (
+        <WeddingProposal
+          data={data}
+          menus={menusStructured}
+          extras={menuExtras}
+          appetizers={appetizersBase}
+          legacyMenus={menuShow}
+          primary={primary}
+          onPrimary={darkPri ? '#fff' : '#111'}
+        />
+      )}
+
+      {/* ACCOMMODATION */}
+      {on('accommodation') && accom && (
+        <section style={{ padding: '80px 0', background: OFF }}>
+          <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 56px' }}>
+            <FadeUp>
+              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Alojamiento</p>
+              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Quedaos a dormir</h2>
+            </FadeUp>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 32, alignItems: 'start' }}>
+              <FadeUp>
+                <div>
+                  {accom.description && <p style={{ fontSize: 14.5, color: MUTED, lineHeight: 1.85, marginBottom: 16 }}>{accom.description}</p>}
+                  {accom.rooms && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {accom.rooms.split('·').map((r: string, i: number) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: INK }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: primary, flexShrink: 0 }} />{r.trim()}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </FadeUp>
+              <FadeUp delay={.1}>
+                {Array.isArray(accom.options) && accom.options.length > 0 ? (
+                  <div style={{ background: WHITE, border: `1px solid ${LINE}`, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {accom.options.map((opt: any, oi: number) => (
+                      <div key={oi} style={{ borderLeft: `3px solid ${primary}`, paddingLeft: 14 }}>
+                        <div style={{ fontFamily: font, fontSize: 18, color: INK }}>{opt.label}</div>
+                        {opt.description && <div style={{ fontSize: 13, color: MUTED, marginTop: 3 }}>{opt.description}</div>}
+                        {opt.included ? (
+                          <div style={{ fontSize: 12.5, color: primary, fontWeight: 600, marginTop: 5 }}>✓ Incluido en la tarifa del venue</div>
+                        ) : opt.price_info ? (
+                          <div style={{ fontSize: 14, color: INK, marginTop: 4 }}>{opt.price_info}</div>
+                        ) : Array.isArray(opt.prices) && opt.prices.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 6 }}>
+                            {opt.prices.map((p: any, pi: number) => (
+                              <div key={pi} style={{ display: 'flex', gap: 10, fontSize: 13, color: INK }}>
+                                <span style={{ flex: 1 }}>{p.season}</span>
+                                <span style={{ fontFamily: font, color: primary }}>{p.price}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : accom.price_info ? (
+                  <div style={{ background: WHITE, border: `1px solid ${LINE}`, padding: 24 }}>
+                    <p style={{ fontSize: 14, color: INK, lineHeight: 1.8 }}>{accom.price_info}</p>
+                  </div>
+                ) : null}
+                {accom.nearby && (
+                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${LINE}` }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: primary, marginBottom: 6 }}>Alojamientos cercanos</div>
+                    <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.7 }}>{accom.nearby}</p>
+                  </div>
+                )}
+              </FadeUp>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* EXTRA SERVICES */}
+      {on('extra_services') && extrasShow.length > 0 && (
+        <section style={{ padding: '80px 0', background: WHITE }}>
+          <div style={{ maxWidth: 780, margin: '0 auto', padding: '0 56px' }}>
+            <FadeUp>
+              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Servicios adicionales</p>
+              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Personaliza tu celebración</h2>
+            </FadeUp>
+            <div>
+              {extrasShow.map((svc: any, i: number) => (
+                <FadeUp key={i} delay={i * .04}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: `1px solid ${LINE}`, gap: 20 }}>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 500, color: INK }}>{svc.name}</div>
+                      {svc.description && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 3 }}>{svc.description}</div>}
+                    </div>
+                    {svc.price && <span style={{ fontFamily: font, fontSize: 20, color: primary, whiteSpace: 'nowrap' }}>{svc.price}</span>}
+                  </div>
+                </FadeUp>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* TESTIMONIALS */}
+      {on('testimonials') && testsShow.length > 0 && (
+        <section style={{ padding: '80px 0', background: OFF }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
+            <FadeUp>
+              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Lo dicen las parejas</p>
+              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Experiencias reales</h2>
+            </FadeUp>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
+              {testsShow.map((t: any, i: number) => {
+                const name = t.couple_name || t.names || ''
+                const rawDate = t.wedding_date || t.date
+                const dateStr = rawDate && /^\d{4}-\d{2}-\d{2}/.test(rawDate) ? formatDate(rawDate) : rawDate
+                return (
+                  <FadeUp key={i} delay={i * .06}>
+                    <div style={{ background: WHITE, border: `1px solid ${LINE}`, padding: '28px 28px 22px', display: 'flex', flexDirection: 'column', gap: 14, height: '100%' }}>
+                      <div style={{ color: '#F5A623', fontSize: 13 }}><StarRating rating={t.rating ?? 5} size={13} color="#F5A623" /></div>
+                      <p style={{ fontFamily: font, fontStyle: 'italic', fontSize: 15.5, lineHeight: 1.7, color: INK, flex: 1 }}>"{t.text}"</p>
+                      <div style={{ paddingTop: 12, borderTop: `1px solid ${LINE}` }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: INK }}>{name}</div>
+                        {dateStr && <div style={{ fontSize: 11, color: primary, marginTop: 2, letterSpacing: '.08em', textTransform: 'uppercase' }}>{dateStr}</div>}
+                      </div>
+                    </div>
+                  </FadeUp>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* COLLABORATORS */}
+      {on('collaborators') && collabsShow.length > 0 && (
+        <section style={{ padding: '80px 0', background: WHITE }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
+            <FadeUp>
+              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Colaboradores</p>
+              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Proveedores de confianza</h2>
+            </FadeUp>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 1, background: LINE, border: `1px solid ${LINE}` }}>
+              {collabsShow.map((c: any, i: number) => (
+                <FadeUp key={i} delay={(i % 4) * .04}>
+                  <div style={{ background: WHITE, padding: '22px 24px', height: '100%' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: primary, marginBottom: 8 }}>{c.category}</div>
+                    <div style={{ fontFamily: font, fontSize: 18, color: INK, marginBottom: 4 }}>{c.name}</div>
+                    {c.description && <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.55 }}>{c.description}</div>}
+                  </div>
+                </FadeUp>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* MAPA */}
+      {on('map') && (sec.map_embed_url || (data.venueContent.map_info as any)?.embed_url) && (() => {
+        const embed = sec.map_embed_url || (data.venueContent.map_info as any).embed_url
+        const address = sec.map_address || (data.venueContent.map_info as any)?.address
+        return (
+          <section style={{ padding: '80px 0', background: OFF }}>
+            <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 56px' }}>
+              <FadeUp>
+                <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Ubicación</p>
+                <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: address ? 10 : 32 }}>Cómo llegar</h2>
+                {address && <p style={{ fontSize: 14, color: MUTED, marginBottom: 32 }}>{address}</p>}
+              </FadeUp>
+              <FadeUp delay={.1}>
+                <div style={{ overflow: 'hidden', border: `1px solid ${LINE}` }}>
+                  <iframe src={embed} width="100%" height="360" style={{ border: 'none', display: 'block' }} loading="lazy" allowFullScreen />
+                </div>
+              </FadeUp>
+            </div>
+          </section>
+        )
+      })()}
+
+      {/* CTA — contacto directo */}
       <section className="t5-cta-section" id="t5-cta">
         <div className="t5-cta-inner">
           <div className="t5-cta-top">
             <FadeUp>
               <h2 className="t5-cta-heading">
-                Vuestra fecha<br />está <span>esperando</span>
+                ¿Tenéis<br />alguna <span>duda?</span>
               </h2>
               <p className="t5-cta-desc">
-                Ya conocéis el espacio. Solo falta confirmar vuestra fecha y empezar a planificar juntos el día más importante de vuestra vida.
+                Escribidnos por WhatsApp o email para cualquier consulta sobre la propuesta o el menú. Respondemos en menos de 24 horas.
               </p>
               <div className="t5-cta-bullets">
                 <div className="t5-cta-bullet"><span className="t5-cta-bullet-text">Respuesta en menos de 24 horas</span></div>
-                <div className="t5-cta-bullet"><span className="t5-cta-bullet-text">Sin compromiso inicial</span></div>
-                <div className="t5-cta-bullet"><span className="t5-cta-bullet-text">Asesoramiento personalizado incluido</span></div>
+                <div className="t5-cta-bullet"><span className="t5-cta-bullet-text">Asesoramiento personalizado</span></div>
               </div>
             </FadeUp>
-            <FadeUp delay={0.15}>
-              {submitted ? (
-                <div style={{ border: `1px solid ${LINE}`, padding: '64px 40px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: 20 }}>✓</div>
-                  <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: '1.6rem', color: INK, marginBottom: 12 }}>
-                    ¡Solicitud recibida!
-                  </h3>
-                  <p style={{ fontSize: '.9rem', color: MUTED, lineHeight: 1.7 }}>
-                    Os contactaremos en menos de 24 horas para confirmar todos los detalles.
-                  </p>
+            {contactOn && (
+              <FadeUp delay={0.15}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'flex-start' }}>
+                  {contact.phone && (
+                    <a href={`https://wa.me/${contact.phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola, me ha llegado la propuesta para ${data.couple_name}.`)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '18px 44px', background: '#25D366', color: '#fff', border: 'none', fontSize: '.88rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', textDecoration: 'none' }}>
+                      <IcoChat width={16} height={16} /> WhatsApp
+                    </a>
+                  )}
+                  {contact.email && (
+                    <a href={`mailto:${contact.email}?subject=${encodeURIComponent(`Propuesta ${data.couple_name}`)}`}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '18px 44px', background: primary, color: darkPri ? '#fff' : INK, border: 'none', fontSize: '.88rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', textDecoration: 'none' }}>
+                      Enviar email
+                    </a>
+                  )}
                 </div>
-              ) : (
-                <form className="t5-form" onSubmit={handleSubmit}>
-                  <div className="t5-form-title">Solicitar disponibilidad</div>
-                  <div className="t5-form-body">
-                    <div className="t5-form-row">
-                      <label className="t5-form-label">Vuestros nombres</label>
-                      <input className="t5-form-input" placeholder={data.couple_name} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} required />
-                    </div>
-                    <div className="t5-form-row">
-                      <label className="t5-form-label">Email de contacto</label>
-                      <input className="t5-form-input" type="email" placeholder="hola@ejemplo.com" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} required />
-                    </div>
-                    <div className="t5-form-row">
-                      <label className="t5-form-label">Teléfono</label>
-                      <input className="t5-form-input" placeholder="+34 600 000 000" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} />
-                    </div>
-                    <div className="t5-form-row">
-                      <label className="t5-form-label">¿Algo más que quieras contarnos?</label>
-                      <textarea className="t5-form-input t5-form-textarea" placeholder="Número de invitados, fecha preferida, preguntas…" value={form.message} onChange={e => setForm(p => ({ ...p, message: e.target.value }))} />
-                    </div>
-                    <button type="submit" className="t5-form-submit">
-                      Confirmar interés <span>→</span>
-                    </button>
-                  </div>
-                </form>
-              )}
-            </FadeUp>
+              </FadeUp>
+            )}
           </div>
         </div>
       {/* ── FLOATING WHATSAPP ── */}
-      <FloatingWhatsApp phone={data.venue?.contact_phone || ''} coupleName={data.couple_name} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />
+      {contactOn && <FloatingWhatsApp phone={contact.phone} coupleName={data.couple_name} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />}
 
         <div className="t5-footer-wrap">
           {branding?.logo_url
             ? <img src={branding.logo_url} className="t5-footer-logo" alt={venueName} />
-            : <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: '.95rem', color: MUTED }}>{venueName}</span>
+            : <span style={{ fontFamily: font, fontSize: '.95rem', color: MUTED }}>{venueName}</span>
           }
           <span className="t5-footer-text">Propuesta generada exclusivamente para {data.couple_name}</span>
           <div className="t5-footer-links">
