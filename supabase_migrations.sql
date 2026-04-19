@@ -182,3 +182,13 @@ CREATE POLICY "owner_select_menu_selections"
         AND p.user_id = auth.uid()
     )
   );
+
+-- ── 12. budget_date columns on leads ─────────────────────────
+--    Separate fields for confirmed budget dates (distinct from proposal/negotiation dates).
+--    Run in Supabase → SQL Editor.
+
+ALTER TABLE leads
+  ADD COLUMN IF NOT EXISTS budget_date            TEXT,
+  ADD COLUMN IF NOT EXISTS budget_date_to         TEXT,
+  ADD COLUMN IF NOT EXISTS budget_date_flexibility TEXT DEFAULT 'exact',
+  ADD COLUMN IF NOT EXISTS budget_date_ranges     JSONB;
