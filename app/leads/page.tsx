@@ -46,6 +46,7 @@ const SUB_STATUS_LABEL: Record<DbStatus, string> = {
 const SOURCE_LABEL: Record<string, string> = {
   web: 'Web', whatsapp: 'WhatsApp', instagram: 'Instagram',
   email: 'Email', referral: 'Referido', manual: 'Manual', other: 'Otro',
+  wedding_planner: 'Planner',
 }
 const BUDGET_LABEL: Record<string, string> = {
   sin_definir: '—',
@@ -3247,7 +3248,11 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm 
                 })()}
               </div>
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                {lead.source && (
+                {lead.source === 'wedding_planner' ? (
+                  <span style={{ fontSize: 10, background: 'rgba(139,92,246,0.1)', color: '#7c3aed', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
+                    🎯 Planner
+                  </span>
+                ) : lead.source && (
                   <span style={{ fontSize: 10, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '1px 7px', borderRadius: 10 }}>
                     {SOURCE_LABEL[lead.source] || lead.source}
                   </span>
@@ -3467,10 +3472,29 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
     <div style={{ display: 'flex', gap: 5, alignItems: 'center', width: '100%' }}>
 
       {tab === 'new' && (<>
-        <EnSeguimientoBtn lead={lead} canProposal={canProposal} onDateConfirm={onDateConfirm} />
+        {lead.source === 'wedding_planner' && (
+          <>
+            <button className="qa" style={{ background: 'rgba(34,197,94,0.1)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.2)', fontWeight: 600 }}
+              onClick={async () => {
+                const supabase = (await import('@/lib/supabase')).createClient()
+                await supabase.from('wp_client_venues').update({ availability_status: 'available' }).eq('lead_id', lead.id)
+                onMove(lead.id, 'contacted')
+              }}>
+              ✓ Disponible
+            </button>
+            <button className="qa" style={{ background: 'rgba(239,68,68,0.08)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.15)' }}
+              onClick={async () => {
+                const supabase = (await import('@/lib/supabase')).createClient()
+                await supabase.from('wp_client_venues').update({ availability_status: 'unavailable' }).eq('lead_id', lead.id)
+                onMove(lead.id, 'lost')
+              }}>
+              No disponible
+            </button>
+          </>
+        )}
+        {lead.source !== 'wedding_planner' && <EnSeguimientoBtn lead={lead} canProposal={canProposal} onDateConfirm={onDateConfirm} />}
         <MoreMenu items={[
           { label: 'Enviar presupuesto', icon: <Receipt    size={11} />, onClick: () => onDateConfirm(lead, 'budget_sent') },
-          { label: 'PDF digital',        icon: <FileText   size={11} />, locked: !canProposal, lockedHint: 'Disponible en plan Premium', onClick: () => window.location.href = '/proposals' },
           { label: 'Agendar visita',     icon: <Calendar   size={11} />, onClick: () => onDateConfirm(lead, 'visit_scheduled') },
           { label: 'Perdido',            icon: <XCircle    size={11} />, danger: true, onClick: () => onMove(lead.id, 'lost') },
         ]} />
@@ -5117,7 +5141,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
   const setOrig = (k: string, v: any) => setForm((f: any) => ({ ...f, [`original_${k}`]: v }))
   const [editingOriginal,  setEditingOriginal]  = useState(false)
   const [showOriginal,     setShowOriginal]     = useState(false)   // Lo que pidió — collapsed by default
-  const [showMoreDetails,  setShowMoreDetails]  = useState(false)   // Ceremony/lang/style collapsible
+  const [showMoreDetails,  setShowMoreDetails]  = useState(true)    // Ceremony/lang/style collapsible
   const [activeModalTab,   setActiveModalTab]   = useState<'boda' | 'oferta' | 'pareja'>(isEdit ? 'boda' : 'pareja')
   const { propuestas: canPropuesta } = usePlanFeatures()
   // Budget file upload (only for budget_sent leads)

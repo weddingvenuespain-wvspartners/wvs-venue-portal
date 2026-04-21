@@ -1524,6 +1524,7 @@ export default function AdminPage() {
   const [selected, setSelected]           = useState<Profile | null>(null)
   const [selectedTab, setSelectedTab]     = useState<'perfil' | 'venues' | 'suscripcion' | 'historial'>('perfil')
   const [showCreateUser, setShowCreateUser] = useState(false)
+  const [crmTab, setCrmTab]               = useState<'venue_owner' | 'wedding_planner' | 'catering'>('venue_owner')
 
   const notify = (msg: string, isErr = false) => {
     isErr ? setError(msg) : setSuccess(msg)
@@ -1778,7 +1779,7 @@ export default function AdminPage() {
 
   // ── Derived data ─────────────────────────────────────────────────────────────
 
-  const owners = profiles.filter(p => p.role !== 'admin')
+  const owners = profiles.filter(p => p.role === crmTab)
 
   const getSubInfo = (userId: string) => {
     // Prefer active > trial > paused > cancelled to avoid showing stale old subs
@@ -1857,17 +1858,37 @@ export default function AdminPage() {
       <Sidebar />
       <div className="main-layout">
         <div className="topbar">
-          <div className="topbar-title">CRM de venues</div>
+          <div className="topbar-title">CRM</div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <button className="btn btn-ghost btn-sm" onClick={loadData} title="Recargar">
               <RefreshCw size={13} />
             </button>
             <button className="btn btn-primary btn-sm" onClick={() => setShowCreateUser(true)}>
-              <UserPlus size={13} /> Nuevo venue owner
+              <UserPlus size={13} /> {crmTab === 'venue_owner' ? 'Nuevo venue' : crmTab === 'wedding_planner' ? 'Nuevo planner' : 'Nuevo catering'}
             </button>
             <a href="/admin/planes"     className="btn btn-ghost btn-sm">Planes →</a>
             <a href="/admin/onboarding" className="btn btn-ghost btn-sm">Solicitudes →</a>
           </div>
+        </div>
+
+        {/* CRM tabs */}
+        <div style={{ display: 'flex', gap: 2, padding: '0 24px', borderBottom: '1px solid var(--ivory)', background: '#fff' }}>
+          {([
+            { key: 'venue_owner',     label: 'Venues',   count: profiles.filter(p => p.role === 'venue_owner').length },
+            { key: 'wedding_planner', label: 'Planners', count: profiles.filter(p => p.role === 'wedding_planner').length },
+            { key: 'catering',        label: 'Catering', count: profiles.filter(p => p.role === 'catering').length },
+          ] as { key: 'venue_owner' | 'wedding_planner' | 'catering'; label: string; count: number }[]).map(tab => (
+            <button key={tab.key} onClick={() => { setCrmTab(tab.key); setSearch(''); setFilterStatus('all'); setFilterPlan('all') }}
+              style={{
+                padding: '10px 18px', fontSize: 13, fontWeight: crmTab === tab.key ? 600 : 400,
+                color: crmTab === tab.key ? 'var(--gold)' : 'var(--warm-gray)',
+                borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+                borderBottom: crmTab === tab.key ? '2px solid var(--gold)' : '2px solid transparent',
+                background: 'none', cursor: 'pointer', fontFamily: 'Manrope, sans-serif', marginBottom: -1,
+              }}>
+              {tab.label} <span style={{ fontSize: 11, opacity: 0.7 }}>({tab.count})</span>
+            </button>
+          ))}
         </div>
 
         <div className="page-content">
@@ -1893,11 +1914,11 @@ export default function AdminPage() {
           )}
 
           {/* Stats */}
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+          <div className="stats-grid" style={{ gridTemplateColumns: `repeat(${crmTab === 'venue_owner' ? 5 : 4}, 1fr)` }}>
             <div className="stat-card accent">
-              <div className="stat-label">Venue owners</div>
+              <div className="stat-label">{crmTab === 'venue_owner' ? 'Venue owners' : crmTab === 'wedding_planner' ? 'Planners' : 'Caterings'}</div>
               <div className="stat-value">{owners.length}</div>
-              <div className="stat-sub">{counts.active} activos · {counts.pending} por verificar · {counts.pending} pendientes</div>
+              <div className="stat-sub">{counts.active} activos · {counts.pending} por verificar</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Pagando</div>
@@ -1920,11 +1941,13 @@ export default function AdminPage() {
               <div className="stat-value" style={{ color: subCounts.expiring > 0 ? '#c0392b' : undefined }}>{subCounts.expiring}</div>
               <div className="stat-sub">En menos de 7 días</div>
             </div>
-            <div className="stat-card">
-              <div className="stat-label">Venues en WP</div>
-              <div className="stat-value">{wpVenues.length}</div>
-              <div className="stat-sub">{wpVenues.length > 0 ? 'Cargados ✓' : 'Sin cargar'}</div>
-            </div>
+            {crmTab === 'venue_owner' && (
+              <div className="stat-card">
+                <div className="stat-label">Venues en WP</div>
+                <div className="stat-value">{wpVenues.length}</div>
+                <div className="stat-sub">{wpVenues.length > 0 ? 'Cargados ✓' : 'Sin cargar'}</div>
+              </div>
+            )}
           </div>
 
           {/* Table */}
@@ -1967,15 +1990,15 @@ export default function AdminPage() {
                     <th>Usuario</th>
                     <th>Empresa</th>
                     <th>Estado</th>
-                    <th>Venues WP</th>
+                    {crmTab === 'venue_owner' && <th>Venues WP</th>}
                     <th>Plan / Suscripción</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--warm-gray)' }}>
-                      {search || filterStatus !== 'all' || filterPlan !== 'all' ? 'Sin resultados' : 'No hay venue owners registrados todavía'}
+                    <tr><td colSpan={crmTab === 'venue_owner' ? 6 : 5} style={{ textAlign: 'center', padding: 40, color: 'var(--warm-gray)' }}>
+                      {search || filterStatus !== 'all' || filterPlan !== 'all' ? 'Sin resultados' : `No hay ${crmTab === 'venue_owner' ? 'venue owners' : crmTab === 'wedding_planner' ? 'planners' : 'caterings'} registrados todavía`}
                     </td></tr>
                   )}
                   {filtered.map(p => {
@@ -2031,7 +2054,8 @@ export default function AdminPage() {
                             {STATUS_LABEL[p.status] || p.status}
                           </span>
                         </td>
-                        <td style={{ fontSize: 12 }}>
+                        {crmTab === 'venue_owner' && (
+                          <td style={{ fontSize: 12 }}>
                           {myVenueCount > 0 ? (
                             <div>
                               <div style={{ fontWeight: 500 }}>{primaryVenue}</div>
@@ -2043,7 +2067,8 @@ export default function AdminPage() {
                               + Asignar
                             </button>
                           )}
-                        </td>
+                          </td>
+                        )}
                         <td>
                           {info ? (
                             <div>

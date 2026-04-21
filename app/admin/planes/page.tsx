@@ -22,6 +22,8 @@ type TrialConfig = {
   trial_plan_id: string | null
 }
 
+type TargetRole = 'venue_owner' | 'wedding_planner' | 'catering'
+
 type Plan = {
   id: string
   name: string
@@ -32,6 +34,7 @@ type Plan = {
   permissions: PlanFeatures | null
   is_active: boolean
   visible_on_web: boolean
+  target_role: TargetRole
   created_at: string
   // loaded client-side
   subscriber_count?: number
@@ -48,6 +51,7 @@ const EMPTY_PLAN: PlanForm = {
   permissions: { ...PERMISSIONS_BASIC },
   is_active: true,
   visible_on_web: true,
+  target_role: 'venue_owner',
 }
 
 // ─── Billing cycle row editor ─────────────────────────────────────────────────
@@ -152,6 +156,7 @@ export default function PlanesPage() {
   const [form, setForm]           = useState<PlanForm>(EMPTY_PLAN)
   const [confirmDelete, setConfirmDelete] = useState<Plan | null>(null)
   const [deactivateWarning, setDeactivateWarning] = useState<Plan | null>(null)
+  const [plansTab, setPlansTab]           = useState<TargetRole>('venue_owner')
 
   // Trial config state
   const [trialConfig, setTrialConfig]       = useState<TrialConfig>({ is_active: true, trial_days: 14, trial_plan_id: null })
@@ -249,7 +254,7 @@ export default function PlanesPage() {
     setTimeout(() => { setSuccess(''); setError('') }, 4000)
   }
 
-  const openAdd = () => { setEditing(null); setForm({ ...EMPTY_PLAN, billing_cycles: [{ ...CYCLE_PRESETS[0] }], permissions: { ...PERMISSIONS_BASIC } }); setShowModal(true) }
+  const openAdd = () => { setEditing(null); setForm({ ...EMPTY_PLAN, target_role: plansTab, billing_cycles: [{ ...CYCLE_PRESETS[0] }], permissions: { ...PERMISSIONS_BASIC } }); setShowModal(true) }
   const openEdit = (plan: Plan) => {
     setEditing(plan)
     setForm({
@@ -259,6 +264,7 @@ export default function PlanesPage() {
       permissions: plan.permissions ?? { ...PERMISSIONS_BASIC },
       is_active: plan.is_active,
       visible_on_web: plan.visible_on_web ?? true,
+      target_role: plan.target_role ?? 'venue_owner',
     })
     setShowModal(true)
   }
@@ -285,6 +291,7 @@ export default function PlanesPage() {
       permissions:    form.permissions || PERMISSIONS_BASIC,
       is_active:      form.is_active,
       visible_on_web: form.visible_on_web,
+      target_role:    form.target_role || 'venue_owner',
     }
     try {
       if (editing) {
@@ -365,6 +372,26 @@ export default function PlanesPage() {
           <button className="btn btn-primary btn-sm" onClick={openAdd}>
             <Plus size={13} /> Nuevo plan
           </button>
+        </div>
+
+        {/* User type tabs */}
+        <div style={{ display: 'flex', gap: 2, padding: '0 24px', borderBottom: '1px solid var(--ivory)', background: '#fff' }}>
+          {([
+            { key: 'venue_owner',     label: 'Venues' },
+            { key: 'wedding_planner', label: 'Planners' },
+            { key: 'catering',        label: 'Catering' },
+          ] as { key: TargetRole; label: string }[]).map(tab => (
+            <button key={tab.key} onClick={() => setPlansTab(tab.key)}
+              style={{
+                padding: '10px 18px', fontSize: 13, fontWeight: plansTab === tab.key ? 600 : 400,
+                color: plansTab === tab.key ? 'var(--gold)' : 'var(--warm-gray)',
+                borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+                borderBottom: plansTab === tab.key ? '2px solid var(--gold)' : '2px solid transparent',
+                background: 'none', cursor: 'pointer', fontFamily: 'Manrope, sans-serif', marginBottom: -1,
+              }}>
+              {tab.label} <span style={{ fontSize: 11, opacity: 0.6 }}>({plans.filter(p => (p.target_role ?? 'venue_owner') === tab.key).length})</span>
+            </button>
+          ))}
         </div>
 
         <div className="page-content">
@@ -475,19 +502,15 @@ export default function PlanesPage() {
           </div>
 
           {/* ── Plans section header ─────────────────────────────────────────── */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 14 }}>
-            Planes de pago
-          </div>
-
-          {plans.length === 0 && (
+          {plans.filter(p => (p.target_role ?? 'venue_owner') === plansTab).length === 0 && (
             <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-              <div style={{ color: 'var(--warm-gray)', marginBottom: 16 }}>Aún no hay planes definidos.</div>
-              <button className="btn btn-primary btn-sm" onClick={openAdd}><Plus size={13} /> Crear el primer plan</button>
+              <div style={{ color: 'var(--warm-gray)', marginBottom: 16 }}>Aún no hay planes para este tipo de usuario.</div>
+              <button className="btn btn-primary btn-sm" onClick={openAdd}><Plus size={13} /> Crear plan</button>
             </div>
           )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
-            {plans.map(plan => {
+            {plans.filter(p => (p.target_role ?? 'venue_owner') === plansTab).map(plan => {
               const perms: Record<string, unknown> = plan.permissions ?? {}
               const enabled  = FEATURE_DEFS.filter(f => !f.dangerous && perms[f.key] === true)
               const restricted = FEATURE_DEFS.filter(f => f.dangerous && perms[f.key] === true)
@@ -644,6 +667,17 @@ export default function PlanesPage() {
               <div style={{ background: 'rgba(196,151,90,0.07)', border: '1px solid rgba(196,151,90,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 7 }}>
                 <Clock size={11} color="var(--gold)" style={{ flexShrink: 0 }} />
                 El período de trial se configura globalmente en la sección <strong style={{ color: 'var(--charcoal)' }}>Prueba gratuita</strong> de esta misma página, no por plan.
+              </div>
+
+              {/* Tipo de usuario */}
+              <div className="form-group" style={{ marginTop: 4 }}>
+                <label className="form-label">Tipo de usuario</label>
+                <select className="form-input" value={form.target_role}
+                  onChange={e => setForm(f => ({ ...f, target_role: e.target.value as TargetRole }))}>
+                  <option value="venue_owner">Venue / Finca</option>
+                  <option value="wedding_planner">Wedding Planner</option>
+                  <option value="catering">Catering</option>
+                </select>
               </div>
 
               {/* Estado y visibilidad */}

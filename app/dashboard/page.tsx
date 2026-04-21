@@ -92,7 +92,7 @@ function AdminDashboard() {
             <div className="card-body" style={{ padding: '14px 20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
                 {[
-                  { href: '/admin',            icon: <Users size={15} />,     label: 'CRM de venues',  sub: 'Gestionar usuarios'    },
+                  { href: '/admin',            icon: <Users size={15} />,     label: 'CRM',            sub: 'Gestionar usuarios'    },
                   { href: '/admin/planes',      icon: <CreditCard size={15} />, label: 'Planes',        sub: 'Precios y funciones'   },
                   { href: '/admin/onboarding',  icon: <ClipboardList size={15} />, label: 'Solicitudes', sub: 'Revisar registros'    },
                   { href: '/estadisticas',      icon: <BarChart2 size={15} />, label: 'Estadísticas',   sub: 'Métricas globales'     },
@@ -543,6 +543,8 @@ export default function DashboardPage() {
     </div>
   )
 
-  if (profile?.role === 'admin') return <AdminDashboard />
+  if (profile?.role === 'admin')          return <AdminDashboard />
+  if (profile?.role === 'wedding_planner') { router.replace('/wp');       return null }
+  if (profile?.role === 'catering')        { router.replace('/catering'); return null }
   return <VenueDashboard />
 }

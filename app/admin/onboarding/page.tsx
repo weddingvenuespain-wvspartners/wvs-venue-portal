@@ -315,17 +315,32 @@ function VenueModal({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+type PendingProfile = {
+  user_id: string
+  first_name: string | null
+  last_name: string | null
+  company: string | null
+  phone: string | null
+  city: string | null
+  status: string
+  role: string
+  created_at: string
+  email?: string
+}
+
 export default function AdminOnboardingPage() {
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
   const [loading, setLoading]         = useState(true)
   const [onboardings, setOnboardings] = useState<Onboarding[]>([])
+  const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>([])
   const [saving, setSaving]           = useState<string | null>(null)
   const [success, setSuccess]         = useState('')
   const [error, setError]             = useState('')
   const [selected, setSelected]       = useState<Onboarding | null>(null)
   const [adminNotes, setAdminNotes]   = useState('')
   const [filterStatus, setFilterStatus] = useState('pending')
+  const [solTab, setSolTab]           = useState<'venues' | 'planners' | 'catering'>('venues')
 
   const CACHE_KEY = 'wvs_admin_onboarding'
 
@@ -337,6 +352,14 @@ export default function AdminOnboardingPage() {
       setOnboardings(onbs)
       sessionStorage.setItem(CACHE_KEY, JSON.stringify(onbs))
     }
+  }
+
+  const fetchPendingProfiles = async () => {
+    try {
+      const res = await fetch('/api/admin/users')
+      const { profiles } = await res.json()
+      if (profiles) setPendingProfiles(profiles.filter((p: PendingProfile) => p.role === 'wedding_planner' || p.role === 'catering'))
+    } catch {}
   }
 
   useEffect(() => {
@@ -357,7 +380,7 @@ export default function AdminOnboardingPage() {
         .from('venue_profiles').select('role').eq('user_id', session.user.id).single()
       if (me?.role !== 'admin') { router.push('/dashboard'); return }
 
-      await fetchOnboardings()
+      await Promise.all([fetchOnboardings(), fetchPendingProfiles()])
       setLoading(false)
     }
     init()
@@ -372,6 +395,37 @@ export default function AdminOnboardingPage() {
   const notify = (msg: string, isErr = false) => {
     isErr ? setError(msg) : setSuccess(msg)
     setTimeout(() => { setSuccess(''); setError('') }, 5000)
+  }
+
+  const handleActivateProfile = async (userId: string) => {
+    setSaving(userId)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, status: 'active' }),
+      })
+      const result = await res.json()
+      if (!res.ok) { notify(result.error || 'Error al activar', true); return }
+      setPendingProfiles(prev => prev.map(p => p.user_id === userId ? { ...p, status: 'active' } : p))
+      notify('Cuenta activada ✓')
+    } catch { notify('Error de conexión', true) }
+    setSaving(null)
+  }
+
+  const handleRejectProfile = async (userId: string) => {
+    setSaving(userId + '-reject')
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, status: 'inactive' }),
+      })
+      if (!res.ok) { notify('Error al rechazar', true); return }
+      setPendingProfiles(prev => prev.map(p => p.user_id === userId ? { ...p, status: 'inactive' } : p))
+      notify('Cuenta rechazada')
+    } catch { notify('Error de conexión', true) }
+    setSaving(null)
   }
 
   const openVenue = (onb: Onboarding) => {
@@ -484,109 +538,185 @@ export default function AdminOnboardingPage() {
         <div className="topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <a href="/admin" className="btn btn-ghost btn-sm"><ArrowLeft size={13} /> CRM</a>
-            <div className="topbar-title">Solicitudes de venues</div>
+            <div className="topbar-title">Solicitudes</div>
           </div>
+        </div>
+
+        {/* Role tabs */}
+        <div style={{ display: 'flex', gap: 2, padding: '0 24px', borderBottom: '1px solid var(--ivory)', background: '#fff' }}>
+          {([
+            { key: 'venues',   label: 'Venues',   count: allPending.length },
+            { key: 'planners', label: 'Planners',  count: pendingProfiles.filter(p => p.role === 'wedding_planner' && p.status === 'pending').length },
+            { key: 'catering', label: 'Catering',  count: pendingProfiles.filter(p => p.role === 'catering' && p.status === 'pending').length },
+          ] as { key: 'venues' | 'planners' | 'catering'; label: string; count: number }[]).map(tab => (
+            <button key={tab.key} onClick={() => setSolTab(tab.key)}
+              style={{
+                padding: '10px 18px', fontSize: 13, fontWeight: solTab === tab.key ? 600 : 400,
+                color: solTab === tab.key ? 'var(--gold)' : 'var(--warm-gray)',
+                borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+                borderBottom: solTab === tab.key ? '2px solid var(--gold)' : '2px solid transparent',
+                background: 'none', cursor: 'pointer', fontFamily: 'Manrope, sans-serif', marginBottom: -1,
+              }}>
+              {tab.label}{tab.count > 0 && <span style={{ marginLeft: 5, background: '#fef9ec', color: '#92400e', fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 8 }}>{tab.count}</span>}
+            </button>
+          ))}
         </div>
 
         <div className="page-content">
           {success && <div className="alert alert-success" style={{ marginBottom: 16 }}>{success}</div>}
           {error   && <div className="alert alert-error"   style={{ marginBottom: 16 }}>{error}</div>}
 
-          {/* Stats */}
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }}>
-            <div className="stat-card accent">
-              <div className="stat-label">Pendientes revisión</div>
-              <div className="stat-value" style={{ color: allPending.length > 0 ? 'var(--gold)' : undefined }}>{allPending.length}</div>
-              <div className={`stat-sub ${allPending.length > 0 ? 'warn' : ''}`}>{allPending.length > 0 ? 'Requieren acción' : 'Al día ✓'}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">En borrador</div>
-              <div className="stat-value">{drafts.length}</div>
-              <div className="stat-sub">Rellenando ficha</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Aprobados</div>
-              <div className="stat-value">{approved.length}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Rechazados</div>
-              <div className="stat-value">{rejected.length}</div>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="card">
-            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {([
-                ['pending',  `Pendientes (${allPending.length})`],
-                ['draft',    'Borradores'],
-                ['approved', 'Aprobados'],
-                ['rejected', 'Rechazados'],
-                ['all',      'Todos'],
-              ] as [string, string][]).map(([k, label]) => (
-                <button
-                  key={k}
-                  className={`btn btn-sm ${filterStatus === k ? 'btn-primary' : 'btn-ghost'}`}
-                  onClick={() => setFilterStatus(k)}
-                >
-                  {label}
-                </button>
-              ))}
+          {solTab === 'venues' && (<>
+            {/* Stats */}
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }}>
+              <div className="stat-card accent">
+                <div className="stat-label">Pendientes revisión</div>
+                <div className="stat-value" style={{ color: allPending.length > 0 ? 'var(--gold)' : undefined }}>{allPending.length}</div>
+                <div className={`stat-sub ${allPending.length > 0 ? 'warn' : ''}`}>{allPending.length > 0 ? 'Requieren acción' : 'Al día ✓'}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">En borrador</div>
+                <div className="stat-value">{drafts.length}</div>
+                <div className="stat-sub">Rellenando ficha</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Aprobados</div>
+                <div className="stat-value">{approved.length}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Rechazados</div>
+                <div className="stat-value">{rejected.length}</div>
+              </div>
             </div>
 
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Venue</th>
-                    <th>Contacto</th>
-                    <th>WP ID</th>
-                    <th>Enviado</th>
-                    <th>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 && (
-                    <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', padding: 40, color: 'var(--warm-gray)' }}>
+            {/* Table */}
+            <div className="card">
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {([
+                  ['pending',  `Pendientes (${allPending.length})`],
+                  ['draft',    'Borradores'],
+                  ['approved', 'Aprobados'],
+                  ['rejected', 'Rechazados'],
+                  ['all',      'Todos'],
+                ] as [string, string][]).map(([k, label]) => (
+                  <button key={k} className={`btn btn-sm ${filterStatus === k ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setFilterStatus(k)}>{label}</button>
+                ))}
+              </div>
+              <div className="table-wrapper">
+                <table className="data-table">
+                  <thead>
+                    <tr><th>Venue</th><th>Contacto</th><th>WP ID</th><th>Enviado</th><th>Estado</th></tr>
+                  </thead>
+                  <tbody>
+                    {filtered.length === 0 && (
+                      <tr><td colSpan={5} style={{ textAlign: 'center', padding: 40, color: 'var(--warm-gray)' }}>
                         {filterStatus === 'pending' ? 'No hay solicitudes pendientes ✓' : 'No hay registros'}
-                      </td>
-                    </tr>
-                  )}
-                  {filtered.map(onb => {
-                    const badge  = getRowBadge(onb)
-                    const name   = onb.ficha_data?.H1_Venue || onb.name || '—'
-                    const region = onb.ficha_data?.location || onb.region || onb.city || '—'
-                    return (
-                      <tr
-                        key={onb.id}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => openVenue(onb)}
-                      >
-                        <td>
-                          <div style={{ fontWeight: 500 }}>{name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{region}</div>
-                        </td>
-                        <td style={{ fontSize: 12 }}>
-                          <div>{onb.contact_name || '—'}</div>
-                          {onb.contact_email && (
-                            <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{onb.contact_email}</div>
-                          )}
-                        </td>
-                        <td style={{ fontSize: 12, color: 'var(--warm-gray)' }}>
-                          {onb.wp_post_id ? `#${onb.wp_post_id}` : '—'}
-                        </td>
-                        <td style={{ fontSize: 11, color: 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
-                          {onb.submitted_at ? new Date(onb.submitted_at).toLocaleDateString('es-ES') : '—'}
-                        </td>
-                        <td><span className={`badge ${badge.cls}`}>{badge.label}</span></td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                      </td></tr>
+                    )}
+                    {filtered.map(onb => {
+                      const badge  = getRowBadge(onb)
+                      const name   = onb.ficha_data?.H1_Venue || onb.name || '—'
+                      const region = onb.ficha_data?.location || onb.region || onb.city || '—'
+                      return (
+                        <tr key={onb.id} style={{ cursor: 'pointer' }} onClick={() => openVenue(onb)}>
+                          <td>
+                            <div style={{ fontWeight: 500 }}>{name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{region}</div>
+                          </td>
+                          <td style={{ fontSize: 12 }}>
+                            <div>{onb.contact_name || '—'}</div>
+                            {onb.contact_email && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{onb.contact_email}</div>}
+                          </td>
+                          <td style={{ fontSize: 12, color: 'var(--warm-gray)' }}>{onb.wp_post_id ? `#${onb.wp_post_id}` : '—'}</td>
+                          <td style={{ fontSize: 11, color: 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
+                            {onb.submitted_at ? new Date(onb.submitted_at).toLocaleDateString('es-ES') : '—'}
+                          </td>
+                          <td><span className={`badge ${badge.cls}`}>{badge.label}</span></td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          </>)}
+
+          {(solTab === 'planners' || solTab === 'catering') && (() => {
+            const roleKey = solTab === 'planners' ? 'wedding_planner' : 'catering'
+            const roleProfiles = pendingProfiles.filter(p => p.role === roleKey)
+            const pendingCount = roleProfiles.filter(p => p.status === 'pending').length
+            const activeCount  = roleProfiles.filter(p => p.status === 'active').length
+            return (
+              <>
+                <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
+                  <div className="stat-card accent">
+                    <div className="stat-label">Pendientes</div>
+                    <div className="stat-value" style={{ color: pendingCount > 0 ? 'var(--gold)' : undefined }}>{pendingCount}</div>
+                    <div className="stat-sub">{pendingCount > 0 ? 'Requieren activación' : 'Al día ✓'}</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Activos</div>
+                    <div className="stat-value">{activeCount}</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Total registrados</div>
+                    <div className="stat-value">{roleProfiles.length}</div>
+                  </div>
+                </div>
+
+                <div className="card">
+                  <div className="table-wrapper">
+                    <table className="data-table">
+                      <thead>
+                        <tr><th>Usuario</th><th>Empresa</th><th>Ciudad</th><th>Registro</th><th>Estado</th><th>Acciones</th></tr>
+                      </thead>
+                      <tbody>
+                        {roleProfiles.length === 0 && (
+                          <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--warm-gray)' }}>
+                            No hay registros todavía
+                          </td></tr>
+                        )}
+                        {roleProfiles.map(p => (
+                          <tr key={p.user_id}>
+                            <td>
+                              <div style={{ fontWeight: 600, fontSize: 13 }}>{[p.first_name, p.last_name].filter(Boolean).join(' ') || '—'}</div>
+                              {p.email && <div style={{ fontSize: 11, color: '#0369a1' }}>{p.email}</div>}
+                              {p.phone && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{p.phone}</div>}
+                            </td>
+                            <td style={{ fontSize: 12 }}>{p.company || '—'}</td>
+                            <td style={{ fontSize: 12 }}>{p.city || '—'}</td>
+                            <td style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{new Date(p.created_at).toLocaleDateString('es-ES')}</td>
+                            <td>
+                              <span className={`badge ${p.status === 'active' ? 'badge-active' : p.status === 'inactive' ? 'badge-inactive' : 'badge-pending'}`}>
+                                {p.status === 'active' ? 'Activo' : p.status === 'inactive' ? 'Rechazado' : 'Pendiente'}
+                              </span>
+                            </td>
+                            <td>
+                              {p.status === 'pending' && (
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button className="btn btn-primary btn-sm"
+                                    disabled={saving === p.user_id}
+                                    onClick={() => handleActivateProfile(p.user_id)}>
+                                    <Check size={11} /> {saving === p.user_id ? '...' : 'Activar'}
+                                  </button>
+                                  <button className="btn btn-danger btn-sm"
+                                    disabled={saving === p.user_id + '-reject'}
+                                    onClick={() => handleRejectProfile(p.user_id)}>
+                                    <X size={11} /> Rechazar
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )
+          })()}
         </div>
       </div>
 

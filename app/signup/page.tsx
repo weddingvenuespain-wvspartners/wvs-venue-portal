@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Check } from 'lucide-react'
+import { Check, Building2, CalendarHeart, UtensilsCrossed } from 'lucide-react'
 import { Suspense } from 'react'
 
 const GoogleIcon = () => (
@@ -15,7 +15,29 @@ const GoogleIcon = () => (
   </svg>
 )
 
-// Custom checkbox component for dark background
+type AccountType = 'venue_owner' | 'wedding_planner' | 'catering'
+
+const ACCOUNT_TYPES: { type: AccountType; label: string; sub: string; icon: React.ReactNode }[] = [
+  {
+    type: 'venue_owner',
+    label: 'Venue / Finca',
+    sub: 'Gestionas bodas en tu espacio',
+    icon: <Building2 size={18} />,
+  },
+  {
+    type: 'wedding_planner',
+    label: 'Wedding Planner',
+    sub: 'Organizas bodas para tus clientes',
+    icon: <CalendarHeart size={18} />,
+  },
+  {
+    type: 'catering',
+    label: 'Catering',
+    sub: 'Ofreces servicio de comida y bebida',
+    icon: <UtensilsCrossed size={18} />,
+  },
+]
+
 function Checkbox({
   checked, onChange, id, children
 }: {
@@ -57,16 +79,16 @@ function RegistroPageInner() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
 
-  const [email, setEmail]                     = useState('')
-  const [password, setPassword]               = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [acceptTerms, setAcceptTerms]         = useState(false)
-  const [acceptMarketing, setAcceptMarketing] = useState(false)
-  const [loading, setLoading]                 = useState(false)
-  const [error, setError]                     = useState('')
-  const [done, setDone]                       = useState(false)
+  const [accountType, setAccountType]          = useState<AccountType>('venue_owner')
+  const [email, setEmail]                      = useState('')
+  const [password, setPassword]                = useState('')
+  const [confirmPassword, setConfirmPassword]  = useState('')
+  const [acceptTerms, setAcceptTerms]          = useState(false)
+  const [acceptMarketing, setAcceptMarketing]  = useState(false)
+  const [loading, setLoading]                  = useState(false)
+  const [error, setError]                      = useState('')
+  const [done, setDone]                        = useState(false)
 
-  // Already logged in → go to dashboard
   useEffect(() => {
     if (!authLoading && user) router.push('/dashboard')
   }, [user, authLoading, router])
@@ -78,12 +100,16 @@ function RegistroPageInner() {
     if (password.length < 8) { setError('La contraseña debe tener al menos 8 caracteres'); return }
     setLoading(true)
     setError('')
+    // Store account type in localStorage as onboarding fallback (same browser confirmation)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('wvs_account_type', accountType)
+    }
     const supabase = createClient()
     const { error } = await supabase.auth.signUp({
       email, password,
       options: {
         emailRedirectTo: `${window.location.origin}/onboarding`,
-        data: { marketing_consent: acceptMarketing }
+        data: { marketing_consent: acceptMarketing, account_type: accountType }
       }
     })
     if (error) { setError(error.message); setLoading(false) }
@@ -93,6 +119,10 @@ function RegistroPageInner() {
   const handleGoogle = async () => {
     if (!acceptTerms) { setError('Debes aceptar los términos de servicio para continuar'); return }
     setError('')
+    // Store account type so onboarding can read it after OAuth redirect
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('wvs_account_type', accountType)
+    }
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -102,7 +132,6 @@ function RegistroPageInner() {
 
   return (
     <div className="login-page">
-      {/* Logo horizontal fijo arriba a la izquierda → vuelve a la landing */}
       <a href="/" style={{ position: 'fixed', top: 20, left: 24, textDecoration: 'none', zIndex: 10 }}>
         <img
           src="https://weddingvenuesspain.com/wp-content/uploads/2024/10/logo-wedding-venues-spain-white-e1732122540714.png"
@@ -117,22 +146,41 @@ function RegistroPageInner() {
         <div className="login-logo" style={{ fontSize: 16, letterSpacing: '0.05em', whiteSpace: 'nowrap', marginTop: 8 }}>
           Wedding Venues Spain
         </div>
-        <div className="login-subtitle" style={{ marginBottom: 14 }}>Partner Portal</div>
+        <div className="login-subtitle" style={{ marginBottom: 18 }}>Partner Portal</div>
 
         {!done ? (
           <>
-            {/* Value prop — pills en una sola fila */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 16, flexWrap: 'nowrap' }}>
-              {['14 días gratis', 'Sin tarjeta', 'Propuestas web'].map(item => (
-                <span key={item} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  background: 'rgba(196,151,90,0.1)', border: '1px solid rgba(196,151,90,0.2)',
-                  borderRadius: 20, padding: '3px 9px', fontSize: 11, color: '#C4975A',
-                  whiteSpace: 'nowrap',
-                }}>
-                  <Check size={9} strokeWidth={3} /> {item}
-                </span>
-              ))}
+            {/* Tipo de cuenta */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 8, fontWeight: 500, letterSpacing: '0.06em' }}>
+                TIPO DE CUENTA
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                {ACCOUNT_TYPES.map(({ type, label, sub, icon }) => {
+                  const selected = accountType === type
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setAccountType(type)}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center',
+                        gap: 6, padding: '10px 8px', borderRadius: 8, cursor: 'pointer',
+                        border: selected ? '1.5px solid #C4975A' : '1.5px solid rgba(255,255,255,0.1)',
+                        background: selected ? 'rgba(196,151,90,0.12)' : 'rgba(255,255,255,0.03)',
+                        transition: 'all 0.15s', textAlign: 'center',
+                      }}
+                    >
+                      <span style={{ opacity: selected ? 1 : 0.4, color: selected ? '#C4975A' : 'rgba(255,255,255,0.6)' }}>
+                        {icon}
+                      </span>
+                      <div style={{ fontSize: 12, fontWeight: 600, fontFamily: 'Manrope, sans-serif', color: selected ? '#C4975A' : 'rgba(255,255,255,0.6)', lineHeight: 1.2 }}>
+                        {label}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             {error && <div className="login-error">{error}</div>}
@@ -151,7 +199,6 @@ function RegistroPageInner() {
                 value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required
               />
 
-              {/* GDPR checkboxes */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '12px 0 16px' }}>
                 <Checkbox id="terms" checked={acceptTerms} onChange={setAcceptTerms}>
                   He leído y acepto los{' '}
@@ -165,7 +212,6 @@ function RegistroPageInner() {
                   </a>
                   {' '}<span style={{ color: 'rgba(239,68,68,0.8)' }}>*</span>
                 </Checkbox>
-
                 <Checkbox id="marketing" checked={acceptMarketing} onChange={setAcceptMarketing}>
                   Acepto recibir comunicaciones comerciales. Puedo darme de baja en cualquier momento.
                 </Checkbox>
@@ -200,7 +246,6 @@ function RegistroPageInner() {
             </p>
           </>
         ) : (
-          /* Success state */
           <div style={{ textAlign: 'center', padding: '8px 0' }}>
             <div style={{
               width: 52, height: 52, borderRadius: '50%',
@@ -227,7 +272,6 @@ function RegistroPageInner() {
           </div>
         )}
 
-        {/* Bottom link to login */}
         {!done && (
           <div style={{ textAlign: 'center', marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
             <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>¿Ya tienes cuenta? </span>

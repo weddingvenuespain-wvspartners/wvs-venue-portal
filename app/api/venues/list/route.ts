@@ -1,0 +1,40 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
+
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  )
+}
+
+async function getSession() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (n: string) => cookieStore.get(n)?.value } }
+  )
+  const { data: { session } } = await supabase.auth.getSession()
+  return session
+}
+
+// GET /api/venues/list — returns active venue_owner profiles (bypasses RLS)
+export async function GET(_req: NextRequest) {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const service = getServiceClient()
+  const { data, error } = await service
+    .from('venue_profiles')
+    .select('user_id, display_name, city, venue_type, venue_website, phone')
+    .eq('role', 'venue_owner')
+    .eq('status', 'active')
+    .order('display_name')
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data ?? [])
+}
