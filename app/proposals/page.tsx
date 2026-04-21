@@ -261,6 +261,34 @@ function PropuestasPageContent() {
         )}
 
         <div className="page-content">
+
+          {/* Tab bar */}
+          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--ivory)', marginBottom: 24 }}>
+            <button style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px',
+              background: 'none', border: 'none', cursor: 'default',
+              borderBottom: '2px solid var(--gold)', marginBottom: -2,
+              color: 'var(--espresso)', transition: 'all 0.15s',
+            }}>
+              <FileText size={15} color="var(--gold)" />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Propuestas</span>
+            </button>
+            <a href="/proposals/config" style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px',
+              textDecoration: 'none',
+              borderBottom: '2px solid transparent', marginBottom: -2,
+              color: 'var(--warm-gray)', transition: 'all 0.15s',
+            }}>
+              <Eye size={15} color="var(--warm-gray)" />
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  Configuración
+                  {!features.propuestas_web && <Lock size={10} style={{ opacity: 0.6 }} />}
+                </div>
+              </div>
+            </a>
+          </div>
+
           {smtpConfigured === false && (
             <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <AlertCircle size={15} style={{ flexShrink: 0 }} />

@@ -389,6 +389,7 @@ export default function LeadsPage() {
   const [flashedTab, setFlashedTab] = useState<string | null>(null)
   const [lostBanner, setLostBanner] = useState<{ name: string } | null>(null)
   const [returnToEditAfterDates, setReturnToEditAfterDates] = useState(false)
+  const [returnToEditAfterVisit, setReturnToEditAfterVisit] = useState(false)
   const [returnToCalendarDate,  setReturnToCalendarDate]  = useState<string | null>(null)
   const [visitSubFilter, setVisitSubFilter] = useState<'all' | 'scheduled' | 'post'>('all')
   const [dateConfirmLead,   setDateConfirmLead]   = useState<any | null>(null)
@@ -472,9 +473,9 @@ export default function LeadsPage() {
     const { data } = await supabase.from('leads').select('*')
       .eq('user_id', user!.id).order('created_at', { ascending: false })
     if (data) {
-      // Auto-move visit_scheduled leads whose visit_date has passed → post_visit
+      // Auto-move leads whose visit_date has passed → post_visit (visit_scheduled y budget_sent con visita)
       const today = todayIso()
-      const toAutoMove = data.filter(l => l.status === 'visit_scheduled' && l.visit_date && l.visit_date < today)
+      const toAutoMove = data.filter(l => ['visit_scheduled', 'budget_sent'].includes(l.status) && l.visit_date && l.visit_date < today)
       if (toAutoMove.length > 0) {
         await supabase.from('leads')
           .update({ status: 'post_visit' })
@@ -738,36 +739,6 @@ export default function LeadsPage() {
       finalUpdates.original_wedding_date_ranges = dateConfirmLead.wedding_date_ranges ?? null
     }
 
-    // Nuevo → presupuesto: las fechas seleccionadas son la primera propuesta formal.
-    // Actualizar original_* para que refleje lo que realmente se le está proponiendo.
-    if (!isVisit && dateConfirmStatus === 'budget_sent' && dateConfirmLead.status === 'new' && calendarDates.length > 0) {
-      const sorted = [...calendarDates].sort()
-      if (sorted.length === 1) {
-        finalUpdates.original_date_flexibility    = 'exact'
-        finalUpdates.original_wedding_date        = sorted[0]
-        finalUpdates.original_wedding_date_to     = null
-        finalUpdates.original_wedding_date_ranges = null
-      } else {
-        const isContiguous = sorted.every((d, i) => {
-          if (i === 0) return true
-          const prev = new Date(sorted[i - 1] + 'T12:00:00')
-          const curr = new Date(d + 'T12:00:00')
-          return (curr.getTime() - prev.getTime()) / 86400000 === 1
-        })
-        if (isContiguous) {
-          finalUpdates.original_date_flexibility    = 'range'
-          finalUpdates.original_wedding_date        = sorted[0]
-          finalUpdates.original_wedding_date_to     = sorted[sorted.length - 1]
-          finalUpdates.original_wedding_date_ranges = null
-        } else {
-          finalUpdates.original_date_flexibility    = 'multi_range'
-          finalUpdates.original_wedding_date        = null
-          finalUpdates.original_wedding_date_to     = null
-          finalUpdates.original_wedding_date_ranges = sorted.map(d => ({ from: d, to: d }))
-        }
-      }
-    }
-
     const { data: updatedLead, error: updateErr } = await supabase.from('leads')
       .update(finalUpdates).eq('id', dateConfirmLead.id).select().single()
 
@@ -884,11 +855,13 @@ export default function LeadsPage() {
       showToast(`Lead movido a "${TABS.find(t => t.key === newTab)?.label}"`, newTab)
     } else showToast('Lead actualizado')
     const shouldReturnToEdit = returnToEditAfterDates
+    const shouldReturnToEditAfterVisit = returnToEditAfterVisit
     setReturnToEditAfterDates(false)
+    setReturnToEditAfterVisit(false)
     setDateConfirmLead(null)
     setDateConfirmStatus(null)
-    // Re-open edit modal if the user came from "Cambiar fechas" inside the edit modal
-    if (shouldReturnToEdit && resolvedLead) {
+    // Re-open edit modal if the user came from "Cambiar fechas" or "Editar visita" inside the edit modal
+    if ((shouldReturnToEdit || shouldReturnToEditAfterVisit) && resolvedLead) {
       openEdit(resolvedLead)
     }
   }
@@ -1406,10 +1379,32 @@ export default function LeadsPage() {
           onClose={() => { setShowForm(false); setEditLead(null) }}
           onEditVisit={() => {
             if (!editLead) return
+            setReturnToEditAfterVisit(true)
             setShowForm(false)
             setDateConfirmLead(editLead)
             setDateConfirmStatus('visit_scheduled')
             setDateConfirmKey(k => k + 1)
+          }}
+          onDeleteVisit={async () => {
+            if (!editLead) return
+            // Reutiliza la lógica de confirmVisitCancel — limpia visita y vuelve al edit
+            setCancelVisitConfirm(null)
+            const supabase = createClient()
+            const { error: clearErr } = await supabase.from('leads').update({ visit_date: null, visit_time: null, visit_duration: null }).eq('id', editLead.id)
+            if (clearErr) await supabase.from('leads').update({ visit_date: null }).eq('id', editLead.id)
+            // Limpiar entrada de calendario si existe
+            if (editLead.visit_date) {
+              const { data: visitEntry } = await supabase.from('calendar_entries').select('id,status').eq('user_id', user!.id).eq('date', editLead.visit_date).maybeSingle()
+              if (visitEntry?.id) {
+                if (visitEntry.status === 'negociacion') await supabase.from('calendar_entries').delete().eq('id', visitEntry.id)
+                else await supabase.from('calendar_entries').update({ lead_id: null, note: null }).eq('id', visitEntry.id)
+              }
+            }
+            const updatedLead = { ...editLead, visit_date: null, visit_time: null, visit_duration: null }
+            setLeads(prev => prev.map(l => l.id === editLead.id ? updatedLead : l))
+            setEditLead(updatedLead)
+            setForm((f: any) => ({ ...f, visit_date: '', visit_time: '', visit_duration: '' }))
+            showToast('Visita eliminada')
           }}
           onChangeDates={() => {
             if (!editLead) return
@@ -1438,7 +1433,14 @@ export default function LeadsPage() {
           allLeads={leads}
           userId={user!.id}
           onConfirm={handleDateConfirm}
-          onClose={() => { setDateConfirmLead(null); setDateConfirmStatus(null) }}
+          onClose={() => { setReturnToEditAfterVisit(false); setDateConfirmLead(null); setDateConfirmStatus(null) }}
+          onBack={returnToEditAfterVisit ? (() => {
+            const leadToReopen = leads.find(l => l.id === dateConfirmLead?.id) ?? dateConfirmLead
+            setReturnToEditAfterVisit(false)
+            setDateConfirmLead(null)
+            setDateConfirmStatus(null)
+            if (leadToReopen) openEdit(leadToReopen)
+          }) : undefined}
         />
       )}
 
@@ -3661,6 +3663,10 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
   return (
     <div style={{ display: 'flex', gap: 5, alignItems: 'center', width: '100%' }}>
 
+      <span style={{ fontSize: 11, color: 'var(--warm-gray)', flexShrink: 0, whiteSpace: 'nowrap', opacity: 0.6 }}>
+        Mover a:
+      </span>
+
       {tab === 'new' && (<>
         {lead.source === 'wedding_planner' && (
           <>
@@ -5463,10 +5469,11 @@ function LanguagePicker({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 // ── Form Modal ─────────────────────────────────────────────────────────────────
-function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onClose, userId, onEditVisit, onChangeDates, onChangeBudgetDates }: {
+function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onClose, userId, onEditVisit, onDeleteVisit, onChangeDates, onChangeBudgetDates }: {
   form: any; setForm: (f: any) => void; isEdit: boolean; editLead?: any | null
   saving: boolean; onSubmit: () => void; onClose: () => void; userId: string
   onEditVisit?: () => void
+  onDeleteVisit?: () => void
   onChangeDates?: () => void
   onChangeBudgetDates?: () => void
 }) {
@@ -5516,7 +5523,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
       const ext = file.name.split('.').pop() || 'pdf'
       const path = `${userId}/budgets/${editLead?.id || 'draft'}/${Date.now()}.${ext}`
       const { error } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
-      if (error) { setBudgetError('Error al subir el archivo'); return }
+      if (error) { console.error('[budget upload error]', error); setBudgetError(`Error al subir el archivo: ${error.message}`); return }
       const { data: pub } = supabase.storage.from('documents').getPublicUrl(path)
       const newFile = { url: pub.publicUrl, name: file.name }
       setForm((f: any) => {
@@ -5529,7 +5536,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
           budget_file_name: updated[0].name,
         }
       })
-    } catch { setBudgetError('Error al subir el archivo') }
+    } catch (e: any) { console.error('[budget upload catch]', e); setBudgetError(`Error al subir el archivo: ${e?.message || 'desconocido'}`) }
     finally { setBudgetUploading(false) }
   }
 
@@ -5669,11 +5676,19 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 </div>
                 {editLead.visit_duration && <div style={{ fontSize: 11, color: '#6ee7b7', marginTop: 1 }}>{editLead.visit_duration} min</div>}
               </div>
-              {onEditVisit && (
-                <button type="button" onClick={onEditVisit} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.7)', border: '1px solid #a7f3d0', color: '#047857', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-                  <Edit2 size={10} /> Editar
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                {onEditVisit && (
+                  <button type="button" onClick={onEditVisit} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.7)', border: '1px solid #a7f3d0', color: '#047857', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                    <Edit2 size={10} /> Editar
+                  </button>
+                )}
+                {onDeleteVisit && (
+                  <button type="button" onClick={onDeleteVisit} aria-label="Eliminar visita"
+                    style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.7)', border: '1px solid #a7f3d0', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -6695,7 +6710,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
 
 // ── Visit Schedule Modal — clean, modern UI dedicated to scheduling a venue visit ──
 function VisitScheduleModal({
-  lead, allLeads = [], userId, onConfirm, onClose,
+  lead, allLeads = [], userId, onConfirm, onClose, onBack,
 }: {
   lead: any
   allLeads?: any[]
@@ -6710,6 +6725,7 @@ function VisitScheduleModal({
     visitDuration?: number,
   ) => Promise<void>
   onClose: () => void
+  onBack?: () => void
 }) {
   const isEditing = !!lead.visit_date
   // Original visit data (for showing "previous" when user picks a different date)
@@ -6877,10 +6893,10 @@ function VisitScheduleModal({
       >
         {/* Header */}
         <div style={{ position: 'relative', padding: '22px 24px 20px 54px', background: 'linear-gradient(135deg, #fef3c7 0%, #fdf6ee 100%)', borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
-          {/* Back arrow — top left */}
+          {/* Back arrow — top left: vuelve a editar el lead si vino del edit modal, si no cierra */}
           <button
-            onClick={onClose}
-            aria-label="Volver"
+            onClick={onBack ?? onClose}
+            aria-label={onBack ? 'Volver a editar lead' : 'Cerrar'}
             style={{ position: 'absolute', top: 14, left: 14, width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.75)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--espresso)' }}
           >
             <ChevronLeft size={18} />

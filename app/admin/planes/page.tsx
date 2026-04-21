@@ -14,6 +14,25 @@ import { FEATURE_DEFS, BASIC_FALLBACK, PREMIUM_FALLBACK } from '@/lib/use-plan-f
 const PERMISSIONS_BASIC   = BASIC_FALLBACK
 const PERMISSIONS_PREMIUM = PREMIUM_FALLBACK
 
+// ─── Feature sections (admin UI groupings) ────────────────────────────────────
+
+const FEATURE_SECTIONS: {
+  id: string
+  label: string
+  masterKey: keyof PlanFeatures
+  subFeatures: (keyof PlanFeatures)[]
+}[] = [
+  { id: 'leads',       label: 'Leads',        masterKey: 'leads',       subFeatures: ['leads_date_filter', 'leads_export', 'leads_new_only'] },
+  { id: 'propuestas',  label: 'Propuestas',   masterKey: 'propuestas',  subFeatures: ['propuestas_web', 'propuestas_pdf'] },
+  { id: 'estadisticas',label: 'Estadísticas', masterKey: 'estadisticas',subFeatures: ['estadisticas_avanzadas'] },
+  { id: 'pipeline',    label: 'Pipeline',     masterKey: 'pipeline',    subFeatures: [] },
+]
+
+// Feature keys that don't belong to any section
+const GENERIC_FEATURE_KEYS: (keyof PlanFeatures)[] = [
+  'ficha', 'calendario', 'comunicacion', 'recordatorios', 'multiusuario', 'soporte_prioritario',
+]
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type TrialConfig = {
@@ -273,6 +292,16 @@ export default function PlanesPage() {
     setForm(f => ({ ...f, billing_cycles: fn(f.billing_cycles) }))
   const setPermission = (key: keyof PlanFeatures, value: boolean) =>
     setForm(f => ({ ...f, permissions: { ...(f.permissions ?? {}), [key]: value } as PlanFeatures }))
+
+  // Toggle a whole section: turning OFF disables master + all sub-features
+  const toggleSection = (masterKey: keyof PlanFeatures, subKeys: (keyof PlanFeatures)[], value: boolean) =>
+    setForm(f => {
+      const updated = { ...(f.permissions ?? {}) } as PlanFeatures
+      updated[masterKey] = value
+      if (!value) subKeys.forEach(k => { (updated as any)[k] = false })
+      return { ...f, permissions: updated }
+    })
+
   const applyPreset = (preset: PlanFeatures) =>
     setForm(f => ({ ...f, permissions: { ...preset } }))
 
@@ -752,7 +781,8 @@ export default function PlanesPage() {
 
               {/* Funcionalidades */}
               <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 14, marginTop: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                {/* Header + presets */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '.07em', textTransform: 'uppercase' }}>
                     Funcionalidades del plan
                   </div>
@@ -761,23 +791,82 @@ export default function PlanesPage() {
                     <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 10, color: '#92400e' }} onClick={() => applyPreset(PERMISSIONS_PREMIUM)}>Preset Premium</button>
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Básicas</div>
-                    {FEATURE_DEFS.filter(f => f.tier === 'basic').map(def => (
-                      <FeatureRow key={def.key} def={def} checked={form.permissions?.[def.key] === true} onChange={v => setPermission(def.key, v)} />
-                    ))}
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6, marginTop: 12 }}>Restricciones</div>
-                    {FEATURE_DEFS.filter(f => f.tier === 'restriction').map(def => (
-                      <FeatureRow key={def.key} def={def} checked={form.permissions?.[def.key] === true} onChange={v => setPermission(def.key, v)} />
-                    ))}
+
+                {/* ── Generales (outside sections) ── */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Generales
+                    <span style={{ fontSize: 9, fontWeight: 400, fontStyle: 'italic', textTransform: 'none', letterSpacing: 0, opacity: 0.7 }}>· aplicables a todos los apartados</span>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#92400e', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Premium</div>
-                    {FEATURE_DEFS.filter(f => f.tier === 'premium').map(def => (
-                      <FeatureRow key={def.key} def={def} checked={form.permissions?.[def.key] === true} onChange={v => setPermission(def.key, v)} />
-                    ))}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+                    {GENERIC_FEATURE_KEYS.map(key => {
+                      const def = FEATURE_DEFS.find(f => f.key === key)
+                      if (!def) return null
+                      return <FeatureRow key={key} def={def} checked={form.permissions?.[key] === true} onChange={v => setPermission(key, v)} />
+                    })}
                   </div>
+                </div>
+
+                {/* ── Apartados ── */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {FEATURE_SECTIONS.map(section => {
+                    const masterOn  = form.permissions?.[section.masterKey] === true
+                    const masterDef = FEATURE_DEFS.find(f => f.key === section.masterKey)
+                    if (!masterDef) return null
+                    const isPremium     = masterDef.tier === 'premium'
+                    const activeSubCount = section.subFeatures.filter(k => form.permissions?.[k] === true).length
+                    const borderColor   = masterOn ? (isPremium ? '#fde68a' : '#bbf7d0') : 'var(--ivory)'
+                    const bgColor       = masterOn ? (isPremium ? '#fef9ec' : '#f0fdf4') : '#f9fafb'
+
+                    return (
+                      <div key={section.id} style={{ borderRadius: 8, border: `1px solid ${borderColor}`, overflow: 'hidden' }}>
+
+                        {/* Section header = master toggle */}
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: bgColor, userSelect: 'none' }}>
+                          <input
+                            type="checkbox"
+                            checked={masterOn}
+                            onChange={e => toggleSection(section.masterKey, section.subFeatures, e.target.checked)}
+                            style={{ width: 15, height: 15, accentColor: isPremium ? 'var(--gold)' : '#16a34a', flexShrink: 0, marginTop: 1 }}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {section.label}
+                              {isPremium && (
+                                <span style={{ fontSize: 9, background: '#fef9ec', color: '#92400e', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>PREMIUM</span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>{masterDef.description}</div>
+                          </div>
+                          {section.subFeatures.length > 0 && (
+                            <span style={{
+                              fontSize: 10, color: masterOn ? (isPremium ? '#92400e' : '#16a34a') : 'var(--warm-gray)',
+                              background: 'rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: 10, flexShrink: 0, fontWeight: 600,
+                            }}>
+                              {activeSubCount}/{section.subFeatures.length} activas
+                            </span>
+                          )}
+                        </label>
+
+                        {/* Sub-features */}
+                        {section.subFeatures.length > 0 && (
+                          <div style={{
+                            padding: '8px 14px 10px 38px',
+                            background: '#fff',
+                            borderTop: `1px solid ${borderColor}`,
+                            opacity: masterOn ? 1 : 0.4,
+                            pointerEvents: masterOn ? 'auto' : 'none',
+                          }}>
+                            {section.subFeatures.map(key => {
+                              const def = FEATURE_DEFS.find(f => f.key === key)
+                              if (!def) return null
+                              return <FeatureRow key={key} def={def} checked={form.permissions?.[key] === true} onChange={v => setPermission(key, v)} />
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
 
