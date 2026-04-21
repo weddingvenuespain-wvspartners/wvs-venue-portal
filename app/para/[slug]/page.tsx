@@ -3,7 +3,8 @@ import CoupleLandingClient from './CoupleLandingClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CoupleLandingPage({ params }: { params: { slug: string } }) {
+export default async function CoupleLandingPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -13,7 +14,7 @@ export default async function CoupleLandingPage({ params }: { params: { slug: st
   const { data: client } = await supabase
     .from('wp_clients')
     .select('*')
-    .eq('slug', params.slug)
+    .eq('slug', slug)
     .single()
 
   if (!client) {
