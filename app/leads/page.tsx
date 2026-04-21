@@ -47,6 +47,8 @@ const SOURCE_LABEL: Record<string, string> = {
   web: 'Web', whatsapp: 'WhatsApp', instagram: 'Instagram',
   email: 'Email', referral: 'Referido', manual: 'Manual', other: 'Otro',
   wedding_planner: 'Planner',
+  wedding_venues_spain: 'Wedding Venues Spain',
+  bodas_net: 'Bodas.net',
 }
 const BUDGET_LABEL: Record<string, string> = {
   sin_definir: '—',
@@ -205,9 +207,15 @@ function formatLeadDate(lead: any): { line1: string; line2?: React.ReactNode; co
     case 'multi_range': {
       const ranges: { from: string; to: string }[] = lead.wedding_date_ranges || []
       if (!ranges.length) return { line1: 'Varios rangos', color: 'var(--warm-gray)' }
-      const first = ranges[0]
-      const rest  = ranges.length > 1 ? ` +${ranges.length - 1} más` : ''
-      return { line1: `${fmtNoYear(first.from)} – ${fmtNoYear(first.to)}${rest}` }
+      const MAX_SHOW = 2
+      const shown = ranges.slice(0, MAX_SHOW)
+      const extra = ranges.length > MAX_SHOW ? ` +${ranges.length - MAX_SHOW}` : ''
+      const parts = shown.map(r => {
+        if (!r.from) return '?'
+        if (!r.to || r.from === r.to) return fmtNoYear(r.from)
+        return `${fmtNoYear(r.from)}–${fmtNoYear(r.to)}`
+      })
+      return { line1: parts.join(' · ') + extra }
     }
     case 'month':
       return { line1: `${MONTHS[(lead.wedding_month || 1) - 1]} ${lead.wedding_year || ''}` }
@@ -340,8 +348,11 @@ const emptyForm = {
   visit_date: '', guests: '', source: 'web',
   notes: '', ceremony_type: 'sin_definir', budget: 'sin_definir',
   language: 'es', style: '',
+  country: '', guests_adults: '', guests_children: '',
+  catering_needed: 'sin_definir', tags: [] as string[],
   // budget attachment (set when passing to presupuesto)
   budget_file_url: '', budget_file_name: '',
+  budget_files: [] as { url: string; name: string }[],
   // confirmed budget dates (separate from proposal/negotiation dates)
   budget_date_flexibility: 'exact',
   budget_date: '', budget_date_to: '',
@@ -378,6 +389,7 @@ export default function LeadsPage() {
   const [flashedTab, setFlashedTab] = useState<string | null>(null)
   const [lostBanner, setLostBanner] = useState<{ name: string } | null>(null)
   const [returnToEditAfterDates, setReturnToEditAfterDates] = useState(false)
+  const [returnToCalendarDate,  setReturnToCalendarDate]  = useState<string | null>(null)
   const [visitSubFilter, setVisitSubFilter] = useState<'all' | 'scheduled' | 'post'>('all')
   const [dateConfirmLead,   setDateConfirmLead]   = useState<any | null>(null)
   const [dateConfirmStatus, setDateConfirmStatus] = useState<DbStatus | null>(null)
@@ -416,6 +428,39 @@ export default function LeadsPage() {
       setActiveTab('visit')
       setDateConfirmLead(lead)
       setDateConfirmStatus('visit_scheduled')
+      setDateConfirmKey(k => k + 1)
+    }
+    window.history.replaceState({}, '', '/leads')
+  }, [leads])
+
+  // Deep-link: open the lead edit modal when arriving with ?open=<leadId>
+  // Optional ?returnDate=YYYY-MM-DD shows a "← Volver al calendario" button
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (leads.length === 0) return
+    const params = new URLSearchParams(window.location.search)
+    const id = params.get('open')
+    if (!id) return
+    const returnDate = params.get('returnDate')
+    if (returnDate) setReturnToCalendarDate(returnDate)
+    const lead = leads.find(l => l.id === id)
+    if (lead) openEdit(lead)
+    window.history.replaceState({}, '', '/leads')
+  }, [leads])
+
+  // Deep-link: open DateConfirmModal directly in "cambiar fechas" mode
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (leads.length === 0) return
+    const params = new URLSearchParams(window.location.search)
+    const id = params.get('changeDates')
+    if (!id) return
+    const returnDate = params.get('returnDate')
+    if (returnDate) setReturnToCalendarDate(returnDate)
+    const lead = leads.find(l => l.id === id)
+    if (lead) {
+      setDateConfirmLead(lead)
+      setDateConfirmStatus(lead.status)
       setDateConfirmKey(k => k + 1)
     }
     window.history.replaceState({}, '', '/leads')
@@ -515,7 +560,16 @@ export default function LeadsPage() {
 
   const moveToStatus = async (id: string, status: DbStatus, cleanCalendar = false) => {
     const supabase = createClient()
-    await supabase.from('leads').update({ status }).eq('id', id)
+    const leadUpdates: any = { status }
+
+    // When moving to lost: auto-clear visit fields so it disappears from calendar
+    if (status === 'lost') {
+      leadUpdates.visit_date = null
+      leadUpdates.visit_time = null
+      leadUpdates.visit_duration = null
+    }
+
+    await supabase.from('leads').update(leadUpdates).eq('id', id)
 
     // Free calendar entries when losing a wedding or explicitly cleaning up (e.g. back to nuevo)
     if (status === 'lost' || cleanCalendar) {
@@ -525,7 +579,7 @@ export default function LeadsPage() {
         .eq('lead_id', id)
     }
 
-    setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, ...leadUpdates } : l))
     const newTab = (Object.entries(TAB_STATUSES) as [Tab, DbStatus[]][])
       .find(([, ss]) => ss.includes(status))?.[0]
     if (newTab && newTab !== activeTab) {
@@ -550,7 +604,12 @@ export default function LeadsPage() {
     if (lead && lead.status === 'won' && newStatus === 'lost') {
       setCancelWeddingLead(lead); setCancelWeddingReason('')
     } else if (lead && lead.status === 'visit_scheduled' && lead.visit_date && newStatus !== 'visit_scheduled') {
-      setCancelVisitConfirm({ lead, targetStatus: newStatus, requiresDateModal: false })
+      if (newStatus === 'lost') {
+        // Skip dialog — auto-clear visit and move directly to lost
+        moveToStatus(id, 'lost')
+      } else {
+        setCancelVisitConfirm({ lead, targetStatus: newStatus, requiresDateModal: false })
+      }
     } else if (lead?.status === 'lost' && newStatus === 'new') {
       // Reactivar lead perdido — conservar todos sus datos sin preguntar
       moveToStatus(id, newStatus)
@@ -770,6 +829,25 @@ export default function LeadsPage() {
     // Visits only update visit_date on the lead — they do NOT touch calendar_entries
     // (availability of the day must not change just because someone is visiting)
     if (!isVisit) {
+      // Free old calendar entries for this lead that are no longer in the new selection
+      // This handles the case where a range like May 21-24 is narrowed to May 21-23:
+      // May 24's calendar entry must be freed, otherwise it stays "negociacion" indefinitely
+      const { data: oldEntries } = await supabase
+        .from('calendar_entries')
+        .select('id,date')
+        .eq('user_id', user!.id)
+        .eq('lead_id', dateConfirmLead.id)
+        .in('status', ['negociacion', 'reservado'])
+      if (oldEntries?.length) {
+        const newDatesSet = new Set(calendarDates)
+        const toFree = oldEntries.filter((e: any) => !newDatesSet.has(e.date))
+        for (const e of toFree) {
+          await supabase.from('calendar_entries')
+            .update({ status: 'libre', lead_id: null, note: null })
+            .eq('id', e.id)
+        }
+      }
+
       // Save full-day calendar entries (dates NOT marked as half-day)
       const fullDayDates = calendarDates.filter(d => !halfDayMap?.[d])
       for (const d of fullDayDates) {
@@ -873,8 +951,13 @@ export default function LeadsPage() {
       ceremony_type: lead.ceremony_type || 'sin_definir',
       budget: lead.budget || 'sin_definir', language: lead.language || 'es',
       style: lead.style || '',
+      country: lead.country || '', guests_adults: lead.guests_adults?.toString() || '',
+      guests_children: lead.guests_children?.toString() || '',
+      catering_needed: lead.catering_needed || 'sin_definir',
+      tags: lead.tags || [],
       budget_file_url: lead.budget_file_url || '',
       budget_file_name: lead.budget_file_name || '',
+      budget_files: (() => { const f = lead.budget_files || []; if (!f.length && lead.budget_file_url) return [{ url: lead.budget_file_url, name: lead.budget_file_name || 'Documento adjunto' }]; return f })(),
       budget_date_flexibility: lead.budget_date_flexibility || 'exact',
       budget_date: lead.budget_date || '',
       budget_date_to: lead.budget_date_to || '',
@@ -895,6 +978,11 @@ export default function LeadsPage() {
     const payload  = {
       ...form,
       guests: form.guests ? parseInt(form.guests) : null,
+      guests_adults: form.guests_adults ? parseInt(form.guests_adults) : null,
+      guests_children: form.guests_children ? parseInt(form.guests_children) : null,
+      country: form.country || null,
+      catering_needed: form.catering_needed === 'sin_definir' ? null : (form.catering_needed || null),
+      tags: form.tags?.length ? form.tags : null,
       visit_date: form.visit_date || null,
       wedding_date: ['exact','range'].includes(form.date_flexibility) ? (form.wedding_date || null) : null,
       // exact → siempre 1 día (sin wedding_date_to); range usa wedding_date_to del rango seleccionado
@@ -913,14 +1001,28 @@ export default function LeadsPage() {
       original_wedding_month: oFlex === 'month' ? (parseInt(form.original_wedding_month) || null) : null,
       original_wedding_season: oFlex === 'season' ? form.original_wedding_season : null,
       // budget attachment
-      budget_file_url:  form.budget_file_url  || null,
-      budget_file_name: form.budget_file_name || null,
+      budget_file_url:  form.budget_files?.[0]?.url  || form.budget_file_url  || null,
+      budget_file_name: form.budget_files?.[0]?.name || form.budget_file_name || null,
+      budget_files:     form.budget_files?.length ? form.budget_files : null,
       // confirmed budget dates
       budget_date:             ['exact','range'].includes(form.budget_date_flexibility) ? (form.budget_date || null) : null,
       budget_date_to:          form.budget_date_flexibility === 'range' ? (form.budget_date_to || null) : null,
       budget_date_flexibility: form.budget_date_flexibility || null,
       budget_date_ranges:      form.budget_date_flexibility === 'multi_range' ? form.budget_date_ranges.filter((r: any) => r.from) : null,
     }
+
+    // Auto-populate original_* when creating or editing a 'new' lead without original dates
+    const isNewLead = !editLead || editLead.status === 'new'
+    if (isNewLead && !payload.original_date_flexibility) {
+      payload.original_date_flexibility    = payload.date_flexibility    || null
+      payload.original_wedding_date        = payload.wedding_date        || null
+      payload.original_wedding_date_to     = payload.wedding_date_to     || null
+      payload.original_wedding_date_ranges = payload.wedding_date_ranges || null
+      payload.original_wedding_year        = payload.wedding_year        || null
+      payload.original_wedding_month       = payload.wedding_month       || null
+      payload.original_wedding_season      = payload.wedding_season      || null
+    }
+
     // Helper: strip columns that don't exist in DB yet, retry once
     const safeUpdate = async (table: any, data: any, match: { id: string }) => {
       let { data: res, error } = await table.update(data).eq('id', match.id).select().single()
@@ -935,6 +1037,10 @@ export default function LeadsPage() {
       if (error?.message && /budget_file_(url|name)/.test(error.message)) {
         const { budget_file_url: _u, budget_file_name: _n, ...d4 } = data
         ;({ data: res, error } = await table.update(d4).eq('id', match.id).select().single())
+      }
+      if (error?.message?.includes('budget_files')) {
+        const { budget_files: _bf, ...d5 } = data
+        ;({ data: res, error } = await table.update(d5).eq('id', match.id).select().single())
       }
       return { data: res, error }
     }
@@ -951,6 +1057,10 @@ export default function LeadsPage() {
       if (error?.message && /budget_file_(url|name)/.test(error.message)) {
         const { budget_file_url: _u, budget_file_name: _n, ...d4 } = data
         ;({ data: res, error } = await table.insert(d4).select().single())
+      }
+      if (error?.message?.includes('budget_files')) {
+        const { budget_files: _bf, ...d5 } = data
+        ;({ data: res, error } = await table.insert(d5).select().single())
       }
       return { data: res, error }
     }
@@ -1000,6 +1110,26 @@ export default function LeadsPage() {
     <div style={{ display: 'flex' }}>
       <Sidebar />
       <div className="main-layout">
+
+        {/* Botón volver al calendario (cuando se llega desde ?open=id&returnDate=date) */}
+        {returnToCalendarDate && (
+          <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 900 }}>
+            <button
+              onClick={() => { setReturnToCalendarDate(null); router.push(`/calendario?openDate=${returnToCalendarDate}`) }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 18px', borderRadius: 30,
+                background: 'var(--espresso)', color: '#fff',
+                border: 'none', cursor: 'pointer',
+                fontSize: 13, fontWeight: 600,
+                fontFamily: 'Manrope, sans-serif',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+              }}
+            >
+              ← Volver al calendario
+            </button>
+          </div>
+        )}
 
         {/* Topbar */}
         <div className="topbar">
@@ -1286,7 +1416,8 @@ export default function LeadsPage() {
             setReturnToEditAfterDates(true)
             setShowForm(false)
             setDateConfirmLead(editLead)
-            setDateConfirmStatus('contacted')
+            // Preserve current status — don't downgrade to 'contacted'
+            setDateConfirmStatus(editLead.status)
             setDateConfirmKey(k => k + 1)
           }}
           onChangeBudgetDates={() => {
@@ -1518,9 +1649,11 @@ function DateConfirmModal({
   const isVisitMode    = targetStatus === 'visit_scheduled'
   const isWonMode      = targetStatus === 'won'
   const isBudgetMode   = targetStatus === 'budget_sent'
-  // "Cambiar fechas" desde en-seguimiento: mismo destino que el estado actual → editar fechas propuestas
-  const isEditDatesMode = targetStatus === 'contacted' && lead.status === 'contacted'
+  // "Cambiar fechas": targetStatus === lead.status → solo editar fechas, sin cambiar estado
+  const isEditDatesMode = !isVisitMode && !isWonMode && !isBudgetMode && targetStatus === lead.status && !['new', 'lost'].includes(lead.status)
   const [dateRules,  setDateRules]  = useState<any>(null)
+  // Declare calEntries early so dateLeadCounts useMemo can reference it
+  const [calEntries,    setCalEntries]    = useState<Record<string, any>>({})
 
   // Dates confirmed during "en seguimiento" (current calendar-verified dates on the lead)
   const confirmedDates = useMemo(() => expandLeadDates(lead), [lead])
@@ -1528,14 +1661,37 @@ function DateConfirmModal({
   // Dates to show in the top pills: always the current lead dates (main fields)
   const requestedDates = useMemo(() => confirmedDates, [confirmedDates])
 
-  // Build a map of date → count of OTHER leads who have that date requested
+  // Build a map of date → count of OTHER leads who have that date requested (excluding visit_scheduled and lost)
   const dateLeadCounts = useMemo(() => {
+    // Use per-date sets of lead_ids to avoid double-counting
+    const byDate = new Map<string, Set<string>>()
+    const activeOthers = allLeads.filter(l => l.id !== lead.id && l.status !== 'lost' && l.status !== 'visit_scheduled')
+    activeOthers.forEach(l => {
+      expandLeadDates(l).forEach(d => {
+        if (!byDate.has(d)) byDate.set(d, new Set())
+        byDate.get(d)!.add(l.id)
+      })
+    })
+    // Also count negociacion calendar_entries for leads that have no dates via wedding_date
+    const activeOtherIds = new Set(activeOthers.map(l => l.id))
+    Object.entries(calEntries).forEach(([date, entry]: [string, any]) => {
+      if (entry?.status === 'negociacion' && entry.lead_id && activeOtherIds.has(entry.lead_id)) {
+        if (!byDate.has(date)) byDate.set(date, new Set())
+        byDate.get(date)!.add(entry.lead_id)
+      }
+    })
+    const counts: Record<string, number> = {}
+    byDate.forEach((ids, date) => { counts[date] = ids.size })
+    return counts
+  }, [allLeads, lead.id, calEntries])
+
+  // Build a map of date → count of OTHER leads with a visit on that date (excluding lost)
+  const dateVisitCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     allLeads.forEach(l => {
       if (l.id === lead.id) return
-      expandLeadDates(l).forEach(d => {
-        counts[d] = (counts[d] || 0) + 1
-      })
+      if (l.status === 'lost') return // no mostrar visitas de leads perdidos
+      if (l.visit_date) counts[l.visit_date] = (counts[l.visit_date] || 0) + 1
     })
     return counts
   }, [allLeads, lead.id])
@@ -1552,7 +1708,6 @@ function DateConfirmModal({
   const [selectedDates,  setSelectedDates]  = useState<string[]>([])
   // selectedAnchors = only the dates the user explicitly clicked (the "wedding days")
   const [selectedAnchors, setSelectedAnchors] = useState<string[]>([])
-  const [calEntries,    setCalEntries]    = useState<Record<string, any>>({})
   const [dateInfo,      setDateInfo]      = useState<string | null>(null) // date whose booking info is shown
   const [saving,        setSaving]        = useState(false)
   // Budget attachment (only used in isBudgetMode)
@@ -2027,12 +2182,13 @@ function DateConfirmModal({
     // In auto mode, selectedDates already contains rule-expanded dates (pairs / spans)
     // In manual mode with overnight, expand at confirm time
     const isOvernight = !isVisitMode && dateRules?.type === 'overnight'
-    let calendarDates = [...selectedDates]
+    // Strip past dates on save — past dates may survive in selectedDates from a previous edit
+    let calendarDates = selectedDates.filter(d => d >= todayStr)
 
-    if (isOvernight && selectedDates.length > 0 && ignoreRules) {
+    if (isOvernight && calendarDates.length > 0 && ignoreRules) {
       // Manual overnight: expand at confirm time (auto mode already expands in toggleDate)
       const expandedSet = new Set<string>()
-      selectedDates.forEach(d => {
+      calendarDates.forEach(d => {
         expandedSet.add(overnightDay === 1 ? d : shiftDate(d, -1))
         expandedSet.add(overnightDay === 1 ? shiftDate(d, 1) : d)
       })
@@ -2044,11 +2200,11 @@ function DateConfirmModal({
         wedding_date_ranges: null, wedding_year: null, wedding_month: null,
       }
     } else if (!isVisitMode) {
-      const hasMissingRequested = availableRequested.some(d => !selectedDates.includes(d))
+      const hasMissingRequested = availableRequested.some(d => !calendarDates.includes(d))
       // For simple-buffer auto mode, buffer days are just calendar blocks — don't update lead dates
       const skipLeadDateUpdate = hasAutoRules && !ignoreRules && dateRules?.type === 'simple'
       if (!skipLeadDateUpdate && (extraDates.length > 0 || hasMissingRequested)) {
-        const sorted = [...selectedDates].sort()
+        const sorted = [...calendarDates].sort()
         if (sorted.length === 0) {
           leadUpdates = {}
         } else if (sorted.length === 1) {
@@ -2665,7 +2821,8 @@ function DateConfirmModal({
                     return false
                   })()
                   const isExtra = isSelected && !isRequested && !isBufferDay
-                  const otherLeadCount = dateLeadCounts[ds] || 0
+                  const otherLeadCount  = dateLeadCounts[ds]  || 0
+                  const otherVisitCount = dateVisitCounts[ds] || 0
                   const cellIdx = i  // for borderRight calc
 
                   // In package mode: non-anchor days that aren't unavailable or already part of a selected span
@@ -2676,13 +2833,21 @@ function DateConfirmModal({
                   return (
                     <button key={ds} onClick={() => {
                       if (isPast) return
-                      if (isUnavailable || (isHalfDay && !isSelected)) {
+                      if (isUnavailable) {
                         setDateInfo(prev => prev === ds ? null : ds)
+                        return
+                      }
+                      // Half-day blocked: auto-select the FREE half
+                      if (isHalfDay && !isSelected) {
+                        const freeHalf = entry?.note?.startsWith('medio_dia_manana') ? 'medio_dia_tarde' : 'medio_dia_manana'
+                        setSelectedDates(prev => [...new Set([...prev, ds])].sort())
+                        setSelectedAnchors(prev => [...new Set([...prev, ds])].sort())
+                        setHalfDayMap(prev => ({ ...prev, [ds]: freeHalf }))
                         return
                       }
                       if (canClick) toggleDate(ds)
                     }}
-                      title={isUnavailable || (isHalfDay && !isSelected) ? 'Ver info de esta reserva' : isOtherVisit ? 'Otro lead tiene visita este día — puedes escoger igualmente' : isHalfDay ? '½ Mañana/Tarde — el otro medio está libre' : isPkgBlocked ? 'Este día no es inicio de ningún paquete' : isAlsoBuffer ? 'Boda + buffer del día anterior (doble rol)' : isBufferDay ? 'Día de buffer (regla del venue)' : isRequested ? 'Fecha solicitada — clic para marcar/desmarcar' : isPkgAvailable ? 'Inicio de paquete — disponible' : otherLeadCount > 0 ? `${otherLeadCount} lead(s) interesado(s)` : ''}
+                      title={isUnavailable ? 'Ver info de esta reserva' : isHalfDay && !isSelected ? (entry?.note?.startsWith('medio_dia_manana') ? 'Mañana ocupada — clic para seleccionar ½ Tarde' : 'Tarde ocupada — clic para seleccionar ½ Mañana') : isOtherVisit ? 'Otro lead tiene visita este día — puedes escoger igualmente' : isPkgBlocked ? 'Este día no es inicio de ningún paquete' : isAlsoBuffer ? 'Boda + buffer del día anterior (doble rol)' : isBufferDay ? 'Día de buffer (regla del venue)' : isRequested ? 'Fecha solicitada — clic para marcar/desmarcar' : isPkgAvailable ? 'Inicio de paquete — disponible' : otherLeadCount > 0 ? `${otherLeadCount} lead(s) interesado(s)` : ''}
                       style={{
                         minHeight: 60, border: 'none',
                         borderBottom: '1px solid var(--ivory)',
@@ -2693,6 +2858,10 @@ function DateConfirmModal({
                           ? '#fdf6ee'
                           : isHalfDayBuffer
                           ? 'linear-gradient(135deg, #fdf6ee 50%, #ffffff 50%)'
+                          : isSelected && isHalfDay && halfDayMap[ds] === 'medio_dia_tarde'
+                          ? 'linear-gradient(135deg, #e5e7eb 50%, #fef3c7 50%)'  /* mañana bloq(gris) + tarde sel(oro) */
+                          : isSelected && isHalfDay && halfDayMap[ds] === 'medio_dia_manana'
+                          ? 'linear-gradient(135deg, #fef3c7 50%, #e5e7eb 50%)'  /* mañana sel(oro) + tarde bloq(gris) */
                           : isSelected && halfDayMap[ds] === 'medio_dia_manana'
                           ? 'linear-gradient(135deg, #fef3c7 50%, #ffffff 50%)'
                           : isSelected && halfDayMap[ds] === 'medio_dia_tarde'
@@ -2701,6 +2870,8 @@ function DateConfirmModal({
                           ? '#fef3c7'
                           : isPartOfSpan
                           ? '#fef3c7'
+                          : isHalfDay && entry?.note?.startsWith('medio_dia_tarde')
+                          ? `linear-gradient(135deg, #ffffff 50%, ${cfg.bg} 50%)`
                           : isHalfDay
                           ? `linear-gradient(135deg, ${cfg.bg} 50%, #ffffff 50%)`
                           : isPast ? '#faf8f5'
@@ -2762,16 +2933,22 @@ function DateConfirmModal({
                         )}
                         {/* Other leads count — orange circle badge */}
                         {otherLeadCount > 0 && !isUnavailable && !isPast && (
-                          <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: isRequested ? 2 : 0, flexShrink: 0 }}>
+                          <div title={`${otherLeadCount} lead(s) interesado(s)`} style={{ width: 14, height: 14, borderRadius: '50%', background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: isRequested ? 2 : 0, flexShrink: 0 }}>
                             <span style={{ fontSize: 8, color: '#fff', fontWeight: 700, lineHeight: 1 }}>{otherLeadCount}</span>
+                          </div>
+                        )}
+                        {/* Other visits count — green circle badge */}
+                        {otherVisitCount > 0 && !isUnavailable && !isPast && (
+                          <div title={`${otherVisitCount} visita(s) programada(s)`} style={{ width: 14, height: 14, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 2, flexShrink: 0 }}>
+                            <span style={{ fontSize: 8, color: '#fff', fontWeight: 700, lineHeight: 1 }}>{otherVisitCount}</span>
                           </div>
                         )}
                         {/* Status symbol — only for unavailable (×) and half-day (½) */}
                         {(isUnavailable || isHalfDay) && !isPkgBlocked && !isPartOfSpan && (
                           <span
-                            title={isUnavailable ? cfg.label : 'Medio día — el otro ½ está libre'}
-                            style={{ fontSize: isUnavailable ? 16 : 9, color: isUnavailable ? cfg.dot : cfg.dot, fontWeight: 900, lineHeight: 1, marginLeft: 'auto' }}>
-                            {isUnavailable ? '×' : '½'}
+                            title={isUnavailable ? cfg.label : entry?.note?.startsWith('medio_dia_tarde') ? '½ Tarde bloqueada — mañana libre' : '½ Mañana bloqueada — tarde libre'}
+                            style={{ fontSize: isUnavailable ? 16 : 8, color: cfg.dot, fontWeight: 900, lineHeight: 1, marginLeft: 'auto' }}>
+                            {isUnavailable ? '×' : entry?.note?.startsWith('medio_dia_tarde') ? '½T' : '½M'}
                           </span>
                         )}
                         {/* Span day indicator (part of a selected package) */}
@@ -3015,6 +3192,14 @@ function DateConfirmModal({
                   <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>2</span>
                 </div>
                 <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Otros leads</span>
+              </div>
+            )}
+            {!isVisitMode && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <div style={{ width: 14, height: 14, borderRadius: 7, background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>1</span>
+                </div>
+                <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Visitas ese día</span>
               </div>
             )}
             {isVisitMode && (
@@ -3262,6 +3447,11 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm 
                     {SUB_STATUS_LABEL[lead.status as DbStatus]}
                   </span>
                 )}
+                {lead.tags?.length > 0 && lead.tags.slice(0, 3).map((t: string) => (
+                  <span key={t} style={{ fontSize: 10, background: 'rgba(99,102,241,0.08)', color: '#4f46e5', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
+                    {t}
+                  </span>
+                ))}
               </div>
             </div>
 
@@ -3306,9 +3496,9 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm 
               {lead.budget && lead.budget !== 'sin_definir' && (
                 <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{BUDGET_LABEL[lead.budget]}</div>
               )}
-              {lead.budget_file_url && (
+              {(lead.budget_files?.length > 0 || lead.budget_file_url) && (
                 <div style={{ fontSize: 10, color: '#16a34a', marginTop: 3, display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
-                  <Paperclip size={10} /> PDF
+                  <Paperclip size={10} /> {lead.budget_files?.length > 1 ? `${lead.budget_files.length} docs` : 'PDF'}
                 </div>
               )}
             </div>
@@ -3493,6 +3683,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
           </>
         )}
         {lead.source !== 'wedding_planner' && <EnSeguimientoBtn lead={lead} canProposal={canProposal} onDateConfirm={onDateConfirm} />}
+        {lead.source !== 'wedding_planner' && <button className="qa qa-success" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>}
         <MoreMenu items={[
           { label: 'Enviar presupuesto', icon: <Receipt    size={11} />, onClick: () => onDateConfirm(lead, 'budget_sent') },
           { label: 'Agendar visita',     icon: <Calendar   size={11} />, onClick: () => onDateConfirm(lead, 'visit_scheduled') },
@@ -3507,7 +3698,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
         <MoreMenu items={[
           { label: 'Enviar presupuesto', icon: <Receipt    size={11} />, onClick: () => onDateConfirm(lead, 'budget_sent') },
           { label: 'PDF digital',        icon: <FileText   size={11} />, locked: !canProposal, lockedHint: 'Disponible en plan Premium', onClick: () => window.location.href = '/proposals' },
-          { label: 'Cambiar fechas',     icon: <Calendar   size={11} />, onClick: () => onDateConfirm(lead, 'contacted') },
+          { label: 'Cambiar fechas',     icon: <Calendar   size={11} />, onClick: () => onDateConfirm(lead, lead.status) },
           { label: 'Volver a nuevos',    icon: <RotateCcw  size={11} />, onClick: () => onMove(lead.id, 'new') },
           { label: 'Perdido',            icon: <XCircle    size={11} />, danger: true, onClick: () => onMove(lead.id, 'lost') },
         ]} />
@@ -4288,7 +4479,7 @@ function MiniCalendarPicker({
   const initD = new Date(initStr + 'T12:00:00')
   const [year,  setYear]  = useState(initD.getFullYear())
   const [month, setMonth] = useState(initD.getMonth())
-  const [entries, setEntries] = useState<Record<string, string>>({})
+  const [entries, setEntries] = useState<Record<string, { status: string; note?: string }>>({})
 
   const [leadCounts, setLeadCounts] = useState<Record<string, number>>({})
 
@@ -4297,18 +4488,29 @@ function MiniCalendarPicker({
     const from = `${year}-${String(month + 1).padStart(2, '0')}-01`
     const to   = new Date(year, month + 1, 0).toISOString().slice(0, 10)
     Promise.all([
-      supabase.from('calendar_entries').select('date,status')
+      supabase.from('calendar_entries').select('date,status,note,lead_id')
         .eq('user_id', userId).gte('date', from).lte('date', to),
-      supabase.from('leads').select('wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility')
+      supabase.from('leads').select('id,wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility')
         .eq('user_id', userId).neq('status', 'lost').neq('status', 'won'),
-    ]).then(([entriesRes, leadsRes]) => {
+      supabase.from('leads').select('id').eq('user_id', userId).eq('status', 'won'),
+    ]).then(([entriesRes, leadsRes, wonRes]) => {
       if (entriesRes.data) {
-        const m: Record<string, string> = {}
-        entriesRes.data.forEach((e: any) => { m[e.date] = e.status })
+        const wonIds    = new Set((wonRes.data   || []).map((l: any) => l.id))
+        const activeIds = new Set((leadsRes.data || []).map((l: any) => l.id))
+        const m: Record<string, { status: string; note?: string }> = {}
+        entriesRes.data.forEach((e: any) => {
+          // Ignorar entradas 'reservado' cuyo lead ya no está en 'won'
+          if (e.status === 'reservado'  && !wonIds.has(e.lead_id))    return
+          // Ignorar entradas 'negociacion' cuyo lead ya no está activo
+          if (e.status === 'negociacion' && e.lead_id && !activeIds.has(e.lead_id)) return
+          m[e.date] = { status: e.status, note: e.note }
+        })
         setEntries(m)
       }
       if (leadsRes.data) {
         const counts: Record<string, number> = {}
+        // Track lead_ids already counted via wedding_date to avoid double-counting
+        const countedViaDate = new Set<string>()
         const addCount = (d: string) => { if (d >= from && d <= to) counts[d] = (counts[d] || 0) + 1 }
         const expand = (f: string, t: string) => {
           const cur = new Date(f + 'T12:00:00'), end = new Date((t || f) + 'T12:00:00')
@@ -4316,16 +4518,27 @@ function MiniCalendarPicker({
         }
         leadsRes.data.forEach((l: any) => {
           const flex = l.date_flexibility || 'exact'
-          if (flex === 'exact' && l.wedding_date) expand(l.wedding_date, l.wedding_date_to || l.wedding_date)
-          else if (flex === 'range' && l.wedding_date) expand(l.wedding_date, l.wedding_date_to || l.wedding_date)
-          else if (flex === 'multi_range' && l.wedding_date_ranges?.length)
+          if (flex === 'exact' && l.wedding_date) { countedViaDate.add(l.id); expand(l.wedding_date, l.wedding_date_to || l.wedding_date) }
+          else if (flex === 'range' && l.wedding_date) { countedViaDate.add(l.id); expand(l.wedding_date, l.wedding_date_to || l.wedding_date) }
+          else if (flex === 'multi_range' && l.wedding_date_ranges?.length) {
+            countedViaDate.add(l.id)
             l.wedding_date_ranges.forEach((r: any) => { if (r.from) expand(r.from, r.to || r.from) })
-          else if (flex === 'month' && l.wedding_year && l.wedding_month) {
+          } else if (flex === 'month' && l.wedding_year && l.wedding_month) {
+            countedViaDate.add(l.id)
             const y = l.wedding_year, mo = l.wedding_month
             const days = new Date(y, mo, 0).getDate()
             for (let d = 1; d <= days; d++) addCount(`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`)
           }
         })
+        // Also count negociacion calendar_entries for active leads that have no wedding_date set
+        const activeIds = new Set((leadsRes.data || []).map((l: any) => l.id))
+        if (entriesRes.data) {
+          entriesRes.data.forEach((e: any) => {
+            if (e.status === 'negociacion' && e.lead_id && activeIds.has(e.lead_id) && !countedViaDate.has(e.lead_id)) {
+              addCount(e.date)
+            }
+          })
+        }
         setLeadCounts(counts)
       }
     })
@@ -4375,7 +4588,11 @@ function MiniCalendarPicker({
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day  = i + 1
           const d    = ds(day)
-          const eSt  = entries[d]
+          const entry = entries[d]
+          const eSt  = entry?.status
+          const eNote = entry?.note
+          const isHalf = !!(eNote?.startsWith('medio_dia'))
+          const isTarde = eNote?.startsWith('medio_dia_tarde')
           const sel  = isSelected(d)
           const inR  = isInRange(d)
           const past = d < todayStr
@@ -4384,7 +4601,7 @@ function MiniCalendarPicker({
           const isRes  = eSt === 'reservado'
           const isBlk  = eSt === 'bloqueado'
           const isNeg  = eSt === 'negociacion'
-          const blocked = isRes || isBlk
+          const blocked = !isHalf && (isRes || isBlk)
           const canClick = !readOnly && !past && !blocked
           const cellIdx = startDow + i
           const isLastCol = cellIdx % 7 === 6
@@ -4392,21 +4609,26 @@ function MiniCalendarPicker({
           const bg = sel ? 'var(--gold)'
                   : inR  ? '#fef3c7'
                   : past ? '#fafaf7'
+                  : isHalf && isTarde  ? `linear-gradient(135deg, #ffffff 50%, #e5e7eb 50%)`
+                  : isHalf             ? `linear-gradient(135deg, #e5e7eb 50%, #ffffff 50%)`
                   : isRes ? '#fef2f2'
                   : isBlk ? '#f5f5f4'
                   : isNeg ? '#fffbeb'
                   : '#fff'
           const color = sel ? '#fff'
                   : past ? '#cfcbc3'
+                  : isHalf ? '#9ca3af'
                   : isRes ? '#b91c1c'
                   : isBlk ? '#9ca3af'
                   : isNeg ? '#b45309'
                   : 'var(--charcoal)'
 
+          const halfTitle = isTarde ? '½ Tarde bloqueada — mañana libre' : '½ Mañana bloqueada — tarde libre'
+
           return (
             <button key={day} type="button" onClick={() => canClick && handleClick(d)}
               disabled={!canClick}
-              title={isRes ? 'Reservado' : isBlk ? 'Bloqueado' : isNeg ? 'En negociación' : past ? 'Fecha pasada' : ''}
+              title={isHalf ? halfTitle : isRes ? 'Reservado' : isBlk ? 'Bloqueado' : isNeg ? 'En negociación' : past ? 'Fecha pasada' : ''}
               style={{
                 minHeight: 40, border: 'none',
                 borderBottom: '1px solid var(--ivory)',
@@ -4424,7 +4646,12 @@ function MiniCalendarPicker({
                 transition: 'background 0.12s, color 0.12s',
               }}>
               {day}
-              {lCount > 0 && !blocked && (
+              {isHalf && !sel && (
+                <span style={{ position: 'absolute', bottom: 2, right: 3, fontSize: 8, fontWeight: 700, color: '#9ca3af', lineHeight: 1 }}>
+                  {isTarde ? '½T' : '½M'}
+                </span>
+              )}
+              {lCount > 0 && !blocked && !isHalf && (
                 <span style={{
                   position: 'absolute', bottom: 2, right: 3,
                   minWidth: 13, height: 13, borderRadius: 7, padding: '0 3px',
@@ -4447,6 +4674,9 @@ function MiniCalendarPicker({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ width: 10, height: 10, borderRadius: 3, background: '#f5f5f4', border: '1px solid #e7e5e4' }} /> Bloqueado
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: 'linear-gradient(135deg, #e5e7eb 50%, #ffffff 50%)', border: '1px solid #e7e5e4' }} /> ½ Bloqueado
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ minWidth: 14, height: 14, borderRadius: 7, padding: '0 3px', background: '#fde68a', color: '#92400e', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
@@ -4473,7 +4703,7 @@ function RangeCalendarPicker({
   const initD   = new Date(initStr + 'T12:00:00')
   const [year,       setYear]       = useState(initD.getFullYear())
   const [month,      setMonth]      = useState(initD.getMonth())
-  const [entries,    setEntries]    = useState<Record<string, string>>({})
+  const [entries,    setEntries]    = useState<Record<string, { status: string; note?: string }>>({})
   const [leadCounts, setLeadCounts] = useState<Record<string, number>>({})
   const [hoverDate,  setHoverDate]  = useState('')
   // 'from' = esperando 1er click, 'to' = esperando 2º click
@@ -4484,24 +4714,41 @@ function RangeCalendarPicker({
     const mFrom = `${year}-${String(month + 1).padStart(2, '0')}-01`
     const mTo   = new Date(year, month + 1, 0).toISOString().slice(0, 10)
     Promise.all([
-      supabase.from('calendar_entries').select('date,status').eq('user_id', userId).gte('date', mFrom).lte('date', mTo),
-      supabase.from('leads').select('wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility').eq('user_id', userId).neq('status', 'lost').neq('status', 'won'),
-    ]).then(([eRes, lRes]) => {
+      supabase.from('calendar_entries').select('date,status,note,lead_id').eq('user_id', userId).gte('date', mFrom).lte('date', mTo),
+      supabase.from('leads').select('id,wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility').eq('user_id', userId).neq('status', 'lost').neq('status', 'won'),
+      supabase.from('leads').select('id').eq('user_id', userId).eq('status', 'won'),
+    ]).then(([eRes, lRes, wonRes]) => {
       if (eRes.data) {
-        const m: Record<string, string> = {}
-        eRes.data.forEach((e: any) => { m[e.date] = e.status })
+        const wonIds    = new Set((wonRes.data || []).map((l: any) => l.id))
+        const activeIds = new Set((lRes.data   || []).map((l: any) => l.id))
+        const m: Record<string, { status: string; note?: string }> = {}
+        eRes.data.forEach((e: any) => {
+          if (e.status === 'reservado'   && !wonIds.has(e.lead_id))                   return
+          if (e.status === 'negociacion' && e.lead_id && !activeIds.has(e.lead_id))   return
+          m[e.date] = { status: e.status, note: e.note }
+        })
         setEntries(m)
       }
       if (lRes.data) {
         const counts: Record<string, number> = {}
+        const countedViaDate2 = new Set<string>()
         const addC = (d: string) => { if (d >= mFrom && d <= mTo) counts[d] = (counts[d] || 0) + 1 }
         const exp  = (f: string, t: string) => { const c = new Date(f + 'T12:00:00'), e = new Date((t || f) + 'T12:00:00'); while (c <= e) { addC(c.toISOString().slice(0, 10)); c.setDate(c.getDate() + 1) } }
         lRes.data.forEach((l: any) => {
           const fl = l.date_flexibility || 'exact'
-          if ((fl === 'exact' || fl === 'range') && l.wedding_date) exp(l.wedding_date, l.wedding_date_to || l.wedding_date)
-          else if (fl === 'multi_range' && l.wedding_date_ranges?.length) l.wedding_date_ranges.forEach((r: any) => { if (r.from) exp(r.from, r.to || r.from) })
-          else if (fl === 'month' && l.wedding_year && l.wedding_month) { const days = new Date(l.wedding_year, l.wedding_month, 0).getDate(); for (let d = 1; d <= days; d++) addC(`${l.wedding_year}-${String(l.wedding_month).padStart(2,'0')}-${String(d).padStart(2,'0')}`) }
+          if ((fl === 'exact' || fl === 'range') && l.wedding_date) { countedViaDate2.add(l.id); exp(l.wedding_date, l.wedding_date_to || l.wedding_date) }
+          else if (fl === 'multi_range' && l.wedding_date_ranges?.length) { countedViaDate2.add(l.id); l.wedding_date_ranges.forEach((r: any) => { if (r.from) exp(r.from, r.to || r.from) }) }
+          else if (fl === 'month' && l.wedding_year && l.wedding_month) { countedViaDate2.add(l.id); const days = new Date(l.wedding_year, l.wedding_month, 0).getDate(); for (let d = 1; d <= days; d++) addC(`${l.wedding_year}-${String(l.wedding_month).padStart(2,'0')}-${String(d).padStart(2,'0')}`) }
         })
+        // Also count negociacion calendar_entries for active leads that have no wedding_date set
+        const activeIds2 = new Set((lRes.data || []).map((l: any) => l.id))
+        if (eRes.data) {
+          eRes.data.forEach((e: any) => {
+            if (e.status === 'negociacion' && e.lead_id && activeIds2.has(e.lead_id) && !countedViaDate2.has(e.lead_id)) {
+              addC(e.date)
+            }
+          })
+        }
         setLeadCounts(counts)
       }
     })
@@ -4570,14 +4817,18 @@ function RangeCalendarPicker({
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day  = i + 1
           const d    = ds(day)
-          const eSt  = entries[d]
+          const entry = entries[d]
+          const eSt  = entry?.status
+          const eNote = entry?.note
+          const isHalf = !!(eNote?.startsWith('medio_dia'))
+          const isTarde = eNote?.startsWith('medio_dia_tarde')
           const lCnt = leadCounts[d] || 0
           const past = d < todayStr
           const isToday = d === todayStr
           const selF = isFrom(d); const selT = isTo(d); const inR = isInRange(d); const hov = isHover(d)
           const isEnd = selF || selT
           const isRes = eSt === 'reservado'; const isBlk = eSt === 'bloqueado'; const isNeg = eSt === 'negociacion'
-          const blocked = isRes || isBlk
+          const blocked = !isHalf && (isRes || isBlk)
           const canClick = !past && !blocked
           const cellIdx = startDow + i
           const isLastCol = cellIdx % 7 === 6
@@ -4586,6 +4837,8 @@ function RangeCalendarPicker({
                   : inR  ? '#fef3c7'
                   : hov  ? '#fefce8'
                   : past ? '#fafaf7'
+                  : isHalf && isTarde  ? 'linear-gradient(135deg, #ffffff 50%, #e5e7eb 50%)'
+                  : isHalf             ? 'linear-gradient(135deg, #e5e7eb 50%, #ffffff 50%)'
                   : isRes ? '#fef2f2'
                   : isBlk ? '#f5f5f4'
                   : isNeg ? '#fffbeb'
@@ -4593,17 +4846,20 @@ function RangeCalendarPicker({
           const color = isEnd ? '#fff'
                   : inR  ? '#92400e'
                   : past ? '#cfcbc3'
+                  : isHalf ? '#9ca3af'
                   : isRes ? '#b91c1c'
                   : isBlk ? '#9ca3af'
                   : isNeg ? '#b45309'
                   : 'var(--charcoal)'
+
+          const halfTitle = isTarde ? '½ Tarde bloqueada — mañana libre' : '½ Mañana bloqueada — tarde libre'
 
           return (
             <button key={day} type="button"
               onClick={() => canClick && handleClick(d)}
               onMouseEnter={() => canClick && setHoverDate(d)}
               disabled={!canClick}
-              title={isRes ? 'Reservado' : isBlk ? 'Bloqueado' : isNeg ? 'En negociación' : past ? 'Fecha pasada' : ''}
+              title={isHalf ? halfTitle : isRes ? 'Reservado' : isBlk ? 'Bloqueado' : isNeg ? 'En negociación' : past ? 'Fecha pasada' : ''}
               style={{
                 minHeight: 40, border: 'none',
                 borderBottom: '1px solid var(--ivory)',
@@ -4621,7 +4877,12 @@ function RangeCalendarPicker({
                 transition: 'background 0.12s, color 0.12s',
               }}>
               {day}
-              {lCnt > 0 && !blocked && (
+              {isHalf && !isEnd && (
+                <span style={{ position: 'absolute', bottom: 2, right: 3, fontSize: 8, fontWeight: 700, color: '#9ca3af', lineHeight: 1 }}>
+                  {isTarde ? '½T' : '½M'}
+                </span>
+              )}
+              {lCnt > 0 && !blocked && !isHalf && (
                 <span style={{
                   position: 'absolute', bottom: 2, right: 3,
                   minWidth: 13, height: 13, borderRadius: 7, padding: '0 3px',
@@ -4645,6 +4906,9 @@ function RangeCalendarPicker({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ width: 10, height: 10, borderRadius: 3, background: '#f5f5f4', border: '1px solid #e7e5e4' }} /> Bloqueado
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: 'linear-gradient(135deg, #e5e7eb 50%, #ffffff 50%)', border: '1px solid #e7e5e4' }} /> ½ Bloqueado
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ minWidth: 14, height: 14, borderRadius: 7, padding: '0 3px', background: '#fde68a', color: '#92400e', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
@@ -4670,7 +4934,7 @@ function MultiRangeCalendarPicker({
   const initD    = new Date(firstFrom + 'T12:00:00')
   const [year,        setYear]        = useState(initD.getFullYear())
   const [month,       setMonth]       = useState(initD.getMonth())
-  const [entries,     setEntries]     = useState<Record<string, string>>({})
+  const [entries,     setEntries]     = useState<Record<string, { status: string; note?: string }>>({})
   const [leadCounts,  setLeadCounts]  = useState<Record<string, number>>({})
   const [hoverDate,   setHoverDate]   = useState('')
   const [pendingFrom, setPendingFrom] = useState('')  // rango en curso: from ya elegido
@@ -4690,24 +4954,41 @@ function MultiRangeCalendarPicker({
     const mFrom = `${year}-${String(month + 1).padStart(2, '0')}-01`
     const mTo   = new Date(year, month + 1, 0).toISOString().slice(0, 10)
     Promise.all([
-      supabase.from('calendar_entries').select('date,status').eq('user_id', userId).gte('date', mFrom).lte('date', mTo),
-      supabase.from('leads').select('wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility').eq('user_id', userId).neq('status', 'lost').neq('status', 'won'),
-    ]).then(([eRes, lRes]) => {
+      supabase.from('calendar_entries').select('date,status,note,lead_id').eq('user_id', userId).gte('date', mFrom).lte('date', mTo),
+      supabase.from('leads').select('id,wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility').eq('user_id', userId).neq('status', 'lost').neq('status', 'won'),
+      supabase.from('leads').select('id').eq('user_id', userId).eq('status', 'won'),
+    ]).then(([eRes, lRes, wonRes]) => {
       if (eRes.data) {
-        const m: Record<string, string> = {}
-        eRes.data.forEach((e: any) => { m[e.date] = e.status })
+        const wonIds    = new Set((wonRes.data || []).map((l: any) => l.id))
+        const activeIds = new Set((lRes.data   || []).map((l: any) => l.id))
+        const m: Record<string, { status: string; note?: string }> = {}
+        eRes.data.forEach((e: any) => {
+          if (e.status === 'reservado'   && !wonIds.has(e.lead_id))                  return
+          if (e.status === 'negociacion' && e.lead_id && !activeIds.has(e.lead_id))  return
+          m[e.date] = { status: e.status, note: e.note }
+        })
         setEntries(m)
       }
       if (lRes.data) {
         const counts: Record<string, number> = {}
+        const countedViaDate3 = new Set<string>()
         const addC = (d: string) => { if (d >= mFrom && d <= mTo) counts[d] = (counts[d] || 0) + 1 }
         const exp  = (f: string, t: string) => { const c = new Date(f + 'T12:00:00'), e = new Date((t || f) + 'T12:00:00'); while (c <= e) { addC(c.toISOString().slice(0, 10)); c.setDate(c.getDate() + 1) } }
         lRes.data.forEach((l: any) => {
           const fl = l.date_flexibility || 'exact'
-          if ((fl === 'exact' || fl === 'range') && l.wedding_date) exp(l.wedding_date, l.wedding_date_to || l.wedding_date)
-          else if (fl === 'multi_range' && l.wedding_date_ranges?.length) l.wedding_date_ranges.forEach((r: any) => { if (r.from) exp(r.from, r.to || r.from) })
-          else if (fl === 'month' && l.wedding_year && l.wedding_month) { const days = new Date(l.wedding_year, l.wedding_month, 0).getDate(); for (let d = 1; d <= days; d++) addC(`${l.wedding_year}-${String(l.wedding_month).padStart(2,'0')}-${String(d).padStart(2,'0')}`) }
+          if ((fl === 'exact' || fl === 'range') && l.wedding_date) { countedViaDate3.add(l.id); exp(l.wedding_date, l.wedding_date_to || l.wedding_date) }
+          else if (fl === 'multi_range' && l.wedding_date_ranges?.length) { countedViaDate3.add(l.id); l.wedding_date_ranges.forEach((r: any) => { if (r.from) exp(r.from, r.to || r.from) }) }
+          else if (fl === 'month' && l.wedding_year && l.wedding_month) { countedViaDate3.add(l.id); const days = new Date(l.wedding_year, l.wedding_month, 0).getDate(); for (let d = 1; d <= days; d++) addC(`${l.wedding_year}-${String(l.wedding_month).padStart(2,'0')}-${String(d).padStart(2,'0')}`) }
         })
+        // Also count negociacion calendar_entries for active leads that have no wedding_date set
+        const activeIds3 = new Set((lRes.data || []).map((l: any) => l.id))
+        if (eRes.data) {
+          eRes.data.forEach((e: any) => {
+            if (e.status === 'negociacion' && e.lead_id && activeIds3.has(e.lead_id) && !countedViaDate3.has(e.lead_id)) {
+              addC(e.date)
+            }
+          })
+        }
         setLeadCounts(counts)
       }
     })
@@ -4820,7 +5101,11 @@ function MultiRangeCalendarPicker({
             const d    = ds(day)
             const past = d < todayStr
             const isToday = d === todayStr
-            const eSt  = entries[d]
+            const entry = entries[d]
+            const eSt  = entry?.status
+            const eNote = entry?.note
+            const isHalf = !!(eNote?.startsWith('medio_dia'))
+            const isTarde = eNote?.startsWith('medio_dia_tarde')
             const lCnt = leadCounts[d] || 0
             const rIdx = getRangeIdx(d)
             const col  = rIdx >= 0 ? RANGE_COLORS[rIdx % RANGE_COLORS.length] : null
@@ -4831,7 +5116,7 @@ function MultiRangeCalendarPicker({
             const isPreviewTo   = d === previewTo
             const isPreviewIn   = pendingFrom && previewTo && d > pendingFrom && d < previewTo
             const isRes = eSt === 'reservado'; const isBlk = eSt === 'bloqueado'; const isNeg = eSt === 'negociacion'
-            const blocked = isRes || isBlk
+            const blocked = !isHalf && (isRes || isBlk)
             const inExistingRange = rIdx !== -1
             const canClick = !past && !blocked && !inExistingRange
             const cellIdx = startDow + i
@@ -4861,18 +5146,23 @@ function MultiRangeCalendarPicker({
             } else if (isPreviewIn) {
               bg = previewWouldOverlap ? '#fee2e2' : nextColor.light
               color = previewWouldOverlap ? '#dc2626' : nextColor.sel
+            } else if (isHalf) {
+              bg = isTarde ? 'linear-gradient(135deg, #ffffff 50%, #e5e7eb 50%)' : 'linear-gradient(135deg, #e5e7eb 50%, #ffffff 50%)'
+              color = '#9ca3af'
             } else if (isRes) { bg = '#fef2f2'; color = '#b91c1c' }
             else if (isBlk)   { bg = '#f5f5f4'; color = '#9ca3af' }
             else if (isNeg)   { bg = '#fffbeb'; color = '#b45309' }
             else if (past)    { bg = '#fafaf7' }
             if (isToday && inset === 'none') inset = 'inset 0 0 0 1.5px var(--gold)'
 
+            const halfTitle = isTarde ? '½ Tarde bloqueada — mañana libre' : '½ Mañana bloqueada — tarde libre'
+
             return (
               <button key={day} type="button"
                 onClick={() => canClick && handleClick(d)}
                 onMouseEnter={() => canClick && setHoverDate(d)}
                 disabled={!canClick}
-                title={isRes ? 'Reservado' : isBlk ? 'Bloqueado' : isNeg ? 'En negociación' : past ? 'Fecha pasada' : ''}
+                title={isHalf ? halfTitle : isRes ? 'Reservado' : isBlk ? 'Bloqueado' : isNeg ? 'En negociación' : past ? 'Fecha pasada' : ''}
                 style={{
                   minHeight: 40, border: 'none',
                   borderBottom: '1px solid var(--ivory)',
@@ -4888,7 +5178,12 @@ function MultiRangeCalendarPicker({
                   transition: 'background 0.12s, color 0.12s',
                 }}>
                 {day}
-                {lCnt > 0 && !col && !isPendingFrom && !blocked && (
+                {isHalf && !col && !isPendingFrom && (
+                  <span style={{ position: 'absolute', bottom: 2, right: 3, fontSize: 8, fontWeight: 700, color: '#9ca3af', lineHeight: 1 }}>
+                    {isTarde ? '½T' : '½M'}
+                  </span>
+                )}
+                {lCnt > 0 && !col && !isPendingFrom && !blocked && !isHalf && (
                   <span style={{
                     position: 'absolute', bottom: 2, right: 3,
                     minWidth: 13, height: 13, borderRadius: 7, padding: '0 3px',
@@ -5027,7 +5322,7 @@ function DateSummaryCard({
         <div style={{ fontSize: 10, fontWeight: 700, color: accent === 'gold' ? 'var(--gold)' : 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 }}>
           {miniLabel}
         </div>
-        <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 17, color: 'var(--espresso)', fontWeight: 500, lineHeight: 1.15, textTransform: 'capitalize' }}>
+        <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 17, color: 'var(--espresso)', fontWeight: 500, lineHeight: 1.15 }}>
           {title}
         </div>
         {subtitle && (
@@ -5035,6 +5330,44 @@ function DateSummaryCard({
         )}
       </div>
       {right}
+    </div>
+  )
+}
+
+// ── Tag input — free-text labels stored as string[] ──────────────────────────
+function TagInput({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [draft, setDraft] = useState('')
+  const tags = value || []
+  const add = (raw: string) => {
+    const t = raw.trim().replace(/,/g, '')
+    if (t && !tags.includes(t)) onChange([...tags, t])
+    setDraft('')
+  }
+  const remove = (t: string) => onChange(tags.filter(x => x !== t))
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--ivory)', background: '#fff', minHeight: 38, alignItems: 'center', cursor: 'text' }}
+      onClick={() => (document.getElementById('tag-input-field') as HTMLInputElement)?.focus()}>
+      {tags.map(t => (
+        <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', fontSize: 11, fontWeight: 600, color: 'var(--espresso)', whiteSpace: 'nowrap' }}>
+          {t}
+          <button type="button" onClick={e => { e.stopPropagation(); remove(t) }}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', lineHeight: 1 }}>
+            <X size={10} />
+          </button>
+        </span>
+      ))}
+      <input
+        id="tag-input-field"
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(draft) }
+          if (e.key === 'Backspace' && !draft && tags.length) remove(tags[tags.length - 1])
+        }}
+        onBlur={() => { if (draft.trim()) add(draft) }}
+        placeholder={tags.length === 0 ? 'VIP, urgente, flexible… (Enter para añadir)' : ''}
+        style={{ border: 'none', outline: 'none', fontSize: 12, color: 'var(--charcoal)', background: 'transparent', minWidth: 120, flex: 1 }}
+      />
     </div>
   )
 }
@@ -5144,10 +5477,12 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
   const [showMoreDetails,  setShowMoreDetails]  = useState(true)    // Ceremony/lang/style collapsible
   const [activeModalTab,   setActiveModalTab]   = useState<'boda' | 'oferta' | 'pareja'>(isEdit ? 'boda' : 'pareja')
   const { propuestas: canPropuesta } = usePlanFeatures()
-  // Budget file upload (only for budget_sent leads)
-  const [budgetUploading, setBudgetUploading] = useState(false)
-  const [budgetError,     setBudgetError]     = useState<string | null>(null)
-  const [budgetDragOver,  setBudgetDragOver]  = useState(false)
+  // Budget file upload (budget_sent and visit leads)
+  const [budgetUploading,   setBudgetUploading]   = useState(false)
+  const [budgetError,       setBudgetError]       = useState<string | null>(null)
+  const [budgetDragOver,    setBudgetDragOver]    = useState(false)
+  const [budgetFileSaving,  setBudgetFileSaving]  = useState(false)
+  const [budgetFileSaved,   setBudgetFileSaved]   = useState(false)
   const budgetInputRef = useRef<HTMLInputElement>(null)
   const initials = getInitials(form.name || '')
   // Lead phase — drives copy + ordering of date sections
@@ -5168,14 +5503,14 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
     </div>
   )
 
-  // Budget file upload helpers (only used in budget_sent leads)
+  // Budget file upload helpers
   const handleBudgetFileSelect = async (file: File) => {
     const allowed = ['application/pdf','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','image/jpeg','image/png','image/webp']
     if (!allowed.includes(file.type) && !file.name.match(/\.(pdf|xlsx?|docx?|png|jpe?g|webp)$/i)) {
       setBudgetError('Formato no permitido. Usa PDF, Excel, Word o imagen.'); return
     }
     if (file.size > 20 * 1024 * 1024) { setBudgetError('El archivo no puede superar 20 MB'); return }
-    setBudgetUploading(true); setBudgetError(null)
+    setBudgetUploading(true); setBudgetError(null); setBudgetFileSaved(false)
     try {
       const supabase = createClient()
       const ext = file.name.split('.').pop() || 'pdf'
@@ -5183,9 +5518,43 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
       const { error } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
       if (error) { setBudgetError('Error al subir el archivo'); return }
       const { data: pub } = supabase.storage.from('documents').getPublicUrl(path)
-      setForm((f: any) => ({ ...f, budget_file_url: pub.publicUrl, budget_file_name: file.name }))
+      const newFile = { url: pub.publicUrl, name: file.name }
+      setForm((f: any) => {
+        const existing = f.budget_files || []
+        const updated  = [...existing, newFile]
+        return {
+          ...f,
+          budget_files:     updated,
+          budget_file_url:  updated[0].url,
+          budget_file_name: updated[0].name,
+        }
+      })
     } catch { setBudgetError('Error al subir el archivo') }
     finally { setBudgetUploading(false) }
+  }
+
+  // Save only budget files (for visit status — does not change lead status)
+  const handleSaveFileOnly = async () => {
+    if (!editLead?.id) return
+    setBudgetFileSaving(true); setBudgetError(null); setBudgetFileSaved(false)
+    try {
+      const supabase = createClient()
+      const files = form.budget_files || []
+      const updates: any = {
+        budget_file_url:  files[0]?.url  || form.budget_file_url  || null,
+        budget_file_name: files[0]?.name || form.budget_file_name || null,
+        budget_files:     files.length ? files : null,
+      }
+      let { error } = await supabase.from('leads').update(updates).eq('id', editLead.id)
+      if (error?.message?.includes('budget_files')) {
+        const { budget_files: _bf, ...noFiles } = updates
+        ;({ error } = await supabase.from('leads').update(noFiles).eq('id', editLead.id))
+      }
+      if (error) { setBudgetError('Error al guardar el documento'); return }
+      setBudgetFileSaved(true)
+      setTimeout(() => setBudgetFileSaved(false), 3000)
+    } catch { setBudgetError('Error al guardar el documento') }
+    finally { setBudgetFileSaving(false) }
   }
 
   return (
@@ -5224,7 +5593,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   lost:            { label: 'Perdido',             bg: 'rgba(254,226,226,0.7)', border: '#fecaca', color: '#b91c1c', icon: <XCircle size={11} /> },
                 }
                 const info = STATUS_INFO[leadStatus] || STATUS_INFO.new
-                const isVisit = leadStatus === 'visit_scheduled' && form.visit_date
+                const hasVisit = form.visit_date
                 return (
                   <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{
@@ -5236,22 +5605,12 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     }}>
                       {info.icon} {info.label}
                     </span>
-                    {isVisit && (
-                      <span style={{ fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Calendar size={10} />
-                        {new Date(form.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    {hasVisit && (
+                      <span style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, background: '#ecfdf5', border: '1px solid #6ee7b7', color: '#047857', fontWeight: 600 }}>
+                        <Landmark size={10} />
+                        Visita: {new Date(form.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
                         {form.visit_time ? ` · ${form.visit_time}` : ''}
                       </span>
-                    )}
-                    {isVisit && onEditVisit && (
-                      <button type="button" onClick={onEditVisit} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                        padding: '3px 10px', borderRadius: 20,
-                        background: 'rgba(16,185,129,0.12)', border: '1px solid #a7f3d0',
-                        color: '#047857', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                      }}>
-                        <Edit2 size={10} /> Editar visita
-                      </button>
                     )}
                   </div>
                 )
@@ -5296,59 +5655,53 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
           {/* ── TAB: BODA ──────────────────────────────────────────────────────── */}
           {activeModalTab === 'boda' && (<>
 
-          {/* ── Fechas acordadas: summary strip (only when dates are confirmed) ── */}
-          {!isNewPhase && editLead && leadStatus !== 'contacted' && leadStatus !== 'proposal_sent' && (() => {
-            const dates = expandLeadDates(editLead)
-            if (!dates.length) return null
-            return (
-              <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 12, background: '#f0fdf4', border: '1.5px solid #86efac' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                  <CheckCircle2 size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#15803d' }}>Fechas acordadas con la pareja</span>
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {dates.map((d: string) => (
-                    <span key={d} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 4,
-                      padding: '4px 10px', borderRadius: 12,
-                      background: '#fff', border: '1.5px solid #86efac',
-                      fontSize: 12, fontWeight: 600, color: '#15803d',
-                    }}>
-                      <CalendarDays size={10} />
-                      {formatDateLabel(d)}
-                    </span>
-                  ))}
-                </div>
-                {editLead.wedding_duration_days && editLead.wedding_duration_days > 1 && (
-                  <div style={{ marginTop: 6, fontSize: 11, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Calendar size={10} /> {editLead.wedding_duration_days} días
-                  </div>
-                )}
+          {/* ── Visita agendada: banner destacado cuando hay visita programada ── */}
+          {!isNewPhase && editLead && editLead.visit_date && (
+            <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 12, background: 'linear-gradient(135deg,#ecfdf5,#f0fdf4)', border: '1.5px solid #6ee7b7', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Landmark size={16} style={{ color: '#fff' }} />
               </div>
-            )
-          })()}
-
-          {/* ── Documento enviado: acceso rápido desde Boda ───────────────────── */}
-          {!isNewPhase && editLead && form.budget_file_url && (
-            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 10, background: '#f9fafb', border: '1.5px solid var(--ivory)' }}>
-              <Paperclip size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {form.budget_file_name || 'Documento adjunto'}
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#065f46', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Visita agendada</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#047857' }}>
+                  {new Date(editLead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  {editLead.visit_time ? <span style={{ fontWeight: 400, color: '#059669' }}> · {editLead.visit_time}{(() => { if (!editLead.visit_duration || !editLead.visit_time) return ''; const [h, m] = editLead.visit_time.split(':').map(Number); const tot = h*60+m+editLead.visit_duration; return ` – ${pad(Math.floor(tot/60)%24)}:${pad(tot%60)}` })()} </span> : null}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
-                  Presupuesto enviado ·{' '}
-                  <button type="button"
-                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--gold)', fontWeight: 600, fontSize: 11 }}
-                    onClick={() => setActiveModalTab('oferta')}>
-                    Ver en Oferta →
-                  </button>
-                </div>
+                {editLead.visit_duration && <div style={{ fontSize: 11, color: '#6ee7b7', marginTop: 1 }}>{editLead.visit_duration} min</div>}
               </div>
-              <a href={form.budget_file_url} target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11, color: 'var(--warm-gray)', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '5px 9px', background: 'var(--cream)', borderRadius: 7, border: '1px solid var(--ivory)' }}>
-                <ExternalLink size={11} /> Ver
-              </a>
+              {onEditVisit && (
+                <button type="button" onClick={onEditVisit} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.7)', border: '1px solid #a7f3d0', color: '#047857', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                  <Edit2 size={10} /> Editar
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ── Documentos adjuntos: acceso rápido desde Boda ───────────────────── */}
+          {!isNewPhase && editLead && ((form.budget_files || []).length > 0 || form.budget_file_url) && (
+            <div style={{ marginBottom: 16 }}>
+              {((form.budget_files || []).length > 0 ? form.budget_files : [{ url: form.budget_file_url, name: form.budget_file_name }]).map((bf: { url: string; name: string }, idx: number) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 10, background: '#f9fafb', border: '1.5px solid var(--ivory)', marginBottom: idx < ((form.budget_files || []).length || 1) - 1 ? 6 : 0 }}>
+                  <Paperclip size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {bf.name || 'Documento adjunto'}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                      Presupuesto ·{' '}
+                      <button type="button"
+                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--gold)', fontWeight: 600, fontSize: 11 }}
+                        onClick={() => setActiveModalTab('oferta')}>
+                        Ver en Oferta →
+                      </button>
+                    </div>
+                  </div>
+                  <a href={bf.url} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 11, color: 'var(--warm-gray)', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '5px 9px', background: 'var(--cream)', borderRadius: 7, border: '1px solid var(--ivory)' }}>
+                    <ExternalLink size={11} /> Ver
+                  </a>
+                </div>
+              ))}
             </div>
           )}
 
@@ -5659,6 +6012,110 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     </div>
                   )
                 })()}
+
+                {/* Lo que pidió originalmente — also shown when editing a 'new' lead */}
+                {isEdit && editLead && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ borderTop: '1px dashed var(--ivory)', marginBottom: 14 }} />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: (showOriginal || editingOriginal) ? 12 : 0 }}>
+                      <button type="button" onClick={() => setShowOriginal((v: boolean) => !v)} style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        background: 'none', border: 'none', padding: 0, cursor: 'pointer', outline: 'none', flex: 1, textAlign: 'left',
+                      }}>
+                        <div style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>
+                          <CalendarDays size={14} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--espresso)' }}>Lo que pidió originalmente la pareja</div>
+                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.3 }}>Solicitud inicial — se guarda automáticamente</div>
+                        </div>
+                        {(showOriginal || editingOriginal)
+                          ? <ChevronUp size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                          : <ChevronDown size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
+                      </button>
+                      {(showOriginal || editingOriginal) && (
+                        <button type="button" onClick={() => setEditingOriginal((v: boolean) => !v)} style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
+                          padding: '5px 10px', borderRadius: 8,
+                          background: editingOriginal ? '#ecfdf5' : '#f9fafb',
+                          border: `1.5px solid ${editingOriginal ? '#86efac' : '#e5e7eb'}`,
+                          color: editingOriginal ? '#15803d' : 'var(--warm-gray)',
+                          fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none',
+                        }}>
+                          {editingOriginal ? <><CheckCircle2 size={10} /> Listo</> : <><Edit2 size={10} /> Editar</>}
+                        </button>
+                      )}
+                    </div>
+
+                    {(showOriginal || editingOriginal) && (editingOriginal ? (
+                      <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Tipo de solicitud</div>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>
+                          {DATE_FLEX_OPTS.map(opt => (
+                            <button key={opt.value} type="button" onClick={() => setOrig('date_flexibility', opt.value)} style={{
+                              padding: '4px 11px', borderRadius: 20, fontSize: 12, cursor: 'pointer', border: '1px solid', fontWeight: 500,
+                              borderColor: form.original_date_flexibility === opt.value ? 'var(--gold)' : 'var(--ivory)',
+                              background:  form.original_date_flexibility === opt.value ? 'var(--gold)' : 'transparent',
+                              color:       form.original_date_flexibility === opt.value ? '#fff' : 'var(--warm-gray)',
+                            }}>{opt.label}</button>
+                          ))}
+                        </div>
+                        {form.original_date_flexibility === 'exact' && <MiniCalendarPicker userId={userId} value={form.original_wedding_date} onChange={d => setOrig('wedding_date', d)} />}
+                        {form.original_date_flexibility === 'range' && <RangeCalendarPicker userId={userId} from={form.original_wedding_date} to={form.original_wedding_date_to} onChange={(f, t) => { setOrig('wedding_date', f); setOrig('wedding_date_to', t) }} />}
+                        {form.original_date_flexibility === 'multi_range' && <MultiRangeCalendarPicker userId={userId} ranges={form.original_wedding_date_ranges || []} onChange={r => setOrig('wedding_date_ranges', r)} />}
+                        {form.original_date_flexibility === 'month' && (
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <select className="form-input" value={form.original_wedding_month} onChange={e => setOrig('wedding_month', e.target.value)}>{MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}</select>
+                            <select className="form-input" style={{ width: 110 }} value={form.original_wedding_year} onChange={e => setOrig('wedding_year', e.target.value)}>{YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}</select>
+                          </div>
+                        )}
+                        {form.original_date_flexibility === 'season' && (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                            {SEASONS.map(s => { const active = form.original_wedding_season === s.value; return <button key={s.value} type="button" onClick={() => setOrig('wedding_season', s.value)} style={{ padding: '6px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer', outline: 'none', border: `1.5px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`, background: active ? 'var(--gold)' : '#fff', color: active ? '#fff' : 'var(--charcoal)', fontWeight: active ? 700 : 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}>{s.emoji} {s.label}</button> })}
+                            <select className="form-input" style={{ width: 110 }} value={form.original_wedding_year} onChange={e => setOrig('wedding_year', e.target.value)}>{YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}</select>
+                          </div>
+                        )}
+                        {(form.original_date_flexibility === 'flexible' || !form.original_date_flexibility) && (
+                          <div style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>
+                            {form.original_date_flexibility === 'flexible' ? 'La pareja era flexible — sin fecha concreta' : 'Selecciona el tipo de solicitud arriba'}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      (() => {
+                        // For new leads, fall back to current dates if no original set yet
+                        const origFlex   = (form.original_date_flexibility || form.date_flexibility) as string
+                        const origDate1  = (form.original_wedding_date || form.wedding_date) as string
+                        const origDate2  = (form.original_wedding_date_to || form.wedding_date_to) as string
+                        const origRanges = (form.original_wedding_date_ranges?.length ? form.original_wedding_date_ranges : form.wedding_date_ranges) as { from: string; to?: string }[]
+                        const origYear   = parseInt(form.original_wedding_year || form.wedding_year)
+                        const origMonth  = parseInt(form.original_wedding_month || form.wedding_month)
+                        const origSeason = (form.original_wedding_season || form.wedding_season) as string
+                        const fmtShort = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+                        const fmtFull  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+                        const fmtLong  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                        let typeLabel = ''; let lines: string[] = []
+                        if (origFlex === 'exact' && origDate1)                    { typeLabel = 'Fecha exacta';       lines = [fmtLong(origDate1)] }
+                        else if (origFlex === 'range' && origDate1)               { typeLabel = 'Rango de fechas';    lines = [`${fmtShort(origDate1)}${origDate2 ? ` – ${fmtFull(origDate2)}` : ''}`] }
+                        else if (origFlex === 'multi_range' && origRanges?.length){ typeLabel = 'Varias opciones';    lines = origRanges.map((r, i) => `Opción ${i + 1}: ${fmtShort(r.from)}${r.to ? ` – ${fmtFull(r.to)}` : ''}`) }
+                        else if (origFlex === 'month' && origYear && origMonth)   { typeLabel = 'Mes concreto';       lines = [`${MONTHS[origMonth - 1]} de ${origYear}`] }
+                        else if (origFlex === 'season')                           { typeLabel = 'Temporada';          lines = [`${SEASONS.find(s => s.value === origSeason)?.label ?? origSeason ?? '—'} ${origYear || ''}`] }
+                        else if (origFlex === 'flexible')                         { typeLabel = 'Sin fecha definida'; lines = ['La pareja era flexible en fechas'] }
+                        if (!typeLabel) return (
+                          <div style={{ marginBottom: 8, padding: '10px 14px', borderRadius: 10, background: '#f9fafb', border: '1px dashed #d1d5db', fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>
+                            Sin datos — guarda el lead para registrar la solicitud original
+                          </div>
+                        )
+                        return (
+                          <div style={{ marginBottom: 8, padding: '12px 14px', borderRadius: 10, background: '#faf8f5', border: '1px solid var(--ivory)' }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{typeLabel}</div>
+                            {lines.map((line, i) => <div key={i} style={{ fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.6 }}>{line}</div>)}
+                          </div>
+                        )
+                      })()
+                    ))}
+                  </div>
+                )}
               </>
             )}
 
@@ -5679,14 +6136,15 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
           {/* Más detalles — collapsible */}
           <div style={{ marginBottom: 4 }}>
             <button type="button" onClick={() => setShowMoreDetails((v: boolean) => !v)} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              padding: '6px 12px', borderRadius: 8,
-              background: 'transparent', border: '1px solid var(--ivory)',
-              color: 'var(--warm-gray)', fontSize: 12, fontWeight: 600,
-              cursor: 'pointer', outline: 'none', marginBottom: showMoreDetails ? 14 : 0,
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: 0, background: 'none', border: 'none',
+              color: 'var(--warm-gray)', fontSize: 12, fontWeight: 500,
+              cursor: 'pointer', outline: 'none', marginBottom: showMoreDetails ? 10 : 0,
+              textDecoration: 'underline', textDecorationColor: 'var(--ivory)',
+              textUnderlineOffset: 3,
             }}>
-              {showMoreDetails ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-              Más detalles
+              {showMoreDetails ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+              {showMoreDetails ? 'Ocultar detalles' : 'Más detalles'}
             </button>
             {showMoreDetails && (
               <>
@@ -5704,39 +6162,67 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     <LanguagePicker value={form.language} onChange={v => set('language', v)} />
                   </div>
                 </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
+                <div className="two-col">
+                  <div className="form-group">
+                    <label className="form-label">País de la pareja</label>
+                    <input className="form-input" value={form.country} onChange={e => set('country', e.target.value)} placeholder="España, Francia…" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Catering</label>
+                    <select className="form-input" value={form.catering_needed} onChange={e => set('catering_needed', e.target.value)}>
+                      <option value="sin_definir">Sin definir</option>
+                      <option value="incluido">Incluido en el venue</option>
+                      <option value="externo">Traen catering externo</option>
+                      <option value="por_definir">Por definir</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="two-col">
+                  <div className="form-group">
+                    <label className="form-label">Adultos</label>
+                    <input className="form-input" type="number" min={0} value={form.guests_adults} onChange={e => set('guests_adults', e.target.value)} placeholder="120" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Niños</label>
+                    <input className="form-input" type="number" min={0} value={form.guests_children} onChange={e => set('guests_children', e.target.value)} placeholder="20" />
+                  </div>
+                </div>
+                <div className="form-group">
                   <label className="form-label">Estilo buscado</label>
                   <input className="form-input" value={form.style} onChange={e => set('style', e.target.value)} placeholder="Rústico, moderno, clásico…" />
                 </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Etiquetas</label>
+                  <TagInput value={form.tags} onChange={v => set('tags', v)} />
+                </div>
+                {/* Presupuesto orientativo — inside Más detalles for new leads */}
+                {isNewPhase && (
+                  <div className="form-group" style={{ marginTop: 12, marginBottom: 0 }}>
+                    <label className="form-label">Presupuesto orientativo</label>
+                    <select className="form-input" value={form.budget} onChange={e => set('budget', e.target.value)}>
+                      {BUDGET_OPTS.map(v => (
+                        <option key={v} value={v}>{v === 'sin_definir' ? 'Sin definir' : BUDGET_LABEL[v].replace('k€', '.000 €')}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </>
             )}
           </div>
-
-          {/* Presupuesto orientativo — only for new leads, shown at the bottom of Boda tab */}
-          {isNewPhase && (
-            <div className="form-group" style={{ marginTop: 12, marginBottom: 4 }}>
-              <label className="form-label">Presupuesto orientativo</label>
-              <select className="form-input" value={form.budget} onChange={e => set('budget', e.target.value)}>
-                {BUDGET_OPTS.map(v => (
-                  <option key={v} value={v}>{v === 'sin_definir' ? 'Sin definir' : BUDGET_LABEL[v].replace('k€', '.000 €')}</option>
-                ))}
-              </select>
-            </div>
-          )}
 
           </>)}
 
           {/* ── TAB: OFERTA ───────────────────────────────────────────────────────── */}
           {activeModalTab === 'oferta' && editLead && (<>
 
-          {/* ════ EN SEGUIMIENTO + VISITA: Fechas propuestas → Propuesta digital ════ */}
-          {(leadStatus === 'contacted' || leadStatus === 'proposal_sent' || leadStatus === 'visit_scheduled' || leadStatus === 'post_visit') && (<>
+          {/* ════ EN SEGUIMIENTO + VISITA + PERDIDOS: Fechas ofertadas → Presupuesto → Pres.digital → Prop.digital ════ */}
+          {(leadStatus === 'contacted' || leadStatus === 'proposal_sent' || leadStatus === 'visit_scheduled' || leadStatus === 'post_visit' || leadStatus === 'lost') && (<>
 
-            {/* Fechas propuestas a la pareja */}
+            {/* Fechas ofertadas */}
             <div style={{ marginBottom: 22 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <SectionTitle icon={<Flower2 size={14} />} title="Fechas propuestas a la pareja" hint="Fechas que estás negociando con la pareja" />
-                {onChangeDates && (
+                <SectionTitle icon={<Flower2 size={14} />} title="Fechas ofertadas" hint="Fechas que estás negociando con la pareja" />
+                {onChangeDates && leadStatus !== 'lost' && (
                   <button type="button" onClick={onChangeDates} style={{
                     display: 'inline-flex', alignItems: 'center', gap: 5,
                     padding: '6px 12px', borderRadius: 8, flexShrink: 0, marginBottom: 12,
@@ -5783,6 +6269,101 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
             {/* Divider */}
             <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
 
+            {/* Presupuesto */}
+            <div style={{ marginBottom: 22 }}>
+              {(leadStatus === 'visit_scheduled' || leadStatus === 'post_visit') ? (<>
+                <SectionTitle icon={<Receipt size={14} />} title="Presupuesto" hint="Adjunta el presupuesto para enviárselo a la pareja" />
+                {/* Multi-file list */}
+                {(form.budget_files || []).map((bf: { url: string; name: string }, idx: number) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#f0fdf4', border: '1.5px solid #86efac', marginBottom: 8 }}>
+                    <CheckCircle2 size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#15803d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bf.name || 'Documento'}</div>
+                      <div style={{ fontSize: 11, color: '#16a34a' }}>Archivo adjunto</div>
+                    </div>
+                    <a href={bf.url} target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 11, color: '#16a34a', textDecoration: 'underline', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <ExternalLink size={11} /> Ver
+                    </a>
+                    <button type="button" onClick={() => {
+                      const newFiles = (form.budget_files || []).filter((_: any, i: number) => i !== idx)
+                      setForm((f: any) => ({ ...f, budget_files: newFiles, budget_file_url: newFiles[0]?.url || '', budget_file_name: newFiles[0]?.name || '' }))
+                      setBudgetFileSaved(false)
+                    }} style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(22,163,74,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#16a34a' }}>
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+                {/* Upload area */}
+                <div
+                  onDragOver={e => { e.preventDefault(); setBudgetDragOver(true) }}
+                  onDragLeave={() => setBudgetDragOver(false)}
+                  onDrop={e => { e.preventDefault(); setBudgetDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleBudgetFileSelect(f) }}
+                  onClick={() => budgetInputRef.current?.click()}
+                  style={{ border: `2px dashed ${budgetDragOver ? 'var(--gold)' : 'var(--ivory)'}`, borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer', background: budgetDragOver ? '#fffbeb' : '#fafaf8', transition: 'all 0.15s', marginBottom: 10 }}>
+                  <input ref={budgetInputRef} type="file" style={{ display: 'none' }}
+                    accept=".pdf,.xlsx,.xls,.docx,.doc,.png,.jpg,.jpeg,.webp"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleBudgetFileSelect(f); e.target.value = '' }} />
+                  {budgetUploading ? (
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid var(--gold)', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} /> Subiendo…
+                    </div>
+                  ) : <>
+                    <Upload size={16} style={{ color: 'var(--gold)', opacity: 0.7 }} />
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{(form.budget_files || []).length > 0 ? 'Añadir otro documento' : 'Arrastra el archivo o haz clic'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>PDF, Excel, Word o imagen · máx. 20 MB</div>
+                    </div>
+                  </>}
+                </div>
+                {budgetError && <div style={{ marginBottom: 8, fontSize: 11, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}><AlertTriangle size={11} /> {budgetError}</div>}
+                {/* Save button */}
+                <button type="button" onClick={handleSaveFileOnly} disabled={budgetFileSaving || !(form.budget_files || []).length}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: 'none', cursor: (budgetFileSaving || !(form.budget_files || []).length) ? 'not-allowed' : 'pointer', background: budgetFileSaved ? '#16a34a' : 'var(--espresso)', color: '#fff', fontSize: 12, fontWeight: 700, opacity: (budgetFileSaving || !(form.budget_files || []).length) ? 0.6 : 1, transition: 'all 0.2s' }}>
+                  {budgetFileSaved ? <><CheckCircle2 size={13} /> Guardado</> : budgetFileSaving ? 'Guardando…' : <><Upload size={13} /> Guardar documento</>}
+                </button>
+              </>) : (<>
+                <SectionTitle icon={<Receipt size={14} />} title="Presupuesto" hint="Importe orientativo del presupuesto" />
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Importe orientativo</label>
+                  <select className="form-input" value={form.budget} onChange={e => set('budget', e.target.value)}>
+                    {BUDGET_OPTS.map(v => (
+                      <option key={v} value={v}>{v === 'sin_definir' ? 'Sin definir' : BUDGET_LABEL[v].replace('k€', '.000 €')}</option>
+                    ))}
+                  </select>
+                </div>
+              </>)}
+            </div>
+
+            {/* Divider */}
+            <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
+
+            {/* Presupuesto digital (bloqueado para básico) */}
+            <div style={{ marginBottom: 22 }}>
+              <SectionTitle icon={<FileText size={14} />} title="Presupuesto digital" hint="Versión interactiva del presupuesto generada automáticamente" />
+              {canPropuesta ? (
+                <a href="/budgets" style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '8px 16px', borderRadius: 10,
+                  background: 'var(--espresso)', color: '#fff',
+                  fontSize: 12, fontWeight: 700, textDecoration: 'none',
+                }}>
+                  <ExternalLink size={12} /> Crear presupuesto digital
+                </a>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px solid var(--ivory)' }}>
+                  <LockKeyhole size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Presupuesto digital</div>
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Disponible en plan Premium</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
+
             {/* Propuesta digital */}
             <div style={{ marginBottom: 4 }}>
               <SectionTitle icon={<Sparkles size={14} />} title="Propuesta digital" hint="Propuesta visual e interactiva para la pareja" />
@@ -5810,6 +6391,36 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
 
           {/* ════ PRESUPUESTO + GANADA: Fechas presup → Presupuesto → Pres.digital → Fechas ofertadas → Prop.digital ════ */}
           {(leadStatus === 'budget_sent' || leadStatus === 'won') && (<>
+
+            {/* Visita previa — si hubo visita antes de mandar el presupuesto */}
+            {editLead?.visit_date && (
+              <>
+                <div style={{ marginBottom: 22 }}>
+                  <SectionTitle icon={<Landmark size={14} />} title="Visita realizada" hint="Visita previa a la elaboración del presupuesto" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: '#ecfdf5', border: '1.5px solid #6ee7b7' }}>
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Landmark size={14} style={{ color: '#fff' }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#047857' }}>
+                        {new Date(editLead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                      </div>
+                      {editLead.visit_time && (
+                        <div style={{ fontSize: 11, color: '#059669', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Clock size={10} /> {editLead.visit_time}{editLead.visit_duration ? ` · ${editLead.visit_duration} min` : ''}
+                        </div>
+                      )}
+                    </div>
+                    {onEditVisit && (
+                      <button type="button" onClick={onEditVisit} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.7)', border: '1px solid #a7f3d0', color: '#047857', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                        <Edit2 size={10} /> Editar
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
+              </>
+            )}
 
             {/* Fechas presupuestadas */}
             <div style={{ marginBottom: 22 }}>
@@ -5874,57 +6485,52 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 </div>
               )}
 
-              {/* Documento adjunto */}
+              {/* Documentos adjuntos — lista múltiple */}
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Documento adjunto</label>
-                {form.budget_file_url ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#f0fdf4', border: '1.5px solid #86efac' }}>
+                <label className="form-label">Documentos adjuntos</label>
+                {(form.budget_files || []).map((bf: { url: string; name: string }, idx: number) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#f0fdf4', border: '1.5px solid #86efac', marginBottom: 8 }}>
                     <CheckCircle2 size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#15803d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{form.budget_file_name || 'Documento adjunto'}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#15803d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bf.name || 'Documento adjunto'}</div>
                       <div style={{ fontSize: 11, color: '#16a34a' }}>Archivo guardado</div>
                     </div>
-                    <a href={form.budget_file_url} target="_blank" rel="noopener noreferrer"
+                    <a href={bf.url} target="_blank" rel="noopener noreferrer"
                       style={{ fontSize: 11, color: '#16a34a', textDecoration: 'underline', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
                       <ExternalLink size={11} /> Ver
                     </a>
-                    <button type="button" onClick={() => setForm((f: any) => ({ ...f, budget_file_url: '', budget_file_name: '' }))}
-                      style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(22,163,74,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#16a34a' }}>
+                    <button type="button" onClick={() => {
+                      const newFiles = (form.budget_files || []).filter((_: any, i: number) => i !== idx)
+                      setForm((f: any) => ({ ...f, budget_files: newFiles, budget_file_url: newFiles[0]?.url || '', budget_file_name: newFiles[0]?.name || '' }))
+                    }} style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(22,163,74,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#16a34a' }}>
                       <X size={12} />
                     </button>
                   </div>
-                ) : (
-                  <div
-                    onDragOver={e => { e.preventDefault(); setBudgetDragOver(true) }}
-                    onDragLeave={() => setBudgetDragOver(false)}
-                    onDrop={e => { e.preventDefault(); setBudgetDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleBudgetFileSelect(f) }}
-                    onClick={() => budgetInputRef.current?.click()}
-                    style={{
-                      border: `2px dashed ${budgetDragOver ? 'var(--gold)' : 'var(--ivory)'}`,
-                      borderRadius: 10, padding: '18px 16px',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
-                      cursor: 'pointer', background: budgetDragOver ? '#fffbeb' : '#fafaf8',
-                      transition: 'all 0.15s',
-                    }}>
-                    <input ref={budgetInputRef} type="file" style={{ display: 'none' }}
-                      accept=".pdf,.xlsx,.xls,.docx,.doc,.png,.jpg,.jpeg,.webp"
-                      onChange={e => { const f = e.target.files?.[0]; if (f) handleBudgetFileSelect(f) }} />
-                    {budgetUploading ? (
-                      <div style={{ fontSize: 12, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--gold)', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
-                        Subiendo…
+                ))}
+                <div
+                  onDragOver={e => { e.preventDefault(); setBudgetDragOver(true) }}
+                  onDragLeave={() => setBudgetDragOver(false)}
+                  onDrop={e => { e.preventDefault(); setBudgetDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleBudgetFileSelect(f) }}
+                  onClick={() => budgetInputRef.current?.click()}
+                  style={{ border: `2px dashed ${budgetDragOver ? 'var(--gold)' : 'var(--ivory)'}`, borderRadius: 10, padding: '18px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, cursor: 'pointer', background: budgetDragOver ? '#fffbeb' : '#fafaf8', transition: 'all 0.15s' }}>
+                  <input ref={budgetInputRef} type="file" style={{ display: 'none' }}
+                    accept=".pdf,.xlsx,.xls,.docx,.doc,.png,.jpg,.jpeg,.webp"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleBudgetFileSelect(f); e.target.value = '' }} />
+                  {budgetUploading ? (
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--gold)', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+                      Subiendo…
+                    </div>
+                  ) : (
+                    <>
+                      <Upload size={18} style={{ color: 'var(--gold)', opacity: 0.7 }} />
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{(form.budget_files || []).length > 0 ? 'Añadir otro documento' : 'Arrastra el archivo o haz clic'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>PDF, Excel, Word o imagen · máx. 20 MB</div>
                       </div>
-                    ) : (
-                      <>
-                        <Upload size={18} style={{ color: 'var(--gold)', opacity: 0.7 }} />
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Arrastra el archivo o haz clic</div>
-                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>PDF, Excel, Word o imagen · máx. 20 MB</div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                    </>
+                  )}
+                </div>
                 {budgetError && (
                   <div style={{ marginTop: 6, fontSize: 11, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <AlertTriangle size={11} /> {budgetError}
@@ -6106,6 +6712,10 @@ function VisitScheduleModal({
   onClose: () => void
 }) {
   const isEditing = !!lead.visit_date
+  // Original visit data (for showing "previous" when user picks a different date)
+  const originalVisitDate     = lead.visit_date     || null
+  const originalVisitTime     = lead.visit_time     || null
+  const originalVisitDuration = lead.visit_duration || null
   // Build map of other leads' visits indexed by date (ignoring this lead + past dates)
   const otherVisitsByDate = useMemo(() => {
     const todayS = todayIso()
@@ -6118,6 +6728,19 @@ function VisitScheduleModal({
       map[l.visit_date].push(l)
     }
     return map
+  }, [allLeads, lead.id])
+  // Build map of date → number of OTHER leads interested in that date (non-lost, non-won, non-visit_scheduled)
+  const otherLeadsByDate = useMemo(() => {
+    const todayS = todayIso()
+    const counts: Record<string, number> = {}
+    for (const l of allLeads) {
+      if (!l || l.id === lead.id) continue
+      if (l.status === 'lost' || l.status === 'won' || l.status === 'visit_scheduled') continue
+      expandLeadDates(l).forEach((d: string) => {
+        if (d >= todayS) counts[d] = (counts[d] || 0) + 1
+      })
+    }
+    return counts
   }, [allLeads, lead.id])
   const todayStr = todayIso()
   const initD = lead.visit_date ? new Date(lead.visit_date + 'T12:00:00')
@@ -6135,13 +6758,19 @@ function VisitScheduleModal({
     const supabase = createClient()
     const ym = `${viewYear}-${pad(viewMonth + 1)}`
     const last = new Date(viewYear, viewMonth + 1, 0).getDate()
-    supabase.from('calendar_entries').select('date,status,note').eq('user_id', userId)
-      .gte('date', `${ym}-01`).lte('date', `${ym}-${pad(last)}`)
-      .then(({ data }) => {
-        const map: Record<string, any> = {}
-        ;(data || []).forEach((e: any) => { if (!map[e.date]) map[e.date] = e })
-        setCalEntries(prev => ({ ...prev, ...map }))
+    Promise.all([
+      supabase.from('calendar_entries').select('date,status,note,lead_id').eq('user_id', userId)
+        .gte('date', `${ym}-01`).lte('date', `${ym}-${pad(last)}`),
+      supabase.from('leads').select('id').eq('user_id', userId).eq('status', 'won'),
+    ]).then(([{ data }, { data: wonData }]) => {
+      const wonIds = new Set((wonData || []).map((l: any) => l.id))
+      const map: Record<string, any> = {}
+      ;(data || []).forEach((e: any) => {
+        if (e.status === 'reservado' && !wonIds.has(e.lead_id)) return
+        if (!map[e.date]) map[e.date] = e
       })
+      setCalEntries(prev => ({ ...prev, ...map }))
+    })
   }, [viewYear, viewMonth, userId])
 
   const isBlocked = (ds: string) => {
@@ -6247,7 +6876,15 @@ function VisitScheduleModal({
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ position: 'relative', padding: '22px 24px 20px', background: 'linear-gradient(135deg, #fef3c7 0%, #fdf6ee 100%)', borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+        <div style={{ position: 'relative', padding: '22px 24px 20px 54px', background: 'linear-gradient(135deg, #fef3c7 0%, #fdf6ee 100%)', borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+          {/* Back arrow — top left */}
+          <button
+            onClick={onClose}
+            aria-label="Volver"
+            style={{ position: 'absolute', top: 14, left: 14, width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.75)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--espresso)' }}
+          >
+            <ChevronLeft size={18} />
+          </button>
           <button
             onClick={onClose}
             aria-label="Cerrar"
@@ -6383,12 +7020,14 @@ function VisitScheduleModal({
                     ? otherVisits.map(v => v.visit_time).filter(Boolean).sort()[0]
                     : null
 
+                  const leadCount = otherLeadsByDate[ds] || 0
+
                   return (
                     <button
                       key={ds}
                       onClick={() => canClick && setSelected(ds)}
                       disabled={!canClick}
-                      title={blocked ? 'Día reservado o bloqueado' : isPast ? 'Fecha pasada' : hasOtherVisit ? `Visita ya agendada: ${otherVisits.map(v => `${v.name}${v.visit_time ? ' · ' + v.visit_time : ''}`).join(' · ')}` : ''}
+                      title={blocked ? 'Día reservado o bloqueado' : isPast ? 'Fecha pasada' : hasOtherVisit ? `Visita ya agendada: ${otherVisits.map(v => `${v.name}${v.visit_time ? ' · ' + v.visit_time : ''}`).join(' · ')}` : leadCount > 0 ? `${leadCount} lead(s) interesado(s) en esta fecha` : ''}
                       style={{
                         minHeight: 52,
                         border: 'none',
@@ -6412,6 +7051,16 @@ function VisitScheduleModal({
                       }}
                     >
                       <span style={{ display: 'block', paddingTop: 6 }}>{day}</span>
+                      {/* Lead interest badge — amber pill top-right */}
+                      {leadCount > 0 && !isSelected && !isPast && (
+                        <span style={{
+                          position: 'absolute', top: 2, right: 2,
+                          minWidth: 14, height: 14, borderRadius: 7, padding: '0 3px',
+                          background: '#fde68a', color: '#92400e',
+                          fontSize: 9, fontWeight: 700, lineHeight: 1,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>{leadCount}</span>
+                      )}
                       {hasOtherVisit && (
                         <span
                           aria-label="Otra visita ya agendada"
@@ -6546,6 +7195,19 @@ function VisitScheduleModal({
                     <div style={{ fontSize: 12, color: 'var(--charcoal)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, fontVariantNumeric: 'tabular-nums' }}>
                       <Clock size={12} style={{ color: 'var(--gold)' }} />
                       {visitTime}{endTime ? ` – ${endTime}` : ''} <span style={{ color: 'var(--warm-gray)' }}>· {durations.find(d => d.v === visitDuration)?.label}</span>
+                    </div>
+                  )}
+                  {/* Previous visit info — shown when editing and the date or time changed */}
+                  {isEditing && originalVisitDate && (selected !== originalVisitDate || visitTime !== (originalVisitTime || '')) && (
+                    <div style={{ marginTop: 8, padding: '7px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.04)', border: '1px dashed var(--ivory)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <RotateCcw size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                      <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                        Anterior: <strong style={{ color: 'var(--charcoal)' }}>
+                          {new Date(originalVisitDate + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          {originalVisitTime ? ` · ${originalVisitTime}` : ''}
+                          {originalVisitDuration ? ` · ${originalVisitDuration} min` : ''}
+                        </strong>
+                      </span>
                     </div>
                   )}
                   {selected && (otherVisitsByDate[selected]?.length || 0) > 0 && (() => {

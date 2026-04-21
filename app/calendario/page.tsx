@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import {
   ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
-  FileText, Calendar, Search, AlertCircle, Settings, Info, Trash2, RotateCcw, Flower2, Edit2,
+  FileText, Calendar, Search, AlertCircle, Settings, Info, Trash2, Flower2, Edit2,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -42,6 +42,10 @@ type Lead = {
   visit_time?: string
   visit_duration?: number
   notes?: string
+  budget_date?: string
+  budget_date_to?: string
+  budget_date_ranges?: { from: string; to: string }[]
+  budget_date_flexibility?: string
 }
 
 type DateRulePackage = {
@@ -69,7 +73,7 @@ const DOW_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const STATUS_CFG: Record<Status, { label: string; bg: string; border: string; color: string; dot: string; badge: string }> = {
   libre:       { label: 'Libre',          bg: '#fff',     border: '#e8ddd3', color: 'var(--charcoal)', dot: '#c5b9aa', badge: '#f5f0eb' },
   negociacion: { label: 'En negociación', bg: '#fef7ec',  border: '#f5deb3', color: '#8a6d2b',         dot: '#d4a24c', badge: '#fef7ec' },
-  reservado:   { label: 'Reservado',      bg: '#eef6f0',  border: '#c3dfc9', color: '#3d6b4a',         dot: '#5a9e6b', badge: '#eef6f0' },
+  reservado:   { label: 'Reservado',      bg: '#d1fae5',  border: '#059669', color: '#064e3b',         dot: '#047857', badge: '#d1fae5' },
   bloqueado:   { label: 'Bloqueado',      bg: '#f0eeec',  border: '#d6d2ce', color: '#8b8580',         dot: '#a8a3a0', badge: '#f0eeec' },
 }
 
@@ -190,8 +194,19 @@ export default function CalendarioPage() {
   const wasDraggingRef = useRef(false)
   const wasDragBulkRef = useRef(false)  // true when bulkMode was activated by drag
 
-  // Calendar filter
-  const [calendarFilter, setCalendarFilter] = useState<'all' | 'visitas' | 'bodas' | 'leads'>('all')
+  // Calendar filter — multi-select; empty Set means "all"
+  const [calendarFilters, setCalendarFilters] = useState<Set<string>>(new Set())
+  const toggleCalendarFilter = (f: string) => {
+    setCalendarFilters(prev => {
+      if (f === 'all') return new Set()
+      const next = new Set(prev)
+      if (next.has(f)) { next.delete(f) } else { next.add(f) }
+      // If all three specific filters are active → reset to "Todos"
+      if (next.has('visitas') && next.has('bodas') && next.has('leads')) return new Set()
+      return next
+    })
+  }
+  const filterAll = calendarFilters.size === 0
 
   // Lead search
   const [leadSearch,        setLeadSearch]        = useState('')
@@ -204,6 +219,16 @@ export default function CalendarioPage() {
     load()
   }, [user, authLoading, year, month])
 
+  // Deep-link: reabrir modal de fecha al volver desde ?openDate=YYYY-MM-DD
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const openDate = params.get('openDate')
+    if (!openDate) return
+    setModalDate(openDate)
+    window.history.replaceState({}, '', '/calendario')
+  }, [])
+
   const load = async () => {
     setLoading(true)
     const supabase = createClient()
@@ -213,7 +238,7 @@ export default function CalendarioPage() {
 
     const [entriesRes, leadsRes, settingsRes] = await Promise.all([
       supabase.from('calendar_entries').select('*').eq('user_id', user!.id).gte('date', from).lte('date', to),
-      supabase.from('leads').select('id,name,email,phone,whatsapp,wedding_date,wedding_date_to,wedding_date_ranges,date_flexibility,wedding_year,wedding_month,guests,status,budget,ceremony_type,visit_date,visit_time,visit_duration,notes').eq('user_id', user!.id).order('wedding_date', { ascending: true }),
+      supabase.from('leads').select('id,name,email,phone,whatsapp,wedding_date,wedding_date_to,wedding_date_ranges,date_flexibility,wedding_year,wedding_month,guests,status,budget,ceremony_type,visit_date,visit_time,visit_duration,notes,budget_date,budget_date_to,budget_date_ranges,budget_date_flexibility').eq('user_id', user!.id).order('wedding_date', { ascending: true }),
       supabase.from('venue_settings').select('date_rules').eq('user_id', user!.id).maybeSingle(),
     ])
 
@@ -268,8 +293,12 @@ export default function CalendarioPage() {
   // Leads indexed by date for fast calendar lookup — handles all flexibility types
   const leadsByDate = useMemo(() => {
     const m: Record<string, Lead[]> = {}
-    const add = (date: string, lead: Lead) => { if (!m[date]) m[date] = []; m[date].push(lead) }
+    const add = (date: string, lead: Lead) => {
+      if (!m[date]) m[date] = []
+      if (!m[date].some(x => x.id === lead.id)) m[date].push(lead)
+    }
     leads.filter(l => l.status !== 'lost').forEach(l => {
+      // Index by wedding_date (what the couple originally requested)
       const flex = l.date_flexibility || 'exact'
       if (flex === 'exact' && l.wedding_date) {
         if (l.wedding_date_to) {
@@ -284,11 +313,28 @@ export default function CalendarioPage() {
           if (r.from) expandRange(r.from, r.to || r.from).forEach(d => add(d, l))
         })
       } else if (flex === 'month' && l.wedding_year && l.wedding_month) {
-        // Mark entire month
         const y = l.wedding_year, mo = l.wedding_month
         const days = new Date(y, mo, 0).getDate()
         for (let d = 1; d <= days; d++) {
           add(`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`, l)
+        }
+      }
+
+      // Also index by budget_date* for budget_sent / won leads
+      if ((l.status === 'budget_sent' || l.status === 'won') && l.budget_date) {
+        const bflex = l.budget_date_flexibility || 'exact'
+        if (bflex === 'exact') {
+          if (l.budget_date_to) {
+            expandRange(l.budget_date, l.budget_date_to).forEach(d => add(d, l))
+          } else {
+            add(l.budget_date, l)
+          }
+        } else if (bflex === 'range') {
+          expandRange(l.budget_date, l.budget_date_to || l.budget_date).forEach(d => add(d, l))
+        } else if (bflex === 'multi_range' && l.budget_date_ranges?.length) {
+          l.budget_date_ranges.forEach(r => {
+            if (r.from) expandRange(r.from, r.to || r.from).forEach(d => add(d, l))
+          })
         }
       }
     })
@@ -641,19 +687,27 @@ export default function CalendarioPage() {
                 </div>
               </div>
 
-              {/* Filter buttons */}
-              <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                {(['all', 'visitas', 'bodas', 'leads'] as const).map(f => (
-                  <button key={f} onClick={() => setCalendarFilter(f)} style={{
-                    fontSize: 11, padding: '3px 10px', borderRadius: 20, border: '1px solid',
-                    borderColor: calendarFilter === f ? (f === 'visitas' ? '#10b981' : f === 'bodas' ? '#ec4899' : f === 'leads' ? '#3b82f6' : 'var(--gold)') : 'var(--ivory)',
-                    background: calendarFilter === f ? (f === 'visitas' ? '#10b981' : f === 'bodas' ? '#ec4899' : f === 'leads' ? '#3b82f6' : 'var(--gold)') : 'transparent',
-                    color: calendarFilter === f ? '#fff' : 'var(--warm-gray)',
-                    cursor: 'pointer', fontWeight: calendarFilter === f ? 600 : 400, transition: 'all 0.15s',
-                  }}>
-                    {f === 'all' ? 'Todos' : f === 'visitas' ? 'Visitas' : f === 'bodas' ? 'Bodas confirmadas' : 'Leads'}
-                  </button>
-                ))}
+              {/* Filter buttons — multi-select */}
+              <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                {([
+                  { key: 'all',    label: 'Todos',             color: 'var(--gold)' },
+                  { key: 'visitas', label: 'Visitas',           color: '#10b981' },
+                  { key: 'bodas',  label: 'Bodas confirmadas', color: '#059669' },
+                  { key: 'leads',  label: 'Leads',             color: '#3b82f6' },
+                ] as const).map(({ key, label, color }) => {
+                  const isActive = key === 'all' ? filterAll : calendarFilters.has(key)
+                  return (
+                    <button key={key} onClick={() => toggleCalendarFilter(key)} style={{
+                      fontSize: 11, padding: '3px 10px', borderRadius: 20, border: '1.5px solid',
+                      borderColor: isActive ? color : 'var(--ivory)',
+                      background: isActive ? color : 'transparent',
+                      color: isActive ? '#fff' : 'var(--warm-gray)',
+                      cursor: 'pointer', fontWeight: isActive ? 600 : 400, transition: 'all 0.15s',
+                    }}>
+                      {label}
+                    </button>
+                  )
+                })}
               </div>
 
               {/* Day headers */}
@@ -691,18 +745,33 @@ export default function CalendarioPage() {
                       const visitLeads = visitsByDate[ds] || []
                       const hasVisits  = visitLeads.length > 0
 
-                      // Filter: does this cell match the active filter?
-                      const matchesFilter =
-                        calendarFilter === 'all' ||
-                        (calendarFilter === 'visitas' && hasVisits) ||
-                        (calendarFilter === 'bodas' && status === 'reservado') ||
-                        (calendarFilter === 'leads' && dayLeads.length > 0)
+                      // Effective status — derived from actual lead statuses (bloqueado stays from DB)
+                      const NEG_LEAD_STATUSES = ['contacted', 'post_visit', 'proposal_sent', 'budget_sent']
+                      const effectiveStatus: Status | undefined = status === 'bloqueado' ? 'bloqueado'
+                        : dayLeads.some((l: any) => l.status === 'won') ? 'reservado'
+                        : dayLeads.some((l: any) => NEG_LEAD_STATUSES.includes(l.status)) ? 'negociacion'
+                        : undefined
 
-                      // Name to show on cell — visit takes priority visually
+                      // Filter: does this cell match the active filter?
+                      const filterIncludesVisitas = !filterAll && calendarFilters.has('visitas')
+                      // Show cross only when visitas filter active + bodas filter NOT active + cell is reservado/bloqueado
+                      const showCross = filterIncludesVisitas && !calendarFilters.has('bodas') && (effectiveStatus === 'reservado' || status === 'bloqueado')
+                      const hideStatusLabel = filterIncludesVisitas && !(calendarFilters.has('bodas') && effectiveStatus === 'reservado')
+                      const matchesFilter =
+                        filterAll ||
+                        (calendarFilters.has('visitas') && hasVisits) ||
+                        (calendarFilters.has('bodas') && effectiveStatus === 'reservado') ||
+                        (calendarFilters.has('leads') && dayLeads.length > 0)
+                      const effectiveCfg = STATUS_CFG[effectiveStatus || 'libre']
+
+                      // Name to show on cell — status takes priority; visit only wins if no status
+                      const visitOnly = hasVisits && !effectiveStatus
                       const displayName = !matchesFilter ? null
-                        : hasVisits ? visitLeads[0].name
+                        : visitOnly ? visitLeads[0].name
                         : linkedLead?.name || (dayLeads.length === 1 ? dayLeads[0].name : null)
-                      const hasUnlinkedLeads = matchesFilter && dayLeads.length > 0 && !linkedLead && !hasVisits
+                      // True when the displayed lead also has a visit that day
+                      const displayLeadHasVisit = hasVisits && (visitOnly || visitLeads.some((v: any) => v.id === linkedLead?.id))
+                      const hasUnlinkedLeads = matchesFilter && dayLeads.length > 0 && !linkedLead && !visitOnly
 
                       // Duration suffix for exact leads with multi-day weddings
                       const singleLead = !hasVisits && dayLeads.length === 1 ? dayLeads[0] : null
@@ -718,10 +787,13 @@ export default function CalendarioPage() {
                       // Half-day split: use actual status color + white (or second booking's color)
                       const statusColor  = (status && status !== 'libre') ? cfg.bg : '#f3f4f6'
                       const statusColor2 = (entry2nd?.status && entry2nd.status !== 'libre') ? cfg2nd.bg : '#f3f4f6'
+                      const isTarde = entry?.note?.startsWith('medio_dia_tarde')
                       const halfDayBg = isDoubleHalf
                         ? `linear-gradient(135deg, ${statusColor} 50%, ${statusColor2} 50%)`
-                        : `linear-gradient(135deg, ${statusColor} 50%, #ffffff 50%)`
-                      const cellBg = isBulkSel ? '#fef3c7' : isPast ? '#faf8f5' : hasVisits && !status ? 'rgba(16,185,129,0.06)' : isHalfDayBlock ? halfDayBg : status && status !== 'libre' ? cfg.bg : '#fff'
+                        : isTarde
+                          ? `linear-gradient(135deg, #ffffff 50%, ${statusColor} 50%)`
+                          : `linear-gradient(135deg, ${statusColor} 50%, #ffffff 50%)`
+                      const cellBg = isBulkSel ? '#fef3c7' : isPast ? '#faf8f5' : hasVisits && !effectiveStatus ? 'rgba(16,185,129,0.06)' : isHalfDayBlock ? halfDayBg : effectiveStatus ? effectiveCfg.bg : '#fff'
                       const colIndex = (startDow + day - 1 + startDow === 0 ? 0 : i) % 7
 
                       return (
@@ -777,30 +849,46 @@ export default function CalendarioPage() {
                             fontSize: 15, fontWeight: isToday ? 700 : 500, lineHeight: 1,
                             color: isPast ? 'var(--stone)' : isToday ? 'var(--gold)' : 'var(--charcoal)',
                             fontFamily: 'Manrope, sans-serif',
+                            position: 'relative', zIndex: 1,
                           }}>
                             {day}
                           </span>
 
-                          {/* Lead name / visit name */}
-                          {displayName && !isPast && (
+                          {/* Big ✕ overlay for reservado/bloqueado when visitas filter active but bodas filter not */}
+                          {showCross && (
+                            <div style={{
+                              position: 'absolute', inset: 0,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              pointerEvents: 'none', zIndex: 0,
+                            }}>
+                              <svg viewBox="0 0 24 24" style={{ width: '65%', height: '65%', opacity: 0.22 }} fill="none" stroke={cfg.dot} strokeWidth={2.5} strokeLinecap="round">
+                                <line x1="4" y1="4" x2="20" y2="20" />
+                                <line x1="20" y1="4" x2="4" y2="20" />
+                              </svg>
+                            </div>
+                          )}
+
+                          {/* Lead name / visit name — hidden when cross is shown */}
+                          {displayName && !isPast && !showCross && (
                             <span style={{
                               fontSize: 9, lineHeight: 1.3,
-                              color: hasVisits && matchesFilter ? '#059669' : cfg.color,
+                              color: visitOnly && matchesFilter ? '#059669' : effectiveCfg.color,
                               fontWeight: 600, maxWidth: '100%', overflow: 'hidden',
                               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                               textAlign: 'left', wordBreak: 'break-word', marginTop: 2,
                             }}>
-                              {hasVisits && matchesFilter ? `📅 ${displayName}` : `${displayName}${durationSuffix}`}
+                              {displayLeadHasVisit && matchesFilter ? `${displayName} - visita` : `${displayName}${durationSuffix}`}
                             </span>
                           )}
 
-                          {/* Bottom: status label or indicators */}
-                          <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', marginTop: 'auto', flexWrap: 'nowrap', overflow: 'hidden' }}>
-                            {matchesFilter && status && status !== 'libre' && (
+                          {/* Bottom: status label or indicators — stacked column */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', marginTop: 'auto', overflow: 'hidden' }}>
+                            {/* Row 1: calendar status — hidden when visitas filter active (except reservado+bodas) */}
+                            {matchesFilter && !hideStatusLabel && effectiveStatus && (
                               <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
-                                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: cfg.color, whiteSpace: 'nowrap' }}>
-                                  {isHalfDayBlock ? (entry?.note?.startsWith('medio_dia_manana') ? '½ Mañ' : entry?.note?.startsWith('medio_dia_tarde') ? '½ Tar' : '½ Día') : status === 'negociacion' ? 'Negociación' : cfg.label}
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: effectiveCfg.dot, flexShrink: 0 }} />
+                                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: effectiveCfg.color, whiteSpace: 'nowrap' }}>
+                                  {isHalfDayBlock ? (entry?.note?.startsWith('medio_dia_manana') ? '½ Mañ' : entry?.note?.startsWith('medio_dia_tarde') ? '½ Tar' : '½ Día') : effectiveStatus === 'negociacion' ? 'Negociación' : effectiveCfg.label}
                                 </span>
                                 {isDoubleHalf && entry2nd?.status && entry2nd.status !== 'libre' && (
                                   <>
@@ -813,15 +901,17 @@ export default function CalendarioPage() {
                                 )}
                               </div>
                             )}
+                            {/* Row 2: visit indicator (always its own line, below status) */}
                             {matchesFilter && hasVisits && (() => {
                               const sorted = [...visitLeads].sort((a: any, b: any) => ((a as any).visit_time || 'zz').localeCompare((b as any).visit_time || 'zz'))
-                              const firstTime = (sorted[0] as any).visit_time as string | undefined
+                              const first = sorted[0] as any
+                              const firstTime = first.visit_time as string | undefined
                               const tipParts = sorted.map((v: any) => `${v.name}${v.visit_time ? ' · ' + v.visit_time : ''}`).join(' · ')
                               return (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={`Visita: ${tipParts}`}>
                                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
                                   <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#059669', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                                    {firstTime ? `Visita ${firstTime}` : 'Visita'}
+                                    {firstTime ? firstTime : 'Visita'}
                                   </span>
                                   {visitLeads.length > 1 && (
                                     <span style={{ fontSize: 8, color: '#10b981', fontWeight: 700 }}>+{visitLeads.length - 1}</span>
@@ -829,19 +919,27 @@ export default function CalendarioPage() {
                                 </div>
                               )
                             })()}
+                            {/* Dots for libre dates with leads/notes */}
                             {(!status || status === 'libre') && !hasVisits ? (
-                              <>
+                              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                                 {hasUnlinkedLeads && (
                                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} title={`${dayLeads.length} lead(s)`} />
                                 )}
                                 {matchesFilter && entry?.note && (
                                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--stone)', flexShrink: 0 }} />
                                 )}
-                              </>
+                              </div>
                             ) : null}
-                            {!hasVisits && matchesFilter && dayLeads.length > 1 && (
-                              <span style={{ fontSize: 8, color: 'var(--warm-gray)', fontWeight: 700, marginLeft: 2 }}>+{dayLeads.length}</span>
-                            )}
+                            {!visitOnly && matchesFilter && (() => {
+                              const nonVisitLeadCount = dayLeads.filter((l: any) => !visitLeads.some((v: any) => v.id === l.id)).length
+                              // If a name is shown already (displayName), count = extras beyond that one
+                              const extraCount = displayName ? nonVisitLeadCount - 1 : nonVisitLeadCount
+                              return extraCount > 0 ? (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 7, fontWeight: 700, background: '#fef3c7', color: '#92400e', borderRadius: 5, padding: '1px 5px', letterSpacing: '0.03em' }}>
+                                  +{extraCount} {extraCount === 1 ? 'lead' : 'leads'}
+                                </span>
+                              ) : null
+                            })()}
                           </div>
                         </button>
                       )
@@ -1127,6 +1225,8 @@ function DayModal({
   const [showCreate,  setShowCreate]  = useState(false)
   const [localSaving, setLocalSaving] = useState(false)
   const [showQuickLink, setShowQuickLink] = useState(false)
+  const [showAllLeads, setShowAllLeads] = useState(false)
+  const LEADS_PREVIEW = 3
 
   // Post-save: leads afectados por fecha bloqueada/reservada
   const [affectedLeads, setAffectedLeads] = useState<Lead[]>([])
@@ -1134,22 +1234,12 @@ function DayModal({
   const [newDateFor,    setNewDateFor]    = useState<Record<string, string>>({})
   const [affectedSaving, setAffectedSaving] = useState<Record<string, boolean>>({})
 
-  // Lead pipeline status + visit date editing
-  const [leadPipelineStatus, setLeadPipelineStatus] = useState<string>('')
-  const [visitDate,          setVisitDate]          = useState<string>('')
-  // Scope: apply calendar entry status to just this date or all linked dates
-  const [scope, setScope] = useState<'this' | 'all'>('this')
-  // All calendar entries linked to this lead
-  const [leadEntries,        setLeadEntries]        = useState<Entry[]>([])
-  const [loadingLeadEntries, setLoadingLeadEntries] = useState(false)
-  // Dates to unlink the lead from
-  const [datesToUnlink, setDatesToUnlink] = useState<Set<string>>(new Set())
-  // Inline lead editing (in "Leads con esta fecha" list)
-  const [expandedLeadId,  setExpandedLeadId]  = useState<string | null>(null)
-  const [inlineEditForm,  setInlineEditForm]  = useState({ name: '', email: '', phone: '', guests: '', status: '' })
-  const [inlineEditSaving, setInlineEditSaving] = useState(false)
   const [removeLeadConfirmId, setRemoveLeadConfirmId] = useState<string | null>(null)
   const [removingSaving, setRemovingSaving] = useState(false)
+  // Local ordering for the "En negociación" section in the day modal
+  const [negOrderIds, setNegOrderIds] = useState<string[]>([])
+  const [deleteVisitConfirmId, setDeleteVisitConfirmId] = useState<string | null>(null)
+  const [deletingVisit, setDeletingVisit] = useState(false)
   const [removedLeadForCrm, setRemovedLeadForCrm] = useState<Lead | null>(null)
 
   // Overnight: which day is the wedding? 1 = wedding today, 2 = check-in was yesterday
@@ -1168,36 +1258,78 @@ function DayModal({
   const isPast = date < new Date().toISOString().split('T')[0]
   const selectedLead = leadId ? leadsById[leadId] : null
 
-  // Sync pipeline status + visit date when lead changes
+  // ── Affected leads helpers ────────────────────────────────────────────────
+  const fmtShort = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+
+  const getOtherDatesLabel = (l: Lead): string | null => {
+    let others: string[] = []
+    if ((l.status === 'budget_sent') && l.budget_date) {
+      const bflex = l.budget_date_flexibility || 'exact'
+      if (bflex === 'multi_range' && l.budget_date_ranges) {
+        others = l.budget_date_ranges.filter(r => r.from !== date).map(r => r.from)
+      } else if (l.budget_date !== date) {
+        others = [l.budget_date]
+      }
+    } else {
+      const flex = l.date_flexibility || 'exact'
+      if (flex === 'multi_range' && l.wedding_date_ranges) {
+        others = l.wedding_date_ranges.filter(r => r.from !== date).map(r => r.from)
+      } else if (flex === 'exact' && l.wedding_date && l.wedding_date !== date) {
+        others = [l.wedding_date]
+      } else if (flex === 'range' && l.wedding_date) {
+        if (l.wedding_date !== date) others.push(l.wedding_date)
+        if (l.wedding_date_to && l.wedding_date_to !== date) others.push(l.wedding_date_to)
+      }
+    }
+    if (others.length === 0) return null
+    return others.slice(0, 2).map(fmtShort).join(', ') + (others.length > 2 ? ` +${others.length - 2}` : '')
+  }
+
+  const handleRemoveFromDate = async (l: Lead) => {
+    setAffectedSaving(s => ({ ...s, [l.id]: true }))
+    const updates: any = {}
+    if ((l.status === 'budget_sent') && l.budget_date) {
+      const bflex = l.budget_date_flexibility || 'exact'
+      if (bflex === 'multi_range' && l.budget_date_ranges) {
+        const filtered = l.budget_date_ranges.filter(r => r.from !== date)
+        if (filtered.length === 0) { updates.budget_date = null; updates.budget_date_to = null; updates.budget_date_ranges = null }
+        else if (filtered.length === 1) { updates.budget_date = filtered[0].from; updates.budget_date_to = filtered[0].to || null; updates.budget_date_ranges = null; updates.budget_date_flexibility = 'exact' }
+        else { updates.budget_date_ranges = filtered }
+      } else { updates.budget_date = null; updates.budget_date_to = null; updates.budget_date_ranges = null }
+    } else {
+      const flex = l.date_flexibility || 'exact'
+      if (flex === 'multi_range' && l.wedding_date_ranges) {
+        const filtered = l.wedding_date_ranges.filter(r => r.from !== date)
+        if (filtered.length === 0) { updates.wedding_date = null; updates.wedding_date_to = null; updates.date_flexibility = 'flexible'; updates.wedding_date_ranges = null }
+        else if (filtered.length === 1) { updates.wedding_date = filtered[0].from; updates.wedding_date_to = filtered[0].to || null; updates.wedding_date_ranges = null; updates.date_flexibility = 'exact' }
+        else { updates.wedding_date_ranges = filtered }
+      } else { updates.wedding_date = null; updates.wedding_date_to = null; updates.date_flexibility = 'flexible'; updates.wedding_date_ranges = null }
+    }
+    await onUpdateLead(l.id, updates)
+    setAffectedLeads(prev => prev.filter(x => x.id !== l.id))
+    setAffectedSaving(s => ({ ...s, [l.id]: false }))
+  }
+
+  // Auto-upgrade calendar status when lead changes
   useEffect(() => {
-    setLeadPipelineStatus(selectedLead?.status || '')
-    setVisitDate(selectedLead?.visit_date || '')
-    setScope('this')
-    setDatesToUnlink(new Set())
-    // Auto-upgrade calendar status: linking a lead to a free date → negociacion
     if (leadId) {
       setStatus(prev => prev === 'libre' ? 'negociacion' : prev)
     } else {
-      // No lead: if status reverts to libre, clear half-day too
       setStatus(prev => { if (prev === 'libre') setHalfDay(''); return prev })
     }
   }, [leadId])
 
-  // Fetch all calendar entries linked to this lead
+  // Al abrir el modal: si la fecha ya está reservada/bloqueada, mostrar panel de afectados
   useEffect(() => {
-    if (!leadId) { setLeadEntries([]); return }
-    setLoadingLeadEntries(true)
-    const supabase = createClient()
-    supabase.from('calendar_entries')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('lead_id', leadId)
-      .order('date', { ascending: true })
-      .then(({ data }) => {
-        setLeadEntries(data || [])
-        setLoadingLeadEntries(false)
-      })
-  }, [leadId])
+    const entryStatus = entry?.status
+    if (entryStatus !== 'reservado' && entryStatus !== 'bloqueado') return
+    const linked = entry?.lead_id
+    const others = leadsOnDate.filter(l => l.id !== linked && l.status !== 'lost' && l.status !== 'won')
+    if (others.length > 0) {
+      setAffectedLeads(others)
+      setShowAffected(true)
+    }
+  }, [date])
 
   const filteredLeads = allLeads
     .filter(l => l.status !== 'lost' && (
@@ -1212,34 +1344,6 @@ function DayModal({
 
   const handleSave = async () => {
     setLocalSaving(true)
-    const supabase = createClient()
-
-    // Update lead fields if changed (status, visit_date)
-    if (selectedLead) {
-      const fields: Partial<Lead> = {}
-      if (leadPipelineStatus && leadPipelineStatus !== selectedLead.status) fields.status = leadPipelineStatus
-      if (visitDate !== (selectedLead.visit_date || '')) fields.visit_date = visitDate || undefined
-      if (Object.keys(fields).length > 0) await onUpdateLead(selectedLead.id, fields)
-    }
-
-    // Unlink lead from selected dates
-    if (datesToUnlink.size > 0) {
-      for (const d of datesToUnlink) {
-        const entryToUpdate = leadEntries.find(e => e.date === d)
-        if (entryToUpdate?.id) {
-          await supabase.from('calendar_entries').update({ lead_id: null }).eq('id', entryToUpdate.id)
-        }
-      }
-    }
-
-    // Apply calendar status to all linked dates if scope === 'all'
-    if (scope === 'all' && leadId && leadEntries.length > 0) {
-      for (const e of leadEntries) {
-        if (e.date !== date && e.id && !datesToUnlink.has(e.date)) {
-          await supabase.from('calendar_entries').update({ status }).eq('id', e.id)
-        }
-      }
-    }
 
     // For overnight/package rules, save extra negociacion entries before calling onSave
     const supabaseExtra = createClient()
@@ -1367,165 +1471,183 @@ function DayModal({
 
         <div style={{ padding: '20px 24px' }}>
 
-          {/* ══ ESTADO DEL CALENDARIO (all modes) ══ */}
-          {!isPast && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 10 }}>Estado del calendario</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
-                {(Object.entries(STATUS_CFG) as [Status, typeof STATUS_CFG[Status]][]).map(([s, cfg]) => (
-                  <button key={s} onClick={() => { setStatus(s); if (s === 'libre') setHalfDay('') }} style={{
-                    padding: '8px 4px', borderRadius: 8, cursor: 'pointer', border: '2px solid',
-                    borderColor: status === s ? cfg.dot : 'var(--ivory)',
-                    background: status === s ? cfg.bg : 'transparent',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, transition: 'all 0.1s',
-                  }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: cfg.dot }} />
-                    <span style={{ fontSize: 11, fontWeight: status === s ? 700 : 400, color: status === s ? cfg.color : 'var(--warm-gray)' }}>
-                      {cfg.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              {/* Medio día — solo para negociacion / reservado / bloqueado */}
-              {status !== 'libre' && (() => {
-                const sColor = STATUS_CFG[status].dot
-                const sBg    = STATUS_CFG[status].bg
-                return (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
-                    {([
-                      { noteVal: 'medio_dia_manana', label: '½ Mañana', swatchGrad: `linear-gradient(to right, ${sBg} 50%, #fff 50%)` },
-                      { noteVal: 'medio_dia_tarde',  label: '½ Tarde',  swatchGrad: `linear-gradient(to right, #fff 50%, ${sBg} 50%)` },
-                    ] as const).map(opt => {
-                      const isActive = halfDay === opt.noteVal
-                      return (
-                        <button key={opt.noteVal} onClick={() => {
-                          setHalfDay(isActive ? '' : opt.noteVal)
-                        }} style={{
-                          padding: '8px 4px', borderRadius: 8, cursor: 'pointer', border: '2px solid',
-                          borderColor: isActive ? sColor : 'var(--ivory)',
-                          background: isActive ? sBg : 'transparent',
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, transition: 'all 0.1s',
-                        }}>
-                          <div style={{ width: 22, height: 10, borderRadius: 3, background: opt.swatchGrad, flexShrink: 0, border: `1px solid ${sColor}` }} />
-                          <span style={{ fontSize: 11, fontWeight: isActive ? 700 : 400, color: isActive ? STATUS_CFG[status].color : 'var(--warm-gray)' }}>{opt.label}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
-            </div>
-          )}
-
-          {/* ══ MODO BLOQUEADO: motivo/nota ══ */}
-          {status === 'bloqueado' && !isPast && (
-            <div style={{ marginBottom: 20 }}>
-              <label className="form-label">{isMedioDia ? 'Nota interna (opcional)' : 'Motivo del bloqueo (nota)'}</label>
-              <textarea className="form-textarea" style={{ minHeight: 70 }} value={note}
-                onChange={e => setNote(e.target.value)}
-                placeholder={isMedioDia ? 'Ej: Festivo, pendiente de confirmar...' : 'Ej: Mantenimiento, evento privado, reserva propia...'} />
-            </div>
-          )}
-
-          {/* ══ MODO RESERVADO: tarjeta de boda ══ */}
-          {status === 'reservado' && !isPast && (
-            <div style={{ marginBottom: 20, padding: '14px 16px', background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#9d174d', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-                <Flower2 size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Boda reservada
-              </div>
-              {selectedLead ? (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-                    {[
-                      { label: 'Pareja', value: selectedLead.name },
-                      { label: 'Invitados', value: selectedLead.guests ? `${selectedLead.guests} personas` : '—' },
-                      { label: 'Presupuesto', value: BUDGET_LABEL[selectedLead.budget || ''] || selectedLead.budget || '—' },
-                      { label: 'Ceremonia', value: CEREMONY_LABEL[selectedLead.ceremony_type || ''] || selectedLead.ceremony_type || '—' },
-                      { label: 'Teléfono', value: selectedLead.phone || selectedLead.whatsapp || '—' },
-                      { label: 'Email', value: selectedLead.email || '—' },
-                    ].map(({ label, value }) => (
-                      <div key={label}>
-                        <div style={{ fontSize: 10, color: '#be185d', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-                        <div style={{ fontSize: 12, color: '#831843', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {!showCancelWedding ? (
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <a href="/leads" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                        <User size={12} /> Ver lead
-                      </a>
-                      <a href="/proposals" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                        <FileText size={12} /> Propuesta
-                      </a>
-                      <button onClick={() => setShowCancelWedding(true)}
-                        style={{ flex: 1, fontSize: 12, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 6, padding: '6px', cursor: 'pointer' }}>
-                        Cancelar boda
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <div style={{ fontSize: 11, color: '#9d174d', marginBottom: 8, lineHeight: 1.5 }}>
-                        Esta acción liberará la fecha y moverá el lead a Perdidos.
-                      </div>
-                      <textarea value={cancelWeddingReason} onChange={e => setCancelWeddingReason(e.target.value)}
-                        placeholder="Motivo de la cancelación (opcional)..."
-                        className="form-input" rows={2}
-                        style={{ fontSize: 12, marginBottom: 8, resize: 'none', width: '100%', boxSizing: 'border-box' }} />
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={() => { setShowCancelWedding(false); setCancelWeddingReason('') }}
-                          style={{ flex: 1, fontSize: 12, background: 'none', border: '1px solid var(--ivory)', borderRadius: 8, padding: '7px 0', cursor: 'pointer', color: 'var(--warm-gray)' }}>
-                          Volver
-                        </button>
-                        <button disabled={cancelWeddingSaving}
-                          onClick={async () => { setCancelWeddingSaving(true); await onCancelWedding(selectedLead, cancelWeddingReason); setCancelWeddingSaving(false); onClose() }}
-                          style={{ flex: 2, fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 600 }}>
-                          {cancelWeddingSaving ? 'Cancelando...' : 'Confirmar cancelación'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div style={{ fontSize: 12, color: '#be185d' }}>Vincula un lead para ver los detalles de la boda.</div>
-              )}
-            </div>
-          )}
-
-          {/* ══ MODO LIBRE / NEGOCIACIÓN ══ */}
-          {(status === 'libre' || status === 'negociacion') && (
+          {showCreate ? (
+            <QuickCreateLead
+              defaultDate={date}
+              userId={userId}
+              onCreated={async (lead) => { await onLeadCreated(lead); setLeadId(lead.id); setShowCreate(false) }}
+              onCancel={() => setShowCreate(false)}
+            />
+          ) : (
             <>
-              {/* ── Bloque: Leads interesados (visible en negociación) ── */}
-              {(leadsOnDate.length > 0 || visitsOnDate.length > 0) && (
-          <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-                Leads con esta fecha de boda
-              </div>
-              {leadsOnDate.map(l => {
-                const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
-                const isLinked = leadId === l.id
-                const isExpanded = expandedLeadId === l.id
-                return (
-                  <div key={l.id} style={{ marginBottom: 6 }}>
-                    {/* Lead row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                      background: isLinked ? '#f0fdf4' : 'var(--cream)',
-                      border: `1px solid ${isLinked ? '#86efac' : 'var(--ivory)'}`,
-                      borderRadius: isExpanded ? '8px 8px 0 0' : 8 }}>
-                      <User size={14} style={{ color: isLinked ? '#16a34a' : 'var(--warm-gray)', flexShrink: 0 }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{l.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
-                          {l.guests ? `${l.guests} inv.` : ''}
-                          {l.guests && l.budget && l.budget !== 'sin_definir' ? ' · ' : ''}
-                          {l.budget && l.budget !== 'sin_definir' ? BUDGET_LABEL[l.budget] || l.budget : ''}
-                          {l.visit_date ? ` · Visita: ${new Date(l.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}` : ''}
+
+              {/* ══ ① BODA CONFIRMADA ══ */}
+              {status === 'reservado' && selectedLead?.status === 'won' && (
+                <div style={{ marginBottom: 16, borderRadius: 10, overflow: 'hidden', border: '1.5px solid #a7d9b5' }}>
+                  <div style={{ background: 'linear-gradient(135deg, #2d6a4f 0%, #40916c 100%)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Flower2 size={14} style={{ color: '#d8f3dc', flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#d8f3dc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Boda confirmada</span>
+                  </div>
+                  <div style={{ background: '#f0faf4', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#1b4332', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedLead.name}</div>
+                      <div style={{ fontSize: 11, color: '#40916c', marginTop: 2 }}>
+                        {selectedLead.guests ? `${selectedLead.guests} inv.` : ''}
+                        {selectedLead.guests && selectedLead.budget && selectedLead.budget !== 'sin_definir' ? ' · ' : ''}
+                        {selectedLead.budget && selectedLead.budget !== 'sin_definir' ? BUDGET_LABEL[selectedLead.budget] || selectedLead.budget : ''}
+                      </div>
+                    </div>
+                    <a href={`/leads?open=${selectedLead.id}&returnDate=${date}`}
+                      style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, background: '#40916c', color: '#fff', textDecoration: 'none', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      Ver lead
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* ══ ② VISITAS PROGRAMADAS ══ */}
+              {visitsOnDate.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} /> Visitas programadas
+                  </div>
+                  {[...visitsOnDate].sort((a, b) => (a.visit_time || 'zz').localeCompare(b.visit_time || 'zz')).map(l => {
+                    const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
+                    const dur = l.visit_duration || 60
+                    let endTime: string | null = null
+                    if (l.visit_time) {
+                      const [h, m] = l.visit_time.split(':').map(Number)
+                      if (!isNaN(h) && !isNaN(m)) {
+                        const total = h * 60 + m + dur
+                        endTime = `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+                      }
+                    }
+                    return (
+                      <div key={l.id} style={{ display: 'flex', alignItems: 'stretch', gap: 0, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
+                        <div style={{ width: 64, flexShrink: 0, background: l.visit_time ? '#10b981' : 'rgba(16,185,129,0.18)', color: l.visit_time ? '#fff' : '#047857', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 4px', fontVariantNumeric: 'tabular-nums' }}>
+                          {l.visit_time ? (
+                            <>
+                              <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1, fontFamily: 'Manrope, sans-serif' }}>{l.visit_time}</div>
+                              {endTime && <div style={{ fontSize: 9, fontWeight: 500, opacity: 0.85, marginTop: 3, lineHeight: 1 }}>– {endTime}</div>}
+                              <div style={{ fontSize: 8, fontWeight: 600, opacity: 0.85, marginTop: 4, letterSpacing: '0.05em' }}>{dur} MIN</div>
+                            </>
+                          ) : (
+                            <>
+                              <Calendar size={16} />
+                              <div style={{ fontSize: 8, fontWeight: 700, marginTop: 4, letterSpacing: '0.05em' }}>SIN HORA</div>
+                            </>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#065f46' }}>{l.name}</div>
+                            <div style={{ fontSize: 11, color: '#059669' }}>
+                              {l.guests ? `${l.guests} inv.` : ''}
+                              {l.guests && (l.budget && l.budget !== 'sin_definir') ? ' · ' : ''}
+                              {l.budget && l.budget !== 'sin_definir' ? BUDGET_LABEL[l.budget] || l.budget : ''}
+                              {l.wedding_date ? ` · Boda: ${new Date(l.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 11, color: st.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{st.label}</span>
+                          {deleteVisitConfirmId === l.id ? (
+                            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                              <button disabled={deletingVisit} onClick={async () => {
+                                setDeletingVisit(true)
+                                const { createClient } = await import('@/lib/supabase')
+                                const sb = createClient()
+                                const updates: any = { visit_date: null, visit_time: null, visit_duration: null }
+                                if (l.status === 'visit_scheduled') updates.status = 'post_visit'
+                                await sb.from('leads').update(updates).eq('id', l.id)
+                                onUpdateLead(l.id, updates)
+                                setDeleteVisitConfirmId(null)
+                                setDeletingVisit(false)
+                              }} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                {deletingVisit ? '...' : '¿Eliminar?'}
+                              </button>
+                              <button onClick={() => setDeleteVisitConfirmId(null)} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 11, cursor: 'pointer' }}>
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                              <a href={`/leads?openVisit=${l.id}`} title="Editar visita" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6, background: '#10b981', color: '#fff', textDecoration: 'none', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                <Edit2 size={11} /> Editar
+                              </a>
+                              <button onClick={() => setDeleteVisitConfirmId(l.id)} title="Eliminar visita" style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <span style={{ fontSize: 11, color: st.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{st.label}</span>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* ══ ② PAREJAS ══ */}
+              {(() => {
+                const NEG_STATUSES  = ['contacted', 'post_visit']
+                const PROP_STATUSES = ['proposal_sent', 'budget_sent']
+                // won y visit_scheduled tienen su propia sección — no aparecen en las listas de leads
+                const HIDDEN_STATUSES = ['visit_scheduled', 'won']
+
+                // Exclude leads already shown in "Visitas programadas" to avoid duplication
+                const visitIds = new Set(visitsOnDate.map(v => v.id))
+                const leadsForSections = leadsOnDate.filter(l => !visitIds.has(l.id) && !HIDDEN_STATUSES.includes(l.status))
+
+                const newLeads  = leadsForSections.filter(l => l.status === 'new')
+                const extraLead = selectedLead && !leadsForSections.some(l => l.id === leadId) && !HIDDEN_STATUSES.includes(selectedLead.status) ? [selectedLead] : []
+                const allNonNew = [...leadsForSections.filter(l => l.status !== 'new'), ...extraLead]
+                const negLeads  = allNonNew.filter(l => NEG_STATUSES.includes(l.status))
+                const propLeads = allNonNew.filter(l => PROP_STATUSES.includes(l.status))
+                // cualquier estado no contemplado cae en negociación
+                const otherLeads = allNonNew.filter(l => !NEG_STATUSES.includes(l.status) && !PROP_STATUSES.includes(l.status))
+                const negAllBase = [...negLeads, ...otherLeads]
+                // Apply local ordering if available (user reordered via arrows)
+                const negAll = negOrderIds.length
+                  ? [...negAllBase].sort((a, b) => {
+                      const ai = negOrderIds.indexOf(a.id)
+                      const bi = negOrderIds.indexOf(b.id)
+                      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+                    })
+                  : negAllBase
+
+                if (newLeads.length === 0 && negAll.length === 0 && propLeads.length === 0) return null
+
+                const SC = { new: '#3b82f6', neg: '#d97706', prop: '#059669' }
+
+                const SectionLabel = ({ label, count, color }: { label: string; count: number; color: string }) => (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#9c8f88', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: color, background: color + '1a', borderRadius: 20, padding: '1px 7px' }}>{count}</span>
+                    <div style={{ flex: 1, height: 1, background: '#ede8e3' }} />
+                  </div>
+                )
+
+                const LeadRow = (l: Lead, sectionColor: string) => {
+                  const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
+                  return (
+                    <div key={l.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 9,
+                      padding: '7px 10px 7px 11px',
+                      background: 'white',
+                      borderRadius: 8,
+                      borderLeft: `3px solid ${sectionColor}`,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: st.color + '1a', color: st.color, fontWeight: 600 }}>{st.label}</span>
+                          {l.guests ? <span style={{ fontSize: 10, color: '#9c8f88' }}>{l.guests} inv.</span> : null}
+                          {l.budget && l.budget !== 'sin_definir' ? <span style={{ fontSize: 10, color: '#9c8f88' }}>{BUDGET_LABEL[l.budget] || l.budget}</span> : null}
+                        </div>
+                      </div>
                       {removeLeadConfirmId === l.id ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 500 }}>¿Quitar de esta fecha?</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                          <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 500 }}>¿Quitar?</span>
                           <button onClick={() => handleRemoveLeadFromDate(l)} disabled={removingSaving}
                             style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, cursor: 'pointer', border: 'none', background: '#dc2626', color: '#fff', fontWeight: 600 }}>
                             {removingSaving ? '...' : 'Sí'}
@@ -1536,568 +1658,452 @@ function DayModal({
                           </button>
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          {/* Vincular — visible para todos los leads; reemplaza el vinculado actual */}
-                          {!isPast && (
-                            <button
-                              onClick={() => { setLeadId(isLinked ? null : l.id); setExpandedLeadId(null) }}
-                              title={!isLinked && leadId ? 'Sustituirá al lead vinculado actual' : ''}
-                              style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid', fontWeight: 500,
-                                borderColor: isLinked ? '#86efac' : leadId ? '#fde68a' : 'var(--ivory)',
-                                background: isLinked ? '#dcfce7' : leadId ? '#fffbeb' : 'transparent',
-                                color: isLinked ? '#16a34a' : leadId ? '#92400e' : 'var(--charcoal)' }}>
-                              {isLinked ? '✓ Vinculado' : leadId ? '⇄ Cambiar' : 'Vincular'}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              if (isExpanded) { setExpandedLeadId(null); return }
-                              setExpandedLeadId(l.id)
-                              setInlineEditForm({ name: l.name, email: l.email || '', phone: l.phone || '', guests: l.guests ? String(l.guests) : '', status: l.status })
-                            }}
-                            title="Editar lead"
-                            style={{ fontSize: 10, padding: '3px 7px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--ivory)', background: isExpanded ? 'var(--ivory)' : 'transparent', color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 3 }}>
-                            <FileText size={10} /> Editar
-                          </button>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                          <a href={`/leads?open=${l.id}&returnDate=${date}`}
+                            style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <FileText size={10} /> Ver
+                          </a>
                           {!isPast && l.status !== 'won' && (
                             <button onClick={() => setRemoveLeadConfirmId(l.id)}
-                              title="Quitar lead de esta fecha"
-                              style={{ fontSize: 10, padding: '3px 7px', borderRadius: 6, cursor: 'pointer', border: '1px solid #fca5a5', background: 'transparent', color: '#dc2626', display: 'flex', alignItems: 'center', gap: 3 }}>
+                              style={{ fontSize: 10, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', border: '1px solid #fca5a5', background: 'transparent', color: '#dc2626', display: 'flex', alignItems: 'center' }}>
                               <Trash2 size={10} />
                             </button>
                           )}
                         </div>
                       )}
                     </div>
+                  )
+                }
 
-                    {/* Inline edit panel */}
-                    {isExpanded && (
-                      <div style={{ padding: '14px 14px', background: '#fafafa', border: '1px solid var(--ivory)', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                          <div>
-                            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Nombre</div>
-                            <input className="form-input" style={{ fontSize: 12 }} value={inlineEditForm.name}
-                              onChange={e => setInlineEditForm(f => ({ ...f, name: e.target.value }))} />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Invitados</div>
-                            <input className="form-input" style={{ fontSize: 12 }} type="number" value={inlineEditForm.guests}
-                              onChange={e => setInlineEditForm(f => ({ ...f, guests: e.target.value }))} placeholder="Nº" />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Teléfono</div>
-                            <input className="form-input" style={{ fontSize: 12 }} value={inlineEditForm.phone}
-                              onChange={e => setInlineEditForm(f => ({ ...f, phone: e.target.value }))} placeholder="+34 600 000 000" />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Email</div>
-                            <input className="form-input" style={{ fontSize: 12 }} type="email" value={inlineEditForm.email}
-                              onChange={e => setInlineEditForm(f => ({ ...f, email: e.target.value }))} />
-                          </div>
-                        </div>
-                        <div style={{ marginBottom: 10 }}>
-                          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Estado del lead</div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                            {Object.entries(LEAD_STATUS).map(([s, cfg]) => (
-                              <button key={s} onClick={() => setInlineEditForm(f => ({ ...f, status: s }))} style={{
-                                fontSize: 11, padding: '3px 9px', borderRadius: 20, cursor: 'pointer',
-                                border: `1px solid ${inlineEditForm.status === s ? cfg.color : 'var(--ivory)'}`,
-                                background: inlineEditForm.status === s ? `${cfg.color}18` : 'transparent',
-                                color: inlineEditForm.status === s ? cfg.color : 'var(--warm-gray)',
-                                fontWeight: inlineEditForm.status === s ? 600 : 400,
-                              }}>
-                                {cfg.label}
+                return (
+                  <div style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                    {propLeads.length > 0 && (
+                      <div>
+                        <SectionLabel label="Propuesta enviada" count={propLeads.length} color={SC.prop} />
+                        {propLeads.map(l => LeadRow(l, SC.prop))}
+                      </div>
+                    )}
+
+                    {negAll.length > 0 && (() => {
+                      const isReorderMode = negOrderIds.length > 0 && negAll.length > 1
+                      return (
+                        <div>
+                          {/* Section header with optional pencil toggle */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: SC.neg, flexShrink: 0 }} />
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#9c8f88', textTransform: 'uppercase', letterSpacing: '0.08em' }}>En negociación</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: SC.neg, background: SC.neg + '1a', borderRadius: 20, padding: '1px 7px' }}>{negAll.length}</span>
+                            {negAll.length > 1 && (
+                              <button
+                                onClick={() => setNegOrderIds(ids => ids.length ? [] : negAll.map(l => l.id))}
+                                title={isReorderMode ? 'Salir del modo orden' : 'Cambiar orden de prioridad'}
+                                style={{
+                                  width: 20, height: 20, borderRadius: 5, border: `1px solid ${isReorderMode ? SC.neg : 'var(--ivory)'}`,
+                                  background: isReorderMode ? SC.neg + '18' : '#fff',
+                                  color: isReorderMode ? SC.neg : 'var(--warm-gray)',
+                                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, marginLeft: 2,
+                                }}
+                              >
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                               </button>
-                            ))}
+                            )}
+                            <div style={{ flex: 1, height: 1, background: '#ede8e3' }} />
                           </div>
+                          {negAll.map((l, idx) => (
+                            <div key={l.id} style={{ display: 'flex', alignItems: 'stretch', gap: 4, marginBottom: 4 }}>
+                              {/* Reorder arrows — only in reorder mode */}
+                              {isReorderMode && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center', flexShrink: 0 }}>
+                                  <button
+                                    disabled={idx === 0}
+                                    onClick={() => { const ids = negAll.map(x => x.id); [ids[idx-1], ids[idx]] = [ids[idx], ids[idx-1]]; setNegOrderIds(ids) }}
+                                    style={{ width: 18, height: 18, borderRadius: 4, border: '1px solid var(--ivory)', background: idx === 0 ? 'transparent' : '#fff', cursor: idx === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: idx === 0 ? '#d1d5db' : SC.neg, padding: 0, fontSize: 10 }}
+                                  >▴</button>
+                                  <button
+                                    disabled={idx === negAll.length - 1}
+                                    onClick={() => { const ids = negAll.map(x => x.id); [ids[idx], ids[idx+1]] = [ids[idx+1], ids[idx]]; setNegOrderIds(ids) }}
+                                    style={{ width: 18, height: 18, borderRadius: 4, border: '1px solid var(--ivory)', background: idx === negAll.length-1 ? 'transparent' : '#fff', cursor: idx === negAll.length-1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: idx === negAll.length-1 ? '#d1d5db' : SC.neg, padding: 0, fontSize: 10 }}
+                                  >▾</button>
+                                </div>
+                              )}
+                              <div style={{ flex: 1 }}>{LeadRow(l, SC.neg)}</div>
+                            </div>
+                          ))}
                         </div>
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                          <button className="btn btn-ghost" 
-                            onClick={() => setExpandedLeadId(null)}>Cancelar</button>
-                          <button className="btn btn-primary" 
-                            disabled={inlineEditSaving}
-                            onClick={async () => {
-                              setInlineEditSaving(true)
-                              const supabase = createClient()
-                              const fields: Partial<Lead> = {
-                                name: inlineEditForm.name,
-                                phone: inlineEditForm.phone || undefined,
-                                email: inlineEditForm.email || undefined,
-                                guests: inlineEditForm.guests ? Number(inlineEditForm.guests) : undefined,
-                                status: inlineEditForm.status,
-                              }
-                              await supabase.from('leads').update(fields).eq('id', l.id)
-                              await onUpdateLead(l.id, fields)
-                              setInlineEditSaving(false)
-                              setExpandedLeadId(null)
-                            }}>
-                            {inlineEditSaving ? 'Guardando...' : 'Guardar cambios'}
+                      )
+                    })()}
+
+                    {newLeads.length > 0 && (
+                      <div>
+                        <SectionLabel label="Leads nuevos" count={newLeads.length} color={SC.new} />
+                        {(showAllLeads ? newLeads : newLeads.slice(0, LEADS_PREVIEW)).map(l => LeadRow(l, SC.new))}
+                        {newLeads.length > LEADS_PREVIEW && (
+                          <button onClick={() => setShowAllLeads(v => !v)}
+                            style={{ width: '100%', marginTop: 2, padding: '4px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>
+                            {showAllLeads ? 'Ver menos ↑' : `+ Ver ${newLeads.length - LEADS_PREVIEW} más`}
                           </button>
-                        </div>
+                        )}
                       </div>
                     )}
 
                   </div>
                 )
-              })}
-            </div>
-          )}
-            </>
-          )}
+              })()}
 
-          {/* Visitas programadas */}
-          {visitsOnDate.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                Visitas programadas
-              </div>
-              {[...visitsOnDate].sort((a, b) => (a.visit_time || 'zz').localeCompare(b.visit_time || 'zz')).map(l => {
-                const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
-                const dur = l.visit_duration || 60
-                let endTime: string | null = null
-                if (l.visit_time) {
-                  const [h, m] = l.visit_time.split(':').map(Number)
-                  if (!isNaN(h) && !isNaN(m)) {
-                    const total = h * 60 + m + dur
-                    endTime = `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
-                  }
-                }
-                return (
-                  <div key={l.id} style={{ display: 'flex', alignItems: 'stretch', gap: 0, padding: 0, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
-                    {/* Time block */}
-                    <div style={{
-                      width: 64, flexShrink: 0,
-                      background: l.visit_time ? '#10b981' : 'rgba(16,185,129,0.18)',
-                      color: l.visit_time ? '#fff' : '#047857',
-                      display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center',
-                      padding: '8px 4px',
-                      fontVariantNumeric: 'tabular-nums',
-                    }}>
-                      {l.visit_time ? (
-                        <>
-                          <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1, fontFamily: 'Manrope, sans-serif' }}>{l.visit_time}</div>
-                          {endTime && (
-                            <div style={{ fontSize: 9, fontWeight: 500, opacity: 0.85, marginTop: 3, lineHeight: 1 }}>– {endTime}</div>
-                          )}
-                          <div style={{ fontSize: 8, fontWeight: 600, opacity: 0.85, marginTop: 4, letterSpacing: '0.05em' }}>{dur} MIN</div>
-                        </>
-                      ) : (
-                        <>
-                          <Calendar size={16} />
-                          <div style={{ fontSize: 8, fontWeight: 700, marginTop: 4, letterSpacing: '0.05em' }}>SIN HORA</div>
-                        </>
-                      )}
-                    </div>
-                    {/* Details */}
-                    <div style={{ flex: 1, minWidth: 0, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#065f46' }}>{l.name}</div>
-                        <div style={{ fontSize: 11, color: '#059669' }}>
-                          {l.guests ? `${l.guests} inv.` : ''}
-                          {l.guests && (l.budget && l.budget !== 'sin_definir') ? ' · ' : ''}
-                          {l.budget && l.budget !== 'sin_definir' ? BUDGET_LABEL[l.budget] || l.budget : ''}
-                          {l.wedding_date ? ` · Boda: ${new Date(l.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
-                        </div>
-                      </div>
-                      <span style={{ fontSize: 11, color: st.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{st.label}</span>
-                      <a
-                        href={`/leads?openVisit=${l.id}`}
-                        title="Editar visita"
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          padding: '5px 10px', borderRadius: 6,
-                          background: '#10b981', color: '#fff',
-                          textDecoration: 'none', fontSize: 11, fontWeight: 600,
-                          whiteSpace: 'nowrap', flexShrink: 0,
-                        }}
-                      >
-                        <Edit2 size={11} /> Editar
-                      </a>
-                    </div>
+              {/* ══ ③ DETALLES SEGÚN ESTADO ══ */}
+
+              {/* RESERVADO: boda card */}
+              {!isPast && status === 'reservado' && (
+                <div style={{ marginBottom: 20, padding: '14px 16px', background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#9d174d', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                    <Flower2 size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Boda reservada
                   </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Quick lead link — only for negociacion / reservado / bloqueado */}
-          {!isPast && !showCreate && (status === 'negociacion' || status === 'reservado' || status === 'bloqueado') && (
-            <div style={{ marginBottom: 20 }}>
-              {selectedLead ? (
-                /* ── Lead already linked ── */
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, marginBottom: dateRules.type !== 'simple' ? 10 : 0 }}>
-                    <User size={15} style={{ color: '#16a34a', flexShrink: 0 }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#15803d' }}>{selectedLead.name}</div>
-                      <div style={{ fontSize: 11, color: '#16a34a' }}>
-                        {selectedLead.guests ? `${selectedLead.guests} inv.` : ''}{selectedLead.email ? ` · ${selectedLead.email}` : ''}
-                      </div>
-                    </div>
-                    <button onClick={() => { setLeadId(null); setSearch('') }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a' }}><X size={14} /></button>
-                  </div>
-
-                  {/* Overnight selector */}
-                  {dateRules.type === 'overnight' && (
-                    <div style={{ padding: '10px 12px', background: '#fdf4ff', border: '1px solid #e9d5ff', borderRadius: 8 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', marginBottom: 8 }}>¿Cuándo es la boda?</div>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {([
-                          { val: 1 as const, label: 'Hoy es la boda', sub: `Boda: ${date} · Check-out: ${addDays(date, 1)}` },
-                          { val: 2 as const, label: 'Hoy es el check-out', sub: `Check-in: ${addDays(date, -1)} · Boda: ${date}` },
-                        ] as const).map(opt => (
-                          <button key={opt.val} type="button" onClick={() => setOvernightDay(opt.val)} style={{
-                            flex: 1, padding: '7px 8px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
-                            border: `2px solid ${overnightDay === opt.val ? '#7c3aed' : 'var(--ivory)'}`,
-                            background: overnightDay === opt.val ? '#faf5ff' : '#fff',
-                          }}>
-                            <div style={{ fontSize: 11, fontWeight: 600, color: overnightDay === opt.val ? '#7c3aed' : 'var(--charcoal)', marginBottom: 2 }}>{opt.label}</div>
-                            <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.3 }}>{opt.sub}</div>
-                          </button>
+                  {selectedLead ? (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                        {[
+                          { label: 'Pareja', value: selectedLead.name },
+                          { label: 'Invitados', value: selectedLead.guests ? `${selectedLead.guests} personas` : '—' },
+                          { label: 'Presupuesto', value: BUDGET_LABEL[selectedLead.budget || ''] || selectedLead.budget || '—' },
+                          { label: 'Ceremonia', value: CEREMONY_LABEL[selectedLead.ceremony_type || ''] || selectedLead.ceremony_type || '—' },
+                          { label: 'Teléfono', value: selectedLead.phone || selectedLead.whatsapp || '—' },
+                          { label: 'Email', value: selectedLead.email || '—' },
+                        ].map(({ label, value }) => (
+                          <div key={label}>
+                            <div style={{ fontSize: 10, color: '#be185d', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+                            <div style={{ fontSize: 12, color: '#831843', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+                          </div>
                         ))}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Packages selector */}
-                  {dateRules.type === 'packages' && (
-                    <div style={{ padding: '10px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: '#15803d', marginBottom: 8 }}>📦 Paquete de fechas</div>
-                      {packagesForDate.length === 0 ? (
-                        <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Esta fecha no pertenece a ningún paquete definido.</div>
-                      ) : packagesForDate.length === 1 ? (
-                        <div style={{ fontSize: 12, color: '#15803d', fontWeight: 500 }}>
-                          {packagesForDate[0].pkg.name || 'Paquete'}: <strong>{packagesForDate[0].startDate}</strong> → <strong>{packagesForDate[0].endDate}</strong>
-                          <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--warm-gray)', fontWeight: 400 }}>({packagesForDate[0].pkg.span_days} días)</span>
+                      {!showCancelWedding ? (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <a href={`/leads?open=${selectedLead.id}&returnDate=${date}`} style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <User size={12} /> Ver lead
+                          </a>
+                          <a href="/proposals" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <FileText size={12} /> Propuesta
+                          </a>
+                          <button onClick={() => setShowCancelWedding(true)}
+                            style={{ flex: 1, fontSize: 12, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 6, padding: '6px', cursor: 'pointer' }}>
+                            Cancelar boda
+                          </button>
                         </div>
                       ) : (
-                        <>
-                          <div style={{ fontSize: 11, color: '#15803d', marginBottom: 6 }}>Esta fecha solapa dos paquetes. ¿Cuál aplica?</div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                            {packagesForDate.map((p, i) => (
-                              <button key={i} type="button" onClick={() => setSelectedPkgIdx(i)} style={{
-                                padding: '7px 10px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
-                                border: `2px solid ${selectedPkgIdx === i ? '#16a34a' : 'var(--ivory)'}`,
-                                background: selectedPkgIdx === i ? '#f0fdf4' : '#fff',
-                                fontSize: 12, fontWeight: 500, color: selectedPkgIdx === i ? '#15803d' : 'var(--charcoal)',
+                        <div>
+                          <div style={{ fontSize: 11, color: '#9d174d', marginBottom: 8, lineHeight: 1.5 }}>Esta acción liberará la fecha y moverá el lead a Perdidos.</div>
+                          <textarea value={cancelWeddingReason} onChange={e => setCancelWeddingReason(e.target.value)}
+                            placeholder="Motivo de la cancelación (opcional)..." className="form-input" rows={2}
+                            style={{ fontSize: 12, marginBottom: 8, resize: 'none', width: '100%', boxSizing: 'border-box' }} />
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button onClick={() => { setShowCancelWedding(false); setCancelWeddingReason('') }}
+                              style={{ flex: 1, fontSize: 12, background: 'none', border: '1px solid var(--ivory)', borderRadius: 8, padding: '7px 0', cursor: 'pointer', color: 'var(--warm-gray)' }}>
+                              Volver
+                            </button>
+                            <button disabled={cancelWeddingSaving}
+                              onClick={async () => { setCancelWeddingSaving(true); await onCancelWedding(selectedLead, cancelWeddingReason); setCancelWeddingSaving(false); onClose() }}
+                              style={{ flex: 2, fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 600 }}>
+                              {cancelWeddingSaving ? 'Cancelando...' : 'Confirmar cancelación'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* No lead linked: show lead search */
+                    <div>
+                      <div style={{ fontSize: 12, color: '#be185d', marginBottom: 10 }}>Vincula la pareja que reservó esta boda.</div>
+                      {!showQuickLink ? (
+                        <button onClick={() => setShowQuickLink(true)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', background: 'transparent', cursor: 'pointer', fontWeight: 500 }}>🔗 Vincular lead</button>
+                      ) : (
+                        <div>
+                          <div style={{ position: 'relative', marginBottom: 8 }}>
+                            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
+                            <input className="form-input" style={{ paddingLeft: 32 }} value={search}
+                              onChange={e => setSearch(e.target.value)} placeholder="Buscar lead por nombre o email..." autoFocus />
+                          </div>
+                          {search && (
+                            <div style={{ border: '1px solid var(--ivory)', borderRadius: 8, overflow: 'hidden' }}>
+                              {filteredLeads.length === 0 ? (
+                                <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--warm-gray)' }}>Sin resultados</div>
+                              ) : filteredLeads.map(l => (
+                                <div key={l.id} onClick={() => { setLeadId(l.id); setSearch(''); setShowQuickLink(false) }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--ivory)', background: '#fff' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--cream)')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
+                                  <User size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 500 }}>{l.name}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{l.guests ? `${l.guests} inv.` : ''}</div>
+                                  </div>
+                                  <span style={{ fontSize: 11, color: (LEAD_STATUS[l.status] || {}).color || '#6b7280', fontWeight: 500 }}>{(LEAD_STATUS[l.status] || { label: l.status }).label}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ══ BLOQUEAR FECHA — compact pills ══ */}
+              {!isPast && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', flexShrink: 0 }}>Bloquear:</span>
+                    {([
+                      { noteVal: '' as const,                 label: 'Día completo' },
+                      { noteVal: 'medio_dia_manana' as const, label: '½ Mañana'     },
+                      { noteVal: 'medio_dia_tarde'  as const, label: '½ Tarde'      },
+                    ]).map(opt => {
+                      const isActive = status === 'bloqueado' && halfDay === opt.noteVal
+                      return (
+                        <button key={opt.noteVal || 'full'} onClick={() => {
+                          if (isActive) { setStatus('libre'); setHalfDay('') }
+                          else          { setStatus('bloqueado'); setHalfDay(opt.noteVal) }
+                        }} style={{
+                          padding: '4px 12px', borderRadius: 20, cursor: 'pointer', fontSize: 12,
+                          border: `1.5px solid ${isActive ? '#6b7280' : 'var(--ivory)'}`,
+                          background: isActive ? '#6b7280' : 'transparent',
+                          color: isActive ? '#fff' : 'var(--warm-gray)',
+                          fontWeight: isActive ? 600 : 400, transition: 'all 0.12s',
+                        }}>
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {status === 'bloqueado' && (
+                    <div style={{ marginTop: 10 }}>
+                      <textarea className="form-textarea" style={{ minHeight: 60 }} value={note}
+                        onChange={e => setNote(e.target.value)}
+                        placeholder={isMedioDia ? 'Nota interna (opcional)...' : 'Motivo del bloqueo (opcional)...'} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* NEGOCIACIÓN: pareja vinculada + detalles */}
+              {!isPast && status === 'negociacion' && (
+                <div style={{ marginBottom: 20 }}>
+                  {selectedLead ? (
+                    <>
+
+                      {/* Overnight selector */}
+                      {dateRules.type === 'overnight' && (
+                        <div style={{ padding: '10px 12px', background: '#fdf4ff', border: '1px solid #e9d5ff', borderRadius: 8, marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', marginBottom: 8 }}>¿Cuándo es la boda?</div>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            {([
+                              { val: 1 as const, label: 'Hoy es la boda', sub: `Boda: ${date} · Check-out: ${addDays(date, 1)}` },
+                              { val: 2 as const, label: 'Hoy es el check-out', sub: `Check-in: ${addDays(date, -1)} · Boda: ${date}` },
+                            ] as const).map(opt => (
+                              <button key={opt.val} type="button" onClick={() => setOvernightDay(opt.val)} style={{
+                                flex: 1, padding: '7px 8px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                                border: `2px solid ${overnightDay === opt.val ? '#7c3aed' : 'var(--ivory)'}`,
+                                background: overnightDay === opt.val ? '#faf5ff' : '#fff',
                               }}>
-                                {p.pkg.name || `Paquete ${i + 1}`}: {p.startDate} → {p.endDate}
-                                <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--warm-gray)', fontWeight: 400 }}>({p.pkg.span_days} días)</span>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: overnightDay === opt.val ? '#7c3aed' : 'var(--charcoal)', marginBottom: 2 }}>{opt.label}</div>
+                                <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.3 }}>{opt.sub}</div>
                               </button>
                             ))}
                           </div>
-                        </>
+                        </div>
                       )}
-                    </div>
-                  )}
-                </>
-              ) : (
-                /* ── No lead linked: quick-link collapsed UI ── */
-                <div>
-                  {!showQuickLink ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 8 }}>
-                      <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Para vincular un lead, hazlo desde <a href="/leads" style={{ color: 'var(--gold)', textDecoration: 'none', fontWeight: 600 }}>Leads</a></span>
-                      <button onClick={() => setShowQuickLink(true)}
-                        style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, cursor: 'pointer', border: '1px solid var(--gold)', background: 'transparent', color: 'var(--gold)', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 8 }}>
-                        🔗 Vincular aquí
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--charcoal)' }}>Vincular lead (sin aplicar reglas)</span>
-                        <button onClick={() => { setShowQuickLink(false); setSearch('') }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 2 }}><X size={13} /></button>
-                      </div>
-                      <div style={{ position: 'relative', marginBottom: 8 }}>
-                        <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
-                        <input className="form-input" style={{ paddingLeft: 32 }} value={search}
-                          onChange={e => setSearch(e.target.value)} placeholder="Buscar lead por nombre o email..." autoFocus />
-                      </div>
-                      {search && (
-                        <div style={{ border: '1px solid var(--ivory)', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
-                          {filteredLeads.length === 0 ? (
-                            <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--warm-gray)' }}>Sin resultados</div>
-                          ) : filteredLeads.map(l => (
-                            <div key={l.id} onClick={() => { setLeadId(l.id); setSearch(''); setShowQuickLink(false) }}
-                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--ivory)', background: '#fff' }}
-                              onMouseEnter={e => (e.currentTarget.style.background = 'var(--cream)')}
-                              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
-                              <User size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                              <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 12, fontWeight: 500 }}>{l.name}</div>
-                                <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
-                                  {l.wedding_date ? new Date(l.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Sin fecha'}
-                                  {l.guests ? ` · ${l.guests} inv.` : ''}
-                                </div>
-                              </div>
-                              <span style={{ fontSize: 11, color: (LEAD_STATUS[l.status] || {}).color || '#6b7280', fontWeight: 500 }}>
-                                {(LEAD_STATUS[l.status] || { label: l.status }).label}
-                              </span>
+
+                      {/* Packages selector */}
+                      {dateRules.type === 'packages' && (
+                        <div style={{ padding: '10px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: '#15803d', marginBottom: 8 }}>📦 Paquete de fechas</div>
+                          {packagesForDate.length === 0 ? (
+                            <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Esta fecha no pertenece a ningún paquete definido.</div>
+                          ) : packagesForDate.length === 1 ? (
+                            <div style={{ fontSize: 12, color: '#15803d', fontWeight: 500 }}>
+                              {packagesForDate[0].pkg.name || 'Paquete'}: <strong>{packagesForDate[0].startDate}</strong> → <strong>{packagesForDate[0].endDate}</strong>
+                              <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--warm-gray)', fontWeight: 400 }}>({packagesForDate[0].pkg.span_days} días)</span>
                             </div>
-                          ))}
+                          ) : (
+                            <>
+                              <div style={{ fontSize: 11, color: '#15803d', marginBottom: 6 }}>Esta fecha solapa dos paquetes. ¿Cuál aplica?</div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                {packagesForDate.map((p, i) => (
+                                  <button key={i} type="button" onClick={() => setSelectedPkgIdx(i)} style={{
+                                    padding: '7px 10px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                                    border: `2px solid ${selectedPkgIdx === i ? '#16a34a' : 'var(--ivory)'}`,
+                                    background: selectedPkgIdx === i ? '#f0fdf4' : '#fff',
+                                    fontSize: 12, fontWeight: 500, color: selectedPkgIdx === i ? '#15803d' : 'var(--charcoal)',
+                                  }}>
+                                    {p.pkg.name || `Paquete ${i + 1}`}: {p.startDate} → {p.endDate}
+                                    <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--warm-gray)', fontWeight: 400 }}>({p.pkg.span_days} días)</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
                         </div>
                       )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
 
-
-          {/* Lead pipeline status editor */}
-          {selectedLead && !isPast && !showCreate && status !== 'reservado' && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Estado del lead</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {Object.entries(LEAD_STATUS).map(([s, cfg]) => (
-                  <button key={s} onClick={() => setLeadPipelineStatus(s)} style={{
-                    fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
-                    border: `1px solid ${leadPipelineStatus === s ? cfg.color : 'var(--ivory)'}`,
-                    background: leadPipelineStatus === s ? `${cfg.color}18` : 'transparent',
-                    color: leadPipelineStatus === s ? cfg.color : 'var(--warm-gray)',
-                    fontWeight: leadPipelineStatus === s ? 600 : 400,
-                    transition: 'all 0.1s',
-                  }}>
-                    {cfg.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Scope selector: apply calendar entry status to just this date or all linked dates */}
-          {selectedLead && !isPast && !showCreate && status !== 'libre' && status !== 'reservado' && leadEntries.length > 1 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-                Aplicar estado del calendario a
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {([['this', 'Solo esta fecha'], ['all', 'Todas las fechas del lead']] as const).map(([val, label]) => (
-                  <button key={val} onClick={() => setScope(val)} style={{
-                    flex: 1, padding: '7px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 11,
-                    border: `1px solid ${scope === val ? 'var(--gold)' : 'var(--ivory)'}`,
-                    background: scope === val ? '#fef9ec' : 'transparent',
-                    color: scope === val ? '#92400e' : 'var(--warm-gray)',
-                    fontWeight: scope === val ? 600 : 400,
-                    transition: 'all 0.1s',
-                  }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Visita programada */}
-          {selectedLead && !isPast && !showCreate && status !== 'reservado' && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-                Visita programada
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <input
-                    className="form-input"
-                    type="date"
-                    value={visitDate}
-                    onChange={e => setVisitDate(e.target.value)}
-                    style={{ fontSize: 13 }}
-                  />
-                </div>
-                {visitDate && (
-                  <button onClick={() => setVisitDate('')}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}>
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-              {visitDate && (
-                <div style={{ marginTop: 6, fontSize: 12, color: '#10b981', fontWeight: 500 }}>
-                  <Calendar size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> {new Date(visitDate + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Linked dates manager */}
-          {selectedLead && !isPast && !showCreate && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-                Fechas en el calendario
-              </div>
-              {loadingLeadEntries ? (
-                <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Cargando...</div>
-              ) : leadEntries.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--warm-gray)', padding: '4px 0' }}>Solo esta fecha vinculada</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {leadEntries.map(e => {
-                    const isThisDate = e.date === date
-                    const isUnlinking = datesToUnlink.has(e.date)
-                    const eCfg = STATUS_CFG[e.status as Status] || STATUS_CFG.libre
-                    return (
-                      <div key={e.date} style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
-                        background: isUnlinking ? '#fef2f2' : isThisDate ? '#f0fdf4' : 'var(--cream)',
-                        border: `1px solid ${isUnlinking ? '#fca5a5' : isThisDate ? '#86efac' : 'var(--ivory)'}`,
-                        borderRadius: 8, opacity: isUnlinking ? 0.75 : 1,
-                      }}>
-                        <div style={{ flex: 1 }}>
-                          <span style={{ fontSize: 12, fontWeight: 500, color: isUnlinking ? '#9ca3af' : 'var(--charcoal)', textDecoration: isUnlinking ? 'line-through' : 'none' }}>
-                            {formatDateEs(e.date)}
-                          </span>
-                          {isThisDate && <span style={{ fontSize: 10, color: '#16a34a', marginLeft: 6, fontWeight: 500 }}>← esta fecha</span>}
+                      {/* Nota */}
+                      <div>
+                        <label className="form-label">Nota interna (opcional)</label>
+                        <textarea className="form-textarea" style={{ minHeight: 60 }} value={note}
+                          onChange={e => setNote(e.target.value)}
+                          placeholder="Ej: Esperando confirmación, visita el lunes..." />
+                      </div>
+                    </>
+                  ) : (
+                    /* No lead linked */
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                        Pareja en negociación
+                      </div>
+                      {!showQuickLink ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 8, marginBottom: 12 }}>
+                          <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Sin pareja vinculada</span>
+                          <button onClick={() => setShowQuickLink(true)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, cursor: 'pointer', border: '1px solid var(--gold)', background: 'transparent', color: 'var(--gold)', fontWeight: 600 }}>
+                            🔗 Vincular lead
+                          </button>
                         </div>
-                        <span style={{ fontSize: 10, background: eCfg.badge, color: eCfg.color, padding: '1px 6px', borderRadius: 10, fontWeight: 500 }}>
-                          {eCfg.label}
-                        </span>
-                        {!isThisDate && (
-                          <button
-                            onClick={() => setDatesToUnlink(prev => {
-                              const n = new Set(prev)
-                              if (n.has(e.date)) n.delete(e.date); else n.add(e.date)
-                              return n
-                            })}
-                            title={isUnlinking ? 'Restaurar' : 'Quitar lead de esta fecha'}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isUnlinking ? '#16a34a' : '#dc2626', padding: 2, display: 'flex', alignItems: 'center' }}>
-                            {isUnlinking ? <RotateCcw size={12} /> : <Trash2 size={12} />}
-                          </button>
-                        )}
+                      ) : (
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--charcoal)' }}>Buscar lead existente</span>
+                            <button onClick={() => { setShowQuickLink(false); setSearch('') }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 2 }}><X size={13} /></button>
+                          </div>
+                          <div style={{ position: 'relative', marginBottom: 8 }}>
+                            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
+                            <input className="form-input" style={{ paddingLeft: 32 }} value={search}
+                              onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o email..." autoFocus />
+                          </div>
+                          {search && (
+                            <div style={{ border: '1px solid var(--ivory)', borderRadius: 8, overflow: 'hidden' }}>
+                              {filteredLeads.length === 0 ? (
+                                <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--warm-gray)' }}>Sin resultados</div>
+                              ) : filteredLeads.map(l => (
+                                <div key={l.id} onClick={() => { setLeadId(l.id); setSearch(''); setShowQuickLink(false) }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--ivory)', background: '#fff' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--cream)')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
+                                  <User size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 500 }}>{l.name}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                                      {l.wedding_date ? new Date(l.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Sin fecha'}
+                                      {l.guests ? ` · ${l.guests} inv.` : ''}
+                                    </div>
+                                  </div>
+                                  <span style={{ fontSize: 11, color: (LEAD_STATUS[l.status] || {}).color || '#6b7280', fontWeight: 500 }}>{(LEAD_STATUS[l.status] || { label: l.status }).label}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Note when no lead */}
+                      <div>
+                        <label className="form-label">Nota interna (opcional)</label>
+                        <textarea className="form-textarea" style={{ minHeight: 60 }} value={note}
+                          onChange={e => setNote(e.target.value)}
+                          placeholder="Ej: Pareja por confirmar, esperando señal..." />
                       </div>
-                    )
-                  })}
-                  {datesToUnlink.size > 0 && (
-                    <div style={{ fontSize: 11, color: '#dc2626', padding: '2px 0' }}>
-                      Se quitará el lead de {datesToUnlink.size} fecha{datesToUnlink.size > 1 ? 's' : ''} al guardar.
                     </div>
                   )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Quick create lead */}
-          {showCreate && (
-            <QuickCreateLead
-              defaultDate={date}
-              userId={userId}
-              onCreated={async (lead) => {
-                await onLeadCreated(lead)
-                setLeadId(lead.id)
-                setShowCreate(false)
-              }}
-              onCancel={() => setShowCreate(false)}
-            />
-          )}
-
-
-          {/* Notes — hidden for bloqueado because it already has its own "Motivo" textarea above */}
-          {!isPast && !showCreate && status !== 'bloqueado' && (
-            <div style={{ marginBottom: 20 }}>
-              <label className="form-label">Nota interna</label>
-              <textarea className="form-textarea" style={{ minHeight: 70 }} value={note}
-                onChange={e => setNote(e.target.value)}
-                placeholder="Ej: Festivo, pendiente de señal, contactar el lunes..." />
-            </div>
-          )}
-
-          {/* Quick actions if lead linked */}
-          {selectedLead && !isPast && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16, padding: '10px 12px', background: 'var(--cream)', borderRadius: 8 }}>
-              <a href="/leads" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                <User size={12} /> Ver lead completo
-              </a>
-              <a href="/proposals" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                <FileText size={12} /> Crear propuesta
-              </a>
-            </div>
-          )}
-
-          {isPast && !entry && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px', background: 'var(--cream)', borderRadius: 8, fontSize: 12, color: 'var(--warm-gray)' }}>
-              <AlertCircle size={14} /> Esta fecha ya ha pasado.
-            </div>
-          )}
-
-          {/* Panel leads afectados tras reservar/bloquear */}
-          {showAffected && affectedLeads.length > 0 && (
-            <div style={{ marginTop: 8, padding: '16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <AlertCircle size={14} /> {affectedLeads.length === 1 ? 'Hay 1 lead' : `Hay ${affectedLeads.length} leads`} más con esta fecha
-              </div>
-              <div style={{ fontSize: 12, color: '#78350f', marginBottom: 12 }}>
-                La fecha acaba de quedar {status}. ¿Qué quieres hacer con estos leads?
-              </div>
-              {affectedLeads.map(l => {
-                const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
-                const isSav = affectedSaving[l.id]
-                return (
-                  <div key={l.id} style={{ background: '#fff', border: '1px solid #fde68a', borderRadius: 8, padding: '12px', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                      <User size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{l.name}</div>
-                        {l.email && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{l.email}{l.phone ? ` · ${l.phone}` : ''}</div>}
-                      </div>
-                      <span style={{ fontSize: 11, color: st.color, fontWeight: 600 }}>{st.label}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <a href="/leads" style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <User size={10} /> Ver lead
-                      </a>
-                      <a href="/proposals" style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <FileText size={10} /> Nueva propuesta
-                      </a>
-                      <button
-                        disabled={isSav}
-                        onClick={async () => {
-                          setAffectedSaving(s => ({ ...s, [l.id]: true }))
-                          await onUpdateLead(l.id, { status: 'lost' })
-                          setAffectedLeads(prev => prev.filter(x => x.id !== l.id))
-                          setAffectedSaving(s => ({ ...s, [l.id]: false }))
-                        }}
-                        style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid #fca5a5', color: '#dc2626', background: 'transparent', cursor: 'pointer' }}>
-                        {isSav ? '...' : '✗ Marcar perdido'}
-                      </button>
-                      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: '1 1 160px' }}>
-                        <input type="date" className="form-input" style={{ fontSize: 11, padding: '4px 8px', flex: 1 }}
-                          value={newDateFor[l.id] || ''}
-                          onChange={e => setNewDateFor(d => ({ ...d, [l.id]: e.target.value }))}
-                          placeholder="Nueva fecha" />
-                        {newDateFor[l.id] && (
-                          <button
-                            disabled={isSav}
-                            onClick={async () => {
-                              setAffectedSaving(s => ({ ...s, [l.id]: true }))
-                              await onUpdateLead(l.id, { wedding_date: newDateFor[l.id] })
-                              setAffectedLeads(prev => prev.filter(x => x.id !== l.id))
-                              setAffectedSaving(s => ({ ...s, [l.id]: false }))
-                            }}
-                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid #86efac', color: '#16a34a', background: '#f0fdf4', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                            {isSav ? '...' : '✓ Guardar fecha'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-              {affectedLeads.length === 0 && (
-                <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 500 }}>✓ Todos los leads gestionados</div>
+              {/* LIBRE: nota */}
+              {!isPast && status === 'libre' && (
+                <div style={{ marginBottom: 20 }}>
+                  <label className="form-label">Nota interna (opcional)</label>
+                  <textarea className="form-textarea" style={{ minHeight: 60 }} value={note}
+                    onChange={e => setNote(e.target.value)}
+                    placeholder="Ej: Festivo, pendiente de confirmar..." />
+                </div>
               )}
-              <button
-                onClick={() => { setShowAffected(false); onClose() }}
-                style={{ marginTop: 8, fontSize: 12, padding: '6px 16px', borderRadius: 6, background: 'var(--gold)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-                Cerrar
-              </button>
-            </div>
+
+              {/* Past date message */}
+              {isPast && !entry && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px', background: 'var(--cream)', borderRadius: 8, fontSize: 12, color: 'var(--warm-gray)' }}>
+                  <AlertCircle size={14} /> Esta fecha ya ha pasado.
+                </div>
+              )}
+
+              {/* Affected leads overlay — rendered via portal below */}
+
+            </>
           )}
         </div>
+
+        {/* ── Overlay: leads afectados por fecha reservada/bloqueada ── */}
+        {showAffected && affectedLeads.length > 0 && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+            onClick={() => setShowAffected(false)}>
+            <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', maxHeight: '80vh', overflow: 'hidden' }}
+              onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid #fde68a', background: '#fffbeb' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <AlertCircle size={15} style={{ color: '#d97706', flexShrink: 0 }} />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#92400e' }}>
+                    {affectedLeads.length === 1 ? '1 lead pendiente de gestionar' : `${affectedLeads.length} leads pendientes de gestionar`}
+                  </span>
+                </div>
+                <p style={{ fontSize: 12, color: '#78350f', margin: 0, lineHeight: 1.4 }}>
+                  Esta fecha está {entry?.status === 'reservado' ? 'reservada' : 'bloqueada'}. Los siguientes leads tienen esta fecha en su propuesta.
+                </p>
+              </div>
+
+              {/* Lead list */}
+              <div style={{ overflowY: 'auto', padding: '14px 20px', flex: 1 }}>
+                {affectedLeads.map(l => {
+                  const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
+                  const otherDates = getOtherDatesLabel(l)
+                  const isSav = affectedSaving[l.id]
+                  return (
+                    <div key={l.id} style={{ border: '1px solid var(--ivory)', borderRadius: 10, padding: '12px 14px', marginBottom: 10, background: 'var(--cream)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <User size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
+                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: st.color + '1a', color: st.color, fontWeight: 600, flexShrink: 0 }}>{st.label}</span>
+                      </div>
+                      {otherDates ? (
+                        <div style={{ fontSize: 11, color: '#059669', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          ✓ Tiene otras fechas propuestas: <strong>{otherDates}</strong>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 11, color: '#d97706', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          ⚠ Esta es su única fecha propuesta
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <a href={`/leads?changeDates=${l.id}&returnDate=${date}`}
+                          style={{ flex: 1, textAlign: 'center', fontSize: 11, padding: '6px 8px', borderRadius: 7, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', fontWeight: 500, fontFamily: 'Manrope, sans-serif' }}>
+                          + Añadir otra fecha
+                        </a>
+                        <button onClick={() => handleRemoveFromDate(l)} disabled={isSav}
+                          style={{ flex: 1, fontSize: 11, padding: '6px 8px', borderRadius: 7, border: '1px solid #fca5a5', color: '#dc2626', background: 'transparent', cursor: 'pointer', fontWeight: 500, fontFamily: 'Manrope, sans-serif' }}>
+                          {isSav ? '...' : '✗ Quitar de esta fecha'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Footer */}
+              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--ivory)', display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={() => setShowAffected(false)}
+                  style={{ fontSize: 12, padding: '7px 16px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'Manrope, sans-serif' }}>
+                  Gestionar más tarde
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Delete from CRM popup */}
         {removedLeadForCrm && (
@@ -2108,9 +2114,7 @@ function DayModal({
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <User size={18} style={{ color: '#ef4444' }} />
                 </div>
-                <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--espresso)' }}>
-                  Lead sin fechas asignadas
-                </div>
+                <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--espresso)' }}>Lead sin fechas asignadas</div>
               </div>
               <div style={{ fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.6, marginBottom: 20 }}>
                 <strong>{removedLeadForCrm.name}</strong> ya no tiene ninguna fecha de boda asignada en el calendario. ¿Qué quieres hacer?
@@ -2126,8 +2130,7 @@ function DayModal({
                   style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                   Mover a Perdidos
                 </button>
-                <button
-                  onClick={() => setRemovedLeadForCrm(null)}
+                <button onClick={() => setRemovedLeadForCrm(null)}
                   style={{ padding: '10px 16px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--charcoal)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
                   Mantener en CRM
                 </button>
@@ -2136,108 +2139,6 @@ function DayModal({
           </div>
         )}
 
-        {/* ── Segundo medio día (only shown when primary is a half-day) ──────── */}
-        {!isPast && !showCreate && isMedioDia && (
-          <div style={{ borderTop: '2px dashed var(--ivory)', padding: '16px 24px' }}>
-            {!showSecondSlot ? (
-              <button
-                onClick={() => {
-                  // auto-assign the opposite half
-                  setHalfDay2(halfDay === 'medio_dia_manana' ? 'medio_dia_tarde' : 'medio_dia_manana')
-                  setStatus2('libre')
-                  setShowSecondSlot(true)
-                }}
-                style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1.5px dashed #fde68a', background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                + Añadir {halfDay === 'medio_dia_manana' ? '½ Tarde' : '½ Mañana'} para otro lead
-              </button>
-            ) : (
-              <div style={{ background: 'var(--cream)', borderRadius: 10, padding: '14px 16px', border: '1px solid var(--ivory)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)' }}>
-                    {halfDay2 === 'medio_dia_manana' ? '½ Mañana' : '½ Tarde'} — segundo lead
-                  </div>
-                  <button onClick={() => {
-                    if (entry2) {
-                      // Delete secondary entry
-                      setSlot2Saving(true)
-                      onSave2({ date, status: 'libre', note: undefined, lead_id: null } as any).then(() => {
-                        setShowSecondSlot(false); setStatus2('libre'); setHalfDay2(''); setNote2(''); setLeadId2(null); setSlot2Saving(false)
-                      })
-                    } else {
-                      setShowSecondSlot(false); setStatus2('libre'); setHalfDay2(''); setNote2(''); setLeadId2(null)
-                    }
-                  }} style={{ fontSize: 11, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
-                </div>
-
-                {/* Status buttons for slot 2 */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 5, marginBottom: 10 }}>
-                  {(Object.entries(STATUS_CFG) as [Status, typeof STATUS_CFG[Status]][]).map(([s, cfg]) => (
-                    <button key={s} onClick={() => setStatus2(s)} style={{
-                      padding: '6px 2px', borderRadius: 6, cursor: 'pointer', border: '2px solid',
-                      borderColor: status2 === s ? cfg.dot : 'var(--ivory)',
-                      background: status2 === s ? cfg.bg : 'transparent', fontSize: 10, fontWeight: 600, color: cfg.color,
-                    }}>{cfg.label}</button>
-                  ))}
-                </div>
-
-                {/* Half label (fixed, opposite of primary) */}
-                <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 10 }}>
-                  Medio día: <strong>{halfDay2 === 'medio_dia_manana' ? '½ Mañana' : '½ Tarde'}</strong>
-                </div>
-
-                {/* Lead picker for slot 2 */}
-                {status2 !== 'libre' && (
-                  <div style={{ marginBottom: 10 }}>
-                    <input
-                      className="form-input" style={{ fontSize: 12, marginBottom: 4 }}
-                      placeholder="Buscar lead por nombre o email..."
-                      value={search2} onChange={e => setSearch2(e.target.value)} />
-                    {search2 && (
-                      <div style={{ maxHeight: 140, overflowY: 'auto', border: '1px solid var(--ivory)', borderRadius: 6, background: '#fff' }}>
-                        {allLeads.filter(l => l.status !== 'lost' && (
-                          l.name.toLowerCase().includes(search2.toLowerCase()) || (l.email || '').toLowerCase().includes(search2.toLowerCase())
-                        )).slice(0, 8).map(l => (
-                          <button key={l.id} onClick={() => { setLeadId2(l.id); setSearch2('') }}
-                            style={{ width: '100%', textAlign: 'left', padding: '7px 10px', border: 'none', background: leadId2 === l.id ? 'var(--cream)' : 'transparent', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <User size={11} style={{ flexShrink: 0 }} />
-                            <span style={{ fontWeight: 500 }}>{l.name}</span>
-                            {l.email && <span style={{ color: 'var(--warm-gray)', fontSize: 10 }}>{l.email}</span>}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {leadId2 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: '#fff', border: '1px solid var(--ivory)', borderRadius: 6, marginTop: 4 }}>
-                        <User size={11} style={{ color: 'var(--warm-gray)' }} />
-                        <span style={{ fontSize: 12, fontWeight: 500, flex: 1 }}>{leadsById[leadId2]?.name || 'Lead seleccionado'}</span>
-                        <button onClick={() => setLeadId2(null)} style={{ fontSize: 10, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Note for slot 2 */}
-                <textarea className="form-textarea" style={{ minHeight: 50, fontSize: 12, marginBottom: 10 }}
-                  value={note2} onChange={e => setNote2(e.target.value)}
-                  placeholder="Nota interna (opcional)" />
-
-                {/* Save button for slot 2 */}
-                <button
-                  onClick={async () => {
-                    setSlot2Saving(true)
-                    const eff2 = status2 !== 'libre' ? halfDay2 : ''
-                    const n2 = eff2 ? (note2.trim() ? `${eff2}|${note2.trim()}` : eff2) : note2.trim() || undefined
-                    await onSave2({ date, status: status2, note: n2, lead_id: leadId2 })
-                    setSlot2Saving(false)
-                  }}
-                  disabled={slot2Saving}
-                  style={{ padding: '7px 16px', borderRadius: 7, border: 'none', background: '#d97706', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                  {slot2Saving ? 'Guardando...' : `Guardar ${halfDay2 === 'medio_dia_manana' ? '½ Mañana' : '½ Tarde'}`}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Footer */}
         {!isPast && !showCreate && (
