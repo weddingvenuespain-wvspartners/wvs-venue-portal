@@ -172,7 +172,7 @@ function SearchProviderModal({
 
         {/* Tabs: Todos / Mis favoritos — venues only, always visible */}
         {mode === 'venue' && (
-          <div style={{ padding: '12px 24px 0', flexShrink: 0, display: 'flex', gap: 4, background: 'var(--ivory)', margin: '0 24px', borderRadius: 10, padding: '4px', width: 'fit-content', margin: '12px 24px 0' }}>
+          <div style={{ padding: '4px', flexShrink: 0, display: 'flex', gap: 4, background: 'var(--ivory)', margin: '12px 24px 0', borderRadius: 10, width: 'fit-content' }}>
             {([
               { key: false, label: 'Todos los venues' },
               { key: true,  label: `Mis favoritos${favorites.size > 0 ? ` (${favorites.size})` : ''}` },
