@@ -4,6 +4,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
+import { usePlanFeatures } from '@/lib/use-plan-features'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { getStarterTemplate } from '@/lib/proposal-starter-templates'
 
@@ -22,11 +24,16 @@ function NuevaPropuestaContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
+  const { isBlocked, ready } = useRequireSubscription()
+  const features = usePlanFeatures()
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
+    if (isBlocked) return // useRequireSubscription already redirects to /pricing
+    if (!ready) return    // wait until subscription state is resolved
+    if (!features.propuestas) { router.replace('/proposals'); return }
 
     const leadId = searchParams.get('lead_id')
     const starter = getStarterTemplate(searchParams.get('template'))
@@ -116,7 +123,7 @@ function NuevaPropuestaContent() {
     }
 
     createDraft()
-  }, [user, authLoading, searchParams, router])
+  }, [user, authLoading, isBlocked, ready, features.propuestas, searchParams, router])
 
   if (error) {
     return (

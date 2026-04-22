@@ -5,6 +5,7 @@ import { use } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
+import { usePlanFeatures } from '@/lib/use-plan-features'
 import ProposalEditor, { type EditorProposal } from '@/components/ProposalEditor'
 import { Loader2 } from 'lucide-react'
 
@@ -12,7 +13,8 @@ export default function ProposalEditarPage({ params }: { params: Promise<{ id: s
   const { id } = use(params)
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const { isBlocked } = useRequireSubscription()
+  const { isBlocked, ready } = useRequireSubscription()
+  const features = usePlanFeatures()
 
   const [proposal, setProposal] = useState<EditorProposal | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -20,7 +22,9 @@ export default function ProposalEditarPage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
-    if (isBlocked) { router.push('/proposals'); return }
+    if (isBlocked) return // useRequireSubscription already redirects to /pricing
+    if (!ready) return    // wait until subscription state is resolved
+    if (!features.propuestas) { router.replace('/proposals'); return }
     const load = async () => {
       const supabase = createClient()
       const { data, error: err } = await supabase
@@ -50,7 +54,7 @@ export default function ProposalEditarPage({ params }: { params: Promise<{ id: s
       })
     }
     load()
-  }, [user, authLoading, id, router])
+  }, [user, authLoading, isBlocked, ready, features.propuestas, id, router])
 
   if (error) {
     return (

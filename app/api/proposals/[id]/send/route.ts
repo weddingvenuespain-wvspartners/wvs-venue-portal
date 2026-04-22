@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { sendProposalEmail } from '@/lib/mailer'
+import { requireFeature } from '@/lib/plan-server'
 
 export async function POST(
   req: NextRequest,
@@ -9,6 +10,9 @@ export async function POST(
 ) {
   try {
     const { id } = await params
+    const gate = await requireFeature('propuestas')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
+
     const body = await req.json().catch(() => ({}))
     const emailOverride: string | null = body.email || null
     const cookieStore = await cookies()
