@@ -21,11 +21,12 @@ export function getServiceClient() {
   )
 }
 
-/** Get the current session. Returns null if not authenticated. */
+/** Get the authenticated user. Returns null if not authenticated. */
 export async function getSession() {
   const supabase = await getUserClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  return session
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) return null
+  return { user }
 }
 
 /**

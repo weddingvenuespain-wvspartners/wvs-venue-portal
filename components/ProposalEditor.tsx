@@ -3,12 +3,13 @@ import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Check, X, Upload, AlertCircle, Zap, Sparkles, ClipboardList, MessageCircle, Target, ChevronDown, ArrowLeft, Copy } from 'lucide-react'
+import { Check, X, Upload, AlertCircle, Zap, Sparkles, ClipboardList, MessageCircle, Target, ChevronDown, ArrowLeft, Copy, ChefHat } from 'lucide-react'
 import type { SectionsData } from '@/lib/proposal-types'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes'
 import ProposalPreview from './ProposalPreview'
 import ProposalMenuEditor from './ProposalMenuEditor'
+import SpaceGroupEditor from './SpaceGroupEditor'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ export type EditorProposal = {
   show_price_estimate: boolean
   status: string
   lead_id: string | null
+  modality_id?: string | null
   sections_data?: SectionsData | null
   template_id?: string | null
   branding?: { logo_url: string | null; primary_color: string; font_family?: string } | null
@@ -51,6 +53,7 @@ const SECTION_LABELS: Record<string, string> = {
   experience: 'La experiencia',
   gallery: 'Galería de fotos',
   zones: 'Zonas del venue',
+  space_groups: 'Grupos de espacios',
   venue_rental: 'Tarifas de alquiler (grid temporada × día)',
   inclusions: 'Qué incluye',
   testimonials: 'Testimonios',
@@ -69,6 +72,29 @@ const emptySections: SectionsData = {
   sections_enabled: {},
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getDefaultSections(cfg: { space_type: string; price_model: string; menu_included?: boolean; has_menu_types?: boolean; catering_own?: boolean }): Record<string, boolean> {
+  const hasOwnMenu = cfg.menu_included === true || cfg.catering_own === true
+  return {
+    hero:           true,
+    availability:   false,
+    welcome:        true,
+    experience:     true,
+    gallery:        true,
+    zones:          cfg.space_type === 'multiple_independent',
+    venue_rental:   cfg.price_model === 'rental',
+    inclusions:     cfg.price_model === 'package' && cfg.menu_included !== false,
+    testimonials:   true,
+    collaborators:  false,
+    accommodation:  false,
+    extra_services: cfg.space_type === 'single_with_supplements' || cfg.space_type === 'multiple_independent',
+    faq:            false,
+    map:            true,
+    contact:        true,
+  }
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ProposalEditor({ proposal: initial }: { proposal: EditorProposal }) {
@@ -79,6 +105,10 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   const [leads, setLeads] = useState<any[]>([])
   const [templates, setTemplates] = useState<ProposalTemplate[]>([])
   const [venue, setVenue] = useState<any>(null)
+
+  const [modalities, setModalities] = useState<any[]>([])
+  const [commercialConfig, setCommercialConfig] = useState<{ space_type: string; price_model: string } | null>(null)
+  const [menuCatalog, setMenuCatalog] = useState<SectionsData | null>(null)
 
   const [form, setForm] = useState({
     lead_id: initial.lead_id ?? '',
@@ -94,6 +124,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     logo_url: initial.branding?.logo_url ?? null as string | null,
     font_family: initial.branding?.font_family ?? 'Georgia, serif',
     template_id: initial.template_id ?? '',
+    modality_id: initial.modality_id ?? '',
   })
   const [sections, setSections] = useState<SectionsData>({ ...emptySections, ...(initial.sections_data ?? {}) })
   const [activeTab, setActiveTab] = useState<'datos' | 'visual' | 'secciones' | 'menus'>('datos')
@@ -125,14 +156,31 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     if (!user) return
     const supabase = createClient()
     ;(async () => {
-      const [{ data: leadsData }, { data: tplData }, { data: venueRow }] = await Promise.all([
+      const [{ data: leadsData }, { data: tplData }, { data: venueRow }, { data: settingsRow }, modalRes] = await Promise.all([
         supabase.from('leads').select('id, name, guests, email').eq('user_id', user.id).order('created_at', { ascending: false }),
         supabase.from('proposal_web_templates').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('venue_onboarding').select('name, city, region, contact_email, contact_phone, website, photo_urls').eq('user_id', user.id).maybeSingle(),
+        supabase.from('venue_settings').select('commercial_config, menu_catalog').eq('user_id', user.id).maybeSingle(),
+        fetch('/api/estructura/modalities'),
       ])
       if (leadsData) setLeads(leadsData)
       if (tplData) setTemplates(tplData as ProposalTemplate[])
       if (venueRow) setVenue(venueRow)
+      if (settingsRow?.commercial_config) {
+        const cfg = settingsRow.commercial_config as { space_type: string; price_model: string }
+        setCommercialConfig(cfg)
+        // Apply smart section defaults only for NEW proposals (no sections_data yet)
+        if (!initial.sections_data || Object.keys(initial.sections_data.sections_enabled ?? {}).length === 0) {
+          setSections(prev => ({
+            ...prev,
+            sections_enabled: getDefaultSections(cfg),
+          }))
+        }
+      }
+      if (settingsRow?.menu_catalog) {
+        setMenuCatalog(settingsRow.menu_catalog as SectionsData)
+      }
+      if (modalRes.ok) { const mj = await modalRes.json(); setModalities(mj.modalities ?? []) }
     })()
     if (!document.querySelector('link[data-gf-editor]')) {
       const link = document.createElement('link')
@@ -204,6 +252,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       show_price_estimate: form.show_price_estimate,
       sections_data: cleanSections,
       template_id: form.template_id || null,
+      modality_id: form.modality_id || null,
     }
 
     const { error: updErr } = await supabase.from('proposals').update(corePayload).eq('id', proposal.id)
@@ -230,6 +279,52 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     setProposal(p => ({ ...p, couple_name: form.couple_name, guest_count: corePayload.guest_count, wedding_date: form.wedding_date || null }))
     notify('Propuesta guardada')
     setSaving(false)
+  }
+
+  // Auto-fill price from modality when modality + wedding_date are both set
+  // Mon=0 … Sun=6 (same convention as WeekDayPicker)
+  const weddingDayOfWeek = (weddingDate: string): number => {
+    const jsDay = new Date(weddingDate + 'T12:00:00').getDay()
+    return (jsDay + 6) % 7
+  }
+
+  const getPriceForDate = (modalityId: string, weddingDate: string): number | null => {
+    const modality = modalities.find(m => m.id === modalityId)
+    if (!modality || !weddingDate) return null
+
+    if (modality.duration_type === 'package') {
+      // Find the package whose check-in day matches the day of the week
+      const dow = weddingDayOfWeek(weddingDate)
+      const pkg = (modality.packages ?? []).find((p: any) => p.day_from === dow)
+      if (!pkg?.prices?.length) return null
+      const match = pkg.prices.find((p: any) => weddingDate >= p.date_from && weddingDate <= p.date_to)
+      return match ? parseFloat(match.price) : null
+    }
+
+    if (!modality.prices?.length) return null
+    const match = modality.prices.find((p: any) => weddingDate >= p.date_from && weddingDate <= p.date_to)
+    return match ? parseFloat(match.price) : null
+  }
+
+  const getMatchedPackageLabel = (modalityId: string, weddingDate: string): string | null => {
+    const modality = modalities.find(m => m.id === modalityId)
+    if (modality?.duration_type !== 'package' || !weddingDate) return null
+    const dow = weddingDayOfWeek(weddingDate)
+    const pkg = (modality.packages ?? []).find((p: any) => p.day_from === dow)
+    if (!pkg) return null
+    if (pkg.label) return pkg.label
+    const DAYS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
+    return pkg.day_from === pkg.day_to ? DAYS[pkg.day_from] : `${DAYS[pkg.day_from]} → ${DAYS[pkg.day_to]}`
+  }
+
+  const onModalityChange = (modalityId: string) => {
+    const price = modalityId && form.wedding_date ? getPriceForDate(modalityId, form.wedding_date) : null
+    setForm(f => ({ ...f, modality_id: modalityId, ...(price !== null ? { price_estimate: String(price) } : {}) }))
+  }
+
+  const onWeddingDateChange = (date: string) => {
+    const price = form.modality_id && date ? getPriceForDate(form.modality_id, date) : null
+    setForm(f => ({ ...f, wedding_date: date, ...(price !== null ? { price_estimate: String(price) } : {}) }))
   }
 
   const onLeadChange = (leadId: string) => {
@@ -379,9 +474,35 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 </div>
                 <div className="form-group">
                   <label className="form-label">Fecha de boda</label>
-                  <input className="form-input" type="date" value={form.wedding_date} onChange={e => setForm(f => ({ ...f, wedding_date: e.target.value }))} />
+                  <input className="form-input" type="date" value={form.wedding_date} onChange={e => onWeddingDateChange(e.target.value)} />
                 </div>
               </div>
+
+              {modalities.filter(m => m.is_active).length > 0 && (
+                <div className="form-group">
+                  <label className="form-label">Modalidad</label>
+                  <select className="form-input" value={form.modality_id} onChange={e => onModalityChange(e.target.value)}>
+                    <option value="">— Sin modalidad —</option>
+                    {modalities.filter(m => m.is_active).map((m: any) => (
+                      <option key={m.id} value={m.id}>{m.name}{m.duration_label ? ` · ${m.duration_label}` : ''}</option>
+                    ))}
+                  </select>
+                  {form.modality_id && form.wedding_date && (() => {
+                    const price = getPriceForDate(form.modality_id, form.wedding_date)
+                    const pkgLabel = getMatchedPackageLabel(form.modality_id, form.wedding_date)
+                    if (price !== null) return (
+                      <div style={{ fontSize: 11, color: 'var(--gold)', marginTop: 4 }}>
+                        ✓ Precio precargado automáticamente{pkgLabel ? ` · paquete ${pkgLabel}` : ''}
+                      </div>
+                    )
+                    return (
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4 }}>
+                        Sin tarifa definida para esta fecha — puedes introducir el precio manualmente
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
 
               <div className="form-group">
                 <label className="form-label">Mensaje personal</label>
@@ -556,6 +677,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               'experience',
               'gallery',
               'zones',
+              'space_groups',
               'venue_rental',
               'inclusions',
               'testimonials',
@@ -757,6 +879,15 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                               })}
                               <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { name: '', description: '', capacities: [] })}>+ Añadir zona</button>
                             </div>
+                          )}
+
+                          {/* SPACE GROUPS */}
+                          {secId === 'space_groups' && (
+                            <SpaceGroupEditor
+                              groups={(sections as any).space_groups ?? []}
+                              onChange={val => setSections((s: any) => ({ ...s, space_groups: val }))}
+                              uploadImage={uploadImage}
+                            />
                           )}
 
                           {/* INCLUSIONS */}
@@ -1057,7 +1188,28 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
           {/* ══ TAB: MENÚS ══ */}
           {activeTab === 'menus' && (
-            <ProposalMenuEditor sections={sections} setSections={setSections} />
+            <div>
+              {/* Cargar desde catálogo — solo si hay catálogo y la propuesta no tiene menús aún */}
+              {menuCatalog && (menuCatalog.menus_override?.length || menuCatalog.menu_extras_override?.length || menuCatalog.appetizers_base_override?.length) &&
+               !sections.menus_override?.length && !sections.menu_extras_override?.length && !sections.appetizers_base_override?.length && (
+                <div style={{ margin: '0 0 16px', background: '#FDF8F0', border: '1px dashed #C4975A66', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <ChefHat size={18} style={{ color: '#C4975A', flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>Tienes un catálogo de menús definido</div>
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Cárgalo como punto de partida y personalízalo para esta pareja</div>
+                  </div>
+                  <button className="btn btn-primary btn-sm" onClick={() => setSections(s => ({
+                    ...s,
+                    menus_override:          menuCatalog.menus_override ?? s.menus_override,
+                    menu_extras_override:    menuCatalog.menu_extras_override ?? s.menu_extras_override,
+                    appetizers_base_override: menuCatalog.appetizers_base_override ?? s.appetizers_base_override,
+                  }))}>
+                    Cargar catálogo
+                  </button>
+                </div>
+              )}
+              <ProposalMenuEditor sections={sections} setSections={setSections} />
+            </div>
           )}
         </div>
 

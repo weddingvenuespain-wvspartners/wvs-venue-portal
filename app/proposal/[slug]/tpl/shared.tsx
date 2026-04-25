@@ -485,5 +485,6 @@ export function extractData(data: ProposalData) {
     accom:          (so.accommodation && Object.keys(so.accommodation).length > 0) ? so.accommodation : vc.accommodation_info,
     mapVC:          vc.map_info,
     budgetSim:      vc.budget_simulator,
+    spaceGroups:    (so.space_groups ?? null) as import('@/lib/proposal-types').SpaceGroup[] | null,
   }
 }

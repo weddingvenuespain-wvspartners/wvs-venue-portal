@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import {
   ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
-  FileText, Calendar, Search, AlertCircle, Settings, Info, Trash2, Flower2, Edit2,
+  FileText, Calendar, Search, AlertCircle, Trash2, Flower2, Edit2,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -48,25 +48,22 @@ type Lead = {
   budget_date_flexibility?: string
 }
 
-type DateRulePackage = {
+type ModalityPackage = {
+  id: string
+  day_from: number  // Mon=0 … Sun=6
+  day_to: number
+  label: string | null
+  sort_order: number
+}
+
+type Modality = {
+  id: string
   name: string
-  anchor_dow: number   // 0=Dom 1=Lun 2=Mar 3=Mié 4=Jue 5=Vie 6=Sáb
-  span_days: number    // días que ocupa el paquete (ej. 3 para Vie-Dom)
-  days_before: number  // días de preparación previos
-  days_after: number   // días de desmontaje posteriores
+  duration_type: string
+  packages: ModalityPackage[]
 }
 
-type DateRule = {
-  type: 'simple' | 'overnight' | 'packages'
-  days_before: number
-  days_after: number
-  overnight_anchor?: 'first' | 'second'  // 'first' = selected date is check-in (default), 'second' = selected date is check-out
-  packages?: DateRulePackage[]
-}
-
-const DEFAULT_RULES: DateRule = { type: 'simple', days_before: 0, days_after: 0, packages: [] }
-
-const DOW_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const DOW_NAMES_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']  // Mon=0 … Sun=6
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -114,47 +111,12 @@ function offsetDate(base: string, offset: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
 }
 
-// Returns dates that should be auto-blocked when marking `date` as 'reservado'.
-// isHalf=true means a soft half-day block (note: 'medio_dia'), still allows same-day bookings.
-function computeAffectedDates(date: string, rules: DateRule): { date: string; reason: string; isHalf: boolean }[] {
-  const result: { date: string; reason: string; isHalf: boolean }[] = []
-  const addDay = (offset: number, reason: string, isHalf = false) => {
-    const ds = offsetDate(date, offset)
-    if (!result.find(r => r.date === ds)) result.push({ date: ds, reason, isHalf })
-  }
-  const addRange = (count: number, sign: -1 | 1, label: string, baseOffset = 0) => {
-    const full = Math.floor(count)
-    const hasHalf = (count * 2) % 2 !== 0  // true if .5
-    for (let i = 1; i <= full; i++) addDay(sign * (baseOffset + i), `${label} (${i}d)`)
-    if (hasHalf) addDay(sign * (baseOffset + full + 1), `${label} (½ día)`, true)
-  }
-
-  if (rules.type === 'simple') {
-    addRange(rules.days_before, -1, 'Preparación')
-    addRange(rules.days_after, 1, 'Desmontaje')
-  } else if (rules.type === 'overnight') {
-    const anchor = rules.overnight_anchor ?? 'first'
-    if (anchor === 'first') {
-      // date = check-in (día 1), day+1 = check-out (día 2)
-      addDay(1, 'Check-out / Día 2')
-      addRange(rules.days_before, -1, 'Preparación')
-      addRange(rules.days_after, 1, 'Desmontaje', 1)
-    } else {
-      // date = check-out (día 2), day-1 = check-in (día 1)
-      addDay(-1, 'Check-in / Día 1')
-      addRange(rules.days_before, -1, 'Preparación', 1)  // before day-1
-      addRange(rules.days_after, 1, 'Desmontaje')        // after day (=checkout)
-    }
-  } else if (rules.type === 'packages') {
-    const dow = new Date(date + 'T12:00:00').getDay()
-    const pkg = rules.packages?.find(p => p.anchor_dow === dow)
-    if (pkg) {
-      for (let i = 1; i < pkg.span_days; i++) addDay(i, `${pkg.name} (día ${i+1})`)
-      addRange(pkg.days_before, -1, 'Preparación')
-      addRange(pkg.days_after, 1, 'Desmontaje', pkg.span_days - 1)
-    }
-  }
-  return result
+// Returns span length (days) for a modality package (Mon=0 convention, supports cross-week)
+function pkgSpanDays(day_from: number, day_to: number): number {
+  if (day_from === day_to) return 1
+  let count = 1, d = day_from
+  while (d !== day_to) { d = (d + 1) % 7; count++ }
+  return count
 }
 
 function formatDateEs(ds: string): string {
@@ -174,8 +136,7 @@ export default function CalendarioPage() {
   const [leads,        setLeads]        = useState<Lead[]>([])
   const [loading,      setLoading]      = useState(true)
   const [saving,       setSaving]       = useState(false)
-  const [dateRules,    setDateRules]    = useState<DateRule>(DEFAULT_RULES)
-  const [showSettings, setShowSettings] = useState(false)
+  const [modalities,   setModalities]   = useState<Modality[]>([])
 
   const today  = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
@@ -236,10 +197,10 @@ export default function CalendarioPage() {
     const from     = dateStr(year, month, 1)
     const to       = dateStr(year, month, lastDay)
 
-    const [entriesRes, leadsRes, settingsRes] = await Promise.all([
+    const [entriesRes, leadsRes, modalitiesRes] = await Promise.all([
       supabase.from('calendar_entries').select('*').eq('user_id', user!.id).gte('date', from).lte('date', to),
       supabase.from('leads').select('id,name,email,phone,whatsapp,wedding_date,wedding_date_to,wedding_date_ranges,date_flexibility,wedding_year,wedding_month,guests,status,budget,ceremony_type,visit_date,visit_time,visit_duration,notes,budget_date,budget_date_to,budget_date_ranges,budget_date_flexibility').eq('user_id', user!.id).order('wedding_date', { ascending: true }),
-      supabase.from('venue_settings').select('date_rules').eq('user_id', user!.id).maybeSingle(),
+      supabase.from('venue_modalities').select('id,name,duration_type,packages:venue_modality_packages(id,day_from,day_to,label,sort_order)').eq('user_id', user!.id).order('sort_order'),
     ])
 
     const map: Record<string, Entry> = {}
@@ -257,25 +218,8 @@ export default function CalendarioPage() {
     setEntries(map)
     setEntries2(map2)
     if (leadsRes.data) setLeads(leadsRes.data)
-    if (settingsRes.data?.date_rules) setDateRules(settingsRes.data.date_rules)
+    if (modalitiesRes.data) setModalities(modalitiesRes.data as Modality[])
     setLoading(false)
-  }
-
-  const saveDateRules = async (rules: DateRule) => {
-    const supabase = createClient()
-    // Try update first; if no rows affected, insert
-    const { data: updated, error: updateErr } = await supabase
-      .from('venue_settings')
-      .update({ date_rules: rules })
-      .eq('user_id', user!.id)
-      .select('user_id')
-      .maybeSingle()
-    if (updateErr || !updated) {
-      await supabase
-        .from('venue_settings')
-        .insert({ user_id: user!.id, date_rules: rules })
-    }
-    setDateRules(rules)
   }
 
   // Expand a date range into all ISO dates within it
@@ -633,9 +577,6 @@ export default function CalendarioPage() {
               <>
                 <button className="btn btn-ghost btn-sm" onClick={() => setBulkMode(true)}>
                   <Calendar size={13} /> Seleccionar rango
-                </button>
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowSettings(true)} title="Reglas de fechas">
-                  <Settings size={13} /> Reglas
                 </button>
               </>
             )}
@@ -1066,7 +1007,7 @@ export default function CalendarioPage() {
           allLeads={leads}
           leadsById={leadsById}
           saving={saving}
-          dateRules={dateRules}
+          modalities={modalities}
           onSave={async (updated, extraBlocks) => { await saveEntry(updated, extraBlocks); setModalDate(null); await load() }}
           onSave2={async (updated) => {
             const supabase = createClient()
@@ -1115,18 +1056,11 @@ export default function CalendarioPage() {
         />
       )}
 
-      {showSettings && (
-        <DateRulesModal
-          rules={dateRules}
-          onSave={async (rules) => { await saveDateRules(rules); setShowSettings(false) }}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
     </div>
   )
 }
 
-// ── Package helpers ────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T12:00:00')
@@ -1134,42 +1068,14 @@ function addDays(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-// Returns all packages that contain this date within their span
-function getPackagesForDate(date: string, packages: DateRulePackage[]): { pkg: DateRulePackage; startDate: string; endDate: string; dayIndex: number }[] {
-  const result: { pkg: DateRulePackage; startDate: string; endDate: string; dayIndex: number }[] = []
-  const d = new Date(date + 'T12:00:00')
-  const dow = d.getDay()
-
-  for (const pkg of packages) {
-    // How many days back is the anchor day?
-    const daysBack = (dow - pkg.anchor_dow + 7) % 7
-    if (daysBack < pkg.span_days) {
-      // This date falls within a span of this package
-      const startD = new Date(date + 'T12:00:00')
-      startD.setDate(startD.getDate() - daysBack)
-      const endD = new Date(startD)
-      endD.setDate(endD.getDate() + pkg.span_days - 1)
-      result.push({
-        pkg,
-        startDate: startD.toISOString().slice(0, 10),
-        endDate: endD.toISOString().slice(0, 10),
-        dayIndex: daysBack, // 0 = anchor/start day, 1 = second day, etc.
-      })
-    }
-  }
-  return result
-}
-
 function getSpanDates(startDate: string, spanDays: number): string[] {
-  const dates: string[] = []
-  for (let i = 0; i < spanDays; i++) dates.push(addDays(startDate, i))
-  return dates
+  return Array.from({ length: spanDays }, (_, i) => addDays(startDate, i))
 }
 
 // ── Day Modal ─────────────────────────────────────────────────────────────────
 
 function DayModal({
-  date, entry, entry2, leadsOnDate, visitsOnDate, allLeads, leadsById, saving, dateRules,
+  date, entry, entry2, leadsOnDate, visitsOnDate, allLeads, leadsById, saving, modalities,
   onSave, onSave2, onDelete, onClose, onLeadCreated, onUpdateLead, onCancelWedding, userId
 }: {
   date: string
@@ -1180,7 +1086,7 @@ function DayModal({
   allLeads: Lead[]
   leadsById: Record<string, Lead>
   saving: boolean
-  dateRules: DateRule
+  modalities: Modality[]
   onSave: (e: Entry, extraBlocks?: { date: string; isHalf: boolean }[]) => Promise<void>
   onSave2: (e: Partial<Entry> & { date: string }) => Promise<void>
   onDelete: () => Promise<void>
@@ -1242,12 +1148,20 @@ function DayModal({
   const [deletingVisit, setDeletingVisit] = useState(false)
   const [removedLeadForCrm, setRemovedLeadForCrm] = useState<Lead | null>(null)
 
-  // Overnight: which day is the wedding? 1 = wedding today, 2 = check-in was yesterday
-  const [overnightDay, setOvernightDay] = useState<1 | 2>(1)
-  // Packages: which package applies to this date (if multiple match, user picks)
-  const packagesForDate = dateRules.type === 'packages' ? getPackagesForDate(date, dateRules.packages || []) : []
-  const [selectedPkgIdx, setSelectedPkgIdx] = useState<number>(0)
-  const selectedPkg = packagesForDate[selectedPkgIdx] ?? null
+  // Modality picker: which modality applies when linking a lead to this date
+  const estructuraDow = (new Date(date + 'T12:00:00').getDay() + 6) % 7
+  const modalityOptions = modalities
+    .map(m => {
+      const pkg = m.packages?.find(p => p.day_from === estructuraDow)
+      if (!pkg) return null
+      const span = pkgSpanDays(pkg.day_from, pkg.day_to)
+      const endDate = addDays(date, span - 1)
+      const pkgLabel = pkg.label || `${DOW_NAMES_ES[pkg.day_from]}→${DOW_NAMES_ES[pkg.day_to]}`
+      return { modality: m, pkg, span, endDate, pkgLabel }
+    })
+    .filter(Boolean) as { modality: Modality; pkg: ModalityPackage; span: number; endDate: string; pkgLabel: string }[]
+  const [selectedModalityId, setSelectedModalityId] = useState<string>('')
+  const selectedOption = modalityOptions.find(o => o.modality.id === selectedModalityId) ?? null
 
   // Cancel wedding confirmation
   const [showCancelWedding,   setShowCancelWedding]   = useState(false)
@@ -1345,32 +1259,12 @@ function DayModal({
   const handleSave = async () => {
     setLocalSaving(true)
 
-    // For overnight/package rules, save extra negociacion entries before calling onSave
     const supabaseExtra = createClient()
     const calStatus = status === 'libre' && leadId ? 'negociacion' : status
 
-    if (dateRules.type === 'overnight' && leadId) {
-      // Compute both overnight dates
-      const d1 = overnightDay === 1 ? date : addDays(date, -1)
-      const d2 = overnightDay === 1 ? addDays(date, 1) : date
-      const otherDate = overnightDay === 1 ? d2 : d1
-      // Save the OTHER overnight date directly (main date handled by onSave below)
-      const { data: existingOther } = await supabaseExtra.from('calendar_entries')
-        .select('id').eq('user_id', userId).eq('date', otherDate).maybeSingle()
-      if (existingOther?.id) {
-        await supabaseExtra.from('calendar_entries').update({ status: calStatus, lead_id: leadId }).eq('id', existingOther.id)
-      } else {
-        await supabaseExtra.from('calendar_entries').insert({ user_id: userId, date: otherDate, status: calStatus, lead_id: leadId })
-      }
-      // Update lead date range
-      await onUpdateLead(leadId, {
-        date_flexibility: 'range',
-        wedding_date: d1,
-        wedding_date_to: d2,
-      })
-    } else if (dateRules.type === 'packages' && selectedPkg && leadId) {
-      const spanDates = getSpanDates(selectedPkg.startDate, selectedPkg.pkg.span_days)
-      // Save all span dates except the clicked date (handled by onSave below)
+    // If a modality with a package is selected, expand calendar entries across the span
+    if (selectedOption && leadId && calStatus === 'negociacion') {
+      const spanDates = getSpanDates(date, selectedOption.span)
       for (const spanDate of spanDates) {
         if (spanDate === date) continue
         const { data: existingSpan } = await supabaseExtra.from('calendar_entries')
@@ -1381,11 +1275,10 @@ function DayModal({
           await supabaseExtra.from('calendar_entries').insert({ user_id: userId, date: spanDate, status: calStatus, lead_id: leadId })
         }
       }
-      // Update lead date range for the package span
       await onUpdateLead(leadId, {
         date_flexibility: 'range',
-        wedding_date: selectedPkg.startDate,
-        wedding_date_to: selectedPkg.endDate,
+        wedding_date: date,
+        wedding_date_to: selectedOption.endDate,
       })
     }
 
@@ -1891,57 +1784,31 @@ function DayModal({
                   {selectedLead ? (
                     <>
 
-                      {/* Overnight selector */}
-                      {dateRules.type === 'overnight' && (
-                        <div style={{ padding: '10px 12px', background: '#fdf4ff', border: '1px solid #e9d5ff', borderRadius: 8, marginBottom: 10 }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', marginBottom: 8 }}>¿Cuándo es la boda?</div>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            {([
-                              { val: 1 as const, label: 'Hoy es la boda', sub: `Boda: ${date} · Check-out: ${addDays(date, 1)}` },
-                              { val: 2 as const, label: 'Hoy es el check-out', sub: `Check-in: ${addDays(date, -1)} · Boda: ${date}` },
-                            ] as const).map(opt => (
-                              <button key={opt.val} type="button" onClick={() => setOvernightDay(opt.val)} style={{
-                                flex: 1, padding: '7px 8px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
-                                border: `2px solid ${overnightDay === opt.val ? '#7c3aed' : 'var(--ivory)'}`,
-                                background: overnightDay === opt.val ? '#faf5ff' : '#fff',
-                              }}>
-                                <div style={{ fontSize: 11, fontWeight: 600, color: overnightDay === opt.val ? '#7c3aed' : 'var(--charcoal)', marginBottom: 2 }}>{opt.label}</div>
-                                <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.3 }}>{opt.sub}</div>
+                      {/* Modality picker — only shown when modalities with matching packages exist */}
+                      {modalityOptions.length > 0 && (
+                        <div style={{ padding: '10px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: '#15803d', marginBottom: 8 }}>Modalidad</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                            {[{ modality: { id: '', name: 'Sin modalidad (1 día)' }, pkgLabel: '', span: 1, endDate: date } as any,
+                              ...modalityOptions].map(opt => (
+                              <button key={opt.modality.id} type="button"
+                                onClick={() => setSelectedModalityId(opt.modality.id)}
+                                style={{
+                                  padding: '7px 10px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                                  border: `2px solid ${selectedModalityId === opt.modality.id ? '#16a34a' : 'var(--ivory)'}`,
+                                  background: selectedModalityId === opt.modality.id ? '#f0fdf4' : '#fff',
+                                  fontSize: 12, fontWeight: 500,
+                                  color: selectedModalityId === opt.modality.id ? '#15803d' : 'var(--charcoal)',
+                                }}>
+                                {opt.modality.name}
+                                {opt.span > 1 && (
+                                  <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--warm-gray)', fontWeight: 400 }}>
+                                    · {opt.pkgLabel} ({opt.span} días, hasta {opt.endDate})
+                                  </span>
+                                )}
                               </button>
                             ))}
                           </div>
-                        </div>
-                      )}
-
-                      {/* Packages selector */}
-                      {dateRules.type === 'packages' && (
-                        <div style={{ padding: '10px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, marginBottom: 10 }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: '#15803d', marginBottom: 8 }}>📦 Paquete de fechas</div>
-                          {packagesForDate.length === 0 ? (
-                            <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Esta fecha no pertenece a ningún paquete definido.</div>
-                          ) : packagesForDate.length === 1 ? (
-                            <div style={{ fontSize: 12, color: '#15803d', fontWeight: 500 }}>
-                              {packagesForDate[0].pkg.name || 'Paquete'}: <strong>{packagesForDate[0].startDate}</strong> → <strong>{packagesForDate[0].endDate}</strong>
-                              <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--warm-gray)', fontWeight: 400 }}>({packagesForDate[0].pkg.span_days} días)</span>
-                            </div>
-                          ) : (
-                            <>
-                              <div style={{ fontSize: 11, color: '#15803d', marginBottom: 6 }}>Esta fecha solapa dos paquetes. ¿Cuál aplica?</div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                {packagesForDate.map((p, i) => (
-                                  <button key={i} type="button" onClick={() => setSelectedPkgIdx(i)} style={{
-                                    padding: '7px 10px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
-                                    border: `2px solid ${selectedPkgIdx === i ? '#16a34a' : 'var(--ivory)'}`,
-                                    background: selectedPkgIdx === i ? '#f0fdf4' : '#fff',
-                                    fontSize: 12, fontWeight: 500, color: selectedPkgIdx === i ? '#15803d' : 'var(--charcoal)',
-                                  }}>
-                                    {p.pkg.name || `Paquete ${i + 1}`}: {p.startDate} → {p.endDate}
-                                    <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--warm-gray)', fontWeight: 400 }}>({p.pkg.span_days} días)</span>
-                                  </button>
-                                ))}
-                              </div>
-                            </>
-                          )}
                         </div>
                       )}
 
@@ -2164,505 +2031,7 @@ function DayModal({
   )
 }
 
-// ── Date Rules Modal ──────────────────────────────────────────────────────────
-
-function DateRulesModal({ rules, onSave, onClose }: {
-  rules: DateRule
-  onSave: (r: DateRule) => Promise<void>
-  onClose: () => void
-}) {
-  const [form, setForm] = useState<DateRule>(() => ({
-    ...DEFAULT_RULES,
-    ...rules,
-    packages: rules.packages ? rules.packages.map(p => ({ ...p })) : [],
-  }))
-  const [saving, setSaving] = useState(false)
-  const [pkgDraft, setPkgDraft] = useState<number | null>(null)   // col of first click when creating a package
-  const [pkgHover, setPkgHover] = useState<number | null>(null)   // col under mouse during draft
-
-  const setField = (k: keyof DateRule, v: any) => setForm(f => ({ ...f, [k]: v }))
-
-  const addPackage = () => {
-    setForm(f => ({
-      ...f,
-      packages: [...(f.packages || []), { name: '', anchor_dow: 5, span_days: 3, days_before: 0, days_after: 0 }]
-    }))
-  }
-
-  const updatePkg = (i: number, k: keyof DateRulePackage, v: any) => {
-    setForm(f => {
-      const pkgs = [...(f.packages || [])]
-      pkgs[i] = { ...pkgs[i], [k]: v }
-      return { ...f, packages: pkgs }
-    })
-  }
-
-  const removePkg = (i: number) => {
-    setForm(f => ({ ...f, packages: (f.packages || []).filter((_, j) => j !== i) }))
-  }
-
-  const handleSave = async () => {
-    setSaving(true)
-    await onSave(form)
-    setSaving(false)
-  }
-
-  const RULE_TYPES = [
-    { value: 'simple',    label: 'Un día',     desc: 'La boda es un único día' },
-    { value: 'overnight', label: 'Con noche',  desc: 'La boda + noche. Los novios se van al día siguiente' },
-    { value: 'packages',  label: 'Paquetes',   desc: 'Varios formatos según el día de la semana' },
-  ]
-
-  const fmtDays = (n: number) => n === 0 ? '0' : n === 0.5 ? '½' : n % 1 === 0.5 ? `${Math.floor(n)}½` : `${n}`
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 16 }}
-      onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 540, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.25)' }}
-        onClick={e => e.stopPropagation()}>
-
-        {/* Header */}
-        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)' }}>Reglas de fechas</div>
-            <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2 }}>Cómo se bloquean los días al reservar una fecha</div>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}><X size={18} /></button>
-        </div>
-
-        <div style={{ padding: '20px 24px' }}>
-
-          {/* Type selector */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Tipo de reserva</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-              {RULE_TYPES.map(rt => (
-                <button key={rt.value} type="button" onClick={() => {
-                  if (rt.value !== form.type) {
-                    setForm(f => ({ ...f, type: rt.value as DateRule['type'], days_before: 0, days_after: 0 }))
-                  }
-                }} style={{
-                  padding: '12px 8px', borderRadius: 10, cursor: 'pointer', border: '2px solid',
-                  borderColor: form.type === rt.value ? 'var(--gold)' : 'var(--ivory)',
-                  background: form.type === rt.value ? '#fef9ec' : '#fff',
-                  textAlign: 'center', transition: 'all 0.15s',
-                }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: form.type === rt.value ? 'var(--espresso)' : 'var(--charcoal)', marginBottom: 4 }}>{rt.label}</div>
-                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{rt.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Simple / Overnight: days before + after */}
-          {(form.type === 'simple' || form.type === 'overnight') && (() => {
-            // Build preview tiles — ½d always outermost: LEFT for before, RIGHT for after
-            const beforeTiles: { label: string; isHalf: boolean; key: string }[] = []
-            const fullBefore = Math.floor(form.days_before)
-            const halfBefore = (form.days_before * 2) % 2 !== 0
-            if (halfBefore) beforeTiles.push({ label: '-½d', isHalf: true, key: 'bh' })
-            for (let i = fullBefore; i >= 1; i--) beforeTiles.push({ label: `-${i}d`, isHalf: false, key: `b${i}` })
-
-            const afterTiles: { label: string; isHalf: boolean; key: string }[] = []
-            const fullAfter = Math.floor(form.days_after)
-            const halfAfter = (form.days_after * 2) % 2 !== 0
-            for (let i = 1; i <= fullAfter; i++) afterTiles.push({ label: `+${i}d`, isHalf: false, key: `a${i}` })
-            if (halfAfter) afterTiles.push({ label: '+½d', isHalf: true, key: 'ah' })
-
-            const showPreview = beforeTiles.length > 0 || afterTiles.length > 0 || form.type === 'overnight'
-
-            return (
-              <div style={{ marginBottom: 24 }}>
-                {/* Overnight explanation banner */}
-                {form.type === 'overnight' && (
-                  <div style={{ marginBottom: 16, padding: '12px 14px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 10 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#5b21b6', marginBottom: 10 }}>¿Cómo funciona «Con noche»?</div>
-                    {/* 2-day timeline */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-                      {/* Day 1 */}
-                      <div style={{ flex: 1, background: '#ede9fe', border: '1.5px solid #c4b5fd', borderRadius: 8, padding: '10px 12px' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Día 1</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#4c1d95', marginBottom: 2 }}>🎊 Boda</div>
-                        <div style={{ fontSize: 10, color: '#6d28d9', lineHeight: 1.4 }}>Ceremonia, banquete y celebración.</div>
-                      </div>
-                      {/* Arrow */}
-                      <div style={{ padding: '0 6px', color: '#a78bfa', fontSize: 16, flexShrink: 0 }}>→</div>
-                      {/* Day 2 */}
-                      <div style={{ flex: 1, background: '#f5f3ff', border: '1.5px solid #ddd6fe', borderRadius: 8, padding: '10px 12px' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Día 2</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#6d28d9', marginBottom: 2 }}>🧳 Check-out</div>
-                        <div style={{ fontSize: 10, color: '#6d28d9', lineHeight: 1.4 }}>El día queda reservado. Los novios se van cuando quieran.</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 14 }}>
-                    {form.type === 'overnight' ? 'Días de preparación y desmontaje (opcionales)' : 'Bloqueo adicional por preparación y desmontaje'}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    <div>
-                      <label className="form-label">Antes — preparación</label>
-                      <select className="form-input" style={{ width: '100%' }}
-                        value={form.days_before}
-                        onChange={e => setField('days_before', Number(e.target.value))}>
-                        <option value={0}>Sin bloqueo</option>
-                        <option value={0.5}>½ día</option>
-                        <option value={1}>1 día</option>
-                        <option value={1.5}>1 día y ½</option>
-                        <option value={2}>2 días</option>
-                        <option value={2.5}>2 días y ½</option>
-                        <option value={3}>3 días</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="form-label">Después — desmontaje</label>
-                      <select className="form-input" style={{ width: '100%' }}
-                        value={form.days_after}
-                        onChange={e => setField('days_after', Number(e.target.value))}>
-                        <option value={0}>Sin bloqueo</option>
-                        <option value={0.5}>½ día</option>
-                        <option value={1}>1 día</option>
-                        <option value={1.5}>1 día y ½</option>
-                        <option value={2}>2 días</option>
-                        <option value={2.5}>2 días y ½</option>
-                        <option value={3}>3 días</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Timeline preview */}
-                  {showPreview && (
-                    <div style={{ marginTop: 14 }}>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-                        Vista previa
-                      </div>
-                      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-                        {beforeTiles.map(t => (
-                          <span key={t.key} style={{
-                            fontSize: 11, padding: '3px 9px', borderRadius: 20,
-                            background: t.isHalf ? '#fef9c3' : '#fed7aa',
-                            color: '#92400e', border: `1px solid ${t.isHalf ? '#fde68a' : '#fcd34d'}`,
-                            opacity: t.isHalf ? 0.8 : 1, fontWeight: 500,
-                          }}>{t.label}</span>
-                        ))}
-                        <span style={{
-                          fontSize: 11, padding: '3px 10px', borderRadius: 20,
-                          background: '#fce7f3', color: '#9d174d', fontWeight: 700, border: '1px solid #f9a8d4',
-                        }}>🎊 Boda</span>
-                        {form.type === 'overnight' && (
-                          <span style={{
-                            fontSize: 11, padding: '3px 9px', borderRadius: 20,
-                            background: '#ede9fe', color: '#5b21b6', fontWeight: 500, border: '1px solid #ddd6fe',
-                          }}>🌙 +1d</span>
-                        )}
-                        {afterTiles.map(t => (
-                          <span key={t.key} style={{
-                            fontSize: 11, padding: '3px 9px', borderRadius: 20,
-                            background: t.isHalf ? '#fef9c3' : '#fed7aa',
-                            color: '#92400e', border: `1px solid ${t.isHalf ? '#fde68a' : '#fcd34d'}`,
-                            opacity: t.isHalf ? 0.8 : 1, fontWeight: 500,
-                          }}>{t.label}</span>
-                        ))}
-                      </div>
-                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 6 }}>
-                        {[
-                          beforeTiles.length > 0 && `${form.days_before}d de preparación`,
-                          form.type === 'overnight' && '1d de check-out incluido',
-                          afterTiles.length > 0 && `${form.days_after}d de desmontaje`,
-                        ].filter(Boolean).join(' · ')}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Packages */}
-          {form.type === 'packages' && (() => {
-            // Mon-first column layout: col 0 = Lun (dow 1) … col 6 = Dom (dow 0)
-            const COLS    = ['L','M','X','J','V','S','D']
-            const dowToCol = (dow: number) => (dow + 6) % 7
-            const colToDow = (col: number) => (col + 1) % 7
-            const PKG_COLORS = [
-              { bg: '#fce7f3', border: '#f9a8d4', text: '#9d174d', solid: '#ec4899' },
-              { bg: '#dbeafe', border: '#93c5fd', text: '#1e3a8a', solid: '#3b82f6' },
-              { bg: '#d1fae5', border: '#6ee7b7', text: '#065f46', solid: '#10b981' },
-              { bg: '#fef3c7', border: '#fcd34d', text: '#92400e', solid: '#f59e0b' },
-              { bg: '#ede9fe', border: '#c4b5fd', text: '#4c1d95', solid: '#8b5cf6' },
-            ]
-            const pkgs = form.packages || []
-
-            // For each cell (0-6), which package indices occupy it
-            const cellPkgs: number[][] = Array.from({ length: 7 }, () => [])
-            pkgs.forEach((p, pi) => {
-              for (let i = 0; i < p.span_days; i++) cellPkgs[(dowToCol(p.anchor_dow) + i) % 7].push(pi)
-            })
-
-            // Conflict detection: only end↔start shared day is allowed
-            const conflictSet = new Set<number>()
-            pkgs.forEach((a, ai) => {
-              pkgs.forEach((b, bi) => {
-                if (bi <= ai) return
-                const ac = dowToCol(a.anchor_dow), bc = dowToCol(b.anchor_dow)
-                const aDays = new Set(Array.from({ length: a.span_days }, (_, k) => (ac + k) % 7))
-                const bDays = new Set(Array.from({ length: b.span_days }, (_, k) => (bc + k) % 7))
-                const shared = [...aDays].filter(d => bDays.has(d))
-                if (shared.length === 0) return
-                if (shared.length === 1) {
-                  const aEnd = (ac + a.span_days - 1) % 7, bEnd = (bc + b.span_days - 1) % 7
-                  if ((shared[0] === aEnd && shared[0] === bc) || (shared[0] === bEnd && shared[0] === ac)) return
-                }
-                conflictSet.add(ai); conflictSet.add(bi)
-              })
-            })
-
-            // Preview range while user is mid-selection
-            const previewSet = new Set<number>()
-            if (pkgDraft !== null && pkgHover !== null && pkgHover !== pkgDraft) {
-              const s = pkgDraft, e = pkgHover
-              const span = e >= s ? e - s + 1 : 7 - s + e + 1
-              for (let i = 0; i < span; i++) previewSet.add((s + i) % 7)
-            }
-
-            // Returns true if column c is the very last day of exactly one package
-            const isLastDayOf = (c: number) => {
-              const cp = cellPkgs[c]
-              if (cp.length !== 1) return false
-              return (dowToCol(pkgs[cp[0]].anchor_dow) + pkgs[cp[0]].span_days - 1) % 7 === c
-            }
-
-            const handleCell = (c: number) => {
-              const cp = cellPkgs[c]
-              if (pkgDraft === null) {
-                // Can start on a free cell, OR on the last day of an existing package
-                // (clicking the last day of A as the start of B creates the valid end↔start shared day)
-                if (cp.length === 0 || isLastDayOf(c)) setPkgDraft(c)
-              } else {
-                if (c === pkgDraft) { setPkgDraft(null); setPkgHover(null); return }
-                const startCol = pkgDraft
-                const span = c >= startCol ? c - startCol + 1 : 7 - startCol + c + 1
-                const anchor_dow = colToDow(startCol)
-                setForm(f => ({
-                  ...f,
-                  packages: [...(f.packages || []), { name: '', anchor_dow, span_days: span, days_before: 0, days_after: 0 }]
-                }))
-                setPkgDraft(null); setPkgHover(null)
-              }
-            }
-
-            return (
-              <div style={{ marginBottom: 24 }}>
-                {/* Instruction bar */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Paquetes de fechas</div>
-                    <div style={{ fontSize: 11, color: pkgDraft !== null ? '#92400e' : 'var(--warm-gray)', fontWeight: pkgDraft !== null ? 600 : 400 }}>
-                      {pkgDraft !== null
-                        ? `▶ ${COLS[pkgDraft]} seleccionado — haz clic en el día de FIN`
-                        : 'Haz clic en el primer día y luego en el último para crear un paquete'}
-                    </div>
-                  </div>
-                  {pkgDraft !== null && (
-                    <button type="button" onClick={() => { setPkgDraft(null); setPkgHover(null) }}
-                      style={{ fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-
-                {/* ── Single week calendar ── */}
-                <div style={{ borderRadius: 12, overflow: 'hidden', border: '1.5px solid var(--ivory)', marginBottom: 16 }}>
-                  {/* Day-name header row */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', background: '#f9fafb', borderBottom: '1.5px solid var(--ivory)' }}>
-                    {COLS.map((d, c) => (
-                      <div key={c} style={{
-                        textAlign: 'center', fontSize: 11, fontWeight: 700, padding: '6px 0',
-                        color: cellPkgs[c].length > 0 ? PKG_COLORS[cellPkgs[c][0] % PKG_COLORS.length].text : 'var(--warm-gray)',
-                        borderRight: c < 6 ? '1px solid var(--ivory)' : 'none',
-                      }}>{d}</div>
-                    ))}
-                  </div>
-
-                  {/* Cells */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
-                    {COLS.map((_, c) => {
-                      const cp = cellPkgs[c]
-                      const isFree       = cp.length === 0
-                      // A "shared" cell is legally end↔start (exactly 2 packages, no conflict on either)
-                      const isShared     = cp.length === 2 && !cp.some(pi => conflictSet.has(pi))
-                      const isConflict   = cp.some(pi => conflictSet.has(pi))
-                      const isDraftStart = pkgDraft === c
-                      const isPreview    = !isDraftStart && pkgDraft !== null && previewSet.has(c)
-                      const isSinglePkg  = cp.length === 1
-                      const col0         = isSinglePkg ? PKG_COLORS[cp[0] % PKG_COLORS.length] : null
-                      const isAnchor     = isSinglePkg && dowToCol(pkgs[cp[0]].anchor_dow) === c
-                      const isEndCell    = isSinglePkg && (dowToCol(pkgs[cp[0]].anchor_dow) + pkgs[cp[0]].span_days - 1) % 7 === c
-
-                      // "isLastDay" — last day of a single pkg (clickable to start a shared day)
-                      const isLastDayCell = isEndCell && !isAnchor && pkgDraft === null
-
-                      // Build cell background
-                      let cellBg = '#fff'
-                      let shadow = 'none'
-                      if (isDraftStart) {
-                        cellBg = '#fef3c7'; shadow = 'inset 0 0 0 2.5px #f59e0b'
-                      } else if (isConflict && !isShared) {
-                        cellBg = '#fef2f2'; shadow = 'inset 0 0 0 2px #fca5a5'
-                      } else if (isShared) {
-                        // diagonal split handled by gradient
-                        const cA = PKG_COLORS[cp[0] % PKG_COLORS.length]
-                        const cB = PKG_COLORS[cp[1] % PKG_COLORS.length]
-                        cellBg = `linear-gradient(135deg, ${cA.solid} 50%, ${cB.solid} 50%)`
-                      } else if (isSinglePkg && col0) {
-                        cellBg = isAnchor ? col0.solid : col0.bg
-                        if (isAnchor) shadow = `inset 0 0 0 2px ${col0.solid}`
-                        // hint: last day can be clicked to chain another package
-                        if (isLastDayCell) shadow = `inset 0 0 0 2px ${col0.solid}88`
-                      } else if (isPreview) {
-                        cellBg = '#fef3c7'
-                      }
-
-                      // Clickable when: free, last-day-of-pkg (to start a shared day), or in draft-end mode
-                      const canClick = pkgDraft === null
-                        ? (isFree || isLastDayOf(c))
-                        : (c !== pkgDraft ? true : false)  // in draft mode any cell ends / cancels
-                      return (
-                        <button key={c} type="button"
-                          onClick={() => handleCell(c)}
-                          onMouseEnter={() => pkgDraft !== null && setPkgHover(c)}
-                          onMouseLeave={() => pkgDraft !== null && setPkgHover(null)}
-                          style={{
-                            height: 76, border: 'none',
-                            borderRight: c < 6 ? '1px solid var(--ivory)' : 'none',
-                            background: cellBg, boxShadow: shadow,
-                            cursor: canClick ? 'pointer' : 'default',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                            outline: 'none', padding: '4px 2px', position: 'relative',
-                          }}>
-                          {isDraftStart ? (
-                            <span style={{ fontSize: 16, color: '#92400e' }}>▶</span>
-                          ) : isShared ? (
-                            /* Split cell: top text = fin (left pkg), bottom = inicio (right pkg) */
-                            <>
-                              <span style={{ fontSize: 8, fontWeight: 800, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.4)', alignSelf: 'flex-start', paddingLeft: 4 }}>fin</span>
-                              <span style={{ fontSize: 8, fontWeight: 800, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.4)', alignSelf: 'flex-end', paddingRight: 4 }}>inicio</span>
-                            </>
-                          ) : isPreview ? (
-                            <span style={{ fontSize: 10, color: '#92400e' }}>·</span>
-                          ) : isFree ? (
-                            <span style={{ fontSize: 18, color: '#d1d5db', lineHeight: 1 }}>+</span>
-                          ) : isSinglePkg && col0 ? (
-                            <>
-                              {isAnchor && (
-                                <span style={{ fontSize: 8, color: '#fff', fontWeight: 700, opacity: 0.85 }}>inicio</span>
-                              )}
-                              <span style={{
-                                fontSize: 11, fontWeight: 700, textAlign: 'center', maxWidth: 44,
-                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                color: isAnchor ? '#fff' : col0.text,
-                              }}>
-                                {pkgs[cp[0]].name || `P${cp[0]+1}`}
-                              </span>
-                              {isEndCell && !isAnchor && (
-                                <span style={{ fontSize: 8, color: col0.text, fontWeight: 700, opacity: 0.7 }}>fin</span>
-                              )}
-                              {/* Small "+" badge on last day — signals user can chain another package here */}
-                              {isLastDayCell && (
-                                <div style={{
-                                  position: 'absolute', top: 4, right: 4,
-                                  width: 14, height: 14, borderRadius: '50%',
-                                  background: col0.solid, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
-                                }}>
-                                  <span style={{ fontSize: 10, color: '#fff', lineHeight: 1, fontWeight: 700 }}>+</span>
-                                </div>
-                              )}
-                            </>
-                          ) : null}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                {/* Empty state */}
-                {pkgs.length === 0 && pkgDraft === null && (
-                  <div style={{ padding: '12px', textAlign: 'center', background: 'var(--cream)', borderRadius: 10, fontSize: 12, color: 'var(--warm-gray)', marginBottom: 10 }}>
-                    Haz clic en el primer día de un paquete para empezar
-                  </div>
-                )}
-
-                {/* Package name list */}
-                {pkgs.map((pkg, i) => {
-                  const col = PKG_COLORS[i % PKG_COLORS.length]
-                  const ac  = dowToCol(pkg.anchor_dow)
-                  const ec  = (ac + pkg.span_days - 1) % 7
-                  const isConflict = conflictSet.has(i)
-                  return (
-                    <div key={i} style={{
-                      marginBottom: 8, borderRadius: 10,
-                      border: `1.5px solid ${isConflict ? '#fca5a5' : col.border}`,
-                      background: isConflict ? '#fef2f2' : col.bg,
-                      padding: '10px 12px',
-                    }}>
-                      {/* Header row: color strip + range badge + delete */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: col.solid, flexShrink: 0 }} />
-                        <span style={{ fontSize: 11, fontWeight: 700, color: col.text }}>Paquete {i + 1}</span>
-                        <span style={{
-                          fontSize: 11, padding: '1px 8px', borderRadius: 20,
-                          background: col.solid + '22', border: `1px solid ${col.border}`,
-                          color: isConflict ? '#dc2626' : col.text, fontWeight: 600,
-                        }}>{COLS[ac]} → {COLS[ec]} · {pkg.span_days} días</span>
-                        <button type="button" onClick={() => removePkg(i)}
-                          style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2, lineHeight: 1, flexShrink: 0 }}>
-                          <X size={13} />
-                        </button>
-                      </div>
-                      {/* Name input with visible border */}
-                      <input value={pkg.name} onChange={e => updatePkg(i, 'name', e.target.value)}
-                        placeholder="Nombre del paquete (ej: Fin de semana, Lunes-Miércoles…)"
-                        style={{
-                          width: '100%', boxSizing: 'border-box',
-                          padding: '6px 10px', borderRadius: 6,
-                          border: `1.5px solid ${isConflict ? '#fca5a5' : col.border}`,
-                          background: '#fff', outline: 'none',
-                          fontSize: 12, color: isConflict ? '#dc2626' : col.text,
-                          fontWeight: 500,
-                        }} />
-                    </div>
-                  )
-                })}
-
-                {conflictSet.size > 0 && (
-                  <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 11, color: '#dc2626', marginTop: 6 }}>
-                    ⚠ Solapamiento no permitido. Dos paquetes solo pueden compartir 1 día (fin de uno = inicio del otro).
-                  </div>
-                )}
-              </div>
-            )
-          })()}
-
-          {/* Info note */}
-          <div style={{ padding: '10px 12px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #bae6fd', fontSize: 12, color: '#0369a1', lineHeight: 1.6 }}>
-            <strong>¿Cómo funciona?</strong> Estas reglas se aplican al pasar un lead de <em>Nuevos</em> a <em>En seguimiento</em>: determinan cuántos días ocupa una boda y qué fechas se marcan como disponibles para ese lead.
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--ivory)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Guardando...' : 'Guardar reglas'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+// ── (DateRulesModal removed — prep/teardown chosen per booking in leads) ──────
 
 // ── Quick Create Lead ──────────────────────────────────────────────────────────
 

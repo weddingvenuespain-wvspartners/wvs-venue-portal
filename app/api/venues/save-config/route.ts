@@ -22,8 +22,8 @@ export async function POST(req: NextRequest) {
       { cookies: { get: (name: string) => cookieStore.get(name)?.value } }
     )
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const { leadsEmail } = await req.json()
 
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const { data: onb, error: onbErr } = await svc
       .from('venue_onboarding')
       .select('ficha_data, changes_data')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single()
 
     if (onbErr || !onb) {
@@ -55,13 +55,13 @@ export async function POST(req: NextRequest) {
     await svc
       .from('venue_onboarding')
       .update(updatePayload)
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
 
     // If venue already has a WP post, update email_del_venue directly in WordPress
     const { data: profile } = await svc
       .from('venue_profiles')
       .select('wp_venue_id')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single()
 
     if (profile?.wp_venue_id) {

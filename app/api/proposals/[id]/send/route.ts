@@ -22,15 +22,15 @@ export async function POST(
       { cookies: { get: (name: string) => cookieStore.get(name)?.value } }
     )
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     // Fetch proposal (must belong to the authenticated user) — sin couple_email ya que puede no existir la columna
     const { data: proposal, error } = await supabase
       .from('proposals')
       .select('id, slug, couple_name, lead_id, status, user_id')
       .eq('id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single()
 
     if (error || !proposal) {
@@ -63,7 +63,7 @@ export async function POST(
         const { data: venueData } = await supabase
           .from('venue_onboarding')
           .select('name, contact_email, smtp_from_email, smtp_host, smtp_port, smtp_user, smtp_pass')
-          .eq('user_id', session.user.id)
+          .eq('user_id', user.id)
           .maybeSingle()
 
         const { data: brandingData } = await supabase

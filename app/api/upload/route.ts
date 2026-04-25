@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       { cookies: { get: (name: string) => cookieStore.get(name)?.value } }
     )
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     // 3. Upload to Supabase Storage
     const svc = getStorageClient()
     const ext = file.type === 'image/webp' ? 'webp' : file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'gif'
-    const uid  = session.user.id.slice(0, 8)
+    const uid  = user.id.slice(0, 8)
     const ts   = Date.now()
     const rand = Math.random().toString(36).slice(2, 7)
     const path = `${uid}/${ts}-${rand}.${ext}`

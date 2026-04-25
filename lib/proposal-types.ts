@@ -17,12 +17,22 @@ export type MenuCourse = {
   items: MenuItem[]
 }
 
+export type MenuSeasonPrice = {
+  date_from:        string   // "YYYY-MM-DD"
+  date_to:          string   // "YYYY-MM-DD"
+  price_per_person: string   // "95€ +IVA"
+  season?:          string   // etiqueta libre, ej: "Temporada alta"
+}
+
 export type Menu = {
   id?: string                     // opcional, para referenciar en la selección
   name: string                    // "Menú Bosque"
   subtitle?: string
-  price_per_person: string        // "138€ +IVA"
+  price_per_person: string        // precio base / por defecto (puede ser vacío si solo hay gasto mínimo)
+  min_spend?: string              // gasto mínimo total (ej. "12.000€ +IVA") — para menús carta o abiertos
+  season_prices?: MenuSeasonPrice[] // precios por temporada (sobrescriben price_per_person si la fecha aplica)
   min_guests?: number
+  max_guests?: number
   courses?: MenuCourse[]          // si tiene cursos estructurados
   description?: string            // fallback: texto libre
   photo_url?: string
@@ -31,7 +41,7 @@ export type Menu = {
 
 export type MenuExtra = {
   id?: string
-  category: 'station' | 'resopon' | 'ceremony' | 'audiovisual' | 'music' | 'other'
+  category: 'station' | 'resopon' | 'open_bar' | 'ceremony' | 'audiovisual' | 'music' | 'other'
   name: string
   description?: string
   price: string                   // "45€", "1000€"
@@ -45,10 +55,30 @@ export type AppetizerGroup = {
   items: string[]
 }
 
+export type VenueSpaceItem = {
+  id?: string
+  name: string
+  description?: string
+  photo_url?: string
+  capacity_max?: number
+  price?: string
+  price_label?: string
+}
+
+export type SpaceGroup = {
+  id?: string
+  name: string
+  description?: string
+  note?: string
+  requires_selection?: boolean
+  spaces: VenueSpaceItem[]
+}
+
 export type SectionsData = {
   availability_message?: string
   sections_enabled?: Record<string, boolean>
   iva_included?: boolean
+  show_menu_prices?: boolean        // default true; false = menus shown without price (price comes from proposal estimate)
   contact?: { phone?: string; email?: string }
   has_catering?: boolean
   venue_rental?: {
@@ -88,6 +118,8 @@ export type SectionsData = {
   // Per-proposal image overrides
   hero_image_url?: string
   gallery_urls?: string[]
+  // Space groups — grouped zone selector for venues with multiple zones
+  space_groups?: SpaceGroup[] | null
   // Per-proposal map override (if empty, falls back to venueContent.map_info)
   map_embed_url?: string
   map_address?: string

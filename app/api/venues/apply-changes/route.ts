@@ -194,11 +194,11 @@ export async function POST(req: NextRequest) {
       { cookies: { get: (name: string) => cookieStore.get(name)?.value } }
     )
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const { data: caller } = await supabase
-      .from('venue_profiles').select('role').eq('user_id', session.user.id).single()
+      .from('venue_profiles').select('role').eq('user_id', user.id).single()
     if (caller?.role !== 'admin') return NextResponse.json({ error: 'Solo admin' }, { status: 403 })
 
     const { target_user_id, is_initial } = await req.json()

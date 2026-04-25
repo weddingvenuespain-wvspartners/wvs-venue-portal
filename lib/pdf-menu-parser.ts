@@ -51,7 +51,7 @@ function extractPrice(lines: string[]): string | null {
 
 export async function extractText(file: File): Promise<string> {
   // Carga dinámica para evitar ejecutar pdfjs en SSR
-  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const pdfjsLib = await import('pdfjs-dist')
   // Worker servido desde public/ (copiado en commit 4, sin dependencia de CDN)
   // @ts-ignore
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs'

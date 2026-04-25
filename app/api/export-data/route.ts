@@ -11,12 +11,12 @@ export async function GET(req: NextRequest) {
       { cookies: { get: (name: string) => cookieStore.get(name)?.value } }
     )
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const userId = session.user.id
+    const userId = user.id
 
     // Fetch all user data in parallel
     const [profileRes, leadsRes, proposalsRes, subscriptionRes] = await Promise.all([

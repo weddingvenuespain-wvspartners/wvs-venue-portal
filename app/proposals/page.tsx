@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Lock, Loader2, FileText, Building2, UtensilsCrossed, type LucideIcon } from 'lucide-react'
+import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Lock, Loader2, FileText, Building2, UtensilsCrossed, LayoutTemplate, type LucideIcon } from 'lucide-react'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import { STARTER_TEMPLATES, type StarterTemplateId, type StarterTemplateIcon } from '@/lib/proposal-starter-templates'
 
@@ -273,19 +273,14 @@ function PropuestasPageContent() {
               <FileText size={15} color="var(--gold)" />
               <span style={{ fontSize: 13, fontWeight: 600 }}>Propuestas</span>
             </button>
-            <a href="/proposals/config" style={{
+            <a href="/proposals/templates" style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px',
               textDecoration: 'none',
               borderBottom: '2px solid transparent', marginBottom: -2,
               color: 'var(--warm-gray)', transition: 'all 0.15s',
             }}>
-              <Eye size={15} color="var(--warm-gray)" />
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  Configuración
-                  {!features.propuestas_web && <Lock size={10} style={{ opacity: 0.6 }} />}
-                </div>
-              </div>
+              <LayoutTemplate size={15} color="var(--warm-gray)" />
+              <span style={{ fontSize: 13 }}>Plantillas</span>
             </a>
           </div>
 

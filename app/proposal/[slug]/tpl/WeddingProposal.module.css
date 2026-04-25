@@ -3,6 +3,8 @@
   color: var(--wp-text);
   padding: 80px 24px;
   font-family: 'Inter', system-ui, sans-serif;
+  container-type: inline-size;
+  container-name: wp;
 }
 .wpW { max-width: 1180px; margin: 0 auto }
 .wpHead { text-align: center; margin-bottom: 48px }
@@ -11,7 +13,7 @@
   color: var(--wp-primary); margin-bottom: 14px; display: block;
 }
 .wpTitle {
-  font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 3rem); font-weight: 300;
+  font-family: Georgia, serif; font-size: clamp(1.6rem, 4cqi, 3rem); font-weight: 300;
   color: var(--wp-text); line-height: 1.15; margin-bottom: 12px;
 }
 .wpSub {
@@ -40,7 +42,9 @@
   background: var(--wp-card); border: 1px solid var(--wp-border); border-radius: 14px;
   overflow: hidden; box-shadow: var(--wp-shadow); margin-bottom: 20px;
 }
-@media (max-width: 880px) { .wpSplit { grid-template-columns: 1fr } }
+@container wp (max-width: 640px) { .wpHead { margin-bottom: 28px } }
+@container wp (max-width: 640px) { .wpSection { padding: 20px 16px } }
+@container wp (max-width: 880px) { .wpSplit { grid-template-columns: 1fr } }
 
 /* Left column: sticky menu list */
 .wpList {
@@ -48,7 +52,7 @@
   border-right: 1px solid var(--wp-border);
   padding: 24px 0;
 }
-@media (max-width: 880px) {
+@container wp (max-width: 880px) {
   .wpList { border-right: none; border-bottom: 1px solid var(--wp-border); padding: 16px 0 8px }
 }
 .wpListH {
@@ -90,7 +94,7 @@
   padding-bottom: 20px; margin-bottom: 24px; border-bottom: 1px solid var(--wp-border);
   display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: end;
 }
-@media (max-width: 560px) { .wpDetailHead { grid-template-columns: 1fr } }
+@container wp (max-width: 560px) { .wpDetailHead { grid-template-columns: 1fr } }
 .wpDetailName {
   font-family: Georgia, serif; font-size: 1.7rem; font-weight: 400; color: var(--wp-text);
   line-height: 1.2; margin: 0 0 6px;
@@ -231,7 +235,7 @@
   padding: 28px 32px; box-shadow: var(--wp-shadow); margin-top: 12px;
   display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center;
 }
-@media (max-width: 720px) { .wpFooter { grid-template-columns: 1fr; padding: 24px } }
+@container wp (max-width: 720px) { .wpFooter { grid-template-columns: 1fr; padding: 24px } }
 
 .wpSumLines { display: flex; flex-direction: column; gap: 6px; min-width: 0 }
 .wpSumLine {
@@ -256,7 +260,7 @@
 .wpFootAction {
   display: flex; flex-direction: column; gap: 10px; align-items: stretch; min-width: 220px;
 }
-@media (max-width: 720px) { .wpFootAction { min-width: 0 } }
+@container wp (max-width: 720px) { .wpFootAction { min-width: 0 } }
 
 .wpBtn {
   display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -287,4 +291,190 @@
 .wpPdfLink {
   display: inline-block; margin-top: 16px; font-size: .82rem;
   color: var(--wp-primary); font-weight: 600; text-decoration: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MENU ALLOCATION GRID — steppers per menu
+═══════════════════════════════════════════════════════════════════ */
+.wpMenuGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.wpMenuCard {
+  border: 1.5px solid var(--wp-border); border-radius: 12px;
+  padding: 18px 16px; background: var(--wp-input);
+  transition: border-color .15s, box-shadow .15s;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.wpMenuCardSel {
+  border-color: var(--wp-primary);
+  box-shadow: 0 0 0 3px rgba(var(--wp-rgb), .1);
+  background: rgba(var(--wp-rgb), .03);
+}
+.wpMenuCardName { font-size: .95rem; font-weight: 600; color: var(--wp-text) }
+.wpMenuCardSub { font-size: .78rem; color: var(--wp-text-soft); line-height: 1.5 }
+.wpMenuCardPrice {
+  font-size: .88rem; font-weight: 700; color: var(--wp-primary);
+}
+.wpMenuCardPrice small { font-size: .72rem; font-weight: 400; color: var(--wp-text-dim); margin-left: 2px }
+
+/* Stepper */
+.wpStepper {
+  display: inline-flex; align-items: stretch;
+  border: 1.5px solid var(--wp-border); border-radius: 8px;
+  overflow: hidden; margin-top: 8px;
+}
+.wpStepperBtn {
+  width: 34px; height: 34px; background: none; border: none; cursor: pointer;
+  font-size: 1.15rem; color: var(--wp-text);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .1s, color .1s;
+}
+.wpStepperBtn:hover { background: rgba(var(--wp-rgb), .07); color: var(--wp-primary) }
+.wpStepperVal {
+  min-width: 44px; text-align: center; font-size: .92rem; font-weight: 700;
+  color: var(--wp-text); line-height: 34px;
+  border-left: 1.5px solid var(--wp-border); border-right: 1.5px solid var(--wp-border);
+}
+
+/* Allocation progress bar */
+.wpAllocBar {
+  font-size: .82rem; color: var(--wp-text-soft);
+  margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: rgba(var(--wp-rgb), .04); border-radius: 8px;
+}
+.wpAllocOk { color: var(--wp-primary); font-weight: 700 }
+.wpAllocOver { color: #dc2626; font-weight: 700 }
+
+/* Course choices per allocated menu */
+.wpMenuCourses {
+  border: 1px solid var(--wp-border); border-radius: 12px;
+  padding: 20px 24px; margin-bottom: 12px; background: var(--wp-card);
+}
+@container wp (max-width: 640px) { .wpMenuCourses { padding: 14px 16px } }
+.wpMenuCoursesHead {
+  font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--wp-text-dim); margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.wpMenuCoursesName { color: var(--wp-text); font-size: .9rem; font-weight: 600 }
+
+/* Date picker for flexible dates */
+.wpDateWrap { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 20px }
+.wpDateInput {
+  padding: 10px 16px; border: 1.5px solid var(--wp-border); border-radius: 8px;
+  font-size: .95rem; color: var(--wp-text); background: var(--wp-input);
+  outline: none; transition: border-color .15s; font-family: inherit;
+}
+.wpDateInput:focus { border-color: var(--wp-primary) }
+.wpDateNote {
+  font-size: .78rem; color: var(--wp-text-soft); text-align: center;
+  font-style: italic; max-width: 400px; line-height: 1.55;
+}
+
+/* Guest count row in menu section */
+.wpGuestRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  background: rgba(var(--wp-rgb), .05); border: 1px solid rgba(var(--wp-rgb), .15);
+  border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;
+}
+.wpGuestLabel { display: flex; flex-direction: column; gap: 3px }
+.wpGuestLabelMain { font-size: .9rem; font-weight: 600; color: var(--wp-text) }
+.wpGuestHint { font-size: .75rem; color: var(--wp-text-dim) }
+.wpGuestReset {
+  font-size: .75rem; color: var(--wp-primary); background: none; border: none;
+  cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 2px;
+}
+@container wp (max-width: 500px) {
+  .wpGuestRow { flex-direction: column; align-items: flex-start; gap: 10px }
+}
+
+/* ── Split-pane menu layout ─────────────────────────────────────────── */
+.wpMenuPane {
+  display: flex; border: 1px solid var(--wp-border); border-radius: 14px; overflow: hidden;
+  background: var(--wp-card); box-shadow: var(--wp-shadow); min-height: 420px;
+}
+.wpMenuSidebar {
+  width: 230px; flex-shrink: 0; border-right: 1px solid var(--wp-border);
+  display: flex; flex-direction: column;
+}
+.wpMenuSidebarItem {
+  padding: 14px 16px; cursor: pointer; border-bottom: 1px solid var(--wp-border);
+  display: flex; align-items: flex-start; gap: 10px; position: relative;
+  transition: background .15s;
+}
+.wpMenuSidebarItem:hover { background: rgba(var(--wp-rgb), .05) }
+.wpMenuSidebarItemSel { background: rgba(var(--wp-rgb), .08) !important }
+.wpMenuSidebarItemSel::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: var(--wp-primary); border-radius: 0 2px 2px 0;
+}
+.wpMenuSidebarInfo { flex: 1; min-width: 0 }
+.wpMenuSidebarName { font-size: .88rem; font-weight: 600; color: var(--wp-text); line-height: 1.3 }
+.wpMenuSidebarPrice { font-size: .75rem; color: var(--wp-primary); margin-top: 2px; font-weight: 500 }
+.wpMenuSidebarAlloc {
+  display: flex; align-items: center; gap: 4px; margin-top: 6px;
+}
+.wpMenuSidebarStepBtn {
+  width: 20px; height: 20px; border-radius: 5px; border: 1px solid var(--wp-border);
+  background: var(--wp-card); color: var(--wp-text); cursor: pointer;
+  font-size: .85rem; font-weight: 700; line-height: 1; display: flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+  transition: border-color .15s, background .15s;
+}
+.wpMenuSidebarStepBtn:hover { border-color: var(--wp-primary); background: rgba(var(--wp-rgb),.08) }
+.wpMenuSidebarStepVal {
+  min-width: 28px; text-align: center; font-size: .82rem; font-weight: 700; color: var(--wp-text);
+}
+.wpMenuSidebarFoot {
+  margin-top: auto; padding: 10px 16px; border-top: 1px solid var(--wp-border);
+  font-size: .78rem; color: var(--wp-text-soft);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.wpMenuSidebarFootOk { color: var(--wp-primary); font-weight: 700 }
+.wpMenuSidebarFootOver { color: #dc2626; font-weight: 700 }
+
+/* Right panel */
+.wpMenuMain { flex: 1; min-width: 0; padding: 28px 32px; overflow-y: auto }
+.wpMenuMainHead {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 20px; padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--wp-border);
+}
+.wpMenuMainLeft { min-width: 0 }
+.wpMenuMainName { font-size: 1.5rem; font-weight: 700; color: var(--wp-text); line-height: 1.2 }
+.wpMenuMainMeta { font-size: .82rem; color: var(--wp-text-soft); margin-top: 5px; line-height: 1.5 }
+.wpMenuMainConstraint {
+  display: inline-block; font-size: .75rem; color: var(--wp-text-dim);
+  margin-top: 8px; padding: 3px 8px; border: 1px solid var(--wp-border); border-radius: 20px;
+}
+.wpMenuMainPriceBlock { text-align: right; flex-shrink: 0 }
+.wpMenuMainPriceVal { font-size: 2rem; font-weight: 700; color: var(--wp-primary); line-height: 1 }
+.wpMenuMainPriceUnit { font-size: .78rem; color: var(--wp-text-dim); margin-top: 3px }
+.wpMenuMainMinSpend { font-size: .75rem; color: var(--wp-text-dim); margin-top: 2px }
+
+/* Single-menu full-width sub-header */
+.wpMenuSingleHead {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 20px; padding: 20px 24px; margin-bottom: 24px;
+  background: var(--wp-card); border: 1px solid var(--wp-border);
+  border-radius: 12px; box-shadow: var(--wp-shadow);
+}
+
+@container wp (max-width: 640px) {
+  .wpMenuPane { flex-direction: column }
+  .wpMenuSidebar {
+    width: 100%; flex-direction: row; overflow-x: auto;
+    border-right: none; border-bottom: 1px solid var(--wp-border); min-height: unset;
+  }
+  .wpMenuSidebarItem {
+    flex-direction: column; min-width: 120px; border-bottom: none;
+    border-right: 1px solid var(--wp-border);
+  }
+  .wpMenuSidebarItemSel::before { top:0; left:0; right:0; bottom:auto; height:3px; width:auto; border-radius: 0 0 2px 2px }
+  .wpMenuSidebarFoot { display: none }
+  .wpMenuMain { padding: 20px 16px }
+  .wpMenuMainName { font-size: 1.2rem }
+  .wpMenuMainPriceVal { font-size: 1.5rem }
 }

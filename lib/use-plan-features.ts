@@ -19,6 +19,7 @@ export type PlanFeatures = {
   estadisticas:           boolean  // Estadísticas básicas
 
   // ── Premium tier (only shown in premium column on web) ────────────────────
+  estructura:             boolean  // Estructura comercial: modalidades y tarifas
   leads_export:           boolean  // Exportar leads a CSV/Excel
   pipeline:               boolean  // Pipeline visual de ventas (kanban/embudo)
   propuestas:             boolean  // Crear propuestas digitales
@@ -54,6 +55,7 @@ export const FEATURE_DEFS: FeatureDef[] = [
   { key: 'estadisticas',           tier: 'basic',       label: 'Estadísticas básicas',           description: 'Métricas de leads recibidos, visitas y conversiones' },
 
   // ── Premium ───────────────────────────────────────────────────────────────
+  { key: 'estructura',              tier: 'premium',     label: 'Estructura comercial',           description: 'Define modalidades de alquiler y tarifas por período para tu venue' },
   { key: 'leads_export',           tier: 'premium',     label: 'Exportar leads a CSV',           description: 'Descargar todos los leads en formato Excel/CSV' },
   { key: 'pipeline',               tier: 'premium',     label: 'Pipeline de ventas',             description: 'Vista kanban del embudo comercial con etapas personalizables' },
   { key: 'propuestas',             tier: 'premium',     label: 'Propuestas digitales',           description: 'Crear y enviar propuestas personalizadas a cada pareja' },
@@ -78,6 +80,7 @@ export const BASIC_FALLBACK: PlanFeatures = {
   calendario:             true,
   estadisticas:           true,
   // premium → false
+  estructura:             false,
   leads_export:           false,
   pipeline:               false,
   propuestas:             false,
@@ -98,6 +101,7 @@ export const PREMIUM_FALLBACK: PlanFeatures = {
   leads_date_filter:      true,
   calendario:             true,
   estadisticas:           true,
+  estructura:             true,
   leads_export:           true,
   pipeline:               true,
   propuestas:             true,
@@ -121,8 +125,9 @@ export function usePlanFeatures(): PlanFeatures & {
   isTrial:        boolean        // subscription status is 'trial'
   isTrialExpired: boolean        // trial exists but trial_end_date is in the past
   trialDaysLeft:  number | null  // null if not trial or no end date
+  loading:        boolean        // true while auth context is still loading
 } {
-  const { profile } = useAuth()
+  const { profile, loading } = useAuth()
 
   const plan               = profile?.plan
   const subscriptionStatus = profile?.subscription_status as string | null | undefined
@@ -163,5 +168,6 @@ export function usePlanFeatures(): PlanFeatures & {
     isTrial,
     isTrialExpired,
     trialDaysLeft,
+    loading,
   }
 }

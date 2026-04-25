@@ -18,10 +18,10 @@ async function requireAdmin() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { get: (n: string) => cookieStore.get(n)?.value } }
   )
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return false
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return false
   const { data: me } = await supabase
-    .from('venue_profiles').select('role').eq('user_id', session.user.id).single()
+    .from('venue_profiles').select('role').eq('user_id', user.id).single()
   return me?.role === 'admin'
 }
 
