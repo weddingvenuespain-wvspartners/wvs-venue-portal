@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, Fragment } from 'react'
 import {
   ChevronLeft, ChevronDown, Check, Loader2, ChefHat, LayoutTemplate,
   Upload, X, Monitor, Smartphone, RefreshCcw, ExternalLink,
@@ -606,8 +606,39 @@ export default function TemplateEditor({
                 {/* Section list — each row has toggle + label + expand */}
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Secciones de la propuesta</div>
                 <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-                  {ALL_SECTION_IDS.map((secId, i) => {
+                  {(() => {
+                    const SPACE_GROUP_IDS = ['zones', 'space_groups', 'venue_rental']
+                    const isSpaceGroupOpen = openSecs.has('__space_group')
+                    const activeSpaceIds = SPACE_GROUP_IDS.filter(id => isSectionOn(id))
+                    const activeSpaceLabel = activeSpaceIds.length === 0
+                      ? 'Ninguna activa'
+                      : activeSpaceIds.map(id => getSectionLabel(id, commercialConfig?.space_type as any, SECTION_LABELS[id as SectionId])).join(' · ')
+                    const renderSpaceGroupHeader = () => (
+                      <div key="__sg_header" style={{ borderBottom: '1px solid var(--border)', background: 'rgba(196,151,90,0.06)' }}>
+                        <div
+                          onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('__space_group') ? n.delete('__space_group') : n.add('__space_group'); return n })}
+                          style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', cursor: 'pointer' }}
+                        >
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--charcoal)' }}>Espacios y precios</span>
+                              <span style={{ fontSize: 10, color: activeSpaceIds.length > 0 ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 7px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600 }}>{activeSpaceIds.length}/{SPACE_GROUP_IDS.length}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: activeSpaceIds.length === 0 ? 'var(--warm-gray)' : '#999', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeSpaceLabel}</div>
+                          </div>
+                          <ChevronDown size={13} style={{ color: 'var(--warm-gray)', transform: isSpaceGroupOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0, marginTop: 2 }} />
+                        </div>
+                      </div>
+                    )
+
+                    return ALL_SECTION_IDS.map((secId, i) => {
                     if (['welcome_light', 'welcome_split', 'welcome_editorial'].includes(secId)) return null
+
+                    const isInSpaceGroup = SPACE_GROUP_IDS.includes(secId)
+                    const isFirstSpaceVisible = isInSpaceGroup && SPACE_GROUP_IDS[0] === secId
+                    if (isInSpaceGroup && !isSpaceGroupOpen) {
+                      return isFirstSpaceVisible ? renderSpaceGroupHeader() : null
+                    }
 
                     if (secId === 'welcome') {
                       const isWelcomeOpen = openSecs.has('welcome')
@@ -644,7 +675,9 @@ export default function TemplateEditor({
                     const isOpen = openSecs.has(secId)
                     const isLast = i === ALL_SECTION_IDS.length - 1
                     return (
-                      <div key={secId} style={{ borderBottom: isLast ? 'none' : '1px solid var(--border)', opacity: isOn ? 1 : 0.5, transition: 'opacity .15s' }}>
+                      <Fragment key={secId}>
+                      {isInSpaceGroup && isFirstSpaceVisible && renderSpaceGroupHeader()}
+                      <div style={{ borderBottom: isLast ? 'none' : '1px solid var(--border)', opacity: isOn ? 1 : 0.5, transition: 'opacity .15s', ...(isInSpaceGroup ? { paddingLeft: 14, borderLeft: '2px solid rgba(196,151,90,0.25)', background: 'rgba(196,151,90,0.02)' } : {}) }}>
                         {/* Row header */}
                         <div
                           onClick={() => setOpenSecs(s => { const n = new Set(s); n.has(secId) ? n.delete(secId) : n.add(secId); return n })}
@@ -684,8 +717,10 @@ export default function TemplateEditor({
                           </div>
                         )}
                       </div>
+                      </Fragment>
                     )
-                  })}
+                    })
+                  })()}
                 </div>
               </div>
             )}

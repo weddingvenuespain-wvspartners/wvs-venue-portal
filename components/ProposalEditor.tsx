@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef, useMemo } from 'react'
+import { useEffect, useState, useRef, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
@@ -791,6 +791,30 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               }
             }))
 
+            const SPACE_GROUP_IDS = ['zones', 'space_groups', 'venue_rental']
+            const visibleSpaceSubs = SPACE_GROUP_IDS.filter(id => isSectionAllowed(id, commercialConfig?.space_type as any))
+            const isSpaceGroupOpen = openSecs.has('__space_group')
+            const activeSpaceIds = visibleSpaceSubs.filter(id => isSectionOn(id))
+            const activeSpaceLabel = activeSpaceIds.length === 0
+              ? 'Ninguna activa'
+              : activeSpaceIds.map(id => getSectionLabel(id, commercialConfig?.space_type as any, SECTION_LABELS[id] || id)).join(' · ')
+            const renderSpaceGroupHeader = () => (
+              <div key="__sg_header" className="sec-row" style={{ background: 'rgba(196,151,90,0.06)' }}>
+                <div className="sec-header"
+                  onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('__space_group') ? n.delete('__space_group') : n.add('__space_group'); return n })}
+                  style={{ cursor: 'pointer', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--charcoal)' }}>Espacios y precios</span>
+                      <span style={{ fontSize: 10, color: activeSpaceIds.length > 0 ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 7px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600 }}>{activeSpaceIds.length}/{visibleSpaceSubs.length}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: activeSpaceIds.length === 0 ? 'var(--warm-gray)' : '#999', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeSpaceLabel}</div>
+                  </div>
+                  <ChevronDown size={14} style={{ color: 'var(--warm-gray)', transform: isSpaceGroupOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0, marginTop: 2 }} />
+                </div>
+              </div>
+            )
+
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                 {tplSections.length === 0 && (
@@ -802,6 +826,12 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 {tplSections.map(secId => {
                   if (['welcome_light', 'welcome_split', 'welcome_editorial'].includes(secId)) return null
                   if (!isSectionAllowed(secId, commercialConfig?.space_type as any)) return null
+
+                  const isInSpaceGroup = SPACE_GROUP_IDS.includes(secId)
+                  const isFirstSpaceVisible = isInSpaceGroup && visibleSpaceSubs[0] === secId
+                  if (isInSpaceGroup && !isSpaceGroupOpen) {
+                    return isFirstSpaceVisible ? renderSpaceGroupHeader() : null
+                  }
 
                   if (secId === 'welcome') {
                     const isWelcomeOpen = openSecs.has('welcome')
@@ -895,7 +925,9 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                   const overrideKey = `${secId}_override`
 
                   return (
-                    <div key={secId} className="sec-row" style={{ opacity: isOn ? 1 : 0.55 }}>
+                    <Fragment key={secId}>
+                    {isInSpaceGroup && isFirstSpaceVisible && renderSpaceGroupHeader()}
+                    <div className="sec-row" style={{ opacity: isOn ? 1 : 0.55, ...(isInSpaceGroup ? { paddingLeft: 14, borderLeft: '2px solid rgba(196,151,90,0.25)', background: 'rgba(196,151,90,0.02)' } : {}) }}>
                       <div className="sec-header" onClick={() => setOpenSecs(s => { const n = new Set(s); n.has(secId) ? n.delete(secId) : n.add(secId); return n })}>
                         <div onClick={e => { e.stopPropagation(); toggleSec(secId, !isOn) }}
                           style={{ width: 34, height: 19, borderRadius: 10, background: isOn ? 'var(--gold)' : '#d1c9b8', position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0 }}>
@@ -1396,6 +1428,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                         </div>
                       )}
                     </div>
+                    </Fragment>
                   )
                 })}
               </div>
