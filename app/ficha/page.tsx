@@ -1294,7 +1294,7 @@ export default function FichaPage() {
                   <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>8 fotos · 4:3 · .webp · Máx 2 MB</span>
                 </div>
                 <div style={{ padding: '0 28px 28px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
                     {hGallery.map((photo, i) => (
                       <ImageUploader
                         key={i}

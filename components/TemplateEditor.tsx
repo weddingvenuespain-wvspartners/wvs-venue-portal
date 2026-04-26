@@ -335,7 +335,7 @@ export default function TemplateEditor({
     if (secId === 'gallery') {
       const urls = sections.gallery_urls ?? []
       return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
           {urls.map((url, i) => (
             <ImageUploader
               key={i}
@@ -589,26 +589,50 @@ export default function TemplateEditor({
       </div>
     )
 
-    if (secId === 'welcome_light') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
-          Muestra el mensaje de bienvenida sobre fondo claro crema. Puedes añadir una imagen de fondo opcional.
+    if (secId === 'welcome_light') {
+      const wl: any = (sections as any).welcome_light ?? {}
+      const setWl = (patch: any) => { setSections(s => ({ ...s, welcome_light: { ...((s as any).welcome_light ?? {}), ...patch } } as any)); markDirty() }
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+            Muestra el mensaje de bienvenida sobre fondo claro crema. Puedes añadir una imagen de fondo opcional.
+          </div>
+          <ImageUploader
+            value={wl.image_url ?? null}
+            height={140}
+            label="Imagen de fondo (opcional)"
+            hint="JPG, PNG o WEBP"
+            alt="Imagen de fondo bienvenida"
+            onUpload={async (f) => {
+              const url = await uploadImage(f, 'welcome')
+              if (url) setWl({ image_url: url })
+            }}
+            onRemove={() => setWl({ image_url: null })}
+          />
         </div>
-        <input className="form-input" placeholder="URL imagen de fondo (opcional)" style={{ fontSize: 12 }}
-          value={(sections as any).welcome_light?.image_url ?? ''}
-          onChange={e => { setSections(s => ({ ...s, welcome_light: { ...((s as any).welcome_light ?? {}), image_url: e.target.value } } as any)); markDirty() }} />
-      </div>
-    )
+      )
+    }
 
     if (secId === 'welcome_split') {
       const ws: any = (sections as any).welcome_split ?? {}
       const p = (patch: any) => { setSections(s => ({ ...s, welcome_split: { ...((s as any).welcome_split ?? {}), ...patch } } as any)); markDirty() }
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
             Dos columnas: imagen a un lado, mensaje de bienvenida al otro.
           </div>
-          <input className="form-input" placeholder="URL de la imagen" style={{ fontSize: 12 }} value={ws.image_url ?? ''} onChange={e => p({ image_url: e.target.value })} />
+          <ImageUploader
+            value={ws.image_url ?? null}
+            height={140}
+            label="Imagen de la sección"
+            hint="JPG, PNG o WEBP"
+            alt="Imagen bienvenida dividida"
+            onUpload={async (f) => {
+              const url = await uploadImage(f, 'welcome')
+              if (url) p({ image_url: url })
+            }}
+            onRemove={() => p({ image_url: null })}
+          />
           <div style={{ display: 'flex', gap: 6 }}>
             {(['left', 'right'] as const).map(side => (
               <button key={side} type="button"

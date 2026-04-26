@@ -855,7 +855,18 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                   <label className="form-label">Imagen de fondo (opcional)</label>
-                                  <input className="form-input" placeholder="https://..." value={(sections as any).welcome_light?.image_url ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_light: { ...(s.welcome_light ?? {}), image_url: e.target.value } }))} />
+                                  <ImageUploader
+                                    value={(sections as any).welcome_light?.image_url ?? null}
+                                    height={160}
+                                    label="Imagen de fondo"
+                                    hint="JPG, PNG o WEBP"
+                                    alt="Imagen bienvenida clara"
+                                    onUpload={async (f) => {
+                                      const url = await uploadImage(f, 'welcome')
+                                      if (url) setSections((s: any) => ({ ...s, welcome_light: { ...(s.welcome_light ?? {}), image_url: url } }))
+                                    }}
+                                    onRemove={() => setSections((s: any) => ({ ...s, welcome_light: { ...(s.welcome_light ?? {}), image_url: null } }))}
+                                  />
                                 </div>
                               </div>
                             )}
@@ -866,8 +877,19 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                   Muestra el mensaje de bienvenida en dos columnas: imagen a un lado, texto al otro.
                                 </div>
                                 <div className="form-group">
-                                  <label className="form-label">URL de la imagen</label>
-                                  <input className="form-input" placeholder="https://..." value={(sections as any).welcome_split?.image_url ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_url: e.target.value } }))} />
+                                  <label className="form-label">Imagen de la sección</label>
+                                  <ImageUploader
+                                    value={(sections as any).welcome_split?.image_url ?? null}
+                                    height={160}
+                                    label="Imagen de la sección"
+                                    hint="JPG, PNG o WEBP"
+                                    alt="Imagen bienvenida dividida"
+                                    onUpload={async (f) => {
+                                      const url = await uploadImage(f, 'welcome')
+                                      if (url) setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_url: url } }))
+                                    }}
+                                    onRemove={() => setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_url: null } }))}
+                                  />
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                   <label className="form-label">Posición de la imagen</label>
@@ -988,7 +1010,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                           {secId === 'gallery' && (() => {
                             const urls = sections.gallery_urls ?? []
                             return (
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                                 {urls.map((url, i) => (
                                   <ImageUploader
                                     key={i}

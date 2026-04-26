@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Upload, X, ImageIcon, Loader2, Pencil } from "lucide-react"
+import { X, ImageIcon, Loader2, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Props = {
@@ -120,39 +120,50 @@ export function ImageUploader({
       >
         {showPreview ? (
           <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={value!}
-              alt={alt}
-              className={cn("h-full w-full", objectFit === "contain" ? "object-contain" : "object-cover")}
-            />
+            {/* Click on the image opens the file picker — works at any size. */}
+            <button
+              type="button"
+              onClick={() => !disabled && !uploading && inputRef.current?.click()}
+              disabled={disabled || uploading}
+              className="block h-full w-full"
+              aria-label="Cambiar imagen"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={value!}
+                alt={alt}
+                className={cn("h-full w-full", objectFit === "contain" ? "object-contain" : "object-cover")}
+              />
+            </button>
 
             {!disabled && (
-              <div className="absolute inset-0 flex items-end justify-end gap-2 bg-gradient-to-t from-black/45 via-transparent to-transparent p-3 opacity-0 transition-opacity group-hover:opacity-100">
-                <button
-                  type="button"
-                  onClick={() => inputRef.current?.click()}
-                  disabled={uploading}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-white/95 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-white"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  Cambiar
-                </button>
+              <>
+                {/* Hover-only "Cambiar" badge centered (only visible on hover, hidden on small thumbs gracefully) */}
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-sm">
+                    <Pencil className="h-3 w-3" />
+                    Cambiar
+                  </span>
+                </div>
+
+                {/* Always-visible remove button (top-right). Stops propagation so it doesn't trigger the change. */}
                 {onRemove && (
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation()
                       setError(null)
                       onRemove()
                     }}
                     disabled={uploading}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white/95 text-destructive shadow-sm transition-colors hover:bg-white"
-                    aria-label="Eliminar"
+                    className="absolute right-1 top-1 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-white shadow-md transition-colors hover:bg-black/85 focus:outline-none focus:ring-2 focus:ring-white"
+                    aria-label="Eliminar imagen"
+                    title="Eliminar"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
                 )}
-              </div>
+              </>
             )}
           </>
         ) : (
