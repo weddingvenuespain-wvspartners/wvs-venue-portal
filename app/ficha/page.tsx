@@ -3,9 +3,10 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Upload, X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Upload, X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Info, FileText, Tag, MapPin, Image as ImageIcon, Star, Settings } from 'lucide-react'
 import DOMPurify from 'dompurify'
 
 type Tab = 'info' | 'descripcion' | 'precios' | 'ubicacion' | 'fotos' | 'resenas' | 'config'
@@ -666,14 +667,14 @@ export default function FichaPage() {
   const ERR = '#dc2626'
   const hasError = (field: string) => validationErrors.some(e => e.field === field)
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'info',        label: 'Info principal' },
-    { key: 'descripcion', label: 'Descripción' },
-    { key: 'precios',     label: 'Precios' },
-    { key: 'ubicacion',   label: 'Ubicación' },
-    { key: 'fotos',       label: 'Fotos' },
-    { key: 'resenas',     label: 'Reseñas' },
-    { key: 'config',      label: 'Configuración' },
+  const tabs: { key: Tab; label: string; icon: any }[] = [
+    { key: 'info',        label: 'Info principal',  icon: Info },
+    { key: 'descripcion', label: 'Descripción',     icon: FileText },
+    { key: 'precios',     label: 'Precios',         icon: Tag },
+    { key: 'ubicacion',   label: 'Ubicación',       icon: MapPin },
+    { key: 'fotos',       label: 'Fotos',           icon: ImageIcon },
+    { key: 'resenas',     label: 'Reseñas',         icon: Star },
+    { key: 'config',      label: 'Configuración',   icon: Settings },
   ]
 
   const wcH1    = wordCount(H1_Venue)
@@ -700,6 +701,37 @@ export default function FichaPage() {
             )}
           </div>
         </div>
+
+        <Tabs
+          activeKey={activeTab}
+          onChange={k => {
+            if (k !== activeTab && isDirty) autoSaveRef.current()
+            setActiveTab(k as Tab)
+          }}
+          tabs={tabs.map(t => {
+            const errCount = validationErrors.filter(e => e.tab === t.key).length
+            return {
+              key: t.key,
+              label: t.label,
+              icon: t.icon,
+              badge: (
+                <>
+                  {dirtyTabs.has(t.key) && !isLocked && (
+                    <AlertCircle size={11} style={{ color: 'currentColor', opacity: 0.6 }} />
+                  )}
+                  {errCount > 0 && (
+                    <span style={{
+                      background: '#dc2626', color: '#fff',
+                      fontSize: 9, fontWeight: 700, lineHeight: 1,
+                      borderRadius: 10, padding: '2px 6px',
+                      display: 'inline-flex', alignItems: 'center',
+                    }}>{errCount}</span>
+                  )}
+                </>
+              ),
+            }
+          })}
+        />
 
         <div className="page-content" style={{ paddingBottom: 80 }} onChange={() => { if (!loading) { setIsDirty(true); setDirtyTabs(prev => new Set(prev).add(activeTab)) } }}>
 
@@ -772,47 +804,13 @@ export default function FichaPage() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 4, marginBottom: 28, alignItems: 'center', position: 'sticky', top: 50, zIndex: 30, background: 'var(--cream)', paddingTop: 16, paddingBottom: 12, marginTop: -16 }}>
-            {tabs.map(t => {
-              const errCount = validationErrors.filter(e => e.tab === t.key).length
-              const isActive = activeTab === t.key
-              return (
-                <button key={t.key}
-                  className={`ficha-tab ${isActive ? 'active' : ''}`}
-                  onClick={() => {
-                    if (t.key !== activeTab && isDirty) {
-                      autoSaveRef.current()
-                    }
-                    setActiveTab(t.key)
-                  }}>
-                  {t.label}
-                  {dirtyTabs.has(t.key) && !isLocked && (
-                    <span className="dirty-tooltip-wrap" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'default', position: 'relative' }}>
-                      <AlertCircle size={12} style={{ color: 'currentColor', opacity: 0.7, flexShrink: 0 }} />
-                      <span className="dirty-tooltip">Hay cambios que no se han guardado</span>
-                    </span>
-                  )}
-                  {errCount > 0 && (
-                    <span style={{
-                      position: 'absolute', top: -3, right: -3,
-                      background: '#dc2626', color: '#fff',
-                      fontSize: 8, fontWeight: 700, lineHeight: 1,
-                      borderRadius: '50%', width: 14, height: 14,
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    }}>{errCount}</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-
           {/* ── INFO PRINCIPAL ──────────────────────────────────────────── */}
           {activeTab === 'info' && (
-            <div>
+            <div className="card" style={{ border: '1px solid var(--ivory)', borderRadius: 12, padding: 24 }}>
               {/* Section title */}
-              <div style={{ marginBottom: 28 }}>
-                <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--espresso)', letterSpacing: '-0.02em' }}>Información principal</div>
-                <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginTop: 6 }}>Gestiona los detalles básicos y la apariencia visual de tu venue.</div>
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--espresso)' }}>Información principal</div>
+                <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginTop: 4 }}>Gestiona los detalles básicos y la apariencia visual de tu venue.</div>
               </div>
 
               {/* Two-column layout */}

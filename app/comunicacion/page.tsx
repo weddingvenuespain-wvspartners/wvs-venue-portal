@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import {
@@ -586,10 +587,10 @@ export default function ComunicacionPage() {
     setLoading(false)
   }
 
-  const TABS: { key: CommTab; label: string; icon: React.ReactNode; desc: string }[] = [
-    { key: 'messages', label: 'Mensajes', icon: <MessageCircle size={15} />, desc: 'Plantillas de WhatsApp y email' },
-    { key: 'dossier',  label: 'Dossier',  icon: <FileText size={15} />,      desc: 'PDF para enviar a parejas' },
-  ]
+  const TABS = [
+    { key: 'messages', label: 'Mensajes', icon: MessageCircle, desc: 'Plantillas de WhatsApp y email' },
+    { key: 'dossier',  label: 'Dossier',  icon: FileText,      desc: 'PDF para enviar a parejas' },
+  ] as const
 
   if (isBlocked) return null
 
@@ -630,29 +631,16 @@ export default function ComunicacionPage() {
       <Sidebar />
       <div className="main-layout">
         <div className="topbar">
-          <div className="topbar-title">Comunicación y plantillas</div>
+          <div className="topbar-title">Comunicación</div>
         </div>
-        <div className="page-content">
 
-          {/* Tab bar */}
-          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--ivory)', marginBottom: 24 }}>
-            {TABS.map(tab => (
-              <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px',
-                background: 'none', border: 'none', cursor: 'pointer',
-                borderBottom: activeTab === tab.key ? '2px solid var(--gold)' : '2px solid transparent',
-                marginBottom: -2,
-                color: activeTab === tab.key ? 'var(--espresso)' : 'var(--warm-gray)',
-                transition: 'all 0.15s',
-              }}>
-                <span style={{ color: activeTab === tab.key ? 'var(--gold)' : 'var(--warm-gray)' }}>{tab.icon}</span>
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: 13, fontWeight: activeTab === tab.key ? 600 : 400 }}>{tab.label}</div>
-                  <div style={{ fontSize: 10, color: 'var(--stone)', display: activeTab === tab.key ? 'block' : 'none' }}>{tab.desc}</div>
-                </div>
-              </button>
-            ))}
-          </div>
+        <Tabs
+          activeKey={activeTab}
+          onChange={k => setActiveTab(k as CommTab)}
+          tabs={TABS as any}
+        />
+
+        <div className="page-content">
 
           {activeTab === 'messages' && (
             <MessagesTab
@@ -753,10 +741,10 @@ function MessagesTab({ templates, leads, userId, onRefresh }: {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16, alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: 16, alignItems: 'start' }}>
 
       {/* Left: template list */}
-      <div className="card" style={{ position: 'sticky', top: 80 }}>
+      <div className="card" style={{ position: 'sticky', top: 112 }}>
         <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 6 }}>
           {(['all', 'whatsapp', 'email'] as const).map(ch => (
             <button key={ch} onClick={() => setFilterCh(ch)} style={{

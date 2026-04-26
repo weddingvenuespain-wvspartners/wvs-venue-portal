@@ -32,6 +32,28 @@ export default function ProposalLanding({ data, preview }: { data: ProposalData;
     return () => window.removeEventListener('message', onMessage)
   }, [preview])
 
+  // Track view via server endpoint (RPC handles dedupe within 30 min + self-view skip).
+  // Skipped in preview mode (editor iframe / template preview).
+  useEffect(() => {
+    if (preview) return
+    if (typeof window === 'undefined') return
+    let session = ''
+    try {
+      session = localStorage.getItem('wvs_proposal_session') || ''
+      if (!session) {
+        session = window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
+        localStorage.setItem('wvs_proposal_session', session)
+      }
+    } catch { session = `${Date.now()}-${Math.random().toString(36).slice(2)}` }
+
+    fetch('/api/proposals/track-view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: data.slug, session }),
+      keepalive: true,
+    }).catch(() => {})
+  }, [data.slug, preview])
+
   const effective = preview ? liveData : data
 
   // Replace dynamic placeholders in personal_message

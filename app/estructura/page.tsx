@@ -1,18 +1,23 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
+import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import {
   Plus, ChevronDown, ChevronUp, Pencil, Trash2,
   X, Check, Lock, Sun, Moon, CalendarDays, Package, SlidersHorizontal,
-  Building2, Users, Layers, CreditCard, LayoutGrid, Settings2, ChevronRight, ChevronLeft,
+  Building2, Users, Layers, CreditCard, LayoutGrid, Settings2, ChefHat, Save,
+  Maximize2, Minimize2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
+import ProposalMenuEditor from '@/components/ProposalMenuEditor'
 import DatePicker, { fmtDate } from '@/components/DatePicker'
-import type { VenueSpace, VenueSpaceGroup, VisitAvailability, DaySchedule, BlockedDate, HourRange } from '@/lib/proposal-types'
+import type { SectionsData } from '@/lib/proposal-types'
+import { WeddingProposal } from '@/app/proposal/[slug]/tpl/WeddingProposal'
+import type { ProposalData } from '@/app/proposal/[slug]/page'
 
 // ── Duration types ─────────────────────────────────────────────────────────────
 
@@ -36,14 +41,18 @@ type SpaceType  = 'single' | 'single_with_supplements' | 'multiple_independent'
 type PriceModel = 'rental' | 'per_person' | 'package'
 
 type CommercialConfig = {
-  space_type:  SpaceType
-  price_model: PriceModel
+  space_type:          SpaceType
+  price_model:         PriceModel
+  menu_included?:      boolean   // per_person/package: ¿el precio incluye menú?
+  has_menu_types?:     boolean   // si menu_included: ¿hay varios tipos de menú?
+  catering_own?:       boolean   // si menú no incluido o rental: ¿catering propio?
+  catering_mandatory?: boolean   // si catering_own: ¿es obligatorio contratarlo?
 }
 
-type WizardQuestion = 'space_type' | 'price_model'
+type WizardQuestion = 'space_type' | 'price_model' | 'menu_included' | 'catering_own' | 'catering_mandatory' | 'has_menu_types'
 type WizardConfig   = Partial<CommercialConfig>
 
-type ZoneItem       = { id: string; name: string }  // used only by PriceRow/PriceForm
+type ZoneItem       = { id: string; name: string }
 type SupplementItem = { id: string; name: string }
 
 type ZonePrice       = { zone_id: string; price: number }
@@ -302,10 +311,15 @@ export default function EstructuraPage() {
   const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
 
+  const [activeTab, setActiveTab]             = useState<'modalidades' | 'menus'>('modalidades')
   const [modalities, setModalities]           = useState<Modality[]>([])
   const [loading, setLoading]                 = useState(true)
   const [expanded, setExpanded]               = useState<Set<string>>(new Set())
   const [error, setError]                     = useState('')
+  const [menuCatalog, setMenuCatalog]         = useState<SectionsData>({})
+  const [previewExpanded, setPreviewExpanded] = useState(false)
+  const [catalogSaving, setCatalogSaving]     = useState(false)
+  const [catalogSaved, setCatalogSaved]       = useState(false)
   const [commercialConfig, setCommercialConfig] = useState<CommercialConfig | null>(null)
   const [configWizardOpen, setConfigWizardOpen]   = useState(false)
   const [wizardQuestion, setWizardQuestion]       = useState<WizardQuestion>('space_type')
@@ -313,49 +327,12 @@ export default function EstructuraPage() {
   const [wizardConfig, setWizardConfig]           = useState<WizardConfig>({})
   const [configSaving, setConfigSaving]           = useState(false)
 
-  // Space groups (replaces flat zones for multiple_independent)
-  const [venueSpaceGroups, setVenueSpaceGroups] = useState<VenueSpaceGroup[]>([])
-  const [savingGroups, setSavingGroups]           = useState(false)
-  const [expandedGroups, setExpandedGroups]       = useState<Set<string>>(new Set())
-  const [editingGroupId, setEditingGroupId]       = useState<string | null>(null)
-  const [editGroupName, setEditGroupName]         = useState('')
-  const [addingSpaceToGroup, setAddingSpaceToGroup] = useState<string | null>(null)
-  const [newSpaceForm, setNewSpaceForm]           = useState({ name: '', cap_min: '', cap_max: '', price: '', description: '' })
-  const [editingSpaceKey, setEditingSpaceKey]     = useState<string | null>(null)
-  const [editSpaceForm, setEditSpaceForm]         = useState({ name: '', cap_min: '', cap_max: '', price: '', description: '' })
-
-  // Visit availability
-  const DEFAULT_SCHEDULE: DaySchedule[] = [0,1,2,3,4].map(day => ({ day, enabled: true, from: '10:00', to: '19:00' }))
-    .concat([5,6].map(day => ({ day, enabled: false, from: '10:00', to: '14:00' })))
-  const [visitAvail, setVisitAvail]     = useState<VisitAvailability>({ slot_duration: 60, schedule: DEFAULT_SCHEDULE, block_booked_weddings: true, block_calendar_unavailable: false, blocked_dates: [] })
-  const [savingVisit, setSavingVisit]   = useState(false)
-  const [visitAvailOpen, setVisitAvailOpen] = useState(false)
-  const [visitAvailDirty, setVisitAvailDirty] = useState(false)
-  // Block calendar UI state
-  const [blockCalYear,  setBlockCalYear]  = useState(() => new Date().getFullYear())
-  const [blockCalMonth, setBlockCalMonth] = useState(() => new Date().getMonth())
-  const [blockView, setBlockView] = useState<'month' | 'week'>('month')
-  const [blockWeekStart, setBlockWeekStart] = useState<string>(() => {
-    const t = new Date(); const day = t.getDay(); const diff = day === 0 ? -6 : 1 - day; t.setDate(t.getDate() + diff)
-    return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
-  })
-  const [blockPickerDate, setBlockPickerDate] = useState<string | null>(null)
-  const [blockType, setBlockType] = useState<BlockedDate['type']>('full')
-  const [blockRanges, setBlockRanges] = useState<Array<{ from: string; to: string }>>([{ from: '09:00', to: '13:00' }])
-  // Range-select mode
-  const [blockRangeStart, setBlockRangeStart] = useState<string | null>(null)
-  const [blockRangeEnd,   setBlockRangeEnd]   = useState<string | null>(null)
-  const [blockRangeMode,  setBlockRangeMode]  = useState(false)
-  // Calendar entries overlaid on block calendar
-  const [blockCalEntries, setBlockCalEntries] = useState<Record<string, string>>({})
-
-  // Supplements
+  // Zones & supplements
+  const [zones, setZones]                   = useState<ZoneItem[]>([])
   const [supplements, setSupplements]       = useState<SupplementItem[]>([])
+  const [newZoneName, setNewZoneName]       = useState('')
   const [newSuppName, setNewSuppName]       = useState('')
   const [savingZS, setSavingZS]             = useState(false)
-
-  // Derived flat zones list for modality pricing (PriceRow/PriceForm)
-  const zones: ZoneItem[] = venueSpaceGroups.flatMap(g => g.spaces.map(s => ({ id: s.id, name: s.name })))
 
   // Modality modal
   const [modalOpen, setModalOpen]     = useState(false)
@@ -381,6 +358,14 @@ export default function EstructuraPage() {
   const [priceSaving, setPriceSaving]     = useState(false)
   const [priceError, setPriceError]       = useState('')
 
+  const menuPreviewData = useMemo<ProposalData>(() => ({
+    id: 'preview', slug: 'preview', couple_name: 'Vista previa',
+    personal_message: null, guest_count: 100, wedding_date: null,
+    price_estimate: null, show_availability: false, show_price_estimate: false,
+    status: 'preview', ctas: [], sections_data: menuCatalog,
+    venueContent: { packages: [], zones: [], season_prices: [], inclusions: [], exclusions: [], faq: [], testimonials: [], collaborators: [], extra_services: [], menu_prices: [], experience: null, techspecs: null, accommodation_info: null, map_info: null, budget_simulator: null, countdown: null },
+    venue: null, branding: null,
+  }), [menuCatalog])
 
   useEffect(() => {
     if (authLoading) return
@@ -388,34 +373,11 @@ export default function EstructuraPage() {
     load()
   }, [user, authLoading]) // eslint-disable-line
 
-  // Load calendar_entries for the visible range (month or week view)
-  useEffect(() => {
-    if (!user) return
-    const supabase = createClient()
-    const p = (n: number) => String(n).padStart(2, '0')
-    let from: string, to: string
-    if (blockView === 'week') {
-      from = blockWeekStart
-      const end = new Date(blockWeekStart + 'T12:00:00'); end.setDate(end.getDate() + 6)
-      to = `${end.getFullYear()}-${p(end.getMonth()+1)}-${p(end.getDate())}`
-    } else {
-      from = `${blockCalYear}-${p(blockCalMonth + 1)}-01`
-      const lastDay = new Date(blockCalYear, blockCalMonth + 1, 0).getDate()
-      to = `${blockCalYear}-${p(blockCalMonth + 1)}-${p(lastDay)}`
-    }
-    supabase.from('calendar_entries').select('date,status').eq('user_id', user.id).gte('date', from).lte('date', to)
-      .then(({ data }) => {
-        const map: Record<string, string> = {}
-        data?.forEach(e => { map[e.date] = e.status })
-        setBlockCalEntries(map)
-      })
-  }, [blockCalYear, blockCalMonth, blockView, blockWeekStart, user]) // eslint-disable-line
-
   const load = async () => {
     const supabase = createClient()
     const [res, { data: settingsRow }] = await Promise.all([
       fetch('/api/estructura/modalities'),
-      supabase.from('venue_settings').select('commercial_config, space_groups, zones, supplements, visit_availability').eq('user_id', user!.id).maybeSingle(),
+      supabase.from('venue_settings').select('commercial_config, zones, supplements, menu_catalog').eq('user_id', user!.id).maybeSingle(),
     ])
     const json = await res.json()
     if (!res.ok) { setError(json.error ?? 'Error al cargar'); setLoading(false); return }
@@ -430,29 +392,9 @@ export default function EstructuraPage() {
     }))
     setModalities(mods)
     if (settingsRow?.commercial_config) setCommercialConfig(settingsRow.commercial_config as CommercialConfig)
-    if (settingsRow?.space_groups) {
-      setVenueSpaceGroups(settingsRow.space_groups as VenueSpaceGroup[])
-      setExpandedGroups(new Set((settingsRow.space_groups as VenueSpaceGroup[]).map((g: VenueSpaceGroup) => g.id)))
-    } else if (settingsRow?.zones && Array.isArray(settingsRow.zones) && settingsRow.zones.length > 0) {
-      // Migrate old flat zones into a single default group
-      const migrated: VenueSpaceGroup[] = [{
-        id: crypto.randomUUID(),
-        name: 'Espacios del venue',
-        selection_mode: 'pick_one',
-        spaces: (settingsRow.zones as ZoneItem[]).map(z => ({ id: z.id, name: z.name })),
-      }]
-      setVenueSpaceGroups(migrated)
-      setExpandedGroups(new Set([migrated[0].id]))
-    }
-    if (settingsRow?.supplements)    setSupplements(settingsRow.supplements as SupplementItem[])
-    if (settingsRow?.visit_availability) {
-      const va = settingsRow.visit_availability as VisitAvailability & { blocked_dates?: Array<BlockedDate | string> }
-      // Migrate legacy string[] blocked_dates → BlockedDate[]
-      const blocked: BlockedDate[] = (va.blocked_dates ?? []).map(b =>
-        typeof b === 'string' ? { date: b, type: 'full' as const } : b
-      )
-      setVisitAvail({ ...va, blocked_dates: blocked })
-    }
+    if (settingsRow?.zones)        setZones(settingsRow.zones as ZoneItem[])
+    if (settingsRow?.supplements)  setSupplements(settingsRow.supplements as SupplementItem[])
+    if (settingsRow?.menu_catalog) setMenuCatalog(settingsRow.menu_catalog as SectionsData)
     setLoading(false)
   }
 
@@ -465,93 +407,34 @@ export default function EstructuraPage() {
     setConfigWizardOpen(false)
   }
 
-  const saveSpaceGroups = async (groups: VenueSpaceGroup[]) => {
-    setSavingGroups(true)
-    const supabase = createClient()
-    await supabase.from('venue_settings').upsert({ user_id: user!.id, space_groups: groups }, { onConflict: 'user_id' })
-    setSavingGroups(false)
-  }
-
-  const saveVisitAvail = async (va: VisitAvailability) => {
-    setSavingVisit(true)
-    const supabase = createClient()
-    const { error } = await supabase.from('venue_settings').upsert({ user_id: user!.id, visit_availability: va }, { onConflict: 'user_id' })
-    if (error) console.error('[saveVisitAvail]', error)
-    else setVisitAvailDirty(false)
-    setSavingVisit(false)
-  }
-
-  const saveSupplements = async (newSupps: SupplementItem[]) => {
+  const saveZonesSupplements = async (newZones: ZoneItem[], newSupps: SupplementItem[]) => {
     setSavingZS(true)
     const supabase = createClient()
-    await supabase.from('venue_settings').upsert({ user_id: user!.id, supplements: newSupps }, { onConflict: 'user_id' })
+    await supabase.from('venue_settings').upsert({ user_id: user!.id, zones: newZones, supplements: newSupps }, { onConflict: 'user_id' })
     setSavingZS(false)
   }
 
-  const addGroup = async () => {
-    const newGroup: VenueSpaceGroup = { id: crypto.randomUUID(), name: 'Nuevo grupo', selection_mode: 'pick_one', spaces: [] }
-    const next = [...venueSpaceGroups, newGroup]
-    setVenueSpaceGroups(next)
-    setExpandedGroups(prev => new Set([...prev, newGroup.id]))
-    setEditingGroupId(newGroup.id); setEditGroupName('Nuevo grupo')
-    await saveSpaceGroups(next)
+  const saveMenuCatalog = async () => {
+    setCatalogSaving(true)
+    const supabase = createClient()
+    await supabase.from('venue_settings').upsert({ user_id: user!.id, menu_catalog: menuCatalog }, { onConflict: 'user_id' })
+    setCatalogSaving(false)
+    setCatalogSaved(true)
+    setTimeout(() => setCatalogSaved(false), 2500)
   }
 
-  const removeGroup = async (groupId: string) => {
-    const next = venueSpaceGroups.filter(g => g.id !== groupId)
-    setVenueSpaceGroups(next)
-    await saveSpaceGroups(next)
-  }
-
-  const updateGroup = async (groupId: string, patch: Partial<VenueSpaceGroup>) => {
-    const next = venueSpaceGroups.map(g => g.id === groupId ? { ...g, ...patch } : g)
-    setVenueSpaceGroups(next)
-    await saveSpaceGroups(next)
-  }
-
-  const commitGroupName = async (groupId: string) => {
-    const name = editGroupName.trim()
-    if (name) await updateGroup(groupId, { name })
-    setEditingGroupId(null)
-  }
-
-  const addSpace = async (groupId: string) => {
-    const name = newSpaceForm.name.trim()
+  const addZone = async () => {
+    const name = newZoneName.trim()
     if (!name) return
-    const space: VenueSpace = {
-      id: crypto.randomUUID(), name,
-      capacity_min: newSpaceForm.cap_min ? Number(newSpaceForm.cap_min) : undefined,
-      capacity_max: newSpaceForm.cap_max ? Number(newSpaceForm.cap_max) : undefined,
-      price: newSpaceForm.price || undefined,
-      description: newSpaceForm.description || undefined,
-    }
-    const next = venueSpaceGroups.map(g => g.id === groupId ? { ...g, spaces: [...g.spaces, space] } : g)
-    setVenueSpaceGroups(next)
-    setNewSpaceForm({ name: '', cap_min: '', cap_max: '', price: '', description: '' })
-    setAddingSpaceToGroup(null)
-    await saveSpaceGroups(next)
+    const next = [...zones, { id: crypto.randomUUID(), name }]
+    setZones(next); setNewZoneName('')
+    await saveZonesSupplements(next, supplements)
   }
 
-  const removeSpace = async (groupId: string, spaceId: string) => {
-    const next = venueSpaceGroups.map(g => g.id === groupId ? { ...g, spaces: g.spaces.filter(s => s.id !== spaceId) } : g)
-    setVenueSpaceGroups(next)
-    await saveSpaceGroups(next)
-  }
-
-  const commitSpaceEdit = async (groupId: string, spaceId: string) => {
-    const name = editSpaceForm.name.trim()
-    if (!name) { setEditingSpaceKey(null); return }
-    const patch: Partial<VenueSpace> = {
-      name,
-      capacity_min: editSpaceForm.cap_min ? Number(editSpaceForm.cap_min) : undefined,
-      capacity_max: editSpaceForm.cap_max ? Number(editSpaceForm.cap_max) : undefined,
-      price: editSpaceForm.price || undefined,
-      description: editSpaceForm.description || undefined,
-    }
-    const next = venueSpaceGroups.map(g => g.id === groupId ? { ...g, spaces: g.spaces.map(s => s.id === spaceId ? { ...s, ...patch } : s) } : g)
-    setVenueSpaceGroups(next)
-    setEditingSpaceKey(null)
-    await saveSpaceGroups(next)
+  const removeZone = async (id: string) => {
+    const next = zones.filter(z => z.id !== id)
+    setZones(next)
+    await saveZonesSupplements(next, supplements)
   }
 
   const addSupplement = async () => {
@@ -559,13 +442,13 @@ export default function EstructuraPage() {
     if (!name) return
     const next = [...supplements, { id: crypto.randomUUID(), name }]
     setSupplements(next); setNewSuppName('')
-    await saveSupplements(next)
+    await saveZonesSupplements(zones, next)
   }
 
   const removeSupplement = async (id: string) => {
     const next = supplements.filter(s => s.id !== id)
     setSupplements(next)
-    await saveSupplements(next)
+    await saveZonesSupplements(zones, next)
   }
 
   const openWizard = () => {
@@ -589,6 +472,18 @@ export default function EstructuraPage() {
 
   const isWizardDone = (cfg: WizardConfig): cfg is CommercialConfig => {
     if (!cfg.space_type || !cfg.price_model) return false
+    const model = cfg.price_model
+    if (model === 'rental') {
+      if (cfg.catering_own === undefined) return false
+      if (cfg.catering_own && cfg.catering_mandatory === undefined) return false
+    } else {
+      if (cfg.menu_included === undefined) return false
+      if (cfg.menu_included && cfg.has_menu_types === undefined) return false
+      if (!cfg.menu_included) {
+        if (cfg.catering_own === undefined) return false
+        if (cfg.catering_own && cfg.catering_mandatory === undefined) return false
+      }
+    }
     return true
   }
 
@@ -821,6 +716,10 @@ export default function EstructuraPage() {
   const totalPrices = modalities.reduce((s, m) =>
     s + m.prices.length + m.packages.reduce((ps, pkg) => ps + pkg.prices.length, 0), 0)
 
+  // Whether the venue's commercial config involves menus/catering at all
+  const venueHasMenus = commercialConfig?.menu_included === true || commercialConfig?.catering_own === true
+  const menuCount  = menuCatalog.menus_override?.length ?? 0
+  const extraCount = menuCatalog.menu_extras_override?.length ?? 0
 
   // ── Main render ────────────────────────────────────────────────────────────
 
@@ -829,22 +728,115 @@ export default function EstructuraPage() {
       <Sidebar />
       <div className="main-layout">
         <div className="topbar">
-          <div>
-            <div className="topbar-title">Estructura comercial</div>
-            <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 1 }}>
-              Define las modalidades de tu venue y sus tarifas por temporada
-            </div>
-          </div>
-          <button className="btn btn-primary btn-sm" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Plus size={14} /> Nueva modalidad
-          </button>
+          <div className="topbar-title">Estructura</div>
+          {activeTab === 'modalidades' && (
+            <button className="btn btn-primary btn-sm" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Plus size={14} /> Nueva modalidad
+            </button>
+          )}
+          {activeTab === 'menus' && (
+            <button className="btn btn-primary btn-sm" onClick={saveMenuCatalog} disabled={catalogSaving} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {catalogSaved ? <><Check size={14} /> Guardado</> : <><Save size={14} /> {catalogSaving ? 'Guardando…' : 'Guardar catálogo'}</>}
+            </button>
+          )}
         </div>
+
+        <Tabs
+          activeKey={activeTab}
+          onChange={k => setActiveTab(k as 'modalidades' | 'menus')}
+          tabs={[
+            { key: 'modalidades', label: 'Modalidades y tarifas', icon: LayoutGrid, desc: 'Modalidades y precios por temporada' },
+            { key: 'menus',       label: 'Menús y extras',        icon: ChefHat,    desc: 'Catálogo de menús, extras y aperitivos',
+              badge: (
+                <>
+                  {commercialConfig && !venueHasMenus && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'var(--ivory)', color: 'var(--warm-gray)', letterSpacing: '0.04em' }}>N/A</span>
+                  )}
+                  {venueHasMenus && (menuCount > 0 || extraCount > 0) && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'rgba(196,151,90,.12)', color: 'var(--gold)', letterSpacing: '0.04em' }}>
+                      {[menuCount > 0 && `${menuCount} menú${menuCount > 1 ? 's' : ''}`, extraCount > 0 && `${extraCount} extra${extraCount > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                  {venueHasMenus && menuCount === 0 && extraCount === 0 && (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', display: 'inline-block', marginLeft: 2 }} title="Sin menús configurados" />
+                  )}
+                </>
+              ),
+            },
+          ]}
+        />
 
         <div className="page-content">
           {error && <div className="alert alert-error" style={{ marginBottom: 20 }}>{error}</div>}
 
-          {/* ── MODALIDADES ───────────────────────────────────────────────────── */}
-          {<>
+          {/* ── TAB: MENÚS ───────────────────────────────────────────────────── */}
+          {activeTab === 'menus' && (
+            <div style={{ display: 'flex', gap: 0, alignItems: 'flex-start', margin: '-24px -28px' }}>
+              {/* Left: editor — hidden when preview expanded or venue has no menus */}
+              {!previewExpanded && (
+                <div style={{ flex: '0 0 500px', padding: '24px 28px', overflowY: 'auto' }}>
+                  {!venueHasMenus && commercialConfig ? (
+                    /* Point 2: no catering in config → explain + redirect */
+                    <div style={{ background: '#F7F3EE', border: '1px solid var(--ivory)', borderRadius: 12, padding: '28px 20px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 32, marginBottom: 10 }}>🍽️</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 8 }}>
+                        Tu modelo no incluye catering propio
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.75, marginBottom: 20 }}>
+                        Según tu configuración comercial, la sección de menús <strong>no aparecerá</strong> en tus propuestas.<br />
+                        Si ofreces o trabajas con catering propio, actualiza tu configuración.
+                      </div>
+                      <button className="btn btn-secondary btn-sm" onClick={() => setActiveTab('modalidades')}>
+                        Revisar configuración →
+                      </button>
+                    </div>
+                  ) : (
+                    <ProposalMenuEditor
+                      sections={menuCatalog}
+                      setSections={setMenuCatalog}
+                      intro="Define el catálogo de menús, extras y aperitivos de tu venue. Se usará como base al crear nuevas propuestas."
+                    />
+                  )}
+                </div>
+              )}
+              {/* Right: live preview */}
+              <div style={{ flex: 1, minWidth: 0, borderLeft: previewExpanded ? 'none' : '1px solid var(--ivory)', position: 'sticky', top: 51, alignSelf: 'flex-start', height: 'calc(100vh - 51px)', overflowY: 'auto', background: '#f9f6f2' }}>
+                {/* Sticky toolbar */}
+                <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', justifyContent: 'flex-end', padding: '6px 10px', background: 'rgba(249,246,242,.85)', backdropFilter: 'blur(6px)', borderBottom: '1px solid var(--ivory)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewExpanded(v => !v)}
+                    title={previewExpanded ? 'Volver al editor' : 'Ampliar vista previa'}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', background: '#fff', border: '1px solid var(--ivory)', borderRadius: 7, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,.05)' }}
+                  >
+                    {previewExpanded ? <><Minimize2 size={11} /> Contraer</> : <><Maximize2 size={11} /> Ampliar</>}
+                  </button>
+                </div>
+                {/* Point 5: preview reflects commercial config */}
+                {!venueHasMenus && commercialConfig ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100% - 37px)', padding: 32, textAlign: 'center', gap: 10 }}>
+                    <div style={{ fontSize: 40, opacity: 0.2 }}>🍽️</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--warm-gray)', opacity: 0.6, lineHeight: 1.6 }}>
+                      La sección de menús no aparece<br />en propuestas con tu configuración
+                    </div>
+                  </div>
+                ) : (
+                  <WeddingProposal
+                    data={menuPreviewData}
+                    menus={menuCatalog.menus_override ?? null}
+                    extras={menuCatalog.menu_extras_override ?? null}
+                    appetizers={menuCatalog.appetizers_base_override ?? null}
+                    primary="#C4975A"
+                    onPrimary="#fff"
+                    previewOnly
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB: MODALIDADES ─────────────────────────────────────────────── */}
+          {activeTab === 'modalidades' && <>
 
           {/* Commercial config banner */}
           {commercialConfig ? (
@@ -858,6 +850,11 @@ export default function EstructuraPage() {
                   {({ single: 'Un espacio único', single_with_supplements: 'Un espacio + suplementos', multiple_independent: 'Varias zonas independientes' } as Record<SpaceType, string>)[commercialConfig.space_type]}
                   {' · '}
                   {({ rental: 'Alquiler del espacio', per_person: 'Por persona', package: 'Paquetes' } as Record<PriceModel, string>)[commercialConfig.price_model]}
+                  {commercialConfig.menu_included === true && ' · Menú incluido'}
+                  {commercialConfig.menu_included === false && ' · Menú aparte'}
+                  {commercialConfig.has_menu_types === true && ' · Varios tipos de menú'}
+                  {commercialConfig.catering_own === true && (commercialConfig.catering_mandatory ? ' · Catering propio obligatorio' : ' · Catering propio opcional')}
+                  {commercialConfig.catering_own === false && ' · Sin catering propio'}
                 </div>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={openWizard} style={{ flexShrink: 0 }}>Editar</button>
@@ -875,201 +872,30 @@ export default function EstructuraPage() {
             </div>
           )}
 
-          {/* Space groups panel — only for multiple_independent */}
+          {/* Zones panel — only for multiple_independent */}
           {commercialConfig?.space_type === 'multiple_independent' && (
             <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, maxWidth: 860 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                <LayoutGrid size={14} style={{ color: '#2563EB' }} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', flex: 1 }}>Grupos y espacios</span>
-                <button className="btn btn-ghost btn-sm" onClick={addGroup} disabled={savingGroups} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                  <Plus size={11} /> Nuevo grupo
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <LayoutGrid size={14} style={{ color: '#2563EB' }} /> Zonas del venue
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: zones.length > 0 ? 12 : 0 }}>
+                {zones.map(z => (
+                  <div key={z.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 20, padding: '4px 10px 4px 12px' }}>
+                    <span style={{ fontSize: 12, color: '#1D4ED8', fontWeight: 500 }}>{z.name}</span>
+                    <button onClick={() => removeZone(z.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#93C5FD', padding: 0, display: 'flex', lineHeight: 1 }}><X size={12} /></button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input className="form-input" placeholder="Nombre de la zona (ej: Salón, Jardín…)" value={newZoneName}
+                  onChange={e => setNewZoneName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addZone()}
+                  style={{ fontSize: 12, flex: 1 }} />
+                <button className="btn btn-ghost btn-sm" onClick={addZone} disabled={!newZoneName.trim() || savingZS} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Plus size={12} /> Añadir
                 </button>
               </div>
-
-              {venueSpaceGroups.length === 0 && (
-                <div style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic', padding: '8px 0' }}>
-                  Crea grupos para organizar tus espacios. Ej: "Salones interiores", "Espacios exteriores".
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {venueSpaceGroups.map(group => {
-                  const isOpen = expandedGroups.has(group.id)
-                  const isEditingName = editingGroupId === group.id
-                  return (
-                    <div key={group.id} style={{ border: '1px solid #BFDBFE', borderRadius: 8, overflow: 'hidden' }}>
-                      {/* Group header */}
-                      <div style={{ background: '#EFF6FF', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <button type="button" onClick={() => setExpandedGroups(prev => { const s = new Set(prev); isOpen ? s.delete(group.id) : s.add(group.id); return s })}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1D4ED8', padding: 0, display: 'flex' }}>
-                          {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        </button>
-                        {isEditingName ? (
-                          <input autoFocus className="form-input" value={editGroupName} onChange={e => setEditGroupName(e.target.value)}
-                            onBlur={() => commitGroupName(group.id)} onKeyDown={e => e.key === 'Enter' && commitGroupName(group.id)}
-                            style={{ fontSize: 12, fontWeight: 600, flex: 1, padding: '2px 6px' }} />
-                        ) : (
-                          <span style={{ fontSize: 12, fontWeight: 600, color: '#1D4ED8', flex: 1 }}>{group.name}</span>
-                        )}
-                        {/* Selection mode pills */}
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          {(['pick_one', 'pick_n', 'optional'] as const).map(mode => (
-                            <button key={mode} type="button" onClick={() => updateGroup(group.id, { selection_mode: mode })}
-                              style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 600,
-                                background: group.selection_mode === mode ? '#1D4ED8' : '#DBEAFE',
-                                color: group.selection_mode === mode ? '#fff' : '#1D4ED8' }}>
-                              {mode === 'pick_one' ? 'Elegir 1' : mode === 'pick_n' ? 'Elegir N' : 'Opcional'}
-                            </button>
-                          ))}
-                        </div>
-                        {/* Pricing mode pills */}
-                        <div style={{ display: 'flex', gap: 4, marginLeft: 4, paddingLeft: 8, borderLeft: '1px solid #BFDBFE' }}>
-                          {(['per_space', 'group_base'] as const).map(pm => (
-                            <button key={pm} type="button" onClick={() => updateGroup(group.id, { pricing_mode: pm })}
-                              style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 600,
-                                background: (group.pricing_mode ?? 'per_space') === pm ? '#0F766E' : '#CCFBF1',
-                                color: (group.pricing_mode ?? 'per_space') === pm ? '#fff' : '#0F766E' }}
-                              title={pm === 'per_space' ? 'Cada espacio tiene su propio precio' : 'Precio base del grupo + suplementos por espacio'}>
-                              {pm === 'per_space' ? 'Precio/espacio' : 'Base + extras'}
-                            </button>
-                          ))}
-                        </div>
-                        {group.selection_mode === 'pick_n' && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <input type="number" className="form-input" placeholder="mín" value={group.pick_n_min ?? ''}
-                              onChange={e => updateGroup(group.id, { pick_n_min: e.target.value ? Number(e.target.value) : undefined })}
-                              style={{ width: 44, fontSize: 11, padding: '2px 4px' }} />
-                            <span style={{ fontSize: 10, color: '#64748B' }}>–</span>
-                            <input type="number" className="form-input" placeholder="máx" value={group.pick_n_max ?? ''}
-                              onChange={e => updateGroup(group.id, { pick_n_max: e.target.value ? Number(e.target.value) : undefined })}
-                              style={{ width: 44, fontSize: 11, padding: '2px 4px' }} />
-                          </div>
-                        )}
-                        <button type="button" onClick={() => { setEditingGroupId(group.id); setEditGroupName(group.name) }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#93C5FD', padding: '2px 4px', display: 'flex' }}>
-                          <Pencil size={12} />
-                        </button>
-                        <button type="button" onClick={() => removeGroup(group.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FCA5A5', padding: '2px 4px', display: 'flex' }}>
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-
-                      {/* Group body */}
-                      {isOpen && (
-                        <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {group.pricing_mode === 'group_base' && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#F0FDFA', border: '1px solid #99F6E4', borderRadius: 6 }}>
-                              <span style={{ fontSize: 11, fontWeight: 600, color: '#0F766E', whiteSpace: 'nowrap' }}>Precio base del grupo:</span>
-                              <input className="form-input" placeholder="ej. 5.000€"
-                                value={group.base_price ?? ''}
-                                onChange={e => updateGroup(group.id, { base_price: e.target.value })}
-                                style={{ fontSize: 12, flex: 1 }} />
-                              <span style={{ fontSize: 10, color: '#0F766E', fontStyle: 'italic' }}>los espacios actúan como suplemento opcional</span>
-                            </div>
-                          )}
-                          {group.spaces.length === 0 && addingSpaceToGroup !== group.id && (
-                            <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin espacios. Añade el primero.</div>
-                          )}
-
-                          {group.spaces.map(space => {
-                            const spaceKey = `${group.id}:${space.id}`
-                            const isEditingSpace = editingSpaceKey === spaceKey
-                            return (
-                              <div key={space.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', background: 'var(--cream)' }}>
-                                {isEditingSpace ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    <div style={{ display: 'flex', gap: 6 }}>
-                                      <input autoFocus className="form-input" placeholder="Nombre *" value={editSpaceForm.name}
-                                        onChange={e => setEditSpaceForm(f => ({ ...f, name: e.target.value }))}
-                                        style={{ fontSize: 12, flex: 2 }} />
-                                      <input type="number" className="form-input" placeholder="Cap. mín" value={editSpaceForm.cap_min}
-                                        onChange={e => setEditSpaceForm(f => ({ ...f, cap_min: e.target.value }))}
-                                        style={{ fontSize: 12, width: 80 }} />
-                                      <input type="number" className="form-input" placeholder="Cap. máx" value={editSpaceForm.cap_max}
-                                        onChange={e => setEditSpaceForm(f => ({ ...f, cap_max: e.target.value }))}
-                                        style={{ fontSize: 12, width: 80 }} />
-                                      <input className="form-input" placeholder={group.pricing_mode === 'group_base' ? 'Suplemento' : 'Precio'} value={editSpaceForm.price}
-                                        onChange={e => setEditSpaceForm(f => ({ ...f, price: e.target.value }))}
-                                        style={{ fontSize: 12, width: 100 }} />
-                                    </div>
-                                    <input className="form-input" placeholder="Descripción breve (opcional)" value={editSpaceForm.description}
-                                      onChange={e => setEditSpaceForm(f => ({ ...f, description: e.target.value }))}
-                                      style={{ fontSize: 12 }} />
-                                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                                      <button className="btn btn-ghost btn-sm" onClick={() => setEditingSpaceKey(null)}>Cancelar</button>
-                                      <button className="btn btn-primary btn-sm" onClick={() => commitSpaceEdit(group.id, space.id)}>Guardar</button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', flex: 1 }}>{space.name}</span>
-                                    {(space.capacity_min || space.capacity_max) && (
-                                      <span style={{ fontSize: 11, color: '#64748B', background: '#F1F5F9', borderRadius: 5, padding: '1px 6px' }}>
-                                        <Users size={9} style={{ verticalAlign: 'middle', marginRight: 3 }} />
-                                        {space.capacity_min ?? '0'}–{space.capacity_max ?? '∞'} pax
-                                      </span>
-                                    )}
-                                    {space.price && (
-                                      <span style={{ fontSize: 11, color: '#64748B', background: '#F1F5F9', borderRadius: 5, padding: '1px 6px' }}>
-                                        {group.pricing_mode === 'group_base' && !space.price.trim().startsWith('+') ? `+${space.price}` : space.price}
-                                      </span>
-                                    )}
-                                    {space.description && (
-                                      <span style={{ fontSize: 10, color: 'var(--warm-gray)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{space.description}</span>
-                                    )}
-                                    <button type="button" onClick={() => { setEditingSpaceKey(spaceKey); setEditSpaceForm({ name: space.name, cap_min: space.capacity_min?.toString() ?? '', cap_max: space.capacity_max?.toString() ?? '', price: space.price ?? '', description: space.description ?? '' }) }}
-                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: '2px 4px', display: 'flex' }}>
-                                      <Pencil size={12} />
-                                    </button>
-                                    <button type="button" onClick={() => removeSpace(group.id, space.id)}
-                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FCA5A5', padding: '2px 4px', display: 'flex' }}>
-                                      <Trash2 size={12} />
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })}
-
-                          {/* Add space form */}
-                          {addingSpaceToGroup === group.id ? (
-                            <div style={{ border: '1px dashed #BFDBFE', borderRadius: 6, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              <div style={{ display: 'flex', gap: 6 }}>
-                                <input autoFocus className="form-input" placeholder="Nombre del espacio *" value={newSpaceForm.name}
-                                  onChange={e => setNewSpaceForm(f => ({ ...f, name: e.target.value }))}
-                                  onKeyDown={e => e.key === 'Enter' && addSpace(group.id)}
-                                  style={{ fontSize: 12, flex: 2 }} />
-                                <input type="number" className="form-input" placeholder="Cap. mín" value={newSpaceForm.cap_min}
-                                  onChange={e => setNewSpaceForm(f => ({ ...f, cap_min: e.target.value }))}
-                                  style={{ fontSize: 12, width: 80 }} />
-                                <input type="number" className="form-input" placeholder="Cap. máx" value={newSpaceForm.cap_max}
-                                  onChange={e => setNewSpaceForm(f => ({ ...f, cap_max: e.target.value }))}
-                                  style={{ fontSize: 12, width: 80 }} />
-                                <input className="form-input" placeholder={group.pricing_mode === 'group_base' ? 'Suplemento' : 'Precio'} value={newSpaceForm.price}
-                                  onChange={e => setNewSpaceForm(f => ({ ...f, price: e.target.value }))}
-                                  style={{ fontSize: 12, width: 100 }} />
-                              </div>
-                              <input className="form-input" placeholder="Descripción breve (opcional)" value={newSpaceForm.description}
-                                onChange={e => setNewSpaceForm(f => ({ ...f, description: e.target.value }))}
-                                style={{ fontSize: 12 }} />
-                              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                                <button className="btn btn-ghost btn-sm" onClick={() => { setAddingSpaceToGroup(null); setNewSpaceForm({ name: '', cap_min: '', cap_max: '', price: '', description: '' }) }}>Cancelar</button>
-                                <button className="btn btn-primary btn-sm" disabled={!newSpaceForm.name.trim()} onClick={() => addSpace(group.id)}>Añadir espacio</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <button type="button" onClick={() => setAddingSpaceToGroup(group.id)}
-                              style={{ fontSize: 11, color: '#2563EB', background: 'none', border: '1px dashed #BFDBFE', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', textAlign: 'left' }}>
-                              <Plus size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} />Añadir espacio
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+              {zones.length === 0 && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 8 }}>Define las zonas para poder asignar precios por separado en cada modalidad.</div>}
             </div>
           )}
 
@@ -1099,543 +925,6 @@ export default function EstructuraPage() {
               {supplements.length === 0 && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 8 }}>Define los extras disponibles para poder fijar su precio en cada período.</div>}
             </div>
           )}
-
-          {/* ── Visit availability panel ─────────────────────────────────────── */}
-          {(() => {
-            const DAY_NAMES = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
-            const DURATIONS: Array<{ value: 30|45|60|90|120; label: string }> = [
-              { value: 30, label: '30 min' }, { value: 45, label: '45 min' },
-              { value: 60, label: '1 hora' }, { value: 90, label: '1,5 h' }, { value: 120, label: '2 h' },
-            ]
-            const updateDay = (day: number, patch: Partial<DaySchedule>) => {
-              const next: VisitAvailability = { ...visitAvail, schedule: visitAvail.schedule.map(s => s.day === day ? { ...s, ...patch } : s) }
-              setVisitAvail(next); setVisitAvailDirty(true)
-            }
-            const updateAvail = (patch: Partial<VisitAvailability>) => {
-              const next = { ...visitAvail, ...patch }; setVisitAvail(next); setVisitAvailDirty(true)
-            }
-            const upsertBlockedDates = (dates: string[], block: Omit<BlockedDate, 'date'>) => {
-              const newEntries: BlockedDate[] = dates.map(d => ({ date: d, ...block }))
-              const newDates = new Set(dates)
-              const rest = visitAvail.blocked_dates.filter(x => !newDates.has(x.date))
-              const next = { ...visitAvail, blocked_dates: [...rest, ...newEntries].sort((a, z) => a.date.localeCompare(z.date)) }
-              setVisitAvail(next); setVisitAvailDirty(true)
-            }
-            const removeBlockedDate = (date: string) => {
-              const next = { ...visitAvail, blocked_dates: visitAvail.blocked_dates.filter(x => x.date !== date) }
-              setVisitAvail(next); setVisitAvailDirty(true)
-              if (blockPickerDate === date) setBlockPickerDate(null)
-            }
-            // Calendar helpers
-            const CAL_MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-            const CAL_DAYS = ['L','M','X','J','V','S','D']
-            const pad2 = (n: number) => String(n).padStart(2, '0')
-            const daysInMonth = new Date(blockCalYear, blockCalMonth + 1, 0).getDate()
-            const firstDow = (() => { const d = new Date(blockCalYear, blockCalMonth, 1).getDay(); return d === 0 ? 6 : d - 1 })()
-            const todayIso = (() => { const t = new Date(); return `${t.getFullYear()}-${pad2(t.getMonth()+1)}-${pad2(t.getDate())}` })()
-            const blockedMap: Record<string, BlockedDate> = {}
-            visitAvail.blocked_dates.forEach(b => { blockedMap[b.date] = b })
-            // Auto-blocked from main calendar
-            const getAutoBlock = (iso: string): 'wedding' | 'unavailable' | null => {
-              const s = blockCalEntries[iso]
-              if (!s || s === 'libre') return null
-              if (visitAvail.block_booked_weddings && (s === 'reservado' || s === 'ganado')) return 'wedding'
-              if (visitAvail.block_calendar_unavailable && s !== 'libre') return 'unavailable'
-              return null
-            }
-            const blockTypeLabel = (t: BlockedDate['type']) => ({ full: 'Día completo', morning: 'Solo mañana', afternoon: 'Solo tarde', hours: 'Horas concretas' })[t]
-            const blockColor = (t: BlockedDate['type']) => ({ full: '#f87171', morning: '#fb923c', afternoon: '#fbbf24', hours: '#a78bfa' })[t]
-            // Range helpers
-            const rangeMin = blockRangeStart && blockPickerDate ? [blockRangeStart, blockPickerDate].sort()[0] : null
-            const rangeMax = blockRangeStart && blockPickerDate ? [blockRangeStart, blockPickerDate].sort()[1] : null
-            const isInRange = (iso: string) => !!(rangeMin && rangeMax && iso >= rangeMin && iso <= rangeMax)
-            // Build list of all dates currently selected (range or single)
-            const getSelectedDates = (): string[] => {
-              if (blockRangeMode && blockRangeStart && blockPickerDate) {
-                const [s, e] = [blockRangeStart, blockPickerDate].sort()
-                const out: string[] = []
-                const cur = new Date(s + 'T12:00:00')
-                const end = new Date(e + 'T12:00:00')
-                while (cur <= end) {
-                  out.push(`${cur.getFullYear()}-${pad2(cur.getMonth()+1)}-${pad2(cur.getDate())}`)
-                  cur.setDate(cur.getDate() + 1)
-                }
-                return out
-              }
-              return blockPickerDate ? [blockPickerDate] : []
-            }
-            const selectedDates = getSelectedDates()
-            const pickerLabel = blockRangeMode && blockRangeStart && blockPickerDate && blockRangeStart !== blockPickerDate
-              ? `${new Date(rangeMin!+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${new Date(rangeMax!+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})} (${selectedDates.length} días)`
-              : blockPickerDate
-                ? new Date(blockPickerDate+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})
-                : blockRangeMode && blockRangeStart
-                  ? `Desde ${new Date(blockRangeStart+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})} — elige el día final`
-                  : null
-            const confirmBlock = () => {
-              if (!selectedDates.length) return
-              const block: Omit<BlockedDate,'date'> = blockType === 'hours'
-                ? { type: 'hours', ranges: blockRanges.filter(r => r.from && r.to) }
-                : { type: blockType }
-              upsertBlockedDates(selectedDates, block)
-              setBlockPickerDate(null)
-              setBlockRangeStart(null)
-              setBlockRangeEnd(null)
-            }
-            return (
-              <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, marginBottom: 16, maxWidth: 860, overflow: 'hidden' }}>
-                {/* Collapsible header */}
-                <button type="button" onClick={() => setVisitAvailOpen(o => !o)}
-                  style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}>
-                  <CalendarDays size={14} style={{ color: '#059669', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', flex: 1 }}>Disponibilidad para visitas</span>
-                  {visitAvailDirty && !visitAvailOpen && (
-                    <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706', background: '#fef3c7', borderRadius: 5, padding: '2px 7px' }}>Sin guardar</span>
-                  )}
-                  {visitAvailDirty && visitAvailOpen && (
-                    <span style={{ fontSize: 10, color: '#d97706' }}>Cambios pendientes</span>
-                  )}
-                  {visitAvailOpen ? <ChevronUp size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} /> : <ChevronDown size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
-                </button>
-
-                {visitAvailOpen && (
-                <div style={{ padding: '0 20px 20px', borderTop: '1px solid var(--ivory)' }}>
-                <div style={{ height: 16 }} />
-
-                {/* Duration */}
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 6 }}>Duración de cada visita</div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {DURATIONS.map(({ value, label }) => (
-                      <button key={value} type="button" onClick={() => updateAvail({ slot_duration: value })}
-                        style={{ fontSize: 11, padding: '4px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600,
-                          background: visitAvail.slot_duration === value ? '#059669' : '#D1FAE5',
-                          color: visitAvail.slot_duration === value ? '#fff' : '#065F46' }}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Weekly schedule */}
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8 }}>Horario disponible</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {visitAvail.schedule.map(ds => (
-                      <div key={ds.day} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <button type="button" onClick={() => updateDay(ds.day, { enabled: !ds.enabled })}
-                          style={{ width: 72, fontSize: 11, padding: '4px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, textAlign: 'center',
-                            background: ds.enabled ? '#059669' : '#F3F4F6', color: ds.enabled ? '#fff' : '#9CA3AF' }}>
-                          {DAY_NAMES[ds.day].slice(0, 3)}
-                        </button>
-                        {ds.enabled && (
-                          <>
-                            <input type="time" value={ds.from} onChange={e => updateDay(ds.day, { from: e.target.value })}
-                              className="form-input" style={{ fontSize: 12, width: 90 }} />
-                            <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>—</span>
-                            <input type="time" value={ds.to} onChange={e => updateDay(ds.day, { to: e.target.value })}
-                              className="form-input" style={{ fontSize: 12, width: 90 }} />
-                          </>
-                        )}
-                        {!ds.enabled && <span style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic' }}>No disponible</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* What blocks a slot */}
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8 }}>Qué bloquea un hueco automáticamente</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--charcoal)', cursor: 'default' }}>
-                      <input type="checkbox" checked disabled style={{ width: 14, height: 14 }} />
-                      Visitas ya agendadas <span style={{ fontSize: 10, color: 'var(--warm-gray)', marginLeft: 4 }}>(siempre activo)</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--charcoal)', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={visitAvail.block_booked_weddings}
-                        onChange={e => updateAvail({ block_booked_weddings: e.target.checked })} style={{ width: 14, height: 14 }} />
-                      Días con boda reservada / contratada en el calendario
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--charcoal)', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={visitAvail.block_calendar_unavailable}
-                        onChange={e => updateAvail({ block_calendar_unavailable: e.target.checked })} style={{ width: 14, height: 14 }} />
-                      Cualquier día marcado como no libre en el calendario
-                    </label>
-                  </div>
-                </div>
-
-                {/* Manual blocked dates — calendar views */}
-                <div>
-                  {/* Toolbar: view toggle + navigation */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginRight: 4 }}>Bloquear fechas manualmente</div>
-                    <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
-                      {(['month','week'] as const).map(v => (
-                        <button key={v} type="button" onClick={() => setBlockView(v)}
-                          style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
-                            background: blockView === v ? '#fff' : 'transparent',
-                            color: blockView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
-                            boxShadow: blockView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
-                          {v === 'month' ? 'Mes' : 'Semana'}
-                        </button>
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
-                      <button type="button" onClick={() => {
-                        if (blockView === 'month') { if (blockCalMonth === 0) { setBlockCalMonth(11); setBlockCalYear(y => y-1) } else setBlockCalMonth(m => m-1) }
-                        else { const d = new Date(blockWeekStart+'T12:00:00'); d.setDate(d.getDate()-7); const p=(n:number)=>String(n).padStart(2,'0'); setBlockWeekStart(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
-                      }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 4 }}><ChevronLeft size={15} /></button>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', minWidth: 120, textAlign: 'center' }}>
-                        {blockView === 'month' ? `${CAL_MONTHS[blockCalMonth]} ${blockCalYear}` : (() => {
-                          const end = new Date(blockWeekStart+'T12:00:00'); end.setDate(end.getDate()+6)
-                          const p=(n:number)=>String(n).padStart(2,'0')
-                          const s = new Date(blockWeekStart+'T12:00:00')
-                          return `${p(s.getDate())} ${CAL_MONTHS[s.getMonth()].slice(0,3)} – ${p(end.getDate())} ${CAL_MONTHS[end.getMonth()].slice(0,3)}`
-                        })()}
-                      </span>
-                      <button type="button" onClick={() => {
-                        if (blockView === 'month') { if (blockCalMonth === 11) { setBlockCalMonth(0); setBlockCalYear(y => y+1) } else setBlockCalMonth(m => m+1) }
-                        else { const d = new Date(blockWeekStart+'T12:00:00'); d.setDate(d.getDate()+7); const p=(n:number)=>String(n).padStart(2,'0'); setBlockWeekStart(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
-                      }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 4 }}><ChevronRight size={15} /></button>
-                    </div>
-                    {blockView === 'month' && (
-                      <button type="button"
-                        onClick={() => { const next = !blockRangeMode; setBlockRangeMode(next); if (!next) { setBlockRangeStart(null); setBlockRangeEnd(null); setBlockPickerDate(null) } }}
-                        style={{ fontSize: 11, padding: '3px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600,
-                          background: blockRangeMode ? '#1e3a5f' : '#ede9e4',
-                          color: blockRangeMode ? '#fff' : 'var(--charcoal)' }}>
-                        {blockRangeMode ? '✕ Cancelar rango' : '↔ Rango'}
-                      </button>
-                    )}
-                  </div>
-                  {blockRangeMode && blockView === 'month' && (
-                    <div style={{ fontSize: 11, color: '#1e3a5f', background: '#e8f0fe', borderRadius: 7, padding: '6px 12px', marginBottom: 8 }}>
-                      {!blockRangeStart ? 'Haz click en el primer día del rango' : !blockPickerDate || blockPickerDate === blockRangeStart ? 'Ahora haz click en el último día del rango' : `Rango seleccionado: ${selectedDates.length} días`}
-                    </div>
-                  )}
-                  <div style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden' }}>
-                    {/* Day headers — month view only */}
-                    {blockView === 'month' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', background: '#faf8f5', borderBottom: '1px solid var(--ivory)' }}>
-                      {CAL_DAYS.map((d, i) => (
-                        <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '.08em', padding: '6px 0' }}>{d}</div>
-                      ))}
-                    </div>
-                    )}
-                    {/* Day cells — month view */}
-                    {blockView === 'month' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
-                      {Array.from({ length: firstDow }).map((_, i) => (
-                        <div key={`e${i}`} style={{ minHeight: 44, borderRight: '1px solid var(--ivory)', borderBottom: '1px solid var(--ivory)' }} />
-                      ))}
-                      {Array.from({ length: daysInMonth }).map((_, idx) => {
-                        const day = idx + 1
-                        const iso = `${blockCalYear}-${pad2(blockCalMonth + 1)}-${pad2(day)}`
-                        const b = blockedMap[iso]
-                        const autoBlock = getAutoBlock(iso)
-                        const isToday = iso === todayIso
-                        const isPast = iso < todayIso
-                        const isRangeStart = blockRangeStart === iso
-                        const inRange = isInRange(iso)
-                        const isSelected = !blockRangeMode && blockPickerDate === iso
-                        const col = (firstDow + idx) % 7
-                        const cellBg = isSelected || isRangeStart ? '#1e3a5f'
-                          : inRange ? '#dbeafe'
-                          : b ? `${blockColor(b.type)}22`
-                          : autoBlock === 'wedding' ? '#d1fae5'
-                          : autoBlock === 'unavailable' ? '#f3f4f6'
-                          : '#fff'
-                        return (
-                          <button key={day} type="button"
-                            disabled={isPast}
-                            onClick={() => {
-                              if (isPast) return
-                              if (blockRangeMode) {
-                                if (!blockRangeStart) {
-                                  setBlockRangeStart(iso); setBlockPickerDate(null)
-                                } else if (iso === blockRangeStart) {
-                                  setBlockRangeStart(null); setBlockPickerDate(null)
-                                } else {
-                                  setBlockPickerDate(iso)
-                                  const b2 = blockedMap[iso]
-                                  if (b2) { setBlockType(b2.type); setBlockRanges(b2.ranges ?? (b2.from ? [{ from: b2.from, to: b2.to ?? '13:00' }] : [{ from: '09:00', to: '13:00' }])) }
-                                  else { setBlockType('full'); setBlockRanges([{ from: '09:00', to: '13:00' }]) }
-                                }
-                              } else {
-                                if (isSelected) { setBlockPickerDate(null); return }
-                                setBlockPickerDate(iso)
-                                if (b) { setBlockType(b.type); setBlockRanges(b.ranges ?? (b.from ? [{ from: b.from, to: b.to ?? '13:00' }] : [{ from: '09:00', to: '13:00' }])) }
-                                else { setBlockType('full'); setBlockRanges([{ from: '09:00', to: '13:00' }]) }
-                              }
-                            }}
-                            style={{
-                              minHeight: 48, border: 'none',
-                              borderRight: col !== 6 ? '1px solid var(--ivory)' : 'none',
-                              borderBottom: '1px solid var(--ivory)',
-                              background: isPast ? '#f9f8f7' : cellBg,
-                              cursor: isPast ? 'default' : 'pointer',
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, padding: '4px 2px',
-                              opacity: isPast ? 0.4 : 1,
-                              boxShadow: isToday ? 'inset 0 0 0 2px var(--gold)' : 'none',
-                              transition: 'background .1s', position: 'relative',
-                            }}
-                          >
-                            <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 500, color: (isSelected || isRangeStart) ? '#fff' : inRange ? '#1e3a5f' : isToday ? 'var(--gold)' : 'var(--charcoal)' }}>{day}</span>
-                            {/* Manual block label */}
-                            {b && !inRange && !isSelected && !isRangeStart && (
-                              <span style={{ fontSize: 7, fontWeight: 700, color: blockColor(b.type), letterSpacing: '.04em', textTransform: 'uppercase', lineHeight: 1, textAlign: 'center' }}>
-                                {b.type === 'hours' ? b.ranges?.map(r => r.from.slice(0,5)).join(' ') : blockTypeLabel(b.type).slice(0, 4)}
-                              </span>
-                            )}
-                            {/* Auto-block indicator (no manual block on this day) */}
-                            {!b && autoBlock && !inRange && !isSelected && !isRangeStart && (
-                              <span style={{ fontSize: 7, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', lineHeight: 1, color: autoBlock === 'wedding' ? '#047857' : '#6b7280' }}>
-                                {autoBlock === 'wedding' ? 'Boda' : 'Ocup.'}
-                              </span>
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>}
-
-                    {/* ── Week view ─────────────────────────────────────────── */}
-                    {blockView === 'week' && (() => {
-                      const PX_PER_HOUR = 50
-                      const TIME_START = 8
-                      const TIME_END = 21
-                      const HOURS = Array.from({ length: TIME_END - TIME_START }, (_, i) => TIME_START + i)
-                      const timeToY = (t: string) => {
-                        const [h, m] = t.split(':').map(Number)
-                        return ((h * 60 + m) - TIME_START * 60) / 60 * PX_PER_HOUR
-                      }
-                      // Build week dates
-                      const weekDates: string[] = []
-                      for (let i = 0; i < 7; i++) {
-                        const d = new Date(blockWeekStart + 'T12:00:00'); d.setDate(d.getDate() + i)
-                        weekDates.push(`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`)
-                      }
-                      const weekDayNames = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
-                      const COL_W = 80
-                      const TIME_COL_W = 36
-                      const totalH = (TIME_END - TIME_START) * PX_PER_HOUR
-
-                      const renderBlockRects = (iso: string) => {
-                        const b = blockedMap[iso]
-                        const auto = getAutoBlock(iso)
-                        const rects: React.ReactNode[] = []
-
-                        if (auto === 'wedding') rects.push(
-                          <div key="auto-w" style={{ position:'absolute', inset: 0, background: '#d1fae588', borderRadius: 3, pointerEvents: 'none' }}>
-                            <span style={{ fontSize: 8, fontWeight: 700, color: '#047857', padding: '2px 4px', display: 'block' }}>Boda</span>
-                          </div>
-                        )
-                        else if (auto === 'unavailable') rects.push(
-                          <div key="auto-u" style={{ position:'absolute', inset: 0, background: '#f3f4f688', borderRadius: 3, pointerEvents: 'none' }}>
-                            <span style={{ fontSize: 8, fontWeight: 700, color: '#6b7280', padding: '2px 4px', display: 'block' }}>Ocup.</span>
-                          </div>
-                        )
-
-                        if (!b) return rects
-
-                        const addRect = (from: string, to: string, color: string, label: string) => {
-                          const top = Math.max(0, timeToY(from))
-                          const bot = Math.min(totalH, timeToY(to))
-                          if (bot <= top) return
-                          rects.push(
-                            <div key={`${from}-${to}`} style={{
-                              position: 'absolute', left: 2, right: 2, top, height: bot - top,
-                              background: `${color}44`, border: `1.5px solid ${color}88`, borderRadius: 4,
-                              overflow: 'hidden', fontSize: 8, fontWeight: 700, color, padding: '1px 3px', lineHeight: 1.3,
-                            }}>{label}</div>
-                          )
-                        }
-
-                        if (b.type === 'full') addRect('08:00', `${TIME_END}:00`, blockColor('full'), 'Bloqueado')
-                        else if (b.type === 'morning') addRect('08:00', '13:00', blockColor('morning'), 'Mañana')
-                        else if (b.type === 'afternoon') addRect('13:00', `${TIME_END}:00`, blockColor('afternoon'), 'Tarde')
-                        else if (b.type === 'hours' && b.ranges?.length)
-                          b.ranges.forEach(r => addRect(r.from, r.to, blockColor('hours'), `${r.from}–${r.to}`))
-
-                        return rects
-                      }
-
-                      return (
-                        <div style={{ overflowX: 'auto' }}>
-                          <div style={{ minWidth: TIME_COL_W + COL_W * 7 }}>
-                            {/* Day headers */}
-                            <div style={{ display: 'flex', borderBottom: '1px solid var(--ivory)', background: '#faf8f5' }}>
-                              <div style={{ width: TIME_COL_W, flexShrink: 0 }} />
-                              {weekDates.map((iso, wi) => {
-                                const d = new Date(iso + 'T12:00:00')
-                                const isPast = iso < todayIso
-                                const isToday = iso === todayIso
-                                return (
-                                  <div key={iso} style={{ width: COL_W, flexShrink: 0, textAlign: 'center', padding: '6px 4px', borderLeft: '1px solid var(--ivory)', opacity: isPast ? 0.45 : 1 }}>
-                                    <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{weekDayNames[wi]}</div>
-                                    <div style={{ fontSize: 14, fontWeight: isToday ? 700 : 500, color: isToday ? '#059669' : 'var(--charcoal)', width: 24, height: 24, borderRadius: '50%', background: isToday ? '#d1fae5' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0' }}>{d.getDate()}</div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                            {/* Time grid */}
-                            <div style={{ display: 'flex', position: 'relative', height: totalH }}>
-                              {/* Hour labels */}
-                              <div style={{ width: TIME_COL_W, flexShrink: 0, position: 'relative' }}>
-                                {HOURS.map(h => (
-                                  <div key={h} style={{ position: 'absolute', top: (h - TIME_START) * PX_PER_HOUR - 6, left: 0, right: 0, textAlign: 'right', paddingRight: 6, fontSize: 9, color: 'var(--warm-gray)', fontWeight: 500 }}>{h}:00</div>
-                                ))}
-                              </div>
-                              {/* Day columns */}
-                              {weekDates.map((iso, wi) => {
-                                const isPast = iso < todayIso
-                                const isToday = iso === todayIso
-                                const isPickerOpen = blockPickerDate === iso
-                                return (
-                                  <div key={iso} style={{ width: COL_W, flexShrink: 0, borderLeft: '1px solid var(--ivory)', position: 'relative', opacity: isPast ? 0.4 : 1, cursor: isPast ? 'default' : 'pointer', background: isToday ? '#f9fffe' : '#fff' }}
-                                    onClick={e => {
-                                      if (isPast) return
-                                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                                      const y = e.clientY - rect.top
-                                      const clickedMin = Math.floor((y / PX_PER_HOUR + TIME_START) * 60 / 30) * 30
-                                      const fromH = Math.floor(clickedMin / 60), fromM = clickedMin % 60
-                                      const toH = Math.floor((clickedMin + 60) / 60), toM = (clickedMin + 60) % 60
-                                      const fmt = (h: number, m: number) => `${pad2(h)}:${pad2(m)}`
-                                      setBlockPickerDate(isPickerOpen ? null : iso)
-                                      const b = blockedMap[iso]
-                                      if (b) { setBlockType(b.type); setBlockRanges(b.ranges ?? (b.from ? [{from: b.from, to: b.to??'13:00'}] : [{from:'09:00',to:'13:00'}])) }
-                                      else { setBlockType('hours'); setBlockRanges([{ from: fmt(fromH, fromM), to: fmt(Math.min(toH, TIME_END), toM) }]) }
-                                    }}>
-                                    {/* Hour lines */}
-                                    {HOURS.map(h => (
-                                      <div key={h} style={{ position: 'absolute', top: (h - TIME_START) * PX_PER_HOUR, left: 0, right: 0, borderTop: '1px solid var(--ivory)', pointerEvents: 'none' }} />
-                                    ))}
-                                    {/* Schedule available background */}
-                                    {visitAvail.schedule.filter(s => s.enabled && s.day === (new Date(iso+'T12:00:00').getDay() === 0 ? 6 : new Date(iso+'T12:00:00').getDay() - 1)).map(s => {
-                                      const top = timeToY(s.from); const bot = timeToY(s.to)
-                                      return <div key="avail" style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0,top), height: Math.max(0, bot - top), background: '#f0fdf4', pointerEvents: 'none' }} />
-                                    })}
-                                    {/* Blocks */}
-                                    {renderBlockRects(iso)}
-                                    {/* Today indicator */}
-                                    {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0, timeToY(`${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`)), height: 2, background: '#059669', pointerEvents: 'none' }} />}
-                                    {/* Selected column highlight */}
-                                    {isPickerOpen && <div style={{ position: 'absolute', inset: 0, background: 'rgba(30,58,95,.06)', pointerEvents: 'none' }} />}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })()}
-
-                  </div>
-
-                  {/* Picker panel — always below the calendar, regardless of view height */}
-                  {pickerLabel && blockPickerDate && (
-                    <div style={{ marginTop: 10, border: '1px solid var(--ivory)', borderRadius: 10, padding: '14px 16px', background: '#f9f7f4' }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ flex: 1 }}>{pickerLabel}</span>
-                        {!blockRangeMode && blockPickerDate && blockedMap[blockPickerDate] && (
-                          <button type="button" onClick={() => removeBlockedDate(blockPickerDate)}
-                            style={{ fontSize: 10, fontWeight: 600, color: '#dc2626', background: '#fee2e2', border: 'none', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>
-                            Quitar bloqueo
-                          </button>
-                        )}
-                        <button type="button" onClick={() => { setBlockPickerDate(null); setBlockRangeStart(null); setBlockRangeEnd(null) }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 2 }}><X size={14} /></button>
-                      </div>
-                      {/* Block type pills */}
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                        {(['full','morning','afternoon','hours'] as BlockedDate['type'][]).map(t => (
-                          <button key={t} type="button" onClick={() => setBlockType(t)}
-                            style={{ fontSize: 11, padding: '4px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600,
-                              background: blockType === t ? blockColor(t) : '#ede9e4',
-                              color: blockType === t ? '#fff' : 'var(--charcoal)' }}>
-                            {blockTypeLabel(t)}
-                          </button>
-                        ))}
-                      </div>
-                      {/* Multiple hour ranges */}
-                      {blockType === 'hours' && (
-                        <div style={{ marginBottom: 10 }}>
-                          {blockRanges.map((r, ri) => (
-                            <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                              <input type="time" className="form-input" value={r.from}
-                                onChange={e => setBlockRanges(prev => prev.map((x, i) => i === ri ? { ...x, from: e.target.value } : x))}
-                                style={{ fontSize: 12, width: 90 }} />
-                              <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>—</span>
-                              <input type="time" className="form-input" value={r.to}
-                                onChange={e => setBlockRanges(prev => prev.map((x, i) => i === ri ? { ...x, to: e.target.value } : x))}
-                                style={{ fontSize: 12, width: 90 }} />
-                              {blockRanges.length > 1 && (
-                                <button type="button" onClick={() => setBlockRanges(prev => prev.filter((_, i) => i !== ri))}
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 2 }}><X size={13} /></button>
-                              )}
-                            </div>
-                          ))}
-                          <button type="button" onClick={() => setBlockRanges(prev => [...prev, { from: '15:00', to: '18:00' }])}
-                            style={{ fontSize: 11, padding: '3px 10px', borderRadius: 7, border: '1px dashed #a78bfa', background: 'transparent', color: '#7c3aed', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <Plus size={11} /> Añadir otro rango
-                          </button>
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <button type="button" onClick={confirmBlock}
-                          style={{ fontSize: 12, fontWeight: 700, padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <Check size={13} /> Confirmar bloqueo{selectedDates.length > 1 ? ` (${selectedDates.length} días)` : ''}
-                        </button>
-                        <button type="button" onClick={() => { setBlockPickerDate(null); setBlockRangeStart(null); setBlockRangeEnd(null) }}
-                          style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--ivory)', cursor: 'pointer', background: '#fff', color: 'var(--warm-gray)', fontWeight: 500 }}>
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Legend */}
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
-                    {(['full','morning','afternoon','hours'] as BlockedDate['type'][]).map(t => (
-                      <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ width: 8, height: 8, borderRadius: 2, background: blockColor(t), flexShrink: 0 }} />
-                        <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{blockTypeLabel(t)}</span>
-                      </div>
-                    ))}
-                    {(visitAvail.block_booked_weddings || visitAvail.block_calendar_unavailable) && (
-                      <>
-                        {visitAvail.block_booked_weddings && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span style={{ width: 8, height: 8, borderRadius: 2, background: '#d1fae5', border: '1px solid #059669', flexShrink: 0 }} />
-                            <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Boda reservada</span>
-                          </div>
-                        )}
-                        {visitAvail.block_calendar_unavailable && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span style={{ width: 8, height: 8, borderRadius: 2, background: '#f3f4f6', border: '1px solid #d1d5db', flexShrink: 0 }} />
-                            <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>No libre</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Save button */}
-                  <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <button type="button" onClick={() => saveVisitAvail(visitAvail)} disabled={savingVisit || !visitAvailDirty}
-                      style={{ fontSize: 12, fontWeight: 700, padding: '7px 20px', borderRadius: 8, border: 'none', cursor: visitAvailDirty ? 'pointer' : 'default',
-                        background: visitAvailDirty ? '#059669' : '#e5e7eb', color: visitAvailDirty ? '#fff' : '#9ca3af',
-                        display: 'flex', alignItems: 'center', gap: 6, transition: 'background .15s' }}>
-                      <Check size={13} /> {savingVisit ? 'Guardando…' : 'Guardar cambios'}
-                    </button>
-                    {visitAvailDirty && !savingVisit && (
-                      <span style={{ fontSize: 11, color: '#d97706' }}>Tienes cambios sin guardar</span>
-                    )}
-                  </div>
-                </div>
-                </div>
-                )}
-              </div>
-            )
-          })()}
 
           {/* Stats */}
           {modalities.length > 0 && (
@@ -1979,8 +1268,12 @@ export default function EstructuraPage() {
       {/* ── Commercial config wizard ───────────────────────────────────────── */}
       {configWizardOpen && (() => {
         const QUESTION_LABELS: Record<WizardQuestion, string> = {
-          space_type:  '¿Cómo está organizado tu espacio?',
-          price_model: '¿Cómo cobras el espacio?',
+          space_type:          '¿Cómo está organizado tu espacio?',
+          price_model:         '¿Cómo cobras el espacio?',
+          menu_included:       wizardConfig.price_model === 'per_person' ? '¿El precio por persona incluye menú?' : '¿El paquete incluye menú?',
+          catering_own:        '¿Ofreces catering / menú propio?',
+          catering_mandatory:  '¿Es obligatorio contratar el catering interno?',
+          has_menu_types:      '¿Hay diferentes tipos de menú (menú A, menú B…)?',
         }
 
         const cardOpts = (q: WizardQuestion) => {
@@ -1997,22 +1290,56 @@ export default function EstructuraPage() {
           return null
         }
 
-        const currentVal = wizardQuestion === 'space_type' ? wizardConfig.space_type : wizardConfig.price_model
+        const yesNoOpts = [
+          { key: true,  label: 'Sí', color: '#059669', bg: '#ECFDF5' },
+          { key: false, label: 'No', color: '#6B7280', bg: '#F9FAFB' },
+        ]
+
+        const currentVal = (() => {
+          if (wizardQuestion === 'space_type')         return wizardConfig.space_type
+          if (wizardQuestion === 'price_model')        return wizardConfig.price_model
+          if (wizardQuestion === 'menu_included')      return wizardConfig.menu_included
+          if (wizardQuestion === 'catering_own')       return wizardConfig.catering_own
+          if (wizardQuestion === 'catering_mandatory') return wizardConfig.catering_mandatory
+          if (wizardQuestion === 'has_menu_types')     return wizardConfig.has_menu_types
+        })()
 
         const handleAnswer = (val: any) => {
-          const next: WizardConfig = wizardQuestion === 'space_type'
-            ? { space_type: val }
-            : { ...wizardConfig, price_model: val }
+          let next: WizardConfig = { ...wizardConfig }
+          if (wizardQuestion === 'space_type') {
+            next = { space_type: val }  // reset downstream when space changes
+          } else if (wizardQuestion === 'price_model') {
+            next = { ...next, price_model: val, menu_included: undefined, catering_own: undefined, catering_mandatory: undefined, has_menu_types: undefined }
+          } else if (wizardQuestion === 'menu_included') {
+            next = { ...next, menu_included: val, catering_own: undefined, catering_mandatory: undefined, has_menu_types: undefined }
+          } else if (wizardQuestion === 'catering_own') {
+            next = { ...next, catering_own: val, catering_mandatory: undefined }
+          } else if (wizardQuestion === 'catering_mandatory') {
+            next = { ...next, catering_mandatory: val }
+          } else if (wizardQuestion === 'has_menu_types') {
+            next = { ...next, has_menu_types: val }
+          }
           setWizardConfig(next)
 
-          if (wizardQuestion === 'space_type') {
-            wizardNext('price_model')
-          } else {
+          // Determine next question
+          const model = next.price_model
+          let goTo: WizardQuestion | 'DONE' = 'DONE'
+          if (wizardQuestion === 'space_type')         goTo = 'price_model'
+          else if (wizardQuestion === 'price_model')   goTo = model === 'rental' ? 'catering_own' : 'menu_included'
+          else if (wizardQuestion === 'menu_included') goTo = val ? 'has_menu_types' : 'catering_own'
+          else if (wizardQuestion === 'catering_own')  goTo = val ? 'catering_mandatory' : 'DONE'
+          else if (wizardQuestion === 'catering_mandatory') goTo = 'DONE'
+          else if (wizardQuestion === 'has_menu_types')     goTo = 'DONE'
+
+          if (goTo === 'DONE') {
             if (isWizardDone(next)) saveCommercialConfig(next)
+          } else {
+            wizardNext(goTo)
           }
         }
 
         const cards = cardOpts(wizardQuestion)
+        const isYesNo = !cards
         const stepNum = wizardHistory.length + 1
 
         return (
@@ -2049,6 +1376,24 @@ export default function EstructuraPage() {
                             <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{opt.sub}</div>
                           </div>
                           {sel && <div style={{ width: 20, height: 20, borderRadius: '50%', background: opt.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Check size={12} style={{ color: '#fff' }} /></div>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Yes/No options */}
+                {isYesNo && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    {yesNoOpts.map(opt => {
+                      const sel = currentVal === opt.key
+                      return (
+                        <button key={String(opt.key)} onClick={() => handleAnswer(opt.key)}
+                          style={{ padding: '20px 16px', border: `2px solid ${sel ? opt.color : 'var(--ivory)'}`, borderRadius: 10, background: sel ? opt.bg : '#fff', cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s', outline: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: sel ? `${opt.color}22` : 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {opt.key ? <Check size={18} style={{ color: sel ? opt.color : 'var(--warm-gray)' }} /> : <X size={18} style={{ color: sel ? opt.color : 'var(--warm-gray)' }} />}
+                          </div>
+                          <span style={{ fontSize: 15, fontWeight: 700, color: sel ? opt.color : 'var(--charcoal)' }}>{opt.label}</span>
                         </button>
                       )
                     })}
