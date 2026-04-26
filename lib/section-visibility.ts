@@ -4,6 +4,20 @@
 
 export type SpaceType = 'single' | 'single_with_supplements' | 'multiple_independent' | null | undefined
 
+export const SPACE_TYPE_LABELS: Record<string, string> = {
+  single: 'Un único espacio',
+  single_with_supplements: 'Espacio principal + zonas opcionales',
+  multiple_independent: 'Varias zonas a elegir',
+}
+
+// Which space_types each section is designed for. Used to render
+// "matches your config" banners inside template editors.
+export const SECTION_SPACE_TYPES: Record<string, Array<'single' | 'single_with_supplements' | 'multiple_independent'>> = {
+  zones: ['single_with_supplements'],
+  space_groups: ['multiple_independent'],
+  venue_rental: ['single', 'single_with_supplements'],
+}
+
 export function isSectionAllowed(secId: string, spaceType: SpaceType): boolean {
   if (!spaceType) return true
 

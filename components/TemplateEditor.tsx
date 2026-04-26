@@ -12,7 +12,7 @@ import { useAuth } from '@/lib/auth-context'
 import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
-import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
+import { getSectionLabel, SECTION_SPACE_TYPES, SPACE_TYPE_LABELS } from '@/lib/section-visibility'
 
 // ─── Section catalogue ────────────────────────────────────────────────────────
 
@@ -608,7 +608,6 @@ export default function TemplateEditor({
                 <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
                   {ALL_SECTION_IDS.map((secId, i) => {
                     if (['welcome_light', 'welcome_split', 'welcome_editorial'].includes(secId)) return null
-                    if (!isSectionAllowed(secId, commercialConfig?.space_type as any)) return null
 
                     if (secId === 'welcome') {
                       const isWelcomeOpen = openSecs.has('welcome')
@@ -660,6 +659,27 @@ export default function TemplateEditor({
                         {/* Expandable content editor */}
                         {isOpen && (
                           <div style={{ padding: '12px 14px 14px', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
+                            {SECTION_SPACE_TYPES[secId] && (() => {
+                              const spaceType = commercialConfig?.space_type as any
+                              const allowedTypes = SECTION_SPACE_TYPES[secId]
+                              const matches = spaceType && allowedTypes.includes(spaceType)
+                              if (matches) {
+                                return (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, fontSize: 11, color: '#166534', lineHeight: 1.4 }}>
+                                    <Check size={13} style={{ flexShrink: 0 }} />
+                                    <span>Recomendada para tu configuración: <strong>{SPACE_TYPE_LABELS[spaceType]}</strong></span>
+                                  </div>
+                                )
+                              }
+                              const targetLabels = allowedTypes.map(t => SPACE_TYPE_LABELS[t]).join(' · ')
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 12, background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.4 }}>
+                                  <Info size={13} style={{ flexShrink: 0, color: 'var(--warm-gray)' }} />
+                                  <span style={{ flex: 1 }}>Aplica si tu configuración es: <strong>{targetLabels}</strong></span>
+                                  <a href="/estructura" style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)', textDecoration: 'none', whiteSpace: 'nowrap' }}>Cambiar →</a>
+                                </div>
+                              )
+                            })()}
                             {renderSectionContent(secId)}
                           </div>
                         )}
