@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef, useMemo } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
@@ -9,15 +9,11 @@ import { usePlanFeatures } from '@/lib/use-plan-features'
 import {
   Plus, ChevronDown, ChevronUp, Pencil, Trash2,
   X, Check, Lock, Sun, Moon, CalendarDays, Package, SlidersHorizontal,
-  Building2, Users, Layers, CreditCard, LayoutGrid, Settings2, ChefHat, Save,
-  Maximize2, Minimize2,
+  Building2, Users, Layers, CreditCard, LayoutGrid, Settings2, ChevronRight, ChevronLeft,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
-import ProposalMenuEditor from '@/components/ProposalMenuEditor'
 import DatePicker, { fmtDate } from '@/components/DatePicker'
-import type { SectionsData } from '@/lib/proposal-types'
-import { WeddingProposal } from '@/app/proposal/[slug]/tpl/WeddingProposal'
-import type { ProposalData } from '@/app/proposal/[slug]/page'
+import type { VisitAvailability, DaySchedule, BlockedDate } from '@/lib/proposal-types'
 
 // ── Duration types ─────────────────────────────────────────────────────────────
 
@@ -311,15 +307,11 @@ export default function EstructuraPage() {
   const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
 
-  const [activeTab, setActiveTab]             = useState<'modalidades' | 'menus'>('modalidades')
+  const [activeTab, setActiveTab]             = useState<'modalidades' | 'visitas'>('modalidades')
   const [modalities, setModalities]           = useState<Modality[]>([])
   const [loading, setLoading]                 = useState(true)
   const [expanded, setExpanded]               = useState<Set<string>>(new Set())
   const [error, setError]                     = useState('')
-  const [menuCatalog, setMenuCatalog]         = useState<SectionsData>({})
-  const [previewExpanded, setPreviewExpanded] = useState(false)
-  const [catalogSaving, setCatalogSaving]     = useState(false)
-  const [catalogSaved, setCatalogSaved]       = useState(false)
   const [commercialConfig, setCommercialConfig] = useState<CommercialConfig | null>(null)
   const [configWizardOpen, setConfigWizardOpen]   = useState(false)
   const [wizardQuestion, setWizardQuestion]       = useState<WizardQuestion>('space_type')
@@ -333,6 +325,31 @@ export default function EstructuraPage() {
   const [newZoneName, setNewZoneName]       = useState('')
   const [newSuppName, setNewSuppName]       = useState('')
   const [savingZS, setSavingZS]             = useState(false)
+
+  // Visit availability
+  const DEFAULT_SCHEDULE: DaySchedule[] = [0,1,2,3,4].map(day => ({ day, enabled: true, from: '10:00', to: '19:00' }))
+    .concat([5,6].map(day => ({ day, enabled: false, from: '10:00', to: '14:00' })))
+  const [visitAvail, setVisitAvail]     = useState<VisitAvailability>({ slot_duration: 60, schedule: DEFAULT_SCHEDULE, block_booked_weddings: true, block_calendar_unavailable: false, blocked_dates: [] })
+  const [savingVisit, setSavingVisit]   = useState(false)
+  const [visitAvailOpen, setVisitAvailOpen] = useState(false)
+  const [visitAvailDirty, setVisitAvailDirty] = useState(false)
+  // Block calendar UI state
+  const [blockCalYear,  setBlockCalYear]  = useState(() => new Date().getFullYear())
+  const [blockCalMonth, setBlockCalMonth] = useState(() => new Date().getMonth())
+  const [blockView, setBlockView] = useState<'month' | 'week'>('month')
+  const [blockWeekStart, setBlockWeekStart] = useState<string>(() => {
+    const t = new Date(); const day = t.getDay(); const diff = day === 0 ? -6 : 1 - day; t.setDate(t.getDate() + diff)
+    return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
+  })
+  const [blockPickerDate, setBlockPickerDate] = useState<string | null>(null)
+  const [blockType, setBlockType] = useState<BlockedDate['type']>('full')
+  const [blockRanges, setBlockRanges] = useState<Array<{ from: string; to: string }>>([{ from: '09:00', to: '13:00' }])
+  // Range-select mode
+  const [blockRangeStart, setBlockRangeStart] = useState<string | null>(null)
+  const [blockRangeEnd,   setBlockRangeEnd]   = useState<string | null>(null)
+  const [blockRangeMode,  setBlockRangeMode]  = useState(false)
+  // Calendar entries overlaid on block calendar
+  const [blockCalEntries, setBlockCalEntries] = useState<Record<string, string>>({})
 
   // Modality modal
   const [modalOpen, setModalOpen]     = useState(false)
@@ -358,26 +375,40 @@ export default function EstructuraPage() {
   const [priceSaving, setPriceSaving]     = useState(false)
   const [priceError, setPriceError]       = useState('')
 
-  const menuPreviewData = useMemo<ProposalData>(() => ({
-    id: 'preview', slug: 'preview', couple_name: 'Vista previa',
-    personal_message: null, guest_count: 100, wedding_date: null,
-    price_estimate: null, show_availability: false, show_price_estimate: false,
-    status: 'preview', ctas: [], sections_data: menuCatalog,
-    venueContent: { packages: [], zones: [], season_prices: [], inclusions: [], exclusions: [], faq: [], testimonials: [], collaborators: [], extra_services: [], menu_prices: [], experience: null, techspecs: null, accommodation_info: null, map_info: null, budget_simulator: null, countdown: null },
-    venue: null, branding: null,
-  }), [menuCatalog])
-
   useEffect(() => {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
     load()
   }, [user, authLoading]) // eslint-disable-line
 
+  // Load calendar_entries for the visible range (month or week view)
+  useEffect(() => {
+    if (!user) return
+    const supabase = createClient()
+    const p = (n: number) => String(n).padStart(2, '0')
+    let from: string, to: string
+    if (blockView === 'week') {
+      from = blockWeekStart
+      const end = new Date(blockWeekStart + 'T12:00:00'); end.setDate(end.getDate() + 6)
+      to = `${end.getFullYear()}-${p(end.getMonth()+1)}-${p(end.getDate())}`
+    } else {
+      from = `${blockCalYear}-${p(blockCalMonth + 1)}-01`
+      const lastDay = new Date(blockCalYear, blockCalMonth + 1, 0).getDate()
+      to = `${blockCalYear}-${p(blockCalMonth + 1)}-${p(lastDay)}`
+    }
+    supabase.from('calendar_entries').select('date,status').eq('user_id', user.id).gte('date', from).lte('date', to)
+      .then(({ data }) => {
+        const map: Record<string, string> = {}
+        data?.forEach(e => { map[e.date] = e.status })
+        setBlockCalEntries(map)
+      })
+  }, [blockCalYear, blockCalMonth, blockView, blockWeekStart, user]) // eslint-disable-line
+
   const load = async () => {
     const supabase = createClient()
     const [res, { data: settingsRow }] = await Promise.all([
       fetch('/api/estructura/modalities'),
-      supabase.from('venue_settings').select('commercial_config, zones, supplements, menu_catalog').eq('user_id', user!.id).maybeSingle(),
+      supabase.from('venue_settings').select('commercial_config, zones, supplements, visit_availability').eq('user_id', user!.id).maybeSingle(),
     ])
     const json = await res.json()
     if (!res.ok) { setError(json.error ?? 'Error al cargar'); setLoading(false); return }
@@ -394,7 +425,14 @@ export default function EstructuraPage() {
     if (settingsRow?.commercial_config) setCommercialConfig(settingsRow.commercial_config as CommercialConfig)
     if (settingsRow?.zones)        setZones(settingsRow.zones as ZoneItem[])
     if (settingsRow?.supplements)  setSupplements(settingsRow.supplements as SupplementItem[])
-    if (settingsRow?.menu_catalog) setMenuCatalog(settingsRow.menu_catalog as SectionsData)
+    if (settingsRow?.visit_availability) {
+      const va = settingsRow.visit_availability as VisitAvailability & { blocked_dates?: Array<BlockedDate | string> }
+      // Migrate legacy string[] blocked_dates → BlockedDate[]
+      const blocked: BlockedDate[] = (va.blocked_dates ?? []).map(b =>
+        typeof b === 'string' ? { date: b, type: 'full' as const } : b
+      )
+      setVisitAvail({ ...va, blocked_dates: blocked })
+    }
     setLoading(false)
   }
 
@@ -414,13 +452,13 @@ export default function EstructuraPage() {
     setSavingZS(false)
   }
 
-  const saveMenuCatalog = async () => {
-    setCatalogSaving(true)
+  const saveVisitAvail = async (va: VisitAvailability) => {
+    setSavingVisit(true)
     const supabase = createClient()
-    await supabase.from('venue_settings').upsert({ user_id: user!.id, menu_catalog: menuCatalog }, { onConflict: 'user_id' })
-    setCatalogSaving(false)
-    setCatalogSaved(true)
-    setTimeout(() => setCatalogSaved(false), 2500)
+    const { error } = await supabase.from('venue_settings').upsert({ user_id: user!.id, visit_availability: va }, { onConflict: 'user_id' })
+    if (error) console.error('[saveVisitAvail]', error)
+    else setVisitAvailDirty(false)
+    setSavingVisit(false)
   }
 
   const addZone = async () => {
@@ -716,11 +754,6 @@ export default function EstructuraPage() {
   const totalPrices = modalities.reduce((s, m) =>
     s + m.prices.length + m.packages.reduce((ps, pkg) => ps + pkg.prices.length, 0), 0)
 
-  // Whether the venue's commercial config involves menus/catering at all
-  const venueHasMenus = commercialConfig?.menu_included === true || commercialConfig?.catering_own === true
-  const menuCount  = menuCatalog.menus_override?.length ?? 0
-  const extraCount = menuCatalog.menu_extras_override?.length ?? 0
-
   // ── Main render ────────────────────────────────────────────────────────────
 
   return (
@@ -734,106 +767,20 @@ export default function EstructuraPage() {
               <Plus size={14} /> Nueva modalidad
             </button>
           )}
-          {activeTab === 'menus' && (
-            <button className="btn btn-primary btn-sm" onClick={saveMenuCatalog} disabled={catalogSaving} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {catalogSaved ? <><Check size={14} /> Guardado</> : <><Save size={14} /> {catalogSaving ? 'Guardando…' : 'Guardar catálogo'}</>}
-            </button>
-          )}
         </div>
 
         <Tabs
           activeKey={activeTab}
-          onChange={k => setActiveTab(k as 'modalidades' | 'menus')}
+          onChange={k => setActiveTab(k as 'modalidades' | 'visitas')}
           tabs={[
-            { key: 'modalidades', label: 'Modalidades y tarifas', icon: LayoutGrid, desc: 'Modalidades y precios por temporada' },
-            { key: 'menus',       label: 'Menús y extras',        icon: ChefHat,    desc: 'Catálogo de menús, extras y aperitivos',
-              badge: (
-                <>
-                  {commercialConfig && !venueHasMenus && (
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'var(--ivory)', color: 'var(--warm-gray)', letterSpacing: '0.04em' }}>N/A</span>
-                  )}
-                  {venueHasMenus && (menuCount > 0 || extraCount > 0) && (
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'rgba(196,151,90,.12)', color: 'var(--gold)', letterSpacing: '0.04em' }}>
-                      {[menuCount > 0 && `${menuCount} menú${menuCount > 1 ? 's' : ''}`, extraCount > 0 && `${extraCount} extra${extraCount > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
-                    </span>
-                  )}
-                  {venueHasMenus && menuCount === 0 && extraCount === 0 && (
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', display: 'inline-block', marginLeft: 2 }} title="Sin menús configurados" />
-                  )}
-                </>
-              ),
-            },
+            { key: 'modalidades', label: 'Modalidades y tarifas', icon: LayoutGrid,   desc: 'Modalidades y precios por temporada' },
+            { key: 'visitas',     label: 'Visitas',               icon: CalendarDays, desc: 'Disponibilidad y bloqueos para visitas' },
           ]}
         />
 
         <div className="page-content">
           {error && <div className="alert alert-error" style={{ marginBottom: 20 }}>{error}</div>}
 
-          {/* ── TAB: MENÚS ───────────────────────────────────────────────────── */}
-          {activeTab === 'menus' && (
-            <div style={{ display: 'flex', gap: 0, alignItems: 'flex-start', margin: '-24px -28px' }}>
-              {/* Left: editor — hidden when preview expanded or venue has no menus */}
-              {!previewExpanded && (
-                <div style={{ flex: '0 0 500px', padding: '24px 28px', overflowY: 'auto' }}>
-                  {!venueHasMenus && commercialConfig ? (
-                    /* Point 2: no catering in config → explain + redirect */
-                    <div style={{ background: '#F7F3EE', border: '1px solid var(--ivory)', borderRadius: 12, padding: '28px 20px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 32, marginBottom: 10 }}>🍽️</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 8 }}>
-                        Tu modelo no incluye catering propio
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.75, marginBottom: 20 }}>
-                        Según tu configuración comercial, la sección de menús <strong>no aparecerá</strong> en tus propuestas.<br />
-                        Si ofreces o trabajas con catering propio, actualiza tu configuración.
-                      </div>
-                      <button className="btn btn-secondary btn-sm" onClick={() => setActiveTab('modalidades')}>
-                        Revisar configuración →
-                      </button>
-                    </div>
-                  ) : (
-                    <ProposalMenuEditor
-                      sections={menuCatalog}
-                      setSections={setMenuCatalog}
-                      intro="Define el catálogo de menús, extras y aperitivos de tu venue. Se usará como base al crear nuevas propuestas."
-                    />
-                  )}
-                </div>
-              )}
-              {/* Right: live preview */}
-              <div style={{ flex: 1, minWidth: 0, borderLeft: previewExpanded ? 'none' : '1px solid var(--ivory)', position: 'sticky', top: 51, alignSelf: 'flex-start', height: 'calc(100vh - 51px)', overflowY: 'auto', background: '#f9f6f2' }}>
-                {/* Sticky toolbar */}
-                <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', justifyContent: 'flex-end', padding: '6px 10px', background: 'rgba(249,246,242,.85)', backdropFilter: 'blur(6px)', borderBottom: '1px solid var(--ivory)' }}>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewExpanded(v => !v)}
-                    title={previewExpanded ? 'Volver al editor' : 'Ampliar vista previa'}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', background: '#fff', border: '1px solid var(--ivory)', borderRadius: 7, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,.05)' }}
-                  >
-                    {previewExpanded ? <><Minimize2 size={11} /> Contraer</> : <><Maximize2 size={11} /> Ampliar</>}
-                  </button>
-                </div>
-                {/* Point 5: preview reflects commercial config */}
-                {!venueHasMenus && commercialConfig ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100% - 37px)', padding: 32, textAlign: 'center', gap: 10 }}>
-                    <div style={{ fontSize: 40, opacity: 0.2 }}>🍽️</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--warm-gray)', opacity: 0.6, lineHeight: 1.6 }}>
-                      La sección de menús no aparece<br />en propuestas con tu configuración
-                    </div>
-                  </div>
-                ) : (
-                  <WeddingProposal
-                    data={menuPreviewData}
-                    menus={menuCatalog.menus_override ?? null}
-                    extras={menuCatalog.menu_extras_override ?? null}
-                    appetizers={menuCatalog.appetizers_base_override ?? null}
-                    primary="#C4975A"
-                    onPrimary="#fff"
-                    previewOnly
-                  />
-                )}
-              </div>
-            </div>
-          )}
 
           {/* ── TAB: MODALIDADES ─────────────────────────────────────────────── */}
           {activeTab === 'modalidades' && <>
@@ -1262,6 +1209,543 @@ export default function EstructuraPage() {
           </div>
 
           </>}
+
+          {/* ── TAB: VISITAS ─────────────────────────────────────────────────── */}
+          {activeTab === 'visitas' && (() => {
+            const DAY_NAMES = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
+            const DURATIONS: Array<{ value: 30|45|60|90|120; label: string }> = [
+              { value: 30, label: '30 min' }, { value: 45, label: '45 min' },
+              { value: 60, label: '1 hora' }, { value: 90, label: '1,5 h' }, { value: 120, label: '2 h' },
+            ]
+            const updateDay = (day: number, patch: Partial<DaySchedule>) => {
+              const next: VisitAvailability = { ...visitAvail, schedule: visitAvail.schedule.map(s => s.day === day ? { ...s, ...patch } : s) }
+              setVisitAvail(next); setVisitAvailDirty(true)
+            }
+            const updateAvail = (patch: Partial<VisitAvailability>) => {
+              const next = { ...visitAvail, ...patch }; setVisitAvail(next); setVisitAvailDirty(true)
+            }
+            const upsertBlockedDates = (dates: string[], block: Omit<BlockedDate, 'date'>) => {
+              const newEntries: BlockedDate[] = dates.map(d => ({ date: d, ...block }))
+              const newDates = new Set(dates)
+              const rest = visitAvail.blocked_dates.filter(x => !newDates.has(x.date))
+              const next = { ...visitAvail, blocked_dates: [...rest, ...newEntries].sort((a, z) => a.date.localeCompare(z.date)) }
+              setVisitAvail(next); setVisitAvailDirty(true)
+            }
+            const removeBlockedDate = (date: string) => {
+              const next = { ...visitAvail, blocked_dates: visitAvail.blocked_dates.filter(x => x.date !== date) }
+              setVisitAvail(next); setVisitAvailDirty(true)
+              if (blockPickerDate === date) setBlockPickerDate(null)
+            }
+            // Calendar helpers
+            const CAL_MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+            const CAL_DAYS = ['L','M','X','J','V','S','D']
+            const pad2 = (n: number) => String(n).padStart(2, '0')
+            const daysInMonth = new Date(blockCalYear, blockCalMonth + 1, 0).getDate()
+            const firstDow = (() => { const d = new Date(blockCalYear, blockCalMonth, 1).getDay(); return d === 0 ? 6 : d - 1 })()
+            const todayIso = (() => { const t = new Date(); return `${t.getFullYear()}-${pad2(t.getMonth()+1)}-${pad2(t.getDate())}` })()
+            const blockedMap: Record<string, BlockedDate> = {}
+            visitAvail.blocked_dates.forEach(b => { blockedMap[b.date] = b })
+            // Auto-blocked from main calendar
+            const getAutoBlock = (iso: string): 'wedding' | 'unavailable' | null => {
+              const s = blockCalEntries[iso]
+              if (!s || s === 'libre') return null
+              if (visitAvail.block_booked_weddings && (s === 'reservado' || s === 'ganado')) return 'wedding'
+              if (visitAvail.block_calendar_unavailable && s !== 'libre') return 'unavailable'
+              return null
+            }
+            const blockTypeLabel = (t: BlockedDate['type']) => ({ full: 'Día completo', morning: 'Solo mañana', afternoon: 'Solo tarde', hours: 'Horas concretas' })[t]
+            const blockColor = (t: BlockedDate['type']) => ({ full: '#f87171', morning: '#fb923c', afternoon: '#fbbf24', hours: '#a78bfa' })[t]
+            // Range helpers
+            const rangeMin = blockRangeStart && blockPickerDate ? [blockRangeStart, blockPickerDate].sort()[0] : null
+            const rangeMax = blockRangeStart && blockPickerDate ? [blockRangeStart, blockPickerDate].sort()[1] : null
+            const isInRange = (iso: string) => !!(rangeMin && rangeMax && iso >= rangeMin && iso <= rangeMax)
+            // Build list of all dates currently selected (range or single)
+            const getSelectedDates = (): string[] => {
+              if (blockRangeMode && blockRangeStart && blockPickerDate) {
+                const [s, e] = [blockRangeStart, blockPickerDate].sort()
+                const out: string[] = []
+                const cur = new Date(s + 'T12:00:00')
+                const end = new Date(e + 'T12:00:00')
+                while (cur <= end) {
+                  out.push(`${cur.getFullYear()}-${pad2(cur.getMonth()+1)}-${pad2(cur.getDate())}`)
+                  cur.setDate(cur.getDate() + 1)
+                }
+                return out
+              }
+              return blockPickerDate ? [blockPickerDate] : []
+            }
+            const selectedDates = getSelectedDates()
+            const pickerLabel = blockRangeMode && blockRangeStart && blockPickerDate && blockRangeStart !== blockPickerDate
+              ? `${new Date(rangeMin!+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${new Date(rangeMax!+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})} (${selectedDates.length} días)`
+              : blockPickerDate
+                ? new Date(blockPickerDate+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})
+                : blockRangeMode && blockRangeStart
+                  ? `Desde ${new Date(blockRangeStart+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})} — elige el día final`
+                  : null
+            const confirmBlock = () => {
+              if (!selectedDates.length) return
+              const block: Omit<BlockedDate,'date'> = blockType === 'hours'
+                ? { type: 'hours', ranges: blockRanges.filter(r => r.from && r.to) }
+                : { type: blockType }
+              upsertBlockedDates(selectedDates, block)
+              setBlockPickerDate(null)
+              setBlockRangeStart(null)
+              setBlockRangeEnd(null)
+            }
+            return (
+              <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, marginBottom: 16, maxWidth: 860, overflow: 'hidden' }}>
+                {/* Collapsible header */}
+                <button type="button" onClick={() => setVisitAvailOpen(o => !o)}
+                  style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}>
+                  <CalendarDays size={14} style={{ color: '#059669', flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', flex: 1 }}>Disponibilidad para visitas</span>
+                  {visitAvailDirty && !visitAvailOpen && (
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706', background: '#fef3c7', borderRadius: 5, padding: '2px 7px' }}>Sin guardar</span>
+                  )}
+                  {visitAvailDirty && visitAvailOpen && (
+                    <span style={{ fontSize: 10, color: '#d97706' }}>Cambios pendientes</span>
+                  )}
+                  {visitAvailOpen ? <ChevronUp size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} /> : <ChevronDown size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
+                </button>
+
+                {visitAvailOpen && (
+                <div style={{ padding: '0 20px 20px', borderTop: '1px solid var(--ivory)' }}>
+                <div style={{ height: 16 }} />
+
+                {/* Duration */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 6 }}>Duración de cada visita</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {DURATIONS.map(({ value, label }) => (
+                      <button key={value} type="button" onClick={() => updateAvail({ slot_duration: value })}
+                        style={{ fontSize: 11, padding: '4px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600,
+                          background: visitAvail.slot_duration === value ? '#059669' : '#D1FAE5',
+                          color: visitAvail.slot_duration === value ? '#fff' : '#065F46' }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Weekly schedule */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8 }}>Horario disponible</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {visitAvail.schedule.map(ds => (
+                      <div key={ds.day} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <button type="button" onClick={() => updateDay(ds.day, { enabled: !ds.enabled })}
+                          style={{ width: 72, fontSize: 11, padding: '4px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, textAlign: 'center',
+                            background: ds.enabled ? '#059669' : '#F3F4F6', color: ds.enabled ? '#fff' : '#9CA3AF' }}>
+                          {DAY_NAMES[ds.day].slice(0, 3)}
+                        </button>
+                        {ds.enabled && (
+                          <>
+                            <input type="time" value={ds.from} onChange={e => updateDay(ds.day, { from: e.target.value })}
+                              className="form-input" style={{ fontSize: 12, width: 90 }} />
+                            <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>—</span>
+                            <input type="time" value={ds.to} onChange={e => updateDay(ds.day, { to: e.target.value })}
+                              className="form-input" style={{ fontSize: 12, width: 90 }} />
+                          </>
+                        )}
+                        {!ds.enabled && <span style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic' }}>No disponible</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* What blocks a slot */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8 }}>Qué bloquea un hueco automáticamente</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--charcoal)', cursor: 'default' }}>
+                      <input type="checkbox" checked disabled style={{ width: 14, height: 14 }} />
+                      Visitas ya agendadas <span style={{ fontSize: 10, color: 'var(--warm-gray)', marginLeft: 4 }}>(siempre activo)</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--charcoal)', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={visitAvail.block_booked_weddings}
+                        onChange={e => updateAvail({ block_booked_weddings: e.target.checked })} style={{ width: 14, height: 14 }} />
+                      Días con boda reservada / contratada en el calendario
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--charcoal)', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={visitAvail.block_calendar_unavailable}
+                        onChange={e => updateAvail({ block_calendar_unavailable: e.target.checked })} style={{ width: 14, height: 14 }} />
+                      Cualquier día marcado como no libre en el calendario
+                    </label>
+                  </div>
+                </div>
+
+                {/* Manual blocked dates — calendar views */}
+                <div>
+                  {/* Toolbar: view toggle + navigation */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginRight: 4 }}>Bloquear fechas manualmente</div>
+                    <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
+                      {(['month','week'] as const).map(v => (
+                        <button key={v} type="button" onClick={() => setBlockView(v)}
+                          style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
+                            background: blockView === v ? '#fff' : 'transparent',
+                            color: blockView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
+                            boxShadow: blockView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
+                          {v === 'month' ? 'Mes' : 'Semana'}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+                      <button type="button" onClick={() => {
+                        if (blockView === 'month') { if (blockCalMonth === 0) { setBlockCalMonth(11); setBlockCalYear(y => y-1) } else setBlockCalMonth(m => m-1) }
+                        else { const d = new Date(blockWeekStart+'T12:00:00'); d.setDate(d.getDate()-7); const p=(n:number)=>String(n).padStart(2,'0'); setBlockWeekStart(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
+                      }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 4 }}><ChevronLeft size={15} /></button>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', minWidth: 120, textAlign: 'center' }}>
+                        {blockView === 'month' ? `${CAL_MONTHS[blockCalMonth]} ${blockCalYear}` : (() => {
+                          const end = new Date(blockWeekStart+'T12:00:00'); end.setDate(end.getDate()+6)
+                          const p=(n:number)=>String(n).padStart(2,'0')
+                          const s = new Date(blockWeekStart+'T12:00:00')
+                          return `${p(s.getDate())} ${CAL_MONTHS[s.getMonth()].slice(0,3)} – ${p(end.getDate())} ${CAL_MONTHS[end.getMonth()].slice(0,3)}`
+                        })()}
+                      </span>
+                      <button type="button" onClick={() => {
+                        if (blockView === 'month') { if (blockCalMonth === 11) { setBlockCalMonth(0); setBlockCalYear(y => y+1) } else setBlockCalMonth(m => m+1) }
+                        else { const d = new Date(blockWeekStart+'T12:00:00'); d.setDate(d.getDate()+7); const p=(n:number)=>String(n).padStart(2,'0'); setBlockWeekStart(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
+                      }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 4 }}><ChevronRight size={15} /></button>
+                    </div>
+                    {blockView === 'month' && (
+                      <button type="button"
+                        onClick={() => { const next = !blockRangeMode; setBlockRangeMode(next); if (!next) { setBlockRangeStart(null); setBlockRangeEnd(null); setBlockPickerDate(null) } }}
+                        style={{ fontSize: 11, padding: '3px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600,
+                          background: blockRangeMode ? '#1e3a5f' : '#ede9e4',
+                          color: blockRangeMode ? '#fff' : 'var(--charcoal)' }}>
+                        {blockRangeMode ? '✕ Cancelar rango' : '↔ Rango'}
+                      </button>
+                    )}
+                  </div>
+                  {blockRangeMode && blockView === 'month' && (
+                    <div style={{ fontSize: 11, color: '#1e3a5f', background: '#e8f0fe', borderRadius: 7, padding: '6px 12px', marginBottom: 8 }}>
+                      {!blockRangeStart ? 'Haz click en el primer día del rango' : !blockPickerDate || blockPickerDate === blockRangeStart ? 'Ahora haz click en el último día del rango' : `Rango seleccionado: ${selectedDates.length} días`}
+                    </div>
+                  )}
+                  <div style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden' }}>
+                    {/* Day headers — month view only */}
+                    {blockView === 'month' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', background: '#faf8f5', borderBottom: '1px solid var(--ivory)' }}>
+                      {CAL_DAYS.map((d, i) => (
+                        <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '.08em', padding: '6px 0' }}>{d}</div>
+                      ))}
+                    </div>
+                    )}
+                    {/* Day cells — month view */}
+                    {blockView === 'month' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
+                      {Array.from({ length: firstDow }).map((_, i) => (
+                        <div key={`e${i}`} style={{ minHeight: 44, borderRight: '1px solid var(--ivory)', borderBottom: '1px solid var(--ivory)' }} />
+                      ))}
+                      {Array.from({ length: daysInMonth }).map((_, idx) => {
+                        const day = idx + 1
+                        const iso = `${blockCalYear}-${pad2(blockCalMonth + 1)}-${pad2(day)}`
+                        const b = blockedMap[iso]
+                        const autoBlock = getAutoBlock(iso)
+                        const isToday = iso === todayIso
+                        const isPast = iso < todayIso
+                        const isRangeStart = blockRangeStart === iso
+                        const inRange = isInRange(iso)
+                        const isSelected = !blockRangeMode && blockPickerDate === iso
+                        const col = (firstDow + idx) % 7
+                        const cellBg = isSelected || isRangeStart ? '#1e3a5f'
+                          : inRange ? '#dbeafe'
+                          : b ? `${blockColor(b.type)}22`
+                          : autoBlock === 'wedding' ? '#d1fae5'
+                          : autoBlock === 'unavailable' ? '#f3f4f6'
+                          : '#fff'
+                        return (
+                          <button key={day} type="button"
+                            disabled={isPast}
+                            onClick={() => {
+                              if (isPast) return
+                              if (blockRangeMode) {
+                                if (!blockRangeStart) {
+                                  setBlockRangeStart(iso); setBlockPickerDate(null)
+                                } else if (iso === blockRangeStart) {
+                                  setBlockRangeStart(null); setBlockPickerDate(null)
+                                } else {
+                                  setBlockPickerDate(iso)
+                                  const b2 = blockedMap[iso]
+                                  if (b2) { setBlockType(b2.type); setBlockRanges(b2.ranges ?? (b2.from ? [{ from: b2.from, to: b2.to ?? '13:00' }] : [{ from: '09:00', to: '13:00' }])) }
+                                  else { setBlockType('full'); setBlockRanges([{ from: '09:00', to: '13:00' }]) }
+                                }
+                              } else {
+                                if (isSelected) { setBlockPickerDate(null); return }
+                                setBlockPickerDate(iso)
+                                if (b) { setBlockType(b.type); setBlockRanges(b.ranges ?? (b.from ? [{ from: b.from, to: b.to ?? '13:00' }] : [{ from: '09:00', to: '13:00' }])) }
+                                else { setBlockType('full'); setBlockRanges([{ from: '09:00', to: '13:00' }]) }
+                              }
+                            }}
+                            style={{
+                              minHeight: 48, border: 'none',
+                              borderRight: col !== 6 ? '1px solid var(--ivory)' : 'none',
+                              borderBottom: '1px solid var(--ivory)',
+                              background: isPast ? '#f9f8f7' : cellBg,
+                              cursor: isPast ? 'default' : 'pointer',
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, padding: '4px 2px',
+                              opacity: isPast ? 0.4 : 1,
+                              boxShadow: isToday ? 'inset 0 0 0 2px var(--gold)' : 'none',
+                              transition: 'background .1s', position: 'relative',
+                            }}
+                          >
+                            <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 500, color: (isSelected || isRangeStart) ? '#fff' : inRange ? '#1e3a5f' : isToday ? 'var(--gold)' : 'var(--charcoal)' }}>{day}</span>
+                            {/* Manual block label */}
+                            {b && !inRange && !isSelected && !isRangeStart && (
+                              <span style={{ fontSize: 7, fontWeight: 700, color: blockColor(b.type), letterSpacing: '.04em', textTransform: 'uppercase', lineHeight: 1, textAlign: 'center' }}>
+                                {b.type === 'hours' ? b.ranges?.map(r => r.from.slice(0,5)).join(' ') : blockTypeLabel(b.type).slice(0, 4)}
+                              </span>
+                            )}
+                            {/* Auto-block indicator (no manual block on this day) */}
+                            {!b && autoBlock && !inRange && !isSelected && !isRangeStart && (
+                              <span style={{ fontSize: 7, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', lineHeight: 1, color: autoBlock === 'wedding' ? '#047857' : '#6b7280' }}>
+                                {autoBlock === 'wedding' ? 'Boda' : 'Ocup.'}
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>}
+
+                    {/* ── Week view ─────────────────────────────────────────── */}
+                    {blockView === 'week' && (() => {
+                      const PX_PER_HOUR = 50
+                      const TIME_START = 8
+                      const TIME_END = 21
+                      const HOURS = Array.from({ length: TIME_END - TIME_START }, (_, i) => TIME_START + i)
+                      const timeToY = (t: string) => {
+                        const [h, m] = t.split(':').map(Number)
+                        return ((h * 60 + m) - TIME_START * 60) / 60 * PX_PER_HOUR
+                      }
+                      // Build week dates
+                      const weekDates: string[] = []
+                      for (let i = 0; i < 7; i++) {
+                        const d = new Date(blockWeekStart + 'T12:00:00'); d.setDate(d.getDate() + i)
+                        weekDates.push(`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`)
+                      }
+                      const weekDayNames = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+                      const COL_W = 80
+                      const TIME_COL_W = 36
+                      const totalH = (TIME_END - TIME_START) * PX_PER_HOUR
+
+                      const renderBlockRects = (iso: string) => {
+                        const b = blockedMap[iso]
+                        const auto = getAutoBlock(iso)
+                        const rects: React.ReactNode[] = []
+
+                        if (auto === 'wedding') rects.push(
+                          <div key="auto-w" style={{ position:'absolute', inset: 0, background: '#d1fae588', borderRadius: 3, pointerEvents: 'none' }}>
+                            <span style={{ fontSize: 8, fontWeight: 700, color: '#047857', padding: '2px 4px', display: 'block' }}>Boda</span>
+                          </div>
+                        )
+                        else if (auto === 'unavailable') rects.push(
+                          <div key="auto-u" style={{ position:'absolute', inset: 0, background: '#f3f4f688', borderRadius: 3, pointerEvents: 'none' }}>
+                            <span style={{ fontSize: 8, fontWeight: 700, color: '#6b7280', padding: '2px 4px', display: 'block' }}>Ocup.</span>
+                          </div>
+                        )
+
+                        if (!b) return rects
+
+                        const addRect = (from: string, to: string, color: string, label: string) => {
+                          const top = Math.max(0, timeToY(from))
+                          const bot = Math.min(totalH, timeToY(to))
+                          if (bot <= top) return
+                          rects.push(
+                            <div key={`${from}-${to}`} style={{
+                              position: 'absolute', left: 2, right: 2, top, height: bot - top,
+                              background: `${color}44`, border: `1.5px solid ${color}88`, borderRadius: 4,
+                              overflow: 'hidden', fontSize: 8, fontWeight: 700, color, padding: '1px 3px', lineHeight: 1.3,
+                            }}>{label}</div>
+                          )
+                        }
+
+                        if (b.type === 'full') addRect('08:00', `${TIME_END}:00`, blockColor('full'), 'Bloqueado')
+                        else if (b.type === 'morning') addRect('08:00', '13:00', blockColor('morning'), 'Mañana')
+                        else if (b.type === 'afternoon') addRect('13:00', `${TIME_END}:00`, blockColor('afternoon'), 'Tarde')
+                        else if (b.type === 'hours' && b.ranges?.length)
+                          b.ranges.forEach(r => addRect(r.from, r.to, blockColor('hours'), `${r.from}–${r.to}`))
+
+                        return rects
+                      }
+
+                      return (
+                        <div style={{ overflowX: 'auto' }}>
+                          <div style={{ minWidth: TIME_COL_W + COL_W * 7 }}>
+                            {/* Day headers */}
+                            <div style={{ display: 'flex', borderBottom: '1px solid var(--ivory)', background: '#faf8f5' }}>
+                              <div style={{ width: TIME_COL_W, flexShrink: 0 }} />
+                              {weekDates.map((iso, wi) => {
+                                const d = new Date(iso + 'T12:00:00')
+                                const isPast = iso < todayIso
+                                const isToday = iso === todayIso
+                                return (
+                                  <div key={iso} style={{ width: COL_W, flexShrink: 0, textAlign: 'center', padding: '6px 4px', borderLeft: '1px solid var(--ivory)', opacity: isPast ? 0.45 : 1 }}>
+                                    <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{weekDayNames[wi]}</div>
+                                    <div style={{ fontSize: 14, fontWeight: isToday ? 700 : 500, color: isToday ? '#059669' : 'var(--charcoal)', width: 24, height: 24, borderRadius: '50%', background: isToday ? '#d1fae5' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0' }}>{d.getDate()}</div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            {/* Time grid */}
+                            <div style={{ display: 'flex', position: 'relative', height: totalH }}>
+                              {/* Hour labels */}
+                              <div style={{ width: TIME_COL_W, flexShrink: 0, position: 'relative' }}>
+                                {HOURS.map(h => (
+                                  <div key={h} style={{ position: 'absolute', top: (h - TIME_START) * PX_PER_HOUR - 6, left: 0, right: 0, textAlign: 'right', paddingRight: 6, fontSize: 9, color: 'var(--warm-gray)', fontWeight: 500 }}>{h}:00</div>
+                                ))}
+                              </div>
+                              {/* Day columns */}
+                              {weekDates.map((iso, wi) => {
+                                const isPast = iso < todayIso
+                                const isToday = iso === todayIso
+                                const isPickerOpen = blockPickerDate === iso
+                                return (
+                                  <div key={iso} style={{ width: COL_W, flexShrink: 0, borderLeft: '1px solid var(--ivory)', position: 'relative', opacity: isPast ? 0.4 : 1, cursor: isPast ? 'default' : 'pointer', background: isToday ? '#f9fffe' : '#fff' }}
+                                    onClick={e => {
+                                      if (isPast) return
+                                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                                      const y = e.clientY - rect.top
+                                      const clickedMin = Math.floor((y / PX_PER_HOUR + TIME_START) * 60 / 30) * 30
+                                      const fromH = Math.floor(clickedMin / 60), fromM = clickedMin % 60
+                                      const toH = Math.floor((clickedMin + 60) / 60), toM = (clickedMin + 60) % 60
+                                      const fmt = (h: number, m: number) => `${pad2(h)}:${pad2(m)}`
+                                      setBlockPickerDate(isPickerOpen ? null : iso)
+                                      const b = blockedMap[iso]
+                                      if (b) { setBlockType(b.type); setBlockRanges(b.ranges ?? (b.from ? [{from: b.from, to: b.to??'13:00'}] : [{from:'09:00',to:'13:00'}])) }
+                                      else { setBlockType('hours'); setBlockRanges([{ from: fmt(fromH, fromM), to: fmt(Math.min(toH, TIME_END), toM) }]) }
+                                    }}>
+                                    {/* Hour lines */}
+                                    {HOURS.map(h => (
+                                      <div key={h} style={{ position: 'absolute', top: (h - TIME_START) * PX_PER_HOUR, left: 0, right: 0, borderTop: '1px solid var(--ivory)', pointerEvents: 'none' }} />
+                                    ))}
+                                    {/* Schedule available background */}
+                                    {visitAvail.schedule.filter(s => s.enabled && s.day === (new Date(iso+'T12:00:00').getDay() === 0 ? 6 : new Date(iso+'T12:00:00').getDay() - 1)).map(s => {
+                                      const top = timeToY(s.from); const bot = timeToY(s.to)
+                                      return <div key="avail" style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0,top), height: Math.max(0, bot - top), background: '#f0fdf4', pointerEvents: 'none' }} />
+                                    })}
+                                    {/* Blocks */}
+                                    {renderBlockRects(iso)}
+                                    {/* Today indicator */}
+                                    {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0, timeToY(`${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`)), height: 2, background: '#059669', pointerEvents: 'none' }} />}
+                                    {/* Selected column highlight */}
+                                    {isPickerOpen && <div style={{ position: 'absolute', inset: 0, background: 'rgba(30,58,95,.06)', pointerEvents: 'none' }} />}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+
+                  </div>
+
+                  {/* Picker panel — always below the calendar, regardless of view height */}
+                  {pickerLabel && blockPickerDate && (
+                    <div style={{ marginTop: 10, border: '1px solid var(--ivory)', borderRadius: 10, padding: '14px 16px', background: '#f9f7f4' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ flex: 1 }}>{pickerLabel}</span>
+                        {!blockRangeMode && blockPickerDate && blockedMap[blockPickerDate] && (
+                          <button type="button" onClick={() => removeBlockedDate(blockPickerDate)}
+                            style={{ fontSize: 10, fontWeight: 600, color: '#dc2626', background: '#fee2e2', border: 'none', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>
+                            Quitar bloqueo
+                          </button>
+                        )}
+                        <button type="button" onClick={() => { setBlockPickerDate(null); setBlockRangeStart(null); setBlockRangeEnd(null) }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 2 }}><X size={14} /></button>
+                      </div>
+                      {/* Block type pills */}
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                        {(['full','morning','afternoon','hours'] as BlockedDate['type'][]).map(t => (
+                          <button key={t} type="button" onClick={() => setBlockType(t)}
+                            style={{ fontSize: 11, padding: '4px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600,
+                              background: blockType === t ? blockColor(t) : '#ede9e4',
+                              color: blockType === t ? '#fff' : 'var(--charcoal)' }}>
+                            {blockTypeLabel(t)}
+                          </button>
+                        ))}
+                      </div>
+                      {/* Multiple hour ranges */}
+                      {blockType === 'hours' && (
+                        <div style={{ marginBottom: 10 }}>
+                          {blockRanges.map((r, ri) => (
+                            <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                              <input type="time" className="form-input" value={r.from}
+                                onChange={e => setBlockRanges(prev => prev.map((x, i) => i === ri ? { ...x, from: e.target.value } : x))}
+                                style={{ fontSize: 12, width: 90 }} />
+                              <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>—</span>
+                              <input type="time" className="form-input" value={r.to}
+                                onChange={e => setBlockRanges(prev => prev.map((x, i) => i === ri ? { ...x, to: e.target.value } : x))}
+                                style={{ fontSize: 12, width: 90 }} />
+                              {blockRanges.length > 1 && (
+                                <button type="button" onClick={() => setBlockRanges(prev => prev.filter((_, i) => i !== ri))}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 2 }}><X size={13} /></button>
+                              )}
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => setBlockRanges(prev => [...prev, { from: '15:00', to: '18:00' }])}
+                            style={{ fontSize: 11, padding: '3px 10px', borderRadius: 7, border: '1px dashed #a78bfa', background: 'transparent', color: '#7c3aed', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Plus size={11} /> Añadir otro rango
+                          </button>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button type="button" onClick={confirmBlock}
+                          style={{ fontSize: 12, fontWeight: 700, padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Check size={13} /> Confirmar bloqueo{selectedDates.length > 1 ? ` (${selectedDates.length} días)` : ''}
+                        </button>
+                        <button type="button" onClick={() => { setBlockPickerDate(null); setBlockRangeStart(null); setBlockRangeEnd(null) }}
+                          style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--ivory)', cursor: 'pointer', background: '#fff', color: 'var(--warm-gray)', fontWeight: 500 }}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Legend */}
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+                    {(['full','morning','afternoon','hours'] as BlockedDate['type'][]).map(t => (
+                      <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 2, background: blockColor(t), flexShrink: 0 }} />
+                        <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{blockTypeLabel(t)}</span>
+                      </div>
+                    ))}
+                    {(visitAvail.block_booked_weddings || visitAvail.block_calendar_unavailable) && (
+                      <>
+                        {visitAvail.block_booked_weddings && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: '#d1fae5', border: '1px solid #059669', flexShrink: 0 }} />
+                            <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Boda reservada</span>
+                          </div>
+                        )}
+                        {visitAvail.block_calendar_unavailable && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: '#f3f4f6', border: '1px solid #d1d5db', flexShrink: 0 }} />
+                            <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>No libre</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Save button */}
+                  <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <button type="button" onClick={() => saveVisitAvail(visitAvail)} disabled={savingVisit || !visitAvailDirty}
+                      style={{ fontSize: 12, fontWeight: 700, padding: '7px 20px', borderRadius: 8, border: 'none', cursor: visitAvailDirty ? 'pointer' : 'default',
+                        background: visitAvailDirty ? '#059669' : '#e5e7eb', color: visitAvailDirty ? '#fff' : '#9ca3af',
+                        display: 'flex', alignItems: 'center', gap: 6, transition: 'background .15s' }}>
+                      <Check size={13} /> {savingVisit ? 'Guardando…' : 'Guardar cambios'}
+                    </button>
+                    {visitAvailDirty && !savingVisit && (
+                      <span style={{ fontSize: 11, color: '#d97706' }}>Tienes cambios sin guardar</span>
+                    )}
+                  </div>
+                </div>
+                </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
       </div>
 
