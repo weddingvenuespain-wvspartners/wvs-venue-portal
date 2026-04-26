@@ -20,7 +20,7 @@ export async function GET(
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { get: (n) => cookieStore.get(n)?.value, set() {}, remove() {} } }
+      { cookies: { get: (n: string) => cookieStore.get(n)?.value, set() {}, remove() {} } }
     )
 
     // 1. Get proposal → user_id
