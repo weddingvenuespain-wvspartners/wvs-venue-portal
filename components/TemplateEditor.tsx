@@ -142,6 +142,37 @@ export default function TemplateEditor({
     markDirty()
   }
 
+  const WELCOME_VARIANTS = ['welcome', 'welcome_light', 'welcome_split', 'welcome_editorial']
+  const WELCOME_VARIANT_LABELS: Record<string, string> = {
+    welcome: 'Oscura · cita centrada',
+    welcome_light: 'Fondo claro',
+    welcome_split: 'Dos columnas con imagen',
+    welcome_editorial: 'Editorial · tipografía grande',
+  }
+  const welcomeGroupOn = !WELCOME_VARIANTS.every(v => (sections.sections_enabled ?? {})[v] === false)
+  const activeWelcome = WELCOME_VARIANTS.find(v => (sections.sections_enabled ?? {})[v] === true)
+    ?? (welcomeGroupOn ? (WELCOME_VARIANTS.find(v => (sections.sections_enabled ?? {})[v] !== false) ?? 'welcome') : 'welcome')
+  const toggleWelcomeGroup = (on: boolean) => {
+    setSections(s => ({
+      ...s,
+      sections_enabled: {
+        ...(s.sections_enabled ?? {}),
+        ...Object.fromEntries(WELCOME_VARIANTS.map(v => [v, on ? v === activeWelcome : false]))
+      }
+    }))
+    markDirty()
+  }
+  const selectWelcomeVariant = (variant: string) => {
+    setSections(s => ({
+      ...s,
+      sections_enabled: {
+        ...(s.sections_enabled ?? {}),
+        ...Object.fromEntries(WELCOME_VARIANTS.map(wv => [wv, wv === variant]))
+      }
+    }))
+    markDirty()
+  }
+
   const hasCatering = sections.has_catering !== false
 
   const getOverride = (key: string) => (sections as any)[key] as any[] ?? []
@@ -560,6 +591,39 @@ export default function TemplateEditor({
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Secciones de la propuesta</div>
                 <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
                   {ALL_SECTION_IDS.map((secId, i) => {
+                    if (['welcome_light', 'welcome_split', 'welcome_editorial'].includes(secId)) return null
+
+                    if (secId === 'welcome') {
+                      const isWelcomeOpen = openSecs.has('welcome')
+                      return (
+                        <div key="welcome-group" style={{ borderBottom: '1px solid var(--border)', opacity: welcomeGroupOn ? 1 : 0.5, transition: 'opacity .15s' }}>
+                          <div
+                            onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('welcome') ? n.delete('welcome') : n.add('welcome'); return n })}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: isWelcomeOpen ? 'var(--cream)' : 'var(--surface)', transition: 'background .15s' }}
+                          >
+                            <div onClick={e => { e.stopPropagation(); toggleWelcomeGroup(!welcomeGroupOn) }}>
+                              <Toggle value={welcomeGroupOn} onChange={v => toggleWelcomeGroup(v)} />
+                            </div>
+                            <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', userSelect: 'none' }}>Bienvenida</span>
+                            <ChevronDown size={13} style={{ color: 'var(--warm-gray)', transform: isWelcomeOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
+                          </div>
+                          {isWelcomeOpen && (
+                            <div style={{ padding: '12px 14px 14px', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14, padding: '8px 10px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                                {WELCOME_VARIANTS.map(v => (
+                                  <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '3px 0' }}>
+                                    <input type="radio" name="welcome-variant-tpl" checked={activeWelcome === v} onChange={() => selectWelcomeVariant(v)} style={{ accentColor: 'var(--gold)' }} />
+                                    <span style={{ fontSize: 12, color: 'var(--charcoal)' }}>{WELCOME_VARIANT_LABELS[v]}</span>
+                                  </label>
+                                ))}
+                              </div>
+                              {renderSectionContent(activeWelcome as SectionId)}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
                     const isOn   = isSectionOn(secId)
                     const isOpen = openSecs.has(secId)
                     const isLast = i === ALL_SECTION_IDS.length - 1

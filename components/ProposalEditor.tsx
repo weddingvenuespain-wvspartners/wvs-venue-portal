@@ -763,6 +763,33 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               const e = sections.sections_enabled
               return e ? (e[id] !== false) : true
             }
+
+            const WELCOME_VARIANTS = ['welcome', 'welcome_light', 'welcome_split', 'welcome_editorial']
+            const WELCOME_VARIANT_LABELS: Record<string, string> = {
+              welcome: 'Oscura · cita centrada',
+              welcome_light: 'Fondo claro',
+              welcome_split: 'Dos columnas con imagen',
+              welcome_editorial: 'Editorial · tipografía grande',
+            }
+            const se = sections.sections_enabled ?? {}
+            const welcomeGroupOn = !WELCOME_VARIANTS.every(v => se[v] === false)
+            const activeWelcome = WELCOME_VARIANTS.find(v => se[v] === true)
+              ?? (welcomeGroupOn ? (WELCOME_VARIANTS.find(v => se[v] !== false) ?? 'welcome') : 'welcome')
+            const toggleWelcomeGroup = (on: boolean) => setSections(s => ({
+              ...s,
+              sections_enabled: {
+                ...(s.sections_enabled ?? {}),
+                ...Object.fromEntries(WELCOME_VARIANTS.map(v => [v, on ? v === activeWelcome : false]))
+              }
+            }))
+            const selectWelcomeVariant = (variant: string) => setSections(s => ({
+              ...s,
+              sections_enabled: {
+                ...(s.sections_enabled ?? {}),
+                ...Object.fromEntries(WELCOME_VARIANTS.map(wv => [wv, wv === variant]))
+              }
+            }))
+
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                 {tplSections.length === 0 && (
@@ -772,6 +799,94 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 )}
 
                 {tplSections.map(secId => {
+                  if (['welcome_light', 'welcome_split', 'welcome_editorial'].includes(secId)) return null
+
+                  if (secId === 'welcome') {
+                    const isWelcomeOpen = openSecs.has('welcome')
+                    return (
+                      <div key="welcome-group" className="sec-row" style={{ opacity: welcomeGroupOn ? 1 : 0.55 }}>
+                        <div className="sec-header" onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('welcome') ? n.delete('welcome') : n.add('welcome'); return n })}>
+                          <div onClick={e => { e.stopPropagation(); toggleWelcomeGroup(!welcomeGroupOn) }}
+                            style={{ width: 34, height: 19, borderRadius: 10, background: welcomeGroupOn ? 'var(--gold)' : '#d1c9b8', position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0 }}>
+                            <div style={{ position: 'absolute', top: 2, left: welcomeGroupOn ? 15 : 2, width: 15, height: 15, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)', flex: 1, userSelect: 'none' }}>Bienvenida</span>
+                          <ChevronDown size={14} style={{ color: 'var(--warm-gray)', transform: isWelcomeOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
+                        </div>
+
+                        {isWelcomeOpen && (
+                          <div className="sec-open-content" style={{ padding: '12px 14px 14px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14, padding: '8px 10px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                              {WELCOME_VARIANTS.map(v => (
+                                <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '3px 0' }}>
+                                  <input type="radio" name="welcome-variant" checked={activeWelcome === v} onChange={() => selectWelcomeVariant(v)} style={{ accentColor: 'var(--gold)' }} />
+                                  <span style={{ fontSize: 12, color: 'var(--charcoal)' }}>{WELCOME_VARIANT_LABELS[v]}</span>
+                                </label>
+                              ))}
+                            </div>
+
+                            {activeWelcome === 'welcome' && (
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <textarea className="form-textarea" style={{ minHeight: 80 }} placeholder="Mensaje personalizado para la pareja..." value={form.personal_message ?? ''} onChange={e => setForm(f => ({ ...f, personal_message: e.target.value }))} />
+                                <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4, lineHeight: 1.5 }}>
+                                  Si se deja vacío, se usará el texto por defecto de la plantilla.
+                                </div>
+                              </div>
+                            )}
+
+                            {activeWelcome === 'welcome_light' && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                                  Muestra el mensaje de bienvenida sobre fondo claro crema. Ideal para venues con estética romántica y luminosa.
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Imagen de fondo (opcional)</label>
+                                  <input className="form-input" placeholder="https://..." value={(sections as any).welcome_light?.image_url ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_light: { ...(s.welcome_light ?? {}), image_url: e.target.value } }))} />
+                                </div>
+                              </div>
+                            )}
+
+                            {activeWelcome === 'welcome_split' && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                                  Muestra el mensaje de bienvenida en dos columnas: imagen a un lado, texto al otro.
+                                </div>
+                                <div className="form-group">
+                                  <label className="form-label">URL de la imagen</label>
+                                  <input className="form-input" placeholder="https://..." value={(sections as any).welcome_split?.image_url ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_url: e.target.value } }))} />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Posición de la imagen</label>
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    {(['left', 'right'] as const).map(side => (
+                                      <button key={side} type="button"
+                                        style={{ flex: 1, padding: '7px 0', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: ((sections as any).welcome_split?.image_side ?? 'left') === side ? 'var(--gold)' : 'var(--surface)', color: ((sections as any).welcome_split?.image_side ?? 'left') === side ? '#fff' : 'var(--charcoal)', cursor: 'pointer', fontWeight: 600 }}
+                                        onClick={() => setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_side: side } }))}>
+                                        {side === 'left' ? 'Izquierda' : 'Derecha'}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {activeWelcome === 'welcome_editorial' && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                                  Muestra el mensaje de bienvenida con tipografía editorial grande, estilo revista de lujo.
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Eyebrow / Etiqueta superior (opcional)</label>
+                                  <input className="form-input" placeholder="Ej. Un mensaje para vosotros" value={(sections as any).welcome_editorial?.eyebrow ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_editorial: { ...(s.welcome_editorial ?? {}), eyebrow: e.target.value } }))} />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+
                   const label = SECTION_LABELS[secId] || secId
                   const isOn = isSectionOn(secId)
                   const isOpen = openSecs.has(secId)
@@ -1135,12 +1250,6 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                             </div>
                           )}
 
-                          {secId === 'welcome' && (
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <textarea className="form-textarea" style={{ minHeight: 80 }} placeholder="Mensaje personalizado para la pareja..." value={form.personal_message ?? ''} onChange={e => setForm(f => ({ ...f, personal_message: e.target.value }))} />
-                            </div>
-                          )}
-
                           {secId === 'availability' && (
                             <div className="form-group" style={{ marginBottom: 0 }}>
                               <textarea className="form-textarea" style={{ minHeight: 70 }} placeholder="Ej. Fecha disponible, confirmación prioritaria..." value={sections.availability_message ?? ''} onChange={e => setSections(s => ({ ...s, availability_message: e.target.value }))} />
@@ -1151,54 +1260,6 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                             <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.6, background: 'var(--cream)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border)' }}>
                               Cuando está activo, aparecen enlaces de navegación en la barra superior para que la pareja pueda saltar directamente a las secciones más relevantes (galería, espacios, menús, contacto...).
                               Los enlaces se generan automáticamente según las secciones que tengas activadas.
-                            </div>
-                          )}
-
-                          {secId === 'welcome_light' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
-                                Muestra el mensaje de bienvenida (pestaña Datos) sobre fondo claro crema. Ideal para venues con estética romántica y luminosa.
-                              </div>
-                              <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label">Imagen de fondo (opcional)</label>
-                                <input className="form-input" placeholder="https://..." value={(sections as any).welcome_light?.image_url ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_light: { ...(s.welcome_light ?? {}), image_url: e.target.value } }))} />
-                              </div>
-                            </div>
-                          )}
-
-                          {secId === 'welcome_split' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
-                                Muestra el mensaje de bienvenida (pestaña Datos) en dos columnas: imagen a un lado, texto al otro.
-                              </div>
-                              <div className="form-group">
-                                <label className="form-label">URL de la imagen</label>
-                                <input className="form-input" placeholder="https://..." value={(sections as any).welcome_split?.image_url ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_url: e.target.value } }))} />
-                              </div>
-                              <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label">Posición de la imagen</label>
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                  {(['left', 'right'] as const).map(side => (
-                                    <button key={side} type="button"
-                                      style={{ flex: 1, padding: '7px 0', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: ((sections as any).welcome_split?.image_side ?? 'left') === side ? 'var(--gold)' : 'var(--surface)', color: ((sections as any).welcome_split?.image_side ?? 'left') === side ? '#fff' : 'var(--charcoal)', cursor: 'pointer', fontWeight: 600 }}
-                                      onClick={() => setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_side: side } }))}>
-                                      {side === 'left' ? 'Izquierda' : 'Derecha'}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {secId === 'welcome_editorial' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
-                                Muestra el mensaje de bienvenida (pestaña Datos) con tipografía editorial grande, estilo revista de lujo.
-                              </div>
-                              <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label">Eyebrow / Etiqueta superior (opcional)</label>
-                                <input className="form-input" placeholder="Ej. Un mensaje para vosotros" value={(sections as any).welcome_editorial?.eyebrow ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_editorial: { ...(s.welcome_editorial ?? {}), eyebrow: e.target.value } }))} />
-                              </div>
                             </div>
                           )}
 
