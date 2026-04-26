@@ -5,7 +5,7 @@
 //            → Qué incluye → Testimoniales → Colaboradores → Extras → FAQ → CTA
 
 import { useEffect, useRef, useState } from 'react'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, StarRating, resolveContact, type ProposalData } from './shared'
+import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, StarRating, resolveContact, type ProposalData } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
@@ -601,12 +601,16 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           GALERÍA MOSAICO
       ════════════════════════════════════════════ */}
-      {on('gallery') && galleryPhotos.length > 0 && (
-        <FadeIn>
-          <div id="sec-gallery" />
-          <Gallery photos={galleryPhotos} primary={primary} dark />
-        </FadeIn>
-      )}
+      {on('gallery') && galleryPhotos.length > 0 && (() => {
+        const galleryStyle = getActiveStyle(sec, 'gallery')
+        const GalleryComp = galleryStyle === 'mosaic' ? GalleryMosaic : galleryStyle === 'grid' ? GalleryGrid : Gallery
+        return (
+          <FadeIn>
+            <div id="sec-gallery" />
+            <GalleryComp photos={galleryPhotos} primary={primary} dark />
+          </FadeIn>
+        )
+      })()}
 
       {/* ════════════════════════════════════════════
           SINGLE SPACE (un único espacio)

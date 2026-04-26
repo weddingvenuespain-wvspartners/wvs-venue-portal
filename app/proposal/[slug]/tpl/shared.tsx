@@ -382,6 +382,102 @@ export function Gallery({
   )
 }
 
+// ─── Gallery Mosaic — primera foto grande + grid asimétrico el resto ─────────
+export function GalleryMosaic({ photos }: { photos: string[]; primary?: string; dark?: boolean }) {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  if (!photos.length) return null
+
+  // Mobile: grid uniforme 2 columnas
+  if (isMobile) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4 }}>
+        {photos.map((url, i) => (
+          <div key={i} style={{ overflow: 'hidden', aspectRatio: '4/3' }}>
+            <img src={url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // Desktop: primera foto grande a la izquierda, resto en grid 2x2 a la derecha
+  const [first, ...rest] = photos
+  const sideCount = Math.min(rest.length, 4)
+  const side = rest.slice(0, sideCount)
+  const remainder = rest.slice(sideCount)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 4, aspectRatio: '21/9' }}>
+        <div style={{ overflow: 'hidden' }}>
+          <img src={first} alt="" loading="eager"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .7s ease' }}
+            onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.04)')}
+            onMouseLeave={e => (e.currentTarget.style.transform = '')} />
+        </div>
+        {side.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: side.length > 1 ? 'repeat(2, 1fr)' : '1fr', gridAutoRows: '1fr', gap: 4 }}>
+            {side.map((url, i) => (
+              <div key={i} style={{ overflow: 'hidden' }}>
+                <img src={url} alt="" loading="lazy"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .7s ease' }}
+                  onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.04)')}
+                  onMouseLeave={e => (e.currentTarget.style.transform = '')} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {remainder.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(remainder.length, 4)}, 1fr)`, gap: 4 }}>
+          {remainder.slice(0, 4).map((url, i) => (
+            <div key={i} style={{ overflow: 'hidden', aspectRatio: '4/3' }}>
+              <img src={url} alt="" loading="lazy"
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .7s ease' }}
+                onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.04)')}
+                onMouseLeave={e => (e.currentTarget.style.transform = '')} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Gallery Grid — todas iguales en cuadrícula uniforme ─────────────────────
+export function GalleryGrid({ photos }: { photos: string[]; primary?: string; dark?: boolean }) {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  if (!photos.length) return null
+  const cols = isMobile ? 2 : photos.length <= 4 ? photos.length : photos.length <= 9 ? 3 : 4
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 4 }}>
+      {photos.map((url, i) => (
+        <div key={i} style={{ overflow: 'hidden', aspectRatio: '4/3' }}>
+          <img src={url} alt="" loading={i < 6 ? 'eager' : 'lazy'}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .7s ease' }}
+            onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.04)')}
+            onMouseLeave={e => (e.currentTarget.style.transform = '')} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Venue Rental Grid — tarifas temporada × día ─────────────────────────────
 export function VenueRentalGrid({
   data, primary, dark = false,

@@ -334,38 +334,84 @@ export default function TemplateEditor({
 
     if (secId === 'gallery') {
       const urls = sections.gallery_urls ?? []
+      const galleryStyleConfig = SECTION_STYLES.gallery
+      const activeGalleryVariantId = getActiveStyle(sections, 'gallery')
+      const selectGalleryVariant = (variantId: string) => {
+        setSections(s => setActiveStyle(s, 'gallery', variantId) as SectionsData)
+        markDirty()
+      }
       return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-          {urls.map((url, i) => (
-            <ImageUploader
-              key={i}
-              compact
-              value={url}
-              aspectRatio={4 / 3}
-              alt=""
-              onUpload={async (f) => {
-                const newUrl = await uploadImage(f, 'gallery')
-                if (newUrl) {
-                  setSections(s => ({ ...s, gallery_urls: (s.gallery_urls ?? []).map((u, j) => j === i ? newUrl : u) }))
-                  markDirty()
-                }
-              }}
-              onRemove={() => { setSections(s => ({ ...s, gallery_urls: (s.gallery_urls ?? []).filter((_, j) => j !== i) })); markDirty() }}
-            />
-          ))}
-          <ImageUploader
-            compact
-            value={null}
-            aspectRatio={4 / 3}
-            label="Añadir foto"
-            onUpload={async (f) => {
-              const newUrl = await uploadImage(f, 'gallery')
-              if (newUrl) {
-                setSections(s => ({ ...s, gallery_urls: [...(s.gallery_urls ?? []), newUrl] }))
-                markDirty()
-              }
-            }}
-          />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Style picker */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Estilo visual</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {galleryStyleConfig.variants.map(v => {
+                const sel = activeGalleryVariantId === v.id
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => selectGalleryVariant(v.id)}
+                    style={{
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      border: `1.5px solid ${sel ? 'var(--gold)' : 'var(--border)'}`,
+                      borderRadius: 8,
+                      background: sel ? 'rgba(196,151,90,0.08)' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: sel ? 'var(--gold)' : 'var(--charcoal)' }}>{v.label}</span>
+                      {sel && <Check size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />}
+                    </div>
+                    {v.description && (
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{v.description}</div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Photo grid */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Fotos</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              {urls.map((url, i) => (
+                <ImageUploader
+                  key={i}
+                  compact
+                  value={url}
+                  aspectRatio={4 / 3}
+                  alt=""
+                  onUpload={async (f) => {
+                    const newUrl = await uploadImage(f, 'gallery')
+                    if (newUrl) {
+                      setSections(s => ({ ...s, gallery_urls: (s.gallery_urls ?? []).map((u, j) => j === i ? newUrl : u) }))
+                      markDirty()
+                    }
+                  }}
+                  onRemove={() => { setSections(s => ({ ...s, gallery_urls: (s.gallery_urls ?? []).filter((_, j) => j !== i) })); markDirty() }}
+                />
+              ))}
+              <ImageUploader
+                compact
+                value={null}
+                aspectRatio={4 / 3}
+                label="Añadir foto"
+                onUpload={async (f) => {
+                  const newUrl = await uploadImage(f, 'gallery')
+                  if (newUrl) {
+                    setSections(s => ({ ...s, gallery_urls: [...(s.gallery_urls ?? []), newUrl] }))
+                    markDirty()
+                  }
+                }}
+              />
+            </div>
+          </div>
         </div>
       )
     }

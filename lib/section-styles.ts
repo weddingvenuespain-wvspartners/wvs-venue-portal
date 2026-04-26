@@ -51,6 +51,15 @@ export const SECTION_STYLES: Record<string, SectionStyleConfig> = {
       welcome_editorial: 'editorial',
     },
   },
+  gallery: {
+    sectionId: 'gallery',
+    defaultVariant: 'carousel',
+    variants: [
+      { id: 'carousel', label: 'Carrusel',    description: 'Tira deslizante con avance automático' },
+      { id: 'mosaic',   label: 'Mosaico',     description: 'Foto principal grande + grid asimétrico' },
+      { id: 'grid',     label: 'Cuadrícula',  description: 'Todas iguales en grid uniforme' },
+    ],
+  },
 }
 
 export function getSectionStyle(sectionId: string): SectionStyleConfig | undefined {
