@@ -9,6 +9,7 @@ import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, Fl
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector from './SpaceGroupSelector'
+import DateSelector from './DateSelector'
 
 export default function T1Impacto({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date,
@@ -16,7 +17,18 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow,
           testsShow, zonesShow, seasonsShow, collabsShow, menuShow,
           menusStructured, menuExtras, appetizersBase,
-          expShow, techspecs, accom, spaceGroups } = extractData(data)
+          expShow, techspecs, accom, spaceGroups, dateSlots } = extractData(data)
+
+  // Use template default message as fallback when no personal message yet
+  const displayMsg = personal_message || (sec as any).welcome_default || null
+
+  // Pick exactly one welcome variant. Defaults to 'welcome' when nothing is
+  // explicitly set; null only when every variant is explicitly disabled.
+  const welcomeVariantList = ['welcome', 'welcome_light', 'welcome_split', 'welcome_editorial'] as const
+  const sectionsEnabledMap = sec.sections_enabled ?? {}
+  const explicitWelcome = welcomeVariantList.find(v => sectionsEnabledMap[v] === true)
+  const allWelcomeOff = welcomeVariantList.every(v => sectionsEnabledMap[v] === false)
+  const activeWelcomeVariant: typeof welcomeVariantList[number] | null = explicitWelcome ?? (allWelcomeOff ? null : 'welcome')
 
   const primary = branding?.primary_color ?? '#8B6914'
   const rgb     = toRgb(primary)
@@ -338,7 +350,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         }
         {on('sticky_nav') && (() => {
           const navLinks = [
-            (on('welcome') || on('welcome_light') || on('welcome_split') || on('welcome_editorial')) && personal_message
+            activeWelcomeVariant && displayMsg
               ? { label: 'Bienvenida', anchor: 'sec-welcome' } : null,
             expShow && on('experience') ? { label: 'Historia', anchor: 'sec-experience' } : null,
             on('gallery') && galleryPhotos.length > 0 ? { label: 'Galería', anchor: 'sec-gallery' } : null,
@@ -433,6 +445,20 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} />
       )}
 
+      {/* ════════════════════════════════════════════
+          SELECTOR DE FECHAS
+      ════════════════════════════════════════════ */}
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+        <DateSelector
+          slots={dateSlots}
+          primary={primary}
+          onPrimary={onPri}
+          dark
+          font={FONT}
+          proposalId={data.id}
+        />
+      )}
+
       {/* ── STATS BAR ── */}
       <div className="t1-stats">
         {[
@@ -453,12 +479,12 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           MENSAJE PERSONAL + CONVERSION BLOCK
       ════════════════════════════════════════════ */}
-      {on('welcome') && personal_message && (
+      {activeWelcomeVariant === 'welcome' && displayMsg && (
         <section id="sec-welcome" className="t1-sec" style={{ background: '#080808' }}>
           <FadeUp>
             <div className="t1-msg">
               <div className="t1-msg-qmark">"</div>
-              <p className="t1-msg-text">{personal_message}</p>
+              <p className="t1-msg-text">{displayMsg}</p>
               {venue?.name && <div className="t1-msg-sig">— {venue.name}</div>}
             </div>
           </FadeUp>
@@ -468,8 +494,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           BIENVENIDA · FONDO CLARO
       ════════════════════════════════════════════ */}
-      {on('welcome_light') && personal_message && (
-        <section id={!on('welcome') ? 'sec-welcome' : undefined} className="t1-wl">
+      {activeWelcomeVariant === 'welcome_light' && displayMsg && (
+        <section id="sec-welcome" className="t1-wl">
           {(sec as any).welcome_light?.image_url && (
             <img className="t1-wl-bg" src={(sec as any).welcome_light.image_url} alt=""
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
@@ -477,7 +503,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <FadeUp>
             <div className="t1-wl-inner">
               <div className="t1-wl-line" />
-              <p className="t1-wl-body">{personal_message}</p>
+              <p className="t1-wl-body">{displayMsg}</p>
               {venue?.name && <div className="t1-wl-sig">— {venue.name}</div>}
             </div>
           </FadeUp>
@@ -487,8 +513,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           BIENVENIDA · DOS COLUMNAS
       ════════════════════════════════════════════ */}
-      {on('welcome_split') && personal_message && (
-        <section id={!on('welcome') && !on('welcome_light') ? 'sec-welcome' : undefined}>
+      {activeWelcomeVariant === 'welcome_split' && displayMsg && (
+        <section id="sec-welcome">
           <div className="t1-ws">
             <div className={`t1-ws-img${(sec as any).welcome_split?.image_side === 'right' ? ' right' : ''}`}>
               {(sec as any).welcome_split?.image_url && (
@@ -499,7 +525,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
             <FadeUp>
               <div className={`t1-ws-text${(sec as any).welcome_split?.image_side === 'right' ? '' : ' after-img'}`}>
                 <span className="t1-ws-eyebrow">Un mensaje para vosotros</span>
-                <p className="t1-ws-body">{personal_message}</p>
+                <p className="t1-ws-body">{displayMsg}</p>
                 {venue?.name && <div className="t1-ws-sig">— {venue.name}</div>}
               </div>
             </FadeUp>
@@ -510,14 +536,14 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           BIENVENIDA · EDITORIAL
       ════════════════════════════════════════════ */}
-      {on('welcome_editorial') && personal_message && (
-        <section id={!on('welcome') && !on('welcome_light') && !on('welcome_split') ? 'sec-welcome' : undefined} className="t1-we">
+      {activeWelcomeVariant === 'welcome_editorial' && displayMsg && (
+        <section id="sec-welcome" className="t1-we">
           <FadeUp>
             <div className="t1-we-inner">
               {(sec as any).welcome_editorial?.eyebrow && (
                 <span className="t1-we-eyebrow">{(sec as any).welcome_editorial.eyebrow}</span>
               )}
-              <p className="t1-we-body">{personal_message}</p>
+              <p className="t1-we-body">{displayMsg}</p>
               {venue?.name && <div className="t1-we-sig">— {venue.name}</div>}
             </div>
           </FadeUp>
