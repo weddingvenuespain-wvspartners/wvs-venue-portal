@@ -478,6 +478,96 @@ export function GalleryGrid({ photos }: { photos: string[]; primary?: string; da
   )
 }
 
+// ─── Inclusions ──────────────────────────────────────────────────────────────
+// Three layout variants: grid (default cards), list (compact vertical), cards (prominent).
+
+type InclusionItem = { title?: string; description?: string; icon?: string; emoji?: string }
+
+function InclusionGlyph({ inc, primary, size = 22 }: { inc: InclusionItem; primary: string; size?: number }) {
+  if (inc.icon) return <InclusionIcon name={inc.icon} size={size} color={primary} />
+  if (inc.emoji && !/\p{Extended_Pictographic}/u.test(inc.emoji))
+    return <InclusionIcon name={inc.emoji} size={size} color={primary} />
+  return <InclusionIcon name="check" size={size} color={primary} />
+}
+
+export function InclusionsGrid({ items, primary, dark = true }: { items: InclusionItem[]; primary: string; dark?: boolean }) {
+  if (!items.length) return null
+  const rgb = toRgb(primary)
+  const border = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
+  const bg = dark ? 'rgba(255,255,255,.02)' : '#fff'
+  const titleColor = dark ? 'rgba(255,255,255,.88)' : '#181410'
+  const descColor = dark ? 'rgba(255,255,255,.45)' : '#6a6560'
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+      {items.map((inc, i) => (
+        <div key={i}
+          style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '22px 20px', border: `1px solid ${border}`, borderRadius: 14, background: bg, transition: 'border-color .2s, background .2s' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = `rgba(${rgb}, .35)`; e.currentTarget.style.background = `rgba(${rgb}, .05)` }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.background = bg }}
+        >
+          <span style={{ flexShrink: 0, marginTop: 2, width: 36, height: 36, borderRadius: 10, background: `rgba(${rgb}, .14)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: primary }}>
+            <InclusionGlyph inc={inc} primary={primary} size={22} />
+          </span>
+          <div>
+            <div style={{ fontSize: '.92rem', fontWeight: 500, color: titleColor, marginBottom: 3 }}>{inc.title}</div>
+            {inc.description && <div style={{ fontSize: '.78rem', color: descColor, lineHeight: 1.55 }}>{inc.description}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function InclusionsList({ items, primary, dark = true }: { items: InclusionItem[]; primary: string; dark?: boolean }) {
+  if (!items.length) return null
+  const divider = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
+  const titleColor = dark ? 'rgba(255,255,255,.92)' : '#181410'
+  const descColor = dark ? 'rgba(255,255,255,.5)' : '#6a6560'
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {items.map((inc, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 4px', borderBottom: i < items.length - 1 ? `1px solid ${divider}` : 'none' }}>
+          <span style={{ flexShrink: 0, color: primary, display: 'inline-flex' }}>
+            <InclusionGlyph inc={inc} primary={primary} size={18} />
+          </span>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{ fontSize: '.95rem', fontWeight: 500, color: titleColor }}>{inc.title}</div>
+            {inc.description && <div style={{ fontSize: '.78rem', color: descColor, lineHeight: 1.5 }}>{inc.description}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function InclusionsCards({ items, primary, dark = true }: { items: InclusionItem[]; primary: string; dark?: boolean }) {
+  if (!items.length) return null
+  const rgb = toRgb(primary)
+  const border = dark ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.08)'
+  const bg = dark ? 'rgba(255,255,255,.03)' : '#fff'
+  const titleColor = dark ? '#fff' : '#181410'
+  const descColor = dark ? 'rgba(255,255,255,.55)' : '#6a6560'
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 18 }}>
+      {items.map((inc, i) => (
+        <div key={i}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14, padding: '32px 20px 26px', border: `1px solid ${border}`, borderRadius: 16, background: bg, transition: 'border-color .25s, background .25s, transform .25s' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = `rgba(${rgb}, .45)`; e.currentTarget.style.transform = 'translateY(-2px)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.transform = '' }}
+        >
+          <span style={{ width: 56, height: 56, borderRadius: '50%', background: `rgba(${rgb}, .14)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: primary }}>
+            <InclusionGlyph inc={inc} primary={primary} size={28} />
+          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: '.98rem', fontWeight: 600, color: titleColor, letterSpacing: '.01em' }}>{inc.title}</div>
+            {inc.description && <div style={{ fontSize: '.8rem', color: descColor, lineHeight: 1.55 }}>{inc.description}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Venue Rental Grid — tarifas temporada × día ─────────────────────────────
 export function VenueRentalGrid({
   data, primary, dark = false,

@@ -60,6 +60,15 @@ export const SECTION_STYLES: Record<string, SectionStyleConfig> = {
       { id: 'grid',     label: 'Cuadrícula',  description: 'Todas iguales en grid uniforme' },
     ],
   },
+  inclusions: {
+    sectionId: 'inclusions',
+    defaultVariant: 'grid',
+    variants: [
+      { id: 'grid',  label: 'Grid',     description: 'Tarjetas con icono lateral, multi-columna' },
+      { id: 'list',  label: 'Lista',    description: 'Lista vertical compacta de una línea' },
+      { id: 'cards', label: 'Tarjetas', description: 'Cards prominentes con icono grande arriba' },
+    ],
+  },
 }
 
 export function getSectionStyle(sectionId: string): SectionStyleConfig | undefined {

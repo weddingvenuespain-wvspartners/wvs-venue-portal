@@ -497,26 +497,72 @@ export default function TemplateEditor({
       </div>
     )
 
-    if (secId === 'inclusions') return (
-      <div>
-        {getOverride(overrideKey).map((x: any, i: number) => (
-          <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 7, marginBottom: 7, padding: '8px 10px', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <div style={{ display: 'flex', gap: 5 }}>
-                <select className="form-input" style={{ width: 160, fontSize: 11, flexShrink: 0 }} value={x.icon ?? ''} onChange={e => updateItem(overrideKey, i, 'icon', e.target.value)}>
-                  <option value="">— icono —</option>
-                  {INCLUSION_ICON_CHOICES.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select>
-                <input className="form-input" placeholder="Título *" style={{ fontSize: 12 }} value={x.title ?? ''} onChange={e => updateItem(overrideKey, i, 'title', e.target.value)} />
-              </div>
-              <input className="form-input" placeholder="Descripción (opcional)" style={{ fontSize: 12 }} value={x.description ?? ''} onChange={e => updateItem(overrideKey, i, 'description', e.target.value)} />
+    if (secId === 'inclusions') {
+      const inclusionsStyleConfig = SECTION_STYLES.inclusions
+      const activeInclusionsVariantId = getActiveStyle(sections, 'inclusions')
+      const selectInclusionsVariant = (variantId: string) => {
+        setSections(s => setActiveStyle(s, 'inclusions', variantId) as SectionsData)
+        markDirty()
+      }
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Style picker */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Estilo visual</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {inclusionsStyleConfig.variants.map(v => {
+                const sel = activeInclusionsVariantId === v.id
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => selectInclusionsVariant(v.id)}
+                    style={{
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      border: `1.5px solid ${sel ? 'var(--gold)' : 'var(--border)'}`,
+                      borderRadius: 8,
+                      background: sel ? 'rgba(196,151,90,0.08)' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: sel ? 'var(--gold)' : 'var(--charcoal)' }}>{v.label}</span>
+                      {sel && <Check size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />}
+                    </div>
+                    {v.description && (
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{v.description}</div>
+                    )}
+                  </button>
+                )
+              })}
             </div>
-            <button type="button" style={removeBtn} onClick={() => removeItem(overrideKey, i)}><X size={12} /></button>
           </div>
-        ))}
-        <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { title: '', icon: 'check', description: '' })}>+ Añadir elemento</button>
-      </div>
-    )
+
+          {/* Items list */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Elementos</div>
+            {getOverride(overrideKey).map((x: any, i: number) => (
+              <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 7, marginBottom: 7, padding: '8px 10px', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    <select className="form-input" style={{ width: 160, fontSize: 11, flexShrink: 0 }} value={x.icon ?? ''} onChange={e => updateItem(overrideKey, i, 'icon', e.target.value)}>
+                      <option value="">— icono —</option>
+                      {INCLUSION_ICON_CHOICES.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    </select>
+                    <input className="form-input" placeholder="Título *" style={{ fontSize: 12 }} value={x.title ?? ''} onChange={e => updateItem(overrideKey, i, 'title', e.target.value)} />
+                  </div>
+                  <input className="form-input" placeholder="Descripción (opcional)" style={{ fontSize: 12 }} value={x.description ?? ''} onChange={e => updateItem(overrideKey, i, 'description', e.target.value)} />
+                </div>
+                <button type="button" style={removeBtn} onClick={() => removeItem(overrideKey, i)}><X size={12} /></button>
+              </div>
+            ))}
+            <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { title: '', icon: 'check', description: '' })}>+ Añadir elemento</button>
+          </div>
+        </div>
+      )
+    }
 
     if (secId === 'testimonials') return (
       <div>

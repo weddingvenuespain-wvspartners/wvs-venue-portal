@@ -5,7 +5,7 @@
 //            → Qué incluye → Testimoniales → Colaboradores → Extras → FAQ → CTA
 
 import { useEffect, useRef, useState } from 'react'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, StarRating, resolveContact, type ProposalData } from './shared'
+import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, StarRating, resolveContact, type ProposalData } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
@@ -828,35 +828,23 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           QUÉ INCLUYE
       ════════════════════════════════════════════ */}
-      {on('inclusions') && inclusionsShow.length > 0 && (
-        <section className="t1-sec" style={{ background: '#0e0e0e' }}>
-          <div className="w">
-            <FadeUp>
-              <span className="t1-label">Qué incluye</span>
-              <h2 className="t1-h2">Todo lo que necesitáis,<br />sin sorpresas</h2>
-            </FadeUp>
-            <div className="t1-inc-grid">
-              {inclusionsShow.map((inc: any, i: number) => (
-                <FadeUp key={i} delay={(i % 4) * .05}>
-                  <div className="t1-inc">
-                    <span className="t1-inc-emoji" style={{ color: primary, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {inc.icon
-                        ? <InclusionIcon name={inc.icon} size={24} color={primary} />
-                        : inc.emoji && !/\p{Extended_Pictographic}/u.test(inc.emoji)
-                          ? <InclusionIcon name={inc.emoji} size={24} color={primary} />
-                          : <InclusionIcon name="check" size={24} color={primary} />}
-                    </span>
-                    <div>
-                      <div className="t1-inc-title">{inc.title}</div>
-                      {inc.description && <div className="t1-inc-desc">{inc.description}</div>}
-                    </div>
-                  </div>
-                </FadeUp>
-              ))}
+      {on('inclusions') && inclusionsShow.length > 0 && (() => {
+        const inclusionsStyle = getActiveStyle(sec, 'inclusions')
+        const InclusionsComp = inclusionsStyle === 'list' ? InclusionsList : inclusionsStyle === 'cards' ? InclusionsCards : InclusionsGrid
+        return (
+          <section className="t1-sec" style={{ background: '#0e0e0e' }}>
+            <div className="w">
+              <FadeUp>
+                <span className="t1-label">Qué incluye</span>
+                <h2 className="t1-h2">Todo lo que necesitáis,<br />sin sorpresas</h2>
+              </FadeUp>
+              <FadeUp delay={.05}>
+                <InclusionsComp items={inclusionsShow} primary={primary} dark />
+              </FadeUp>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )
+      })()}
 
       {/* ════════════════════════════════════════════
           CONFIGURA VUESTRA BODA (WeddingProposal)
