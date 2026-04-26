@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef, Fragment } from 'react'
 import {
   ChevronLeft, ChevronDown, Check, Loader2, ChefHat, LayoutTemplate,
-  Upload, X, Monitor, Smartphone, RefreshCcw, ExternalLink,
+  X, Monitor, Smartphone, RefreshCcw, ExternalLink,
   PanelLeftOpen, PanelLeftClose, Info, Palette,
 } from 'lucide-react'
 import type { SectionsData, VenueSpaceGroup } from '@/lib/proposal-types'
@@ -13,6 +13,7 @@ import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/
 import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
 import MultipleZonesEditor from './MultipleZonesEditor'
+import { ImageUploader } from './ImageUploader'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 import { getSectionLabel, SECTION_SPACE_TYPES, SPACE_TYPE_LABELS } from '@/lib/section-visibility'
 
@@ -96,13 +97,6 @@ export default function TemplateEditor({
   const [iframeReady, setIframeReady] = useState(false)
   const [device, setDevice]           = useState<'desktop' | 'mobile'>('desktop')
 
-  // Upload states
-  const [uploadingHero,    setUploadingHero]    = useState(false)
-  const [uploadingGallery, setUploadingGallery] = useState(false)
-  const [uploadingLogo,    setUploadingLogo]    = useState(false)
-  const heroInputRef    = useRef<HTMLInputElement>(null)
-  const galleryInputRef = useRef<HTMLInputElement>(null)
-  const logoInputRef    = useRef<HTMLInputElement>(null)
 
   // Open/close section content cards
   const [openSecs, setOpenSecs] = useState<Set<string>>(new Set())
@@ -231,25 +225,13 @@ export default function TemplateEditor({
   }
 
   const handleHeroUpload = async (file: File) => {
-    setUploadingHero(true)
     const url = await uploadImage(file, 'hero')
     if (url) { setSections(s => ({ ...s, hero_image_url: url })); markDirty() }
-    setUploadingHero(false)
-  }
-
-  const handleGalleryUpload = async (files: FileList) => {
-    setUploadingGallery(true)
-    const urls: string[] = []
-    for (const f of Array.from(files)) { const u = await uploadImage(f, 'gallery'); if (u) urls.push(u) }
-    if (urls.length) { setSections(s => ({ ...s, gallery_urls: [...(s.gallery_urls ?? []), ...urls] })); markDirty() }
-    setUploadingGallery(false)
   }
 
   const handleLogoUpload = async (file: File) => {
-    setUploadingLogo(true)
     const url = await uploadImage(file, 'logos')
     if (url) { setSections(s => ({ ...s, logo_url: url })); markDirty() }
-    setUploadingLogo(false)
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
@@ -283,21 +265,15 @@ export default function TemplateEditor({
     const overrideKey = `${secId}_override`
 
     if (secId === 'hero') return (
-      <div>
-        <input ref={heroInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleHeroUpload(e.target.files[0])} />
-        {sections.hero_image_url && (
-          <div style={{ marginBottom: 8, position: 'relative', display: 'inline-block', width: '100%' }}>
-            <img src={sections.hero_image_url} alt="hero" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', display: 'block' }} />
-            <button onClick={() => { setSections(s => ({ ...s, hero_image_url: undefined })); markDirty() }}
-              style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#ef4444', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <X size={10} color="#fff" />
-            </button>
-          </div>
-        )}
-        <button className="btn btn-ghost btn-sm" onClick={() => heroInputRef.current?.click()} disabled={uploadingHero} style={{ width: '100%', justifyContent: 'center' }}>
-          <Upload size={12} /> {uploadingHero ? 'Subiendo…' : sections.hero_image_url ? 'Cambiar imagen' : 'Subir foto principal'}
-        </button>
-      </div>
+      <ImageUploader
+        value={sections.hero_image_url ?? null}
+        height={120}
+        label="Foto principal"
+        hint="JPG, PNG o WEBP (máx. 10 MB)"
+        alt="Hero"
+        onUpload={async (f) => { await handleHeroUpload(f) }}
+        onRemove={() => { setSections(s => ({ ...s, hero_image_url: undefined })); markDirty() }}
+      />
     )
 
     if (secId === 'welcome') return (
@@ -333,27 +309,42 @@ export default function TemplateEditor({
       </div>
     )
 
-    if (secId === 'gallery') return (
-      <div>
-        <input ref={galleryInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => e.target.files?.length && handleGalleryUpload(e.target.files)} />
-        {(sections.gallery_urls ?? []).length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-            {(sections.gallery_urls ?? []).map((url, i) => (
-              <div key={i} style={{ position: 'relative' }}>
-                <img src={url} alt="" style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 5, border: '1px solid var(--border)', display: 'block' }} />
-                <button onClick={() => { setSections(s => ({ ...s, gallery_urls: (s.gallery_urls ?? []).filter((_, j) => j !== i) })); markDirty() }}
-                  style={{ position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <X size={8} color="#fff" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <button className="btn btn-ghost btn-sm" onClick={() => galleryInputRef.current?.click()} disabled={uploadingGallery} style={{ width: '100%', justifyContent: 'center' }}>
-          <Upload size={12} /> {uploadingGallery ? 'Subiendo…' : 'Añadir fotos a la galería'}
-        </button>
-      </div>
-    )
+    if (secId === 'gallery') {
+      const urls = sections.gallery_urls ?? []
+      return (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+          {urls.map((url, i) => (
+            <ImageUploader
+              key={i}
+              value={url}
+              aspectRatio={4 / 3}
+              alt=""
+              onUpload={async (f) => {
+                const newUrl = await uploadImage(f, 'gallery')
+                if (newUrl) {
+                  setSections(s => ({ ...s, gallery_urls: (s.gallery_urls ?? []).map((u, j) => j === i ? newUrl : u) }))
+                  markDirty()
+                }
+              }}
+              onRemove={() => { setSections(s => ({ ...s, gallery_urls: (s.gallery_urls ?? []).filter((_, j) => j !== i) })); markDirty() }}
+            />
+          ))}
+          <ImageUploader
+            value={null}
+            aspectRatio={4 / 3}
+            label="Añadir foto"
+            hint="Click o arrastra"
+            onUpload={async (f) => {
+              const newUrl = await uploadImage(f, 'gallery')
+              if (newUrl) {
+                setSections(s => ({ ...s, gallery_urls: [...(s.gallery_urls ?? []), newUrl] }))
+                markDirty()
+              }
+            }}
+          />
+        </div>
+      )
+    }
 
     if (secId === 'single_space') {
       const ss: any = (sections as any).single_space ?? {}
@@ -906,23 +897,18 @@ export default function TemplateEditor({
                 {/* Logo */}
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Logo del venue</div>
                 <div style={{ marginBottom: 20 }}>
-                  <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleLogoUpload(e.target.files[0])} />
-                  {sections.logo_url ? (
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ position: 'relative', display: 'inline-block' }}>
-                        <img src={sections.logo_url} alt="logo" style={{ maxHeight: 56, maxWidth: '100%', borderRadius: 6, border: '1px solid var(--border)', display: 'block', background: '#fff', padding: 6 }} />
-                        <button onClick={() => { setSections(s => ({ ...s, logo_url: null })); markDirty() }}
-                          style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <X size={9} color="#fff" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                  <button className="btn btn-ghost btn-sm" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} style={{ width: '100%', justifyContent: 'center' }}>
-                    <Upload size={12} /> {uploadingLogo ? 'Subiendo…' : sections.logo_url ? 'Cambiar logo' : 'Subir logo'}
-                  </button>
+                  <ImageUploader
+                    value={sections.logo_url ?? null}
+                    height={88}
+                    objectFit="contain"
+                    label="Subir logo"
+                    hint="PNG transparente recomendado"
+                    alt="Logo del venue"
+                    onUpload={async (f) => { await handleLogoUpload(f) }}
+                    onRemove={() => { setSections(s => ({ ...s, logo_url: null })); markDirty() }}
+                  />
                   <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 6, lineHeight: 1.5 }}>
-                    PNG transparente recomendado. Se mostrará en la cabecera de la propuesta.
+                    Se mostrará en la cabecera de la propuesta.
                   </div>
                 </div>
 
@@ -1116,24 +1102,18 @@ export default function TemplateEditor({
 // ─── Zone photo upload helper ─────────────────────────────────────────────────
 
 function ZonePhotoUpload({ zone, onUpload, onRemove }: { zone: any; onUpload: (f: File) => Promise<void>; onRemove: () => void }) {
-  const [uploading, setUploading] = useState(false)
   const photo = zone.photos?.[0]
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-      {photo ? (
-        <>
-          <img src={photo} alt="" style={{ width: 72, height: 50, objectFit: 'cover', borderRadius: 5, border: '1px solid var(--border)' }} />
-          <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={onRemove}>Quitar</button>
-          <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer', fontSize: 11 }}>
-            Cambiar<input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => { if (e.target.files?.[0]) { setUploading(true); await onUpload(e.target.files[0]); setUploading(false) } }} />
-          </label>
-        </>
-      ) : (
-        <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer', fontSize: 11 }}>
-          {uploading ? <><Loader2 size={11} className="animate-spin" /> Subiendo…</> : <><Upload size={11} /> Foto zona</>}
-          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => { if (e.target.files?.[0]) { setUploading(true); await onUpload(e.target.files[0]); setUploading(false) } }} />
-        </label>
-      )}
+    <div style={{ width: 96 }}>
+      <ImageUploader
+        value={photo ?? null}
+        aspectRatio={4 / 3}
+        label="Foto zona"
+        hint="Click o arrastra"
+        alt={zone.name ?? 'Zona'}
+        onUpload={onUpload}
+        onRemove={onRemove}
+      />
     </div>
   )
 }

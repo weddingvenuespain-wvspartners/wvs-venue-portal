@@ -4,9 +4,10 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
+import { ImageUploader } from '@/components/ImageUploader'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Upload, X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Info, FileText, Tag, MapPin, Image as ImageIcon, Star, Settings } from 'lucide-react'
+import { X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Info, FileText, Tag, MapPin, Image as ImageIcon, Star, Settings } from 'lucide-react'
 import DOMPurify from 'dompurify'
 
 type Tab = 'info' | 'descripcion' | 'precios' | 'ubicacion' | 'fotos' | 'resenas' | 'config'
@@ -63,7 +64,7 @@ export default function FichaPage() {
   const [dirtyTabs, setDirtyTabs]   = useState<Set<Tab>>(new Set())
   const [pendingNav, setPendingNav] = useState<string | null>(null)
   const [heroLocalPreview, setHeroLocalPreview]   = useState<string | null>(null)
-  const [cropState, setCropState] = useState<{ file: File; aspect: number; onCrop: (blob: Blob) => void; maxPx?: number; quality?: number } | null>(null)
+  const [cropState, setCropState] = useState<{ file: File; aspect: number; onCrop: (blob: Blob) => void; onCancel?: () => void; maxPx?: number; quality?: number } | null>(null)
   const [selectedVenueId, setSelectedVenueId]     = useState<number | null>(null)
   const [resolvedVenueWpId, setResolvedVenueWpId] = useState<number | null>(null)
   const [success, setSuccess]       = useState('')
@@ -621,6 +622,25 @@ export default function FichaPage() {
     finally { setUploading(false) }
   }
 
+  const cropFile = (
+    file: File,
+    aspect: number,
+    opts?: { maxPx?: number; quality?: number; outName?: string }
+  ): Promise<File | null> =>
+    new Promise(resolve => {
+      setCropState({
+        file,
+        aspect,
+        maxPx: opts?.maxPx,
+        quality: opts?.quality,
+        onCrop: (blob) => {
+          setCropState(null)
+          resolve(new File([blob], opts?.outName || 'cropped.webp', { type: 'image/webp' }))
+        },
+        onCancel: () => resolve(null),
+      })
+    })
+
   const uploadGalleryPhoto = async (file: File, i: number, localPreviewUrl?: string) => {
     setUploadingPhoto(true); setUploadMsg(`Subiendo foto ${i + 1}...`)
     try {
@@ -922,67 +942,30 @@ export default function FichaPage() {
                 {/* Imagen hero */}
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Imagen de fondo (hero)</label>
-                  <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: `1px solid ${hasError('Imagen hero') ? ERR : 'var(--ivory)'}`, background: 'var(--cream)' }}>
-                    {(heroImage?.url || heroLocalPreview) ? (
-                      <>
-                        <img src={heroImage?.url || heroLocalPreview!} alt="Hero" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
-                        {uploadingHero && (
-                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <span style={{ color: '#fff', fontSize: 12, fontWeight: 500 }}>Subiendo...</span>
-                          </div>
-                        )}
-                        {!isLocked && heroImage && !uploadingHero && (
-                          <button onClick={() => { setHeroImage(null); setHeroLocalPreview(null) }} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none', borderRadius: 6, width: 26, height: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} /></button>
-                        )}
-                      </>
-                    ) : (
-                      <label style={{ height: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: isLocked ? 'default' : 'pointer' }}>
-                        <Upload size={22} style={{ color: hasError('Imagen hero') ? ERR : 'var(--stone)' }} />
-                        <span style={{ fontSize: 11, color: hasError('Imagen hero') ? ERR : 'var(--warm-gray)' }}>Sube la foto principal (16:9)</span>
-                        {!isLocked && (
-                          <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploadingHero}
-                            onChange={e => {
-                              const f = e.target.files?.[0]
-                              if (!f) return
-                              setCropState({
-                                file: f,
-                                aspect: 16 / 9,
-                                onCrop: async (blob) => {
-                                  setCropState(null)
-                                  const localUrl = URL.createObjectURL(blob)
-                                  setHeroLocalPreview(localUrl)
-                                  const cropped = new File([blob], 'hero.webp', { type: 'image/webp' })
-                                  uploadImage(cropped, img => { setHeroImage(img); URL.revokeObjectURL(localUrl); setHeroLocalPreview(null) }, setUploadingHero, 'Imagen hero', () => { URL.revokeObjectURL(localUrl); setHeroLocalPreview(null) })
-                                },
-                              })
-                              e.target.value = ''
-                            }} />
-                        )}
-                      </label>
-                    )}
-                  </div>
-                  {!isLocked && heroImage && (
-                    <label style={{ display: 'inline-block', marginTop: 8, fontSize: 12, color: 'var(--gold)', cursor: 'pointer', fontWeight: 500 }}>
-                      Cambiar imagen
-                      <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploadingHero}
-                        onChange={e => {
-                          const f = e.target.files?.[0]
-                          if (!f) return
-                          setCropState({
-                            file: f,
-                            aspect: 16 / 9,
-                            onCrop: async (blob) => {
-                              setCropState(null)
-                              const localUrl = URL.createObjectURL(blob)
-                              setHeroLocalPreview(localUrl)
-                              const cropped = new File([blob], 'hero.webp', { type: 'image/webp' })
-                              uploadImage(cropped, img => { setHeroImage(img); URL.revokeObjectURL(localUrl); setHeroLocalPreview(null) }, setUploadingHero, 'Imagen hero', () => { URL.revokeObjectURL(localUrl); setHeroLocalPreview(null) })
-                            },
-                          })
-                          e.target.value = ''
-                        }} />
-                    </label>
-                  )}
+                  <ImageUploader
+                    value={heroImage?.url ?? heroLocalPreview ?? null}
+                    aspectRatio={16 / 9}
+                    disabled={isLocked}
+                    hasError={hasError('Imagen hero')}
+                    label="Imagen de fondo"
+                    hint="Ratio 16:9 — JPG, PNG o WEBP (máx. 10 MB)"
+                    alt="Hero"
+                    beforeUpload={(f) => cropFile(f, 16 / 9, { outName: 'hero.webp' })}
+                    onUpload={async (cropped) => {
+                      const localUrl = URL.createObjectURL(cropped)
+                      setHeroLocalPreview(localUrl)
+                      await new Promise<void>((resolve) =>
+                        uploadImage(
+                          cropped,
+                          img => { setHeroImage(img); URL.revokeObjectURL(localUrl); setHeroLocalPreview(null); resolve() },
+                          setUploadingHero,
+                          'Imagen hero',
+                          () => { URL.revokeObjectURL(localUrl); setHeroLocalPreview(null); resolve() }
+                        )
+                      )
+                    }}
+                    onRemove={() => { setHeroImage(null); setHeroLocalPreview(null) }}
+                  />
                 </div>
 
                 {/* Consejo */}
@@ -1268,44 +1251,36 @@ export default function FichaPage() {
                   <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>800 × 1200 px · 2:3 · .webp</span>
                 </div>
                 <div style={{ padding: '0 28px 28px' }}>
-                  <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                    {verticalPhoto?.url ? (
-                      <div style={{ position: 'relative', width: 120, height: 135, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
-                        <img src={verticalPhoto.url} alt="Vertical" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        {!isLocked && <button onClick={() => setVerticalPhoto(null)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 4, width: 22, height: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={12} /></button>}
-                      </div>
-                    ) : (
-                      <div style={{ width: 120, height: 135, borderRadius: 8, border: `2px dashed ${hasError('Foto vertical') ? ERR : 'var(--ivory)'}`, background: hasError('Foto vertical') ? '#fef2f2' : 'var(--cream)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                        <Upload size={20} style={{ color: 'var(--stone)' }} />
-                        <span style={{ fontSize: 10, color: 'var(--warm-gray)', textAlign: 'center', padding: '0 8px' }}>Sin foto</span>
-                      </div>
-                    )}
+                  <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+                    <div style={{ width: 120, flexShrink: 0 }}>
+                      <ImageUploader
+                        value={verticalPhoto?.url ?? null}
+                        aspectRatio={8 / 9}
+                        disabled={isLocked}
+                        hasError={hasError('Foto vertical')}
+                        label="Subir foto"
+                        hint="Ratio 8:9"
+                        alt="Foto vertical"
+                        beforeUpload={(f) => cropFile(f, 8 / 9, { maxPx: 900, quality: 0.82, outName: 'vertical.webp' })}
+                        onUpload={async (cropped) => {
+                          const localUrl = URL.createObjectURL(cropped)
+                          setVerticalPhoto({ id: 0, url: localUrl })
+                          await new Promise<void>((resolve) =>
+                            uploadImage(
+                              cropped,
+                              img => { setVerticalPhoto(img); URL.revokeObjectURL(localUrl); resolve() },
+                              setUploadingVertical,
+                              'Foto vertical',
+                              () => { URL.revokeObjectURL(localUrl); setVerticalPhoto(null); resolve() }
+                            )
+                          )
+                        }}
+                        onRemove={() => setVerticalPhoto(null)}
+                      />
+                    </div>
                     {!isLocked && (
-                      <div>
-                        <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
-                          {uploadingVertical ? 'Subiendo...' : 'Subir foto'}
-                          <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploadingVertical}
-                            onChange={e => {
-                              const f = e.target.files?.[0]
-                              if (!f) return
-                              setCropState({
-                                file: f,
-                                aspect: 8 / 9,
-                                maxPx: 900,
-                                quality: 0.82,
-                                onCrop: async (blob) => {
-                                  setCropState(null)
-                                  // Show local preview immediately while uploading
-                                  const localUrl = URL.createObjectURL(blob)
-                                  setVerticalPhoto({ id: 0, url: localUrl })
-                                  const cropped = new File([blob], 'vertical.webp', { type: 'image/webp' })
-                                  uploadImage(cropped, img => { setVerticalPhoto(img); URL.revokeObjectURL(localUrl) }, setUploadingVertical, 'Foto vertical', () => { URL.revokeObjectURL(localUrl); setVerticalPhoto(null) })
-                                },
-                              })
-                              e.target.value = ''
-                            }} />
-                        </label>
-                        <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 6, lineHeight: 1.6 }}>Ratio 8:9 · máx 400 KB · .webp<br />Aparece destacada junto a la descripción del venue.</div>
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.6, paddingTop: 4 }}>
+                        Ratio 8:9 · máx 400 KB · .webp<br />Aparece destacada junto a la descripción del venue.
                       </div>
                     )}
                   </div>
@@ -1319,50 +1294,25 @@ export default function FichaPage() {
                   <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>8 fotos · 4:3 · .webp · Máx 2 MB</span>
                 </div>
                 <div style={{ padding: '0 28px 28px' }}>
-                  {uploadingPhoto && <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--gold)' }}>{uploadMsg}</div>}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
                     {hGallery.map((photo, i) => (
-                      <div key={i} style={{ aspectRatio: '4/3', borderRadius: 8, overflow: 'hidden', border: `2px dashed ${photo === null && hasError('Galería de fotos') ? ERR : 'var(--ivory)'}`, position: 'relative', background: 'var(--cream)' }}>
-                        {photo ? (
-                          <>
-                            {photo.url && <img src={photo.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-                            {!isLocked && (
-                              <button onClick={() => { const g = [...hGallery]; g[i] = null; setHGallery(g) }}
-                                style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 4, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <X size={12} />
-                              </button>
-                            )}
-                          </>
-                        ) : !isLocked ? (
-                          <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', cursor: 'pointer', gap: 5 }}>
-                            <Upload size={16} style={{ color: 'var(--stone)' }} />
-                            <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Foto {i + 1}</span>
-                            <input type="file" accept="image/*" style={{ display: 'none' }}
-                              onChange={e => {
-                                const f = e.target.files?.[0]
-                                if (!f) return
-                                const idx = i
-                                setCropState({
-                                  file: f,
-                                  aspect: 4 / 3,
-                                  onCrop: async (blob) => {
-                                    setCropState(null)
-                                    // Show local preview immediately while uploading
-                                    const localUrl = URL.createObjectURL(blob)
-                                    setHGallery(prev => { const g = [...prev]; g[idx] = { id: 0, url: localUrl }; return g })
-                                    const cropped = new File([blob], `gallery_${idx + 1}.webp`, { type: 'image/webp' })
-                                    uploadGalleryPhoto(cropped, idx, localUrl)
-                                  },
-                                })
-                                e.target.value = ''
-                              }} />
-                          </label>
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                            <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Foto {i + 1}</span>
-                          </div>
-                        )}
-                      </div>
+                      <ImageUploader
+                        key={i}
+                        value={photo?.url ?? null}
+                        aspectRatio={4 / 3}
+                        disabled={isLocked}
+                        hasError={photo === null && hasError('Galería de fotos')}
+                        label={`Foto ${i + 1}`}
+                        hint="Ratio 4:3"
+                        alt={`Foto ${i + 1}`}
+                        beforeUpload={(f) => cropFile(f, 4 / 3, { outName: `gallery_${i + 1}.webp` })}
+                        onUpload={async (cropped) => {
+                          const localUrl = URL.createObjectURL(cropped)
+                          setHGallery(prev => { const g = [...prev]; g[i] = { id: 0, url: localUrl }; return g })
+                          await uploadGalleryPhoto(cropped, i, localUrl)
+                        }}
+                        onRemove={() => { const g = [...hGallery]; g[i] = null; setHGallery(g) }}
+                      />
                     ))}
                   </div>
                 </div>
@@ -1617,7 +1567,7 @@ export default function FichaPage() {
           file={cropState.file}
           aspect={cropState.aspect}
           onCrop={cropState.onCrop}
-          onClose={() => setCropState(null)}
+          onClose={() => { cropState.onCancel?.(); setCropState(null) }}
           maxPx={cropState.maxPx}
           quality={cropState.quality}
         />

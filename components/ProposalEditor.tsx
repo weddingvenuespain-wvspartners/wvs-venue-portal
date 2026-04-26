@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Check, X, Upload, AlertCircle, ChevronDown, ArrowLeft, Copy, ChefHat } from 'lucide-react'
+import { Check, X, AlertCircle, ChevronDown, ArrowLeft, Copy, ChefHat } from 'lucide-react'
 import type { SectionsData, VenueSpaceGroup } from '@/lib/proposal-types'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes'
@@ -12,6 +12,7 @@ import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
 import MultipleZonesEditor from './MultipleZonesEditor'
 import ProposalDateModal from './ProposalDateModal'
+import { ImageUploader } from './ImageUploader'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
 
@@ -157,15 +158,8 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   }, [activeTab, sections.has_catering])
 
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [uploadingHero, setUploadingHero] = useState(false)
-  const [uploadingGallery, setUploadingGallery] = useState(false)
   const [copied, setCopied] = useState(false)
   const [toast, setToast] = useState<{ msg: string; err: boolean } | null>(null)
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const heroInputRef = useRef<HTMLInputElement>(null)
-  const galleryInputRef = useRef<HTMLInputElement>(null)
 
   // Snapshot del estado guardado para detectar cambios sin guardar
   const savedSnapshotRef = useRef(JSON.stringify({ form, sections }))
@@ -233,26 +227,12 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   }
 
   const handleLogoUpload = async (file: File) => {
-    setUploading(true)
     const url = await uploadImage(file, 'logos')
     if (url) setForm(f => ({ ...f, logo_url: url }))
-    setUploading(false)
   }
   const handleHeroUpload = async (file: File) => {
-    setUploadingHero(true)
     const url = await uploadImage(file, 'hero')
     if (url) setSections(s => ({ ...s, hero_image_url: url }))
-    setUploadingHero(false)
-  }
-  const handleGalleryUpload = async (files: FileList) => {
-    setUploadingGallery(true)
-    const urls: string[] = []
-    for (const file of Array.from(files)) {
-      const url = await uploadImage(file, 'gallery')
-      if (url) urls.push(url)
-    }
-    if (urls.length) setSections(s => ({ ...s, gallery_urls: [...(s.gallery_urls ?? []), ...urls] }))
-    setUploadingGallery(false)
   }
 
   // ── Save
@@ -679,19 +659,16 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
               <div className="form-group">
                 <label className="form-label">Logo del venue</label>
-                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleLogoUpload(e.target.files[0])} />
-                {form.logo_url && (
-                  <div style={{ marginBottom: 8, position: 'relative', display: 'inline-block' }}>
-                    <img src={form.logo_url} alt="logo" style={{ height: 64, maxWidth: 180, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--border)', background: '#f8f7f4', padding: '6px 10px', display: 'block' }} />
-                    <button onClick={() => setForm(f => ({ ...f, logo_url: null }))} title="Eliminar logo"
-                      style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#ef4444', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <X size={11} style={{ color: '#fff' }} />
-                    </button>
-                  </div>
-                )}
-                <button className="btn btn-ghost btn-sm" onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{ width: '100%', justifyContent: 'center' }}>
-                  <Upload size={12} /> {uploading ? 'Subiendo...' : form.logo_url ? 'Cambiar logo' : 'Subir logo'}
-                </button>
+                <ImageUploader
+                  value={form.logo_url ?? null}
+                  height={88}
+                  objectFit="contain"
+                  label="Subir logo"
+                  hint="PNG transparente recomendado"
+                  alt="Logo del venue"
+                  onUpload={async (f) => { await handleLogoUpload(f) }}
+                  onRemove={() => setForm(f => ({ ...f, logo_url: null }))}
+                />
               </div>
 
               <div className="form-group">
@@ -998,43 +975,46 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                           })()}
 
                           {secId === 'hero' && (
-                            <div>
-                              <input ref={heroInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleHeroUpload(e.target.files[0])} />
-                              {sections.hero_image_url && (
-                                <div style={{ marginBottom: 8, position: 'relative', display: 'inline-block' }}>
-                                  <img src={sections.hero_image_url} alt="hero" style={{ width: '100%', maxWidth: 340, height: 120, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', display: 'block' }} />
-                                  <button onClick={() => setSections(s => ({ ...s, hero_image_url: undefined }))} title="Eliminar imagen"
-                                    style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#ef4444', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <X size={11} style={{ color: '#fff' }} />
-                                  </button>
-                                </div>
-                              )}
-                              <button className="btn btn-ghost btn-sm" onClick={() => heroInputRef.current?.click()} disabled={uploadingHero} style={{ width: '100%', justifyContent: 'center' }}>
-                                <Upload size={12} /> {uploadingHero ? 'Subiendo...' : sections.hero_image_url ? 'Cambiar imagen' : 'Subir foto principal'}
-                              </button>
-                            </div>
+                            <ImageUploader
+                              value={sections.hero_image_url ?? null}
+                              height={120}
+                              label="Foto principal"
+                              hint="JPG, PNG o WEBP (máx. 10 MB)"
+                              alt="Hero"
+                              onUpload={async (f) => { await handleHeroUpload(f) }}
+                              onRemove={() => setSections(s => ({ ...s, hero_image_url: undefined }))}
+                            />
                           )}
-                          {secId === 'gallery' && (
-                            <div>
-                              <input ref={galleryInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => e.target.files?.length && handleGalleryUpload(e.target.files)} />
-                              {(sections.gallery_urls ?? []).length > 0 && (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                                  {(sections.gallery_urls ?? []).map((url, i) => (
-                                    <div key={i} style={{ position: 'relative' }}>
-                                      <img src={url} alt="" style={{ width: 72, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', display: 'block' }} />
-                                      <button onClick={() => setSections(s => ({ ...s, gallery_urls: (s.gallery_urls ?? []).filter((_, idx) => idx !== i) }))}
-                                        style={{ position: 'absolute', top: -5, right: -5, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <X size={9} style={{ color: '#fff' }} />
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              <button className="btn btn-ghost btn-sm" onClick={() => galleryInputRef.current?.click()} disabled={uploadingGallery} style={{ width: '100%', justifyContent: 'center' }}>
-                                <Upload size={12} /> {uploadingGallery ? 'Subiendo...' : 'Añadir fotos'}
-                              </button>
-                            </div>
-                          )}
+                          {secId === 'gallery' && (() => {
+                            const urls = sections.gallery_urls ?? []
+                            return (
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                                {urls.map((url, i) => (
+                                  <ImageUploader
+                                    key={i}
+                                    value={url}
+                                    aspectRatio={4 / 3}
+                                    alt=""
+                                    onUpload={async (f) => {
+                                      const newUrl = await uploadImage(f, 'gallery')
+                                      if (newUrl) setSections(s => ({ ...s, gallery_urls: (s.gallery_urls ?? []).map((u, j) => j === i ? newUrl : u) }))
+                                    }}
+                                    onRemove={() => setSections(s => ({ ...s, gallery_urls: (s.gallery_urls ?? []).filter((_, j) => j !== i) }))}
+                                  />
+                                ))}
+                                <ImageUploader
+                                  value={null}
+                                  aspectRatio={4 / 3}
+                                  label="Añadir foto"
+                                  hint="Click o arrastra"
+                                  onUpload={async (f) => {
+                                    const newUrl = await uploadImage(f, 'gallery')
+                                    if (newUrl) setSections(s => ({ ...s, gallery_urls: [...(s.gallery_urls ?? []), newUrl] }))
+                                  }}
+                                />
+                              </div>
+                            )
+                          })()}
                           {secId === 'contact' && (() => {
                             const c: any = sections.contact ?? {}
                             const patch = (p: any) => setSections(s => ({ ...s, contact: { ...(s.contact ?? {}), ...p } }))
@@ -1136,21 +1116,17 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
                                       {/* Image upload */}
                                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                        {photo ? (
-                                          <>
-                                            <img src={photo} alt="" style={{ width: 80, height: 54, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
-                                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => updateOverrideItem(overrideKey, i, 'photos', [])}>Quitar</button>
-                                            <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
-                                              Cambiar
-                                              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleUpload(e.target.files[0])} />
-                                            </label>
-                                          </>
-                                        ) : (
-                                          <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
-                                            <Upload size={12} /> Subir imagen (opcional)
-                                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleUpload(e.target.files[0])} />
-                                          </label>
-                                        )}
+                                        <div style={{ width: 100, flexShrink: 0 }}>
+                                          <ImageUploader
+                                            value={photo ?? null}
+                                            aspectRatio={4 / 3}
+                                            label="Foto"
+                                            hint="Opcional"
+                                            alt={z.name ?? 'Zona'}
+                                            onUpload={handleUpload}
+                                            onRemove={() => updateOverrideItem(overrideKey, i, 'photos', [])}
+                                          />
+                                        </div>
                                         <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Si no subes una, se usará una foto de la galería del venue.</div>
                                       </div>
 
@@ -1584,7 +1560,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
           <button
             className="btn btn-primary"
             onClick={handleSave}
-            disabled={saving || uploading || !isDirty}
+            disabled={saving || !isDirty}
             style={{ flex: 1, justifyContent: 'center' }}
           >
             {saving ? 'Guardando…' : isDirty ? 'Guardar cambios' : 'Guardado'}

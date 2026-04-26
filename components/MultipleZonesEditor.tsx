@@ -1,7 +1,8 @@
 'use client'
-import { X, Upload, Check, RefreshCw, AlertCircle, Users, ChevronDown, ChevronRight } from 'lucide-react'
+import { X, Check, RefreshCw, AlertCircle, Users, ChevronDown, ChevronRight } from 'lucide-react'
 import type { VenueSpaceGroup, SpaceGroup, VenueSpaceItem } from '@/lib/proposal-types'
 import { useState } from 'react'
+import { ImageUploader } from './ImageUploader'
 
 type Props = {
   venueSpaceGroups: VenueSpaceGroup[]
@@ -237,23 +238,22 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
                       </div>
 
                       {/* Photo */}
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        {ps.photo_url ? (
-                          <>
-                            <img src={ps.photo_url} alt="" style={{ width: 80, height: 54, objectFit: 'cover', borderRadius: 5, border: '1px solid var(--border)' }} />
-                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => updateSpace(vg.id, vs.id, { photo_url: undefined })}>Quitar</button>
-                          </>
-                        ) : uploadImage ? (
-                          <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
-                            <Upload size={11} /> Subir foto
-                            <input type="file" accept="image/*" style={{ display: 'none' }}
-                              onChange={e => e.target.files?.[0] && handleUpload(vg.id, vs.id, e.target.files[0])} />
-                          </label>
-                        ) : (
-                          <input className="form-input" style={{ fontSize: 12, flex: 1 }}
-                            placeholder="URL imagen" value={ps.photo_url ?? ''} onChange={e => updateSpace(vg.id, vs.id, { photo_url: e.target.value })} />
-                        )}
-                      </div>
+                      {uploadImage ? (
+                        <div style={{ width: 100 }}>
+                          <ImageUploader
+                            value={ps.photo_url ?? null}
+                            aspectRatio={4 / 3}
+                            label="Foto"
+                            hint="Click o arrastra"
+                            alt={vs.name}
+                            onUpload={(f) => handleUpload(vg.id, vs.id, f)}
+                            onRemove={() => updateSpace(vg.id, vs.id, { photo_url: undefined })}
+                          />
+                        </div>
+                      ) : (
+                        <input className="form-input" style={{ fontSize: 12, flex: 1 }}
+                          placeholder="URL imagen" value={ps.photo_url ?? ''} onChange={e => updateSpace(vg.id, vs.id, { photo_url: e.target.value })} />
+                      )}
                     </div>
                   )
                 })}

@@ -1,7 +1,7 @@
 'use client'
-import { useState } from 'react'
-import { ChevronDown, X, Upload } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 import type { SpaceGroup, VenueSpaceItem } from '@/lib/proposal-types'
+import { ImageUploader } from './ImageUploader'
 
 type Props = {
   groups: SpaceGroup[]
@@ -28,8 +28,6 @@ function newSpace(): VenueSpaceItem {
 }
 
 export default function SpaceGroupEditor({ groups, onChange, uploadImage }: Props) {
-  const [uploadingIdx, setUploadingIdx] = useState<string | null>(null)
-
   const updateGroup = (gi: number, patch: Partial<SpaceGroup>) => {
     onChange(groups.map((g, i) => i === gi ? { ...g, ...patch } : g))
   }
@@ -45,11 +43,8 @@ export default function SpaceGroupEditor({ groups, onChange, uploadImage }: Prop
 
   const handlePhotoUpload = async (gi: number, si: number, file: File) => {
     if (!uploadImage) return
-    const key = `${gi}-${si}`
-    setUploadingIdx(key)
     const url = await uploadImage(file, 'space-groups')
     if (url) updateSpace(gi, si, { photo_url: url })
-    setUploadingIdx(null)
   }
 
   return (
@@ -113,25 +108,19 @@ export default function SpaceGroupEditor({ groups, onChange, uploadImage }: Prop
                     </div>
 
                     {/* Photo */}
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      {s.photo_url ? (
-                        <>
-                          <img src={s.photo_url} alt="" style={{ width: 80, height: 54, objectFit: 'cover', borderRadius: 5, border: '1px solid var(--border)' }} />
-                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => updateSpace(gi, si, { photo_url: undefined })}>Quitar</button>
-                          {uploadImage && (
-                            <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
-                              Cambiar
-                              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handlePhotoUpload(gi, si, e.target.files[0])} />
-                            </label>
-                          )}
-                        </>
-                      ) : uploadImage ? (
-                        <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer', opacity: uploadingIdx === `${gi}-${si}` ? 0.6 : 1 }}>
-                          <Upload size={11} /> {uploadingIdx === `${gi}-${si}` ? 'Subiendo…' : 'Foto del espacio'}
-                          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handlePhotoUpload(gi, si, e.target.files[0])} />
-                        </label>
-                      ) : null}
-                    </div>
+                    {uploadImage && (
+                      <div style={{ width: 100 }}>
+                        <ImageUploader
+                          value={s.photo_url ?? null}
+                          aspectRatio={4 / 3}
+                          label="Foto"
+                          hint="Click o arrastra"
+                          alt={s.name || 'Espacio'}
+                          onUpload={(f) => handlePhotoUpload(gi, si, f)}
+                          onRemove={() => updateSpace(gi, si, { photo_url: undefined })}
+                        />
+                      </div>
+                    )}
                   </div>
                 </details>
               ))}
