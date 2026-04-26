@@ -339,6 +339,7 @@ export default function TemplateEditor({
           {urls.map((url, i) => (
             <ImageUploader
               key={i}
+              compact
               value={url}
               aspectRatio={4 / 3}
               alt=""
@@ -353,10 +354,10 @@ export default function TemplateEditor({
             />
           ))}
           <ImageUploader
+            compact
             value={null}
             aspectRatio={4 / 3}
             label="Añadir foto"
-            hint="Click o arrastra"
             onUpload={async (f) => {
               const newUrl = await uploadImage(f, 'gallery')
               if (newUrl) {
@@ -1177,10 +1178,10 @@ function ZonePhotoUpload({ zone, onUpload, onRemove }: { zone: any; onUpload: (f
   return (
     <div style={{ width: 96 }}>
       <ImageUploader
+        compact
         value={photo ?? null}
         aspectRatio={4 / 3}
         label="Foto zona"
-        hint="Click o arrastra"
         alt={zone.name ?? 'Zona'}
         onUpload={onUpload}
         onRemove={onRemove}

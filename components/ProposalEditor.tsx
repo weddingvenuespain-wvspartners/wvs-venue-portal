@@ -1014,6 +1014,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                 {urls.map((url, i) => (
                                   <ImageUploader
                                     key={i}
+                                    compact
                                     value={url}
                                     aspectRatio={4 / 3}
                                     alt=""
@@ -1025,10 +1026,10 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                   />
                                 ))}
                                 <ImageUploader
+                                  compact
                                   value={null}
                                   aspectRatio={4 / 3}
                                   label="Añadir foto"
-                                  hint="Click o arrastra"
                                   onUpload={async (f) => {
                                     const newUrl = await uploadImage(f, 'gallery')
                                     if (newUrl) setSections(s => ({ ...s, gallery_urls: [...(s.gallery_urls ?? []), newUrl] }))
@@ -1140,10 +1141,10 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                         <div style={{ width: 100, flexShrink: 0 }}>
                                           <ImageUploader
+                                            compact
                                             value={photo ?? null}
                                             aspectRatio={4 / 3}
                                             label="Foto"
-                                            hint="Opcional"
                                             alt={z.name ?? 'Zona'}
                                             onUpload={handleUpload}
                                             onRemove={() => updateOverrideItem(overrideKey, i, 'photos', [])}

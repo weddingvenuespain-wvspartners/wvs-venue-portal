@@ -241,10 +241,10 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
                       {uploadImage ? (
                         <div style={{ width: 100 }}>
                           <ImageUploader
+                            compact
                             value={ps.photo_url ?? null}
                             aspectRatio={4 / 3}
                             label="Foto"
-                            hint="Click o arrastra"
                             alt={vs.name}
                             onUpload={(f) => handleUpload(vg.id, vs.id, f)}
                             onRemove={() => updateSpace(vg.id, vs.id, { photo_url: undefined })}

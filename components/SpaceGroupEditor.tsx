@@ -111,10 +111,10 @@ export default function SpaceGroupEditor({ groups, onChange, uploadImage }: Prop
                     {uploadImage && (
                       <div style={{ width: 100 }}>
                         <ImageUploader
+                          compact
                           value={s.photo_url ?? null}
                           aspectRatio={4 / 3}
                           label="Foto"
-                          hint="Click o arrastra"
                           alt={s.name || 'Espacio'}
                           onUpload={(f) => handlePhotoUpload(gi, si, f)}
                           onRemove={() => updateSpace(gi, si, { photo_url: undefined })}

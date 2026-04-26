@@ -1254,12 +1254,12 @@ export default function FichaPage() {
                   <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
                     <div style={{ width: 120, flexShrink: 0 }}>
                       <ImageUploader
+                        compact
                         value={verticalPhoto?.url ?? null}
                         aspectRatio={8 / 9}
                         disabled={isLocked}
                         hasError={hasError('Foto vertical')}
                         label="Subir foto"
-                        hint="Ratio 8:9"
                         alt="Foto vertical"
                         beforeUpload={(f) => cropFile(f, 8 / 9, { maxPx: 900, quality: 0.82, outName: 'vertical.webp' })}
                         onUpload={async (cropped) => {
@@ -1294,16 +1294,16 @@ export default function FichaPage() {
                   <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>8 fotos · 4:3 · .webp · Máx 2 MB</span>
                 </div>
                 <div style={{ padding: '0 28px 28px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
                     {hGallery.map((photo, i) => (
                       <ImageUploader
                         key={i}
+                        compact
                         value={photo?.url ?? null}
                         aspectRatio={4 / 3}
                         disabled={isLocked}
                         hasError={photo === null && hasError('Galería de fotos')}
                         label={`Foto ${i + 1}`}
-                        hint="Ratio 4:3"
                         alt={`Foto ${i + 1}`}
                         beforeUpload={(f) => cropFile(f, 4 / 3, { outName: `gallery_${i + 1}.webp` })}
                         onUpload={async (cropped) => {

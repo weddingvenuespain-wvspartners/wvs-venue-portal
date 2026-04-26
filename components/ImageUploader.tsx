@@ -20,6 +20,8 @@ type Props = {
   alt?: string
   className?: string
   objectFit?: "cover" | "contain"
+  /** Simplifies the empty state for small thumbnails (icon + short label, no long hint, smaller padding). */
+  compact?: boolean
 }
 
 const DEFAULT_ACCEPT = "image/jpeg,image/png,image/webp"
@@ -41,6 +43,7 @@ export function ImageUploader({
   alt = "",
   className,
   objectFit = "cover",
+  compact = false,
 }: Props) {
   const inputRef = React.useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = React.useState(false)
@@ -172,22 +175,33 @@ export function ImageUploader({
             onClick={() => inputRef.current?.click()}
             disabled={disabled || uploading}
             className={cn(
-              "flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center",
+              "flex h-full w-full flex-col items-center justify-center text-center",
+              compact ? "gap-1 px-2" : "gap-2 px-4",
               !disabled && !uploading && "cursor-pointer hover:bg-muted/60"
             )}
           >
             <div
               className={cn(
-                "flex h-10 w-10 items-center justify-center rounded-full",
+                "flex items-center justify-center rounded-full",
+                compact ? "h-7 w-7" : "h-10 w-10",
                 hasError || error ? "bg-destructive/10 text-destructive" : "bg-background text-muted-foreground"
               )}
             >
-              <ImageIcon className="h-5 w-5" />
+              <ImageIcon className={compact ? "h-3.5 w-3.5" : "h-5 w-5"} />
             </div>
-            <div className="text-sm font-medium text-foreground">{label}</div>
-            <div className="text-xs text-muted-foreground">
-              {hint ?? `Arrastra una imagen o haz clic — ${accept.replaceAll("image/", "").toUpperCase()} (máx. ${maxSizeMb} MB)`}
+            <div
+              className={cn(
+                "font-medium text-foreground leading-tight",
+                compact ? "text-[11px]" : "text-sm"
+              )}
+            >
+              {label}
             </div>
+            {!compact && (
+              <div className="text-xs text-muted-foreground">
+                {hint ?? `Arrastra una imagen o haz clic — ${accept.replaceAll("image/", "").toUpperCase()} (máx. ${maxSizeMb} MB)`}
+              </div>
+            )}
           </button>
         )}
 
