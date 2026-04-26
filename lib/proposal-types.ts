@@ -55,6 +55,15 @@ export type AppetizerGroup = {
   items: string[]
 }
 
+export type DateSlot = {
+  id?: string
+  label?: string           // "Temporada alta", "Fin de semana premium"
+  dates: string[]          // ["2025-10-04", "2025-10-11"]
+  price_per_person?: string // "110€/pax"
+  price_rental?: string    // "5.000€"
+  notes?: string           // "Sábados · IVA no incluido"
+}
+
 export type VenueSpaceItem = {
   id?: string
   name: string
@@ -127,6 +136,8 @@ export type SectionsData = {
   // Per-proposal image overrides
   hero_image_url?: string
   gallery_urls?: string[]
+  // Date slots — multiple available dates with optional per-slot pricing
+  date_slots?: DateSlot[] | null
   // Space groups — grouped zone selector for venues with multiple zones
   space_groups?: SpaceGroup[] | null
   // Per-proposal map override (if empty, falls back to venueContent.map_info)

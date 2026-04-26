@@ -9,6 +9,7 @@ import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, Fl
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector from './SpaceGroupSelector'
+import DateSelector from './DateSelector'
 
 export default function T1Impacto({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date,
@@ -16,7 +17,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow,
           testsShow, zonesShow, seasonsShow, collabsShow, menuShow,
           menusStructured, menuExtras, appetizersBase,
-          expShow, techspecs, accom, spaceGroups } = extractData(data)
+          expShow, techspecs, accom, spaceGroups, dateSlots } = extractData(data)
 
   const primary = branding?.primary_color ?? '#8B6914'
   const rgb     = toRgb(primary)
@@ -364,6 +365,20 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} />
+      )}
+
+      {/* ════════════════════════════════════════════
+          SELECTOR DE FECHAS
+      ════════════════════════════════════════════ */}
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+        <DateSelector
+          slots={dateSlots}
+          primary={primary}
+          onPrimary={onPri}
+          dark
+          font={FONT}
+          proposalId={data.id}
+        />
       )}
 
       {/* ── STATS BAR ── */}

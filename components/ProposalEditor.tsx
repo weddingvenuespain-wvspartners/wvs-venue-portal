@@ -48,6 +48,7 @@ const PRESET_COLORS = ['#2d4a7a', '#7a5c3c', '#6b2d42', '#2a6b4a', '#4a4a4a', '#
 
 const SECTION_LABELS: Record<string, string> = {
   hero: 'Foto principal',
+  date_slots: 'Fechas disponibles',
   availability: 'Disponibilidad',
   welcome: 'Mensaje de bienvenida',
   experience: 'La experiencia',
@@ -568,6 +569,38 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 </div>
               )}
 
+              {/* Template selector */}
+              <div className="form-group" style={{ marginTop: 14 }}>
+                <label className="form-label">Diseño de la propuesta</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  {([
+                    { id: 1, icon: '⚡', name: 'Impacto Directo', desc: 'Dark luxury' },
+                    { id: 2, icon: '✨', name: 'Emoción Primero', desc: 'Cream editorial' },
+                    { id: 3, icon: '📋', name: 'Todo Claro', desc: 'Estructurado' },
+                    { id: 4, icon: '💬', name: 'Social Proof', desc: 'Stats + confianza' },
+                    { id: 5, icon: '◻', name: 'Minimalista', desc: 'CTA prominente' },
+                  ] as const).map(tpl => {
+                    const active = (sections.visual_template_id ?? 1) === tpl.id
+                    return (
+                      <button key={tpl.id} type="button"
+                        onClick={() => setSections(s => ({ ...s, visual_template_id: tpl.id }))}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                          borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                          border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                          background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
+                        }}>
+                        <span style={{ fontSize: 14 }}>{tpl.icon}</span>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)' }}>{tpl.name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{tpl.desc}</div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
               <div className="form-group" style={{ marginTop: 14 }}>
                 <label className="form-label">Tipo de servicio</label>
                 <div style={{ display: 'flex', gap: 10 }}>
@@ -726,6 +759,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
             // Sections in the same order the templates render them
             const ALL_SECTION_IDS = [
               'hero',
+              'date_slots',
               'availability',
               'welcome',
               'experience',
@@ -775,6 +809,59 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
                       {isOpen && (
                         <div className="sec-open-content" style={{ padding: '12px 14px 14px' }}>
+                          {/* DATE SLOTS */}
+                          {secId === 'date_slots' && (() => {
+                            const slots: any[] = (sections as any).date_slots ?? []
+                            const setSlots = (val: any[]) => setSections((s: any) => ({ ...s, date_slots: val }))
+                            const updateSlot = (i: number, patch: any) => setSlots(slots.map((s: any, j: number) => j === i ? { ...s, ...patch } : s))
+                            const removeSlot = (i: number) => setSlots(slots.filter((_: any, j: number) => j !== i))
+                            const addDate = (i: number) => updateSlot(i, { dates: [...(slots[i].dates ?? []), ''] })
+                            const updateDate = (i: number, di: number, val: string) => updateSlot(i, { dates: slots[i].dates.map((d: string, j: number) => j === di ? val : d) })
+                            const removeDate = (i: number, di: number) => updateSlot(i, { dates: slots[i].dates.filter((_: string, j: number) => j !== di) })
+
+                            return (
+                              <div>
+                                <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.6, marginBottom: 10, background: 'var(--cream)', borderRadius: 6, padding: '8px 10px' }}>
+                                  Añade una o varias franjas de fechas. Si tienen <strong>precios distintos</strong>, la pareja podrá seleccionar la que prefiera y el precio se mostrará dinámicamente.
+                                </div>
+                                {slots.map((slot: any, i: number) => (
+                                  <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
+                                    <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--charcoal)', background: 'var(--cream)', listStyle: 'none' }}>
+                                      <ChevronDown size={12} style={{ color: 'var(--warm-gray)' }} />
+                                      <span style={{ flex: 1 }}>{slot.label || <em style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>Franja {i + 1}</em>}</span>
+                                      {slot.price_per_person && <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 600 }}>{slot.price_per_person}</span>}
+                                      <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeSlot(i) }}><X size={13} /></button>
+                                    </summary>
+                                    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                      <input className="form-input" placeholder="Etiqueta  (ej. Temporada alta · Sábados)" value={slot.label ?? ''} onChange={e => updateSlot(i, { label: e.target.value })} />
+                                      <div style={{ display: 'flex', gap: 6 }}>
+                                        <input className="form-input" placeholder="Precio/persona  (ej. 110€/pax)" style={{ flex: 1 }} value={slot.price_per_person ?? ''} onChange={e => updateSlot(i, { price_per_person: e.target.value })} />
+                                        <input className="form-input" placeholder="Precio total  (ej. 8.000€)" style={{ flex: 1 }} value={slot.price_rental ?? ''} onChange={e => updateSlot(i, { price_rental: e.target.value })} />
+                                      </div>
+                                      <input className="form-input" placeholder="Nota  (ej. IVA no incluido · Viernes)" value={slot.notes ?? ''} onChange={e => updateSlot(i, { notes: e.target.value })} />
+                                      {/* Dates */}
+                                      <div style={{ background: 'var(--cream)', borderRadius: 6, padding: '8px 10px' }}>
+                                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 6 }}>Fechas</div>
+                                        {(slot.dates ?? []).map((d: string, di: number) => (
+                                          <div key={di} style={{ display: 'flex', gap: 5, alignItems: 'center', marginBottom: 4 }}>
+                                            <input className="form-input" type="date" style={{ flex: 1 }} value={d} onChange={e => updateDate(i, di, e.target.value)} />
+                                            <button type="button" style={removeBtn} onClick={() => removeDate(i, di)}><X size={11} /></button>
+                                          </div>
+                                        ))}
+                                        <button type="button" style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0' }} onClick={() => addDate(i)}>
+                                          + Añadir fecha
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </details>
+                                ))}
+                                <button type="button" style={addBtn} onClick={() => setSlots([...slots, { label: '', dates: [], price_per_person: '', notes: '' }])}>
+                                  + Añadir franja de fechas
+                                </button>
+                              </div>
+                            )
+                          })()}
+
                           {secId === 'hero' && (
                             <div>
                               <input ref={heroInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleHeroUpload(e.target.files[0])} />

@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef, useMemo } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
@@ -8,15 +8,10 @@ import { usePlanFeatures } from '@/lib/use-plan-features'
 import {
   Plus, ChevronDown, ChevronUp, Pencil, Trash2,
   X, Check, Lock, Sun, Moon, CalendarDays, Package, SlidersHorizontal,
-  Building2, Users, Layers, CreditCard, LayoutGrid, Settings2, ChefHat, Save,
-  Maximize2, Minimize2,
+  Building2, Users, Layers, CreditCard, LayoutGrid, Settings2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
-import ProposalMenuEditor from '@/components/ProposalMenuEditor'
 import DatePicker, { fmtDate } from '@/components/DatePicker'
-import type { SectionsData } from '@/lib/proposal-types'
-import { WeddingProposal } from '@/app/proposal/[slug]/tpl/WeddingProposal'
-import type { ProposalData } from '@/app/proposal/[slug]/page'
 
 // ── Duration types ─────────────────────────────────────────────────────────────
 
@@ -310,15 +305,10 @@ export default function EstructuraPage() {
   const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
 
-  const [activeTab, setActiveTab]             = useState<'modalidades' | 'menus'>('modalidades')
   const [modalities, setModalities]           = useState<Modality[]>([])
   const [loading, setLoading]                 = useState(true)
   const [expanded, setExpanded]               = useState<Set<string>>(new Set())
   const [error, setError]                     = useState('')
-  const [menuCatalog, setMenuCatalog]         = useState<SectionsData>({})
-  const [previewExpanded, setPreviewExpanded] = useState(false)
-  const [catalogSaving, setCatalogSaving]     = useState(false)
-  const [catalogSaved, setCatalogSaved]       = useState(false)
   const [commercialConfig, setCommercialConfig] = useState<CommercialConfig | null>(null)
   const [configWizardOpen, setConfigWizardOpen]   = useState(false)
   const [wizardQuestion, setWizardQuestion]       = useState<WizardQuestion>('space_type')
@@ -357,14 +347,6 @@ export default function EstructuraPage() {
   const [priceSaving, setPriceSaving]     = useState(false)
   const [priceError, setPriceError]       = useState('')
 
-  const menuPreviewData = useMemo<ProposalData>(() => ({
-    id: 'preview', slug: 'preview', couple_name: 'Vista previa',
-    personal_message: null, guest_count: 100, wedding_date: null,
-    price_estimate: null, show_availability: false, show_price_estimate: false,
-    status: 'preview', ctas: [], sections_data: menuCatalog,
-    venueContent: { packages: [], zones: [], season_prices: [], inclusions: [], exclusions: [], faq: [], testimonials: [], collaborators: [], extra_services: [], menu_prices: [], experience: null, techspecs: null, accommodation_info: null, map_info: null, budget_simulator: null, countdown: null },
-    venue: null, branding: null,
-  }), [menuCatalog])
 
   useEffect(() => {
     if (authLoading) return
@@ -376,7 +358,7 @@ export default function EstructuraPage() {
     const supabase = createClient()
     const [res, { data: settingsRow }] = await Promise.all([
       fetch('/api/estructura/modalities'),
-      supabase.from('venue_settings').select('commercial_config, zones, supplements, menu_catalog').eq('user_id', user!.id).maybeSingle(),
+      supabase.from('venue_settings').select('commercial_config, zones, supplements').eq('user_id', user!.id).maybeSingle(),
     ])
     const json = await res.json()
     if (!res.ok) { setError(json.error ?? 'Error al cargar'); setLoading(false); return }
@@ -393,7 +375,6 @@ export default function EstructuraPage() {
     if (settingsRow?.commercial_config) setCommercialConfig(settingsRow.commercial_config as CommercialConfig)
     if (settingsRow?.zones)        setZones(settingsRow.zones as ZoneItem[])
     if (settingsRow?.supplements)  setSupplements(settingsRow.supplements as SupplementItem[])
-    if (settingsRow?.menu_catalog) setMenuCatalog(settingsRow.menu_catalog as SectionsData)
     setLoading(false)
   }
 
@@ -413,14 +394,7 @@ export default function EstructuraPage() {
     setSavingZS(false)
   }
 
-  const saveMenuCatalog = async () => {
-    setCatalogSaving(true)
-    const supabase = createClient()
-    await supabase.from('venue_settings').upsert({ user_id: user!.id, menu_catalog: menuCatalog }, { onConflict: 'user_id' })
-    setCatalogSaving(false)
-    setCatalogSaved(true)
-    setTimeout(() => setCatalogSaved(false), 2500)
-  }
+
 
   const addZone = async () => {
     const name = newZoneName.trim()
@@ -715,10 +689,6 @@ export default function EstructuraPage() {
   const totalPrices = modalities.reduce((s, m) =>
     s + m.prices.length + m.packages.reduce((ps, pkg) => ps + pkg.prices.length, 0), 0)
 
-  // Whether the venue's commercial config involves menus/catering at all
-  const venueHasMenus = commercialConfig?.menu_included === true || commercialConfig?.catering_own === true
-  const menuCount  = menuCatalog.menus_override?.length ?? 0
-  const extraCount = menuCatalog.menu_extras_override?.length ?? 0
 
   // ── Main render ────────────────────────────────────────────────────────────
 
@@ -730,117 +700,19 @@ export default function EstructuraPage() {
           <div>
             <div className="topbar-title">Estructura comercial</div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 1 }}>
-              {activeTab === 'modalidades' ? 'Define las modalidades de tu venue y sus tarifas por temporada' : 'Catálogo de menús, extras y aperitivos de tu venue'}
+              Define las modalidades de tu venue y sus tarifas por temporada
             </div>
           </div>
-          {activeTab === 'modalidades' && (
-            <button className="btn btn-primary btn-sm" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Plus size={14} /> Nueva modalidad
-            </button>
-          )}
-          {activeTab === 'menus' && (
-            <button className="btn btn-primary btn-sm" onClick={saveMenuCatalog} disabled={catalogSaving} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {catalogSaved ? <><Check size={14} /> Guardado</> : <><Save size={14} /> {catalogSaving ? 'Guardando…' : 'Guardar catálogo'}</>}
-            </button>
-          )}
-        </div>
-
-        {/* Tabs */}
-        <div style={{ borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 0, padding: '0 24px', background: '#fff' }}>
-          <button onClick={() => setActiveTab('modalidades')}
-            style={{ padding: '10px 16px', fontSize: 13, fontWeight: activeTab === 'modalidades' ? 600 : 400, color: activeTab === 'modalidades' ? 'var(--charcoal)' : 'var(--warm-gray)', background: 'none', border: 'none', borderBottom: activeTab === 'modalidades' ? '2px solid var(--gold)' : '2px solid transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'color 0.15s', marginBottom: -1 }}>
-            Modalidades y tarifas
-          </button>
-          <button onClick={() => setActiveTab('menus')}
-            style={{ padding: '10px 16px', fontSize: 13, fontWeight: activeTab === 'menus' ? 600 : 400, color: activeTab === 'menus' ? 'var(--charcoal)' : 'var(--warm-gray)', background: 'none', border: 'none', borderBottom: activeTab === 'menus' ? '2px solid var(--gold)' : '2px solid transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'color 0.15s', marginBottom: -1 }}>
-            <ChefHat size={13} />
-            Menús y extras
-            {/* Status badge */}
-            {commercialConfig && !venueHasMenus && (
-              <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'var(--ivory)', color: 'var(--warm-gray)', letterSpacing: '0.04em' }}>N/A</span>
-            )}
-            {venueHasMenus && (menuCount > 0 || extraCount > 0) && (
-              <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'rgba(196,151,90,.12)', color: 'var(--gold)', letterSpacing: '0.04em' }}>
-                {[menuCount > 0 && `${menuCount} menú${menuCount > 1 ? 's' : ''}`, extraCount > 0 && `${extraCount} extra${extraCount > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
-              </span>
-            )}
-            {venueHasMenus && menuCount === 0 && extraCount === 0 && (
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', display: 'inline-block', marginLeft: 2 }} title="Sin menús configurados" />
-            )}
+          <button className="btn btn-primary btn-sm" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Plus size={14} /> Nueva modalidad
           </button>
         </div>
 
         <div className="page-content">
           {error && <div className="alert alert-error" style={{ marginBottom: 20 }}>{error}</div>}
 
-          {/* ── TAB: MENÚS ───────────────────────────────────────────────────── */}
-          {activeTab === 'menus' && (
-            <div style={{ display: 'flex', gap: 0, alignItems: 'flex-start', margin: '-24px -28px' }}>
-              {/* Left: editor — hidden when preview expanded or venue has no menus */}
-              {!previewExpanded && (
-                <div style={{ flex: '0 0 500px', padding: '24px 28px', overflowY: 'auto' }}>
-                  {!venueHasMenus && commercialConfig ? (
-                    /* Point 2: no catering in config → explain + redirect */
-                    <div style={{ background: '#F7F3EE', border: '1px solid var(--ivory)', borderRadius: 12, padding: '28px 20px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 32, marginBottom: 10 }}>🍽️</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 8 }}>
-                        Tu modelo no incluye catering propio
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.75, marginBottom: 20 }}>
-                        Según tu configuración comercial, la sección de menús <strong>no aparecerá</strong> en tus propuestas.<br />
-                        Si ofreces o trabajas con catering propio, actualiza tu configuración.
-                      </div>
-                      <button className="btn btn-secondary btn-sm" onClick={() => setActiveTab('modalidades')}>
-                        Revisar configuración →
-                      </button>
-                    </div>
-                  ) : (
-                    <ProposalMenuEditor
-                      sections={menuCatalog}
-                      setSections={setMenuCatalog}
-                      intro="Define el catálogo de menús, extras y aperitivos de tu venue. Se usará como base al crear nuevas propuestas."
-                    />
-                  )}
-                </div>
-              )}
-              {/* Right: live preview */}
-              <div style={{ flex: 1, minWidth: 0, borderLeft: previewExpanded ? 'none' : '1px solid var(--ivory)', position: 'sticky', top: 112, alignSelf: 'flex-start', height: 'calc(100vh - 112px)', overflowY: 'auto', background: '#f9f6f2' }}>
-                {/* Sticky toolbar */}
-                <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', justifyContent: 'flex-end', padding: '6px 10px', background: 'rgba(249,246,242,.85)', backdropFilter: 'blur(6px)', borderBottom: '1px solid var(--ivory)' }}>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewExpanded(v => !v)}
-                    title={previewExpanded ? 'Volver al editor' : 'Ampliar vista previa'}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', background: '#fff', border: '1px solid var(--ivory)', borderRadius: 7, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,.05)' }}
-                  >
-                    {previewExpanded ? <><Minimize2 size={11} /> Contraer</> : <><Maximize2 size={11} /> Ampliar</>}
-                  </button>
-                </div>
-                {/* Point 5: preview reflects commercial config */}
-                {!venueHasMenus && commercialConfig ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100% - 37px)', padding: 32, textAlign: 'center', gap: 10 }}>
-                    <div style={{ fontSize: 40, opacity: 0.2 }}>🍽️</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--warm-gray)', opacity: 0.6, lineHeight: 1.6 }}>
-                      La sección de menús no aparece<br />en propuestas con tu configuración
-                    </div>
-                  </div>
-                ) : (
-                  <WeddingProposal
-                    data={menuPreviewData}
-                    menus={menuCatalog.menus_override ?? null}
-                    extras={menuCatalog.menu_extras_override ?? null}
-                    appetizers={menuCatalog.appetizers_base_override ?? null}
-                    primary="#C4975A"
-                    onPrimary="#fff"
-                    previewOnly
-                  />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ── TAB: MODALIDADES ─────────────────────────────────────────────── */}
-          {activeTab === 'modalidades' && <>
+          {/* ── MODALIDADES ───────────────────────────────────────────────────── */}
+          {<>
 
           {/* Commercial config banner */}
           {commercialConfig ? (
