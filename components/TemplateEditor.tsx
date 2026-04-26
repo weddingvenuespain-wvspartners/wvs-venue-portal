@@ -564,31 +564,77 @@ export default function TemplateEditor({
       )
     }
 
-    if (secId === 'testimonials') return (
-      <div>
-        {getOverride(overrideKey).map((t: any, i: number) => (
-          <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 7, marginBottom: 7, overflow: 'hidden' }}>
-            <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
-              <ChevronDown size={11} color="var(--warm-gray)" />
-              <span style={{ flex: 1 }}>{t.couple_name || <em style={{ color: 'var(--warm-gray)' }}>Nuevo testimonio</em>}</span>
-              <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeItem(overrideKey, i) }}><X size={12} /></button>
-            </summary>
-            <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', gap: 5 }}>
-                <input className="form-input" placeholder="Nombres pareja *" style={{ fontSize: 12 }} value={t.couple_name ?? ''} onChange={e => updateItem(overrideKey, i, 'couple_name', e.target.value)} />
-                <input className="form-input" type="date" style={{ width: 145, flexShrink: 0, fontSize: 12 }} value={t.wedding_date ?? ''} onChange={e => updateItem(overrideKey, i, 'wedding_date', e.target.value)} />
-              </div>
-              <textarea className="form-textarea" style={{ minHeight: 70, fontSize: 12 }} placeholder="Testimonio…" value={t.text ?? ''} onChange={e => updateItem(overrideKey, i, 'text', e.target.value)} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--warm-gray)' }}>
-                Estrellas:
-                <input className="form-input" type="number" min={1} max={5} style={{ width: 65, fontSize: 12 }} value={t.rating ?? 5} onChange={e => updateItem(overrideKey, i, 'rating', Number(e.target.value) || 5)} />
-              </div>
+    if (secId === 'testimonials') {
+      const testimonialsStyleConfig = SECTION_STYLES.testimonials
+      const activeTestimonialsVariantId = getActiveStyle(sections, 'testimonials')
+      const selectTestimonialsVariant = (variantId: string) => {
+        setSections(s => setActiveStyle(s, 'testimonials', variantId) as SectionsData)
+        markDirty()
+      }
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Style picker */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Estilo visual</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {testimonialsStyleConfig.variants.map(v => {
+                const sel = activeTestimonialsVariantId === v.id
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => selectTestimonialsVariant(v.id)}
+                    style={{
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      border: `1.5px solid ${sel ? 'var(--gold)' : 'var(--border)'}`,
+                      borderRadius: 8,
+                      background: sel ? 'rgba(196,151,90,0.08)' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: sel ? 'var(--gold)' : 'var(--charcoal)' }}>{v.label}</span>
+                      {sel && <Check size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />}
+                    </div>
+                    {v.description && (
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{v.description}</div>
+                    )}
+                  </button>
+                )
+              })}
             </div>
-          </details>
-        ))}
-        <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { couple_name: '', text: '', wedding_date: '', rating: 5 })}>+ Añadir testimonio</button>
-      </div>
-    )
+          </div>
+
+          {/* Testimonials list */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Testimonios</div>
+            {getOverride(overrideKey).map((t: any, i: number) => (
+              <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 7, marginBottom: 7, overflow: 'hidden' }}>
+                <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
+                  <ChevronDown size={11} color="var(--warm-gray)" />
+                  <span style={{ flex: 1 }}>{t.couple_name || <em style={{ color: 'var(--warm-gray)' }}>Nuevo testimonio</em>}</span>
+                  <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeItem(overrideKey, i) }}><X size={12} /></button>
+                </summary>
+                <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    <input className="form-input" placeholder="Nombres pareja *" style={{ fontSize: 12 }} value={t.couple_name ?? ''} onChange={e => updateItem(overrideKey, i, 'couple_name', e.target.value)} />
+                    <input className="form-input" type="date" style={{ width: 145, flexShrink: 0, fontSize: 12 }} value={t.wedding_date ?? ''} onChange={e => updateItem(overrideKey, i, 'wedding_date', e.target.value)} />
+                  </div>
+                  <textarea className="form-textarea" style={{ minHeight: 70, fontSize: 12 }} placeholder="Testimonio…" value={t.text ?? ''} onChange={e => updateItem(overrideKey, i, 'text', e.target.value)} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--warm-gray)' }}>
+                    Estrellas:
+                    <input className="form-input" type="number" min={1} max={5} style={{ width: 65, fontSize: 12 }} value={t.rating ?? 5} onChange={e => updateItem(overrideKey, i, 'rating', Number(e.target.value) || 5)} />
+                  </div>
+                </div>
+              </details>
+            ))}
+            <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { couple_name: '', text: '', wedding_date: '', rating: 5 })}>+ Añadir testimonio</button>
+          </div>
+        </div>
+      )
+    }
 
     if (secId === 'collaborators') return (
       <div>

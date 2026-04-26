@@ -5,7 +5,7 @@
 //            → Qué incluye → Testimoniales → Colaboradores → Extras → FAQ → CTA
 
 import { useEffect, useRef, useState } from 'react'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, StarRating, resolveContact, type ProposalData } from './shared'
+import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, StarRating, resolveContact, type ProposalData } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
@@ -865,36 +865,23 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           TESTIMONIALES
       ════════════════════════════════════════════ */}
-      {on('testimonials') && testsShow.length > 0 && (
-        <section className="t1-sec" style={{ background: '#050505' }}>
-          <div className="w">
-            <FadeUp>
-              <span className="t1-label">Lo dicen nuestras parejas</span>
-              <h2 className="t1-h2">Experiencias reales</h2>
-            </FadeUp>
-            <div className="t1-tests">
-              {testsShow.map((t: any, i: number) => {
-                const name = t.couple_name || t.names || ''
-                const rawDate = t.wedding_date || t.date
-                const dateStr = rawDate && /^\d{4}-\d{2}-\d{2}/.test(rawDate) ? formatDate(rawDate) : rawDate
-                return (
-                  <FadeUp key={i} delay={i * .1}>
-                    <div className="t1-test">
-                      <div className="t1-test-qmark">"</div>
-                      <div className="t1-test-stars"><StarRating rating={t.rating ?? 5} size={14} color="#F5A623" /></div>
-                      <p className="t1-test-text">"{t.text}"</p>
-                      <div className="t1-test-foot">
-                        <div className="t1-test-couple">{name}</div>
-                        {dateStr && <div className="t1-test-date">{dateStr}</div>}
-                      </div>
-                    </div>
-                  </FadeUp>
-                )
-              })}
+      {on('testimonials') && testsShow.length > 0 && (() => {
+        const testimonialsStyle = getActiveStyle(sec, 'testimonials')
+        const TestimonialsComp = testimonialsStyle === 'quotes' ? TestimonialsQuotes : testimonialsStyle === 'compact' ? TestimonialsCompact : TestimonialsCards
+        return (
+          <section className="t1-sec" style={{ background: '#050505' }}>
+            <div className="w">
+              <FadeUp>
+                <span className="t1-label">Lo dicen nuestras parejas</span>
+                <h2 className="t1-h2">Experiencias reales</h2>
+              </FadeUp>
+              <FadeUp delay={.05}>
+                <TestimonialsComp items={testsShow} primary={primary} dark font={FONT} />
+              </FadeUp>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )
+      })()}
 
       {/* ════════════════════════════════════════════
           COLABORADORES

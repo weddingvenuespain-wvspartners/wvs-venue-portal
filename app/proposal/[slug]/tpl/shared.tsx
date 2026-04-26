@@ -568,6 +568,135 @@ export function InclusionsCards({ items, primary, dark = true }: { items: Inclus
   )
 }
 
+// ─── Testimonials ────────────────────────────────────────────────────────────
+// Three layout variants: cards (default), quotes (large typography), compact (avatar list).
+
+type TestimonialItem = {
+  couple_name?: string
+  names?: string
+  text?: string
+  rating?: number
+  wedding_date?: string
+  date?: string
+}
+
+function fmtTestimonialDate(t: TestimonialItem): string {
+  const raw = t.wedding_date || t.date
+  if (!raw) return ''
+  return /^\d{4}-\d{2}-\d{2}/.test(raw) ? (formatDate(raw) ?? raw) : raw
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(/[\s&,]+/)
+    .filter(Boolean)
+    .map(p => p[0]?.toUpperCase() ?? '')
+    .slice(0, 2)
+    .join('')
+}
+
+export function TestimonialsCards({ items, primary, dark = true, font }: { items: TestimonialItem[]; primary: string; dark?: boolean; font?: string }) {
+  if (!items.length) return null
+  const rgb = toRgb(primary)
+  const cardBg = dark ? '#111' : '#fff'
+  const border = dark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.08)'
+  const textColor = dark ? 'rgba(255,255,255,.75)' : '#3a342f'
+  const nameColor = dark ? '#fff' : '#181410'
+  const dividerColor = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
+  const FONT = font || "'Cormorant Garamond', Georgia, serif"
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 24, alignItems: 'stretch' }}>
+      {items.map((t, i) => {
+        const name = t.couple_name || t.names || ''
+        const dateStr = fmtTestimonialDate(t)
+        return (
+          <div key={i}
+            style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 18, padding: '32px 32px 28px', background: cardBg, border: `1px solid ${border}`, borderRadius: 4, overflow: 'hidden', transition: 'border-color .3s, transform .3s' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = `rgba(${rgb}, .35)`; e.currentTarget.style.transform = 'translateY(-3px)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.transform = '' }}
+          >
+            <span aria-hidden style={{ position: 'absolute', top: 8, right: 20, fontFamily: FONT, fontSize: '7rem', lineHeight: .7, color: primary, opacity: .1, userSelect: 'none', pointerEvents: 'none' }}>"</span>
+            <div style={{ position: 'relative', zIndex: 1 }}><StarRating rating={t.rating ?? 5} size={14} color="#F5A623" /></div>
+            <p style={{ fontFamily: FONT, fontStyle: 'italic', fontSize: '1.02rem', lineHeight: 1.75, color: textColor, flex: 1, position: 'relative', zIndex: 1, paddingLeft: 16, borderLeft: `2px solid ${primary}`, margin: 0 }}>
+              "{t.text}"
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 18, borderTop: `1px solid ${dividerColor}`, marginTop: 'auto', position: 'relative', zIndex: 1 }}>
+              <div style={{ fontSize: '.92rem', fontWeight: 600, color: nameColor, letterSpacing: '.01em' }}>{name}</div>
+              {dateStr && <div style={{ fontSize: '.72rem', color: primary, fontWeight: 500, letterSpacing: '.08em', textTransform: 'uppercase' }}>{dateStr}</div>}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export function TestimonialsQuotes({ items, primary, dark = true, font }: { items: TestimonialItem[]; primary: string; dark?: boolean; font?: string }) {
+  if (!items.length) return null
+  const textColor = dark ? 'rgba(255,255,255,.85)' : '#3a342f'
+  const nameColor = dark ? '#fff' : '#181410'
+  const divider = dark ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.08)'
+  const FONT = font || "'Cormorant Garamond', Georgia, serif"
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {items.map((t, i) => {
+        const name = t.couple_name || t.names || ''
+        const dateStr = fmtTestimonialDate(t)
+        const isLast = i === items.length - 1
+        return (
+          <div key={i} style={{ padding: '36px 24px', borderBottom: isLast ? 'none' : `1px solid ${divider}`, textAlign: 'center', maxWidth: 720, margin: '0 auto', width: '100%' }}>
+            <div style={{ marginBottom: 18, display: 'flex', justifyContent: 'center' }}>
+              <StarRating rating={t.rating ?? 5} size={15} color="#F5A623" />
+            </div>
+            <p style={{ fontFamily: FONT, fontSize: 'clamp(1.3rem, 2vw, 1.7rem)', lineHeight: 1.5, fontStyle: 'italic', fontWeight: 300, color: textColor, margin: '0 0 22px', letterSpacing: '-.005em' }}>
+              "{t.text}"
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+              <div style={{ width: 28, height: 1, background: primary, marginBottom: 6 }} />
+              <div style={{ fontSize: '.92rem', fontWeight: 600, color: nameColor, letterSpacing: '.04em' }}>{name}</div>
+              {dateStr && <div style={{ fontSize: '.7rem', color: primary, fontWeight: 500, letterSpacing: '.12em', textTransform: 'uppercase' }}>{dateStr}</div>}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export function TestimonialsCompact({ items, primary, dark = true }: { items: TestimonialItem[]; primary: string; dark?: boolean; font?: string }) {
+  if (!items.length) return null
+  const rgb = toRgb(primary)
+  const border = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
+  const bg = dark ? 'rgba(255,255,255,.02)' : '#fff'
+  const textColor = dark ? 'rgba(255,255,255,.78)' : '#3a342f'
+  const nameColor = dark ? '#fff' : '#181410'
+  const subColor = dark ? 'rgba(255,255,255,.5)' : '#6a6560'
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {items.map((t, i) => {
+        const name = t.couple_name || t.names || ''
+        const dateStr = fmtTestimonialDate(t)
+        const initials = getInitials(name) || '·'
+        return (
+          <div key={i} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: '18px 20px', background: bg, border: `1px solid ${border}`, borderRadius: 12 }}>
+            <div style={{ flexShrink: 0, width: 44, height: 44, borderRadius: '50%', background: `rgba(${rgb}, .2)`, color: primary, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '.85rem', letterSpacing: '.02em' }}>
+              {initials}
+            </div>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '.92rem', fontWeight: 600, color: nameColor }}>{name}</span>
+                <StarRating rating={t.rating ?? 5} size={11} color="#F5A623" />
+                {dateStr && <span style={{ fontSize: '.7rem', color: subColor, marginLeft: 'auto' }}>{dateStr}</span>}
+              </div>
+              <p style={{ fontSize: '.85rem', lineHeight: 1.6, color: textColor, margin: 0 }}>"{t.text}"</p>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── Venue Rental Grid — tarifas temporada × día ─────────────────────────────
 export function VenueRentalGrid({
   data, primary, dark = false,
