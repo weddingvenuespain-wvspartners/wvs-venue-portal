@@ -465,21 +465,28 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       )}
 
       {/* ── STATS BAR ── */}
-      <div className="t1-stats">
-        {[
-          { n: '1687', l: 'Año de fundación' },
-          { n: techspecs?.sqm?.split('·')[0]?.trim() || '8 Ha', l: 'Extensión' },
-          { n: '350', l: 'Capacidad máxima' },
-          { n: '1', l: 'Sola boda al día' },
-        ].map((s, i) => (
-          <FadeIn key={i} delay={i * .08}>
-            <div className="t1-stat">
-              <span className="t1-stat-n">{s.n}</span>
-              <span className="t1-stat-l">{s.l}</span>
-            </div>
-          </FadeIn>
-        ))}
-      </div>
+      {on('venue_specs') && (() => {
+        const vs = (sec as any).venue_specs ?? {}
+        const items = [
+          { n: vs.founded_year ?? '1687',                                                l: 'Año de fundación' },
+          { n: vs.area ?? techspecs?.sqm?.split('·')[0]?.trim() ?? '8 Ha',               l: 'Extensión' },
+          { n: vs.max_capacity ?? '350',                                                  l: 'Capacidad máxima' },
+          { n: vs.extra_value ?? '1',                                                     l: vs.extra_label ?? 'Sola boda al día' },
+        ].filter(s => s.n !== '' && s.n != null)
+        if (!items.length) return null
+        return (
+          <div className="t1-stats">
+            {items.map((s, i) => (
+              <FadeIn key={i} delay={i * .08}>
+                <div className="t1-stat">
+                  <span className="t1-stat-n">{s.n}</span>
+                  <span className="t1-stat-l">{s.l}</span>
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* ════════════════════════════════════════════
           MENSAJE PERSONAL + CONVERSION BLOCK

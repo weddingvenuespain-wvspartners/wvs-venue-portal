@@ -20,7 +20,7 @@ import { getSectionLabel, SECTION_SPACE_TYPES, SPACE_TYPE_LABELS } from '@/lib/s
 // ─── Section catalogue ────────────────────────────────────────────────────────
 
 export const ALL_SECTION_IDS = [
-  'hero', 'availability', 'sticky_nav',
+  'hero', 'availability', 'venue_specs', 'sticky_nav',
   'welcome', 'welcome_light', 'welcome_split', 'welcome_editorial',
   'experience', 'gallery',
   'single_space', 'zones', 'space_groups', 'venue_rental', 'inclusions', 'testimonials',
@@ -33,6 +33,7 @@ type SectionId = typeof ALL_SECTION_IDS[number]
 const SECTION_LABELS: Record<SectionId, string> = {
   hero:              'Foto principal',
   availability:      'Disponibilidad',
+  venue_specs:       'Datos del venue (año, capacidad, extensión…)',
   sticky_nav:        'Menú de navegación (sticky top)',
   welcome:           'Bienvenida · Oscura (cita centrada)',
   welcome_light:     'Bienvenida · Fondo claro',
@@ -297,6 +298,30 @@ export default function TemplateEditor({
         value={sections.availability_message ?? ''}
         onChange={e => { setSections(s => ({ ...s, availability_message: e.target.value })); markDirty() }} />
     )
+
+    if (secId === 'venue_specs') {
+      const vs = (sections as any).venue_specs ?? {}
+      const setVs = (patch: any) => { setSections((s: any) => ({ ...s, venue_specs: { ...((s as any).venue_specs ?? {}), ...patch } })); markDirty() }
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <input className="form-input" style={{ fontSize: 12 }} placeholder="Año fundación (ej. 1687)"
+              value={vs.founded_year ?? ''} onChange={e => setVs({ founded_year: e.target.value })} />
+            <input className="form-input" style={{ fontSize: 12 }} placeholder="Extensión (ej. 8 Ha)"
+              value={vs.area ?? ''} onChange={e => setVs({ area: e.target.value })} />
+            <input className="form-input" style={{ fontSize: 12 }} placeholder="Capacidad máxima (ej. 350)"
+              value={vs.max_capacity ?? ''} onChange={e => setVs({ max_capacity: e.target.value })} />
+            <input className="form-input" style={{ fontSize: 12 }} placeholder="Valor extra (ej. 1)"
+              value={vs.extra_value ?? ''} onChange={e => setVs({ extra_value: e.target.value })} />
+          </div>
+          <input className="form-input" style={{ fontSize: 12 }} placeholder="Etiqueta del valor extra (ej. Sola boda al día)"
+            value={vs.extra_label ?? ''} onChange={e => setVs({ extra_label: e.target.value })} />
+          <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.55 }}>
+            Estos datos aparecen en las plantillas que muestran estadísticas del venue (ej. T1Impacto). Deja un campo vacío para ocultarlo individualmente.
+          </div>
+        </div>
+      )
+    }
 
     if (secId === 'experience') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
