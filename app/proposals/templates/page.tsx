@@ -77,9 +77,9 @@ export default function TemplatesPage() {
           <div className="topbar-title">Propuestas</div>
         </div>
 
-        <div className="page-content" style={{ paddingBottom: 0 }}>
+        <div className="page-content">
           {/* Tab bar */}
-          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--ivory)', marginBottom: 0 }}>
+          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--ivory)', marginBottom: 24 }}>
             <a href="/proposals" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', textDecoration: 'none', borderBottom: '2px solid transparent', marginBottom: -2, color: 'var(--warm-gray)', transition: 'all .15s' }}>
               <FileText size={15} /><span style={{ fontSize: 13, fontWeight: 500 }}>Propuestas</span>
             </a>
@@ -87,9 +87,6 @@ export default function TemplatesPage() {
               <LayoutTemplate size={15} color="var(--gold)" /><span style={{ fontSize: 13, fontWeight: 600 }}>Plantillas</span>
             </button>
           </div>
-        </div>
-
-        <div className="page-content">
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
               <Loader2 size={18} className="animate-spin" style={{ color: 'var(--warm-gray)' }} />

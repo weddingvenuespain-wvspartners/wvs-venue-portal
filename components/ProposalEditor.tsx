@@ -1,17 +1,19 @@
 'use client'
-import { useEffect, useState, useRef, useMemo } from 'react'
+import { useEffect, useState, useRef, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Check, X, Upload, AlertCircle, Zap, Sparkles, ClipboardList, MessageCircle, Target, ChevronDown, ArrowLeft, Copy, ChefHat } from 'lucide-react'
-import type { SectionsData } from '@/lib/proposal-types'
+import { Check, X, Upload, AlertCircle, ChevronDown, ArrowLeft, Copy, ChefHat } from 'lucide-react'
+import type { SectionsData, VenueSpaceGroup } from '@/lib/proposal-types'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes'
 import ProposalPreview from './ProposalPreview'
 import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
+import MultipleZonesEditor from './MultipleZonesEditor'
 import ProposalDateModal from './ProposalDateModal'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
+import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,6 +60,7 @@ const SECTION_LABELS: Record<string, string> = {
   welcome_editorial: 'Bienvenida · Editorial (tipografía grande)',
   experience: 'La experiencia',
   gallery: 'Galería de fotos',
+  single_space: 'Tu espacio',
   zones: 'Zonas del venue',
   space_groups: 'Grupos de espacios',
   venue_rental: 'Tarifas de alquiler (grid temporada × día)',
@@ -93,8 +96,10 @@ function getDefaultSections(cfg: { space_type: string; price_model: string; menu
     welcome_editorial: false,
     experience:       true,
     gallery:          true,
-    zones:            cfg.space_type === 'multiple_independent',
-    venue_rental:     cfg.price_model === 'rental',
+    single_space:     cfg.space_type === 'single',
+    zones:            cfg.space_type === 'single_with_supplements',
+    space_groups:     cfg.space_type === 'multiple_independent',
+    venue_rental:     cfg.price_model === 'rental' && cfg.space_type !== 'multiple_independent',
     inclusions:       cfg.price_model === 'package' && cfg.menu_included !== false,
     testimonials:     true,
     collaborators:    false,
@@ -120,6 +125,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
   const [modalities, setModalities] = useState<any[]>([])
   const [commercialConfig, setCommercialConfig] = useState<{ space_type: string; price_model: string } | null>(null)
+  const [venueSpaceGroups, setVenueSpaceGroups] = useState<VenueSpaceGroup[]>([])
   const [menuCatalog, setMenuCatalog] = useState<SectionsData | null>(null)
   const [contentTemplates, setContentTemplates] = useState<Array<{ id: string; name: string; description: string | null; sections_data: SectionsData; is_default: boolean }>>([])
   const [applyingTemplate, setApplyingTemplate] = useState(false)
@@ -175,13 +181,14 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
         supabase.from('leads').select('id, name, guests, email').eq('user_id', user.id).order('created_at', { ascending: false }),
         supabase.from('proposal_web_templates').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('venue_onboarding').select('name, city, region, contact_email, contact_phone, website, photo_urls').eq('user_id', user.id).maybeSingle(),
-        supabase.from('venue_settings').select('commercial_config, menu_catalog').eq('user_id', user.id).maybeSingle(),
+        supabase.from('venue_settings').select('commercial_config, menu_catalog, space_groups').eq('user_id', user.id).maybeSingle(),
         fetch('/api/estructura/modalities'),
         fetch('/api/proposal-templates'),
       ])
       if (leadsData) setLeads(leadsData)
       if (tplData) setTemplates(tplData as ProposalTemplate[])
       if (venueRow) setVenue(venueRow)
+      if (Array.isArray(settingsRow?.space_groups)) setVenueSpaceGroups(settingsRow.space_groups as VenueSpaceGroup[])
       if (settingsRow?.commercial_config) {
         const cfg = settingsRow.commercial_config as { space_type: string; price_model: string }
         setCommercialConfig(cfg)
@@ -372,6 +379,11 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       ...(tpl.sections_data ?? {}),
       content_template_id: templateId,
     }))
+    // Also apply visual branding from template if set
+    const sd = tpl.sections_data ?? {}
+    if (sd.primary_color) setForm(f => ({ ...f, primary_color: sd.primary_color! }))
+    if (sd.font_family)   setForm(f => ({ ...f, font_family: sd.font_family! }))
+    if (sd.logo_url)      setForm(f => ({ ...f, logo_url: sd.logo_url! }))
     setTimeout(() => setApplyingTemplate(false), 500)
   }
 
@@ -592,38 +604,6 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 </div>
               )}
 
-              {/* Template selector */}
-              <div className="form-group" style={{ marginTop: 14 }}>
-                <label className="form-label">Diseño de la propuesta</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  {([
-                    { id: 1, icon: '⚡', name: 'Impacto Directo', desc: 'Dark luxury' },
-                    { id: 2, icon: '✨', name: 'Emoción Primero', desc: 'Cream editorial' },
-                    { id: 3, icon: '📋', name: 'Todo Claro', desc: 'Estructurado' },
-                    { id: 4, icon: '💬', name: 'Social Proof', desc: 'Stats + confianza' },
-                    { id: 5, icon: '◻', name: 'Minimalista', desc: 'CTA prominente' },
-                  ] as const).map(tpl => {
-                    const active = (sections.visual_template_id ?? 1) === tpl.id
-                    return (
-                      <button key={tpl.id} type="button"
-                        onClick={() => setSections(s => ({ ...s, visual_template_id: tpl.id }))}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                          borderRadius: 7, cursor: 'pointer', textAlign: 'left',
-                          border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
-                          background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
-                        }}>
-                        <span style={{ fontSize: 14 }}>{tpl.icon}</span>
-                        <div>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)' }}>{tpl.name}</div>
-                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{tpl.desc}</div>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
               <div className="form-group" style={{ marginTop: 14 }}>
                 <label className="form-label">Tipo de servicio</label>
                 <div style={{ display: 'flex', gap: 10 }}>
@@ -679,36 +659,6 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
           {activeTab === 'visual' && (
             <div>
               <div style={secLabel}>Aspecto visual de la landing</div>
-
-              <div className="form-group" style={{ marginBottom: 20 }}>
-                <label className="form-label">Diseño de la landing</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
-                  {([
-                    { id: 1, icon: <Zap size={18} />, name: 'Impacto Directo', desc: 'Dark luxury · precio visible · CTA al frente' },
-                    { id: 2, icon: <Sparkles size={18} />, name: 'Emoción Primero', desc: 'Cream editorial · galería arriba · emotivo' },
-                    { id: 3, icon: <ClipboardList size={18} />, name: 'Todo Claro', desc: 'Sidebar + índice · estructurado' },
-                    { id: 4, icon: <MessageCircle size={18} />, name: 'Social Proof', desc: 'Stats + testimonios · confianza' },
-                    { id: 5, icon: <Target size={18} />, name: 'Minimalista', desc: 'Limpio · CTA muy prominente' },
-                  ] as const).map(tpl => {
-                    const active = (sections.visual_template_id ?? 1) === tpl.id
-                    return (
-                      <button key={tpl.id} type="button" onClick={() => setSections(s => ({ ...s, visual_template_id: tpl.id }))}
-                        style={{
-                          display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
-                          borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                          border: `2px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
-                          background: active ? 'rgba(196,151,90,0.10)' : 'var(--surface)',
-                        }}>
-                        <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>{tpl.icon}</span>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)', marginBottom: 2 }}>{tpl.name}</div>
-                          <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{tpl.desc}</div>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
 
               <div className="form-group">
                 <label className="form-label">Color principal</label>
@@ -781,16 +731,15 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
           {activeTab === 'secciones' && (() => {
             // Sections in the same order the templates render them
             const ALL_SECTION_IDS = [
-              'hero',
-              'date_slots',
-              'availability',
+              // Order matches T1Impacto render order top → bottom
               'sticky_nav',
-              'welcome',
-              'welcome_light',
-              'welcome_split',
-              'welcome_editorial',
+              'hero',
+              'availability',
+              'date_slots',
+              'welcome', 'welcome_light', 'welcome_split', 'welcome_editorial', // grouped
               'experience',
               'gallery',
+              'single_space',
               'zones',
               'space_groups',
               'venue_rental',
@@ -810,6 +759,57 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               const e = sections.sections_enabled
               return e ? (e[id] !== false) : true
             }
+
+            const WELCOME_VARIANTS = ['welcome', 'welcome_light', 'welcome_split', 'welcome_editorial']
+            const WELCOME_VARIANT_LABELS: Record<string, string> = {
+              welcome: 'Oscura · cita centrada',
+              welcome_light: 'Fondo claro',
+              welcome_split: 'Dos columnas con imagen',
+              welcome_editorial: 'Editorial · tipografía grande',
+            }
+            const se = sections.sections_enabled ?? {}
+            const welcomeGroupOn = !WELCOME_VARIANTS.every(v => se[v] === false)
+            const activeWelcome = WELCOME_VARIANTS.find(v => se[v] === true)
+              ?? (welcomeGroupOn ? (WELCOME_VARIANTS.find(v => se[v] !== false) ?? 'welcome') : 'welcome')
+            const toggleWelcomeGroup = (on: boolean) => setSections(s => ({
+              ...s,
+              sections_enabled: {
+                ...(s.sections_enabled ?? {}),
+                ...Object.fromEntries(WELCOME_VARIANTS.map(v => [v, on ? v === activeWelcome : false]))
+              }
+            }))
+            const selectWelcomeVariant = (variant: string) => setSections(s => ({
+              ...s,
+              sections_enabled: {
+                ...(s.sections_enabled ?? {}),
+                ...Object.fromEntries(WELCOME_VARIANTS.map(wv => [wv, wv === variant]))
+              }
+            }))
+
+            const SPACE_GROUP_IDS = ['single_space', 'zones', 'space_groups', 'venue_rental']
+            const visibleSpaceSubs = SPACE_GROUP_IDS.filter(id => isSectionAllowed(id, commercialConfig?.space_type as any))
+            const isSpaceGroupOpen = openSecs.has('__space_group')
+            const activeSpaceIds = visibleSpaceSubs.filter(id => isSectionOn(id))
+            const activeSpaceLabel = activeSpaceIds.length === 0
+              ? 'Ninguna activa'
+              : activeSpaceIds.map(id => getSectionLabel(id, commercialConfig?.space_type as any, SECTION_LABELS[id] || id)).join(' · ')
+            const renderSpaceGroupHeader = () => (
+              <div key="__sg_header" className="sec-row" style={{ background: 'rgba(196,151,90,0.06)' }}>
+                <div className="sec-header"
+                  onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('__space_group') ? n.delete('__space_group') : n.add('__space_group'); return n })}
+                  style={{ cursor: 'pointer', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--charcoal)' }}>Espacios y precios</span>
+                      <span style={{ fontSize: 10, color: activeSpaceIds.length > 0 ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 7px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600 }}>{activeSpaceIds.length}/{visibleSpaceSubs.length}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: activeSpaceIds.length === 0 ? 'var(--warm-gray)' : '#999', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeSpaceLabel}</div>
+                  </div>
+                  <ChevronDown size={14} style={{ color: 'var(--warm-gray)', transform: isSpaceGroupOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0, marginTop: 2 }} />
+                </div>
+              </div>
+            )
+
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                 {tplSections.length === 0 && (
@@ -819,13 +819,120 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 )}
 
                 {tplSections.map(secId => {
-                  const label = SECTION_LABELS[secId] || secId
+                  if (['welcome_light', 'welcome_split', 'welcome_editorial'].includes(secId)) return null
+                  if (!isSectionAllowed(secId, commercialConfig?.space_type as any)) return null
+
+                  // Space group: collapsed → only header at first sub; expanded → header + indented subs
+                  const isInSpaceGroup = SPACE_GROUP_IDS.includes(secId)
+                  const isFirstSpaceVisible = isInSpaceGroup && visibleSpaceSubs[0] === secId
+                  if (isInSpaceGroup && !isSpaceGroupOpen) {
+                    return isFirstSpaceVisible ? renderSpaceGroupHeader() : null
+                  }
+
+                  if (secId === 'welcome') {
+                    const isWelcomeOpen = openSecs.has('welcome')
+                    const activeVariantLabel = welcomeGroupOn ? WELCOME_VARIANT_LABELS[activeWelcome] : 'Desactivada'
+                    return (
+                      <div key="welcome-group" className="sec-row" style={{ opacity: welcomeGroupOn ? 1 : 0.55, background: 'rgba(196,151,90,0.06)' }}>
+                        <div className="sec-header"
+                          onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('welcome') ? n.delete('welcome') : n.add('welcome'); return n })}
+                          style={{ alignItems: 'flex-start' }}>
+                          <div onClick={e => { e.stopPropagation(); toggleWelcomeGroup(!welcomeGroupOn) }}
+                            style={{ width: 34, height: 19, borderRadius: 10, background: welcomeGroupOn ? 'var(--gold)' : '#d1c9b8', position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0, marginTop: 2 }}>
+                            <div style={{ position: 'absolute', top: 2, left: welcomeGroupOn ? 15 : 2, width: 15, height: 15, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+                          </div>
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--charcoal)' }}>Bienvenida</span>
+                              <span style={{ fontSize: 10, color: welcomeGroupOn ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 7px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600 }}>{welcomeGroupOn ? '1' : '0'}/{WELCOME_VARIANTS.length}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: welcomeGroupOn ? '#999' : 'var(--warm-gray)', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeVariantLabel}</div>
+                          </div>
+                          <ChevronDown size={14} style={{ color: 'var(--warm-gray)', transform: isWelcomeOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0, marginTop: 2 }} />
+                        </div>
+
+                        {isWelcomeOpen && (
+                          <div className="sec-open-content" style={{ padding: '12px 14px 14px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14, padding: '8px 10px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                              {WELCOME_VARIANTS.map(v => (
+                                <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '3px 0' }}>
+                                  <input type="radio" name="welcome-variant" checked={activeWelcome === v} onChange={() => selectWelcomeVariant(v)} style={{ accentColor: 'var(--gold)' }} />
+                                  <span style={{ fontSize: 12, color: 'var(--charcoal)' }}>{WELCOME_VARIANT_LABELS[v]}</span>
+                                </label>
+                              ))}
+                            </div>
+
+                            {activeWelcome === 'welcome' && (
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <textarea className="form-textarea" style={{ minHeight: 80 }} placeholder="Mensaje personalizado para la pareja..." value={form.personal_message ?? ''} onChange={e => setForm(f => ({ ...f, personal_message: e.target.value }))} />
+                                <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4, lineHeight: 1.5 }}>
+                                  Si se deja vacío, se usará el texto por defecto de la plantilla.
+                                </div>
+                              </div>
+                            )}
+
+                            {activeWelcome === 'welcome_light' && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                                  Muestra el mensaje de bienvenida sobre fondo claro crema. Ideal para venues con estética romántica y luminosa.
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Imagen de fondo (opcional)</label>
+                                  <input className="form-input" placeholder="https://..." value={(sections as any).welcome_light?.image_url ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_light: { ...(s.welcome_light ?? {}), image_url: e.target.value } }))} />
+                                </div>
+                              </div>
+                            )}
+
+                            {activeWelcome === 'welcome_split' && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                                  Muestra el mensaje de bienvenida en dos columnas: imagen a un lado, texto al otro.
+                                </div>
+                                <div className="form-group">
+                                  <label className="form-label">URL de la imagen</label>
+                                  <input className="form-input" placeholder="https://..." value={(sections as any).welcome_split?.image_url ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_url: e.target.value } }))} />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Posición de la imagen</label>
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    {(['left', 'right'] as const).map(side => (
+                                      <button key={side} type="button"
+                                        style={{ flex: 1, padding: '7px 0', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: ((sections as any).welcome_split?.image_side ?? 'left') === side ? 'var(--gold)' : 'var(--surface)', color: ((sections as any).welcome_split?.image_side ?? 'left') === side ? '#fff' : 'var(--charcoal)', cursor: 'pointer', fontWeight: 600 }}
+                                        onClick={() => setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_side: side } }))}>
+                                        {side === 'left' ? 'Izquierda' : 'Derecha'}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {activeWelcome === 'welcome_editorial' && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                                  Muestra el mensaje de bienvenida con tipografía editorial grande, estilo revista de lujo.
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Eyebrow / Etiqueta superior (opcional)</label>
+                                  <input className="form-input" placeholder="Ej. Un mensaje para vosotros" value={(sections as any).welcome_editorial?.eyebrow ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_editorial: { ...(s.welcome_editorial ?? {}), eyebrow: e.target.value } }))} />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+
+                  const label = getSectionLabel(secId, commercialConfig?.space_type as any, SECTION_LABELS[secId] || secId)
                   const isOn = isSectionOn(secId)
                   const isOpen = openSecs.has(secId)
                   const overrideKey = `${secId}_override`
 
                   return (
-                    <div key={secId} className="sec-row" style={{ opacity: isOn ? 1 : 0.55 }}>
+                    <Fragment key={secId}>
+                    {isInSpaceGroup && isFirstSpaceVisible && renderSpaceGroupHeader()}
+                    <div className="sec-row" style={{ opacity: isOn ? 1 : 0.55, ...(isInSpaceGroup ? { paddingLeft: 14, borderLeft: '2px solid rgba(196,151,90,0.25)', background: 'rgba(196,151,90,0.02)' } : {}) }}>
                       <div className="sec-header" onClick={() => setOpenSecs(s => { const n = new Set(s); n.has(secId) ? n.delete(secId) : n.add(secId); return n })}>
                         <div onClick={e => { e.stopPropagation(); toggleSec(secId, !isOn) }}
                           style={{ width: 34, height: 19, borderRadius: 10, background: isOn ? 'var(--gold)' : '#d1c9b8', position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0 }}>
@@ -948,6 +1055,51 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                             )
                           })()}
 
+                          {/* SINGLE SPACE */}
+                          {secId === 'single_space' && (() => {
+                            const ss: any = (sections as any).single_space ?? {}
+                            const setSs = (patch: any) => setSections((s: any) => ({ ...s, single_space: { ...(s.single_space ?? {}), ...patch } }))
+                            const features: string[] = Array.isArray(ss.features) ? ss.features : []
+                            const setFeatures = (next: string[]) => setSs({ features: next })
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Título</label>
+                                  <input className="form-input" placeholder="Ej. El Salón Principal" value={ss.title ?? ''} onChange={e => setSs({ title: e.target.value })} />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Descripción</label>
+                                  <textarea className="form-textarea" style={{ minHeight: 70 }} placeholder="Cuenta cómo es el espacio, qué lo hace especial…" value={ss.description ?? ''} onChange={e => setSs({ description: e.target.value })} />
+                                </div>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                  <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                                    <label className="form-label">m²</label>
+                                    <input className="form-input" placeholder="500" value={ss.sqm ?? ''} onChange={e => setSs({ sqm: e.target.value })} />
+                                  </div>
+                                  <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                                    <label className="form-label">Capacidad máx.</label>
+                                    <input className="form-input" placeholder="200 invitados" value={ss.max_guests ?? ''} onChange={e => setSs({ max_guests: e.target.value })} />
+                                  </div>
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Imagen del espacio (opcional)</label>
+                                  <input className="form-input" placeholder="https://..." value={ss.image_url ?? ''} onChange={e => setSs({ image_url: e.target.value })} />
+                                  <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4 }}>Si la dejas vacía, se usará la foto principal.</div>
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Características destacadas</label>
+                                  {features.map((f, fi) => (
+                                    <div key={fi} style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                                      <input className="form-input" placeholder="Ej. Aire acondicionado" value={f} onChange={e => setFeatures(features.map((x, j) => j === fi ? e.target.value : x))} />
+                                      <button type="button" style={removeBtn} onClick={() => setFeatures(features.filter((_, j) => j !== fi))}><X size={11} /></button>
+                                    </div>
+                                  ))}
+                                  <button type="button" style={addBtn} onClick={() => setFeatures([...features, ''])}>+ Añadir característica</button>
+                                </div>
+                              </div>
+                            )
+                          })()}
+
                           {/* ZONES */}
                           {secId === 'zones' && (
                             <div>
@@ -977,6 +1129,10 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                         <input className="form-input" style={{ width: 80, flexShrink: 0 }} type="number" placeholder="m²" value={z.sqm ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'sqm', e.target.value ? Number(e.target.value) : undefined)} />
                                       </div>
                                       <input className="form-input" placeholder="Descripción breve" value={z.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
+                                      <input className="form-input"
+                                        placeholder={commercialConfig?.space_type === 'single_with_supplements' ? 'Suplemento (ej. +500€)' : 'Precio (opcional)'}
+                                        value={z.price ?? ''}
+                                        onChange={e => updateOverrideItem(overrideKey, i, 'price', e.target.value)} />
 
                                       {/* Image upload */}
                                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -1052,11 +1208,21 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
                           {/* SPACE GROUPS */}
                           {secId === 'space_groups' && (
-                            <SpaceGroupEditor
-                              groups={(sections as any).space_groups ?? []}
-                              onChange={val => setSections((s: any) => ({ ...s, space_groups: val }))}
-                              uploadImage={uploadImage}
-                            />
+                            commercialConfig?.space_type === 'multiple_independent' ? (
+                              <MultipleZonesEditor
+                                venueSpaceGroups={venueSpaceGroups}
+                                groups={(sections as any).space_groups ?? []}
+                                onChange={val => setSections((s: any) => ({ ...s, space_groups: val }))}
+                                uploadImage={uploadImage}
+                                guestCount={leads.find(l => l.id === form.lead_id)?.guests ?? undefined}
+                              />
+                            ) : (
+                              <SpaceGroupEditor
+                                groups={(sections as any).space_groups ?? []}
+                                onChange={val => setSections((s: any) => ({ ...s, space_groups: val }))}
+                                uploadImage={uploadImage}
+                              />
+                            )
                           )}
 
                           {/* INCLUSIONS */}
@@ -1235,12 +1401,6 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                             </div>
                           )}
 
-                          {secId === 'welcome' && (
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <textarea className="form-textarea" style={{ minHeight: 80 }} placeholder="Mensaje personalizado para la pareja..." value={form.personal_message ?? ''} onChange={e => setForm(f => ({ ...f, personal_message: e.target.value }))} />
-                            </div>
-                          )}
-
                           {secId === 'availability' && (
                             <div className="form-group" style={{ marginBottom: 0 }}>
                               <textarea className="form-textarea" style={{ minHeight: 70 }} placeholder="Ej. Fecha disponible, confirmación prioritaria..." value={sections.availability_message ?? ''} onChange={e => setSections(s => ({ ...s, availability_message: e.target.value }))} />
@@ -1251,54 +1411,6 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                             <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.6, background: 'var(--cream)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border)' }}>
                               Cuando está activo, aparecen enlaces de navegación en la barra superior para que la pareja pueda saltar directamente a las secciones más relevantes (galería, espacios, menús, contacto...).
                               Los enlaces se generan automáticamente según las secciones que tengas activadas.
-                            </div>
-                          )}
-
-                          {secId === 'welcome_light' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
-                                Muestra el mensaje de bienvenida (pestaña Datos) sobre fondo claro crema. Ideal para venues con estética romántica y luminosa.
-                              </div>
-                              <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label">Imagen de fondo (opcional)</label>
-                                <input className="form-input" placeholder="https://..." value={(sections as any).welcome_light?.image_url ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_light: { ...(s.welcome_light ?? {}), image_url: e.target.value } }))} />
-                              </div>
-                            </div>
-                          )}
-
-                          {secId === 'welcome_split' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
-                                Muestra el mensaje de bienvenida (pestaña Datos) en dos columnas: imagen a un lado, texto al otro.
-                              </div>
-                              <div className="form-group">
-                                <label className="form-label">URL de la imagen</label>
-                                <input className="form-input" placeholder="https://..." value={(sections as any).welcome_split?.image_url ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_url: e.target.value } }))} />
-                              </div>
-                              <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label">Posición de la imagen</label>
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                  {(['left', 'right'] as const).map(side => (
-                                    <button key={side} type="button"
-                                      style={{ flex: 1, padding: '7px 0', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: ((sections as any).welcome_split?.image_side ?? 'left') === side ? 'var(--gold)' : 'var(--surface)', color: ((sections as any).welcome_split?.image_side ?? 'left') === side ? '#fff' : 'var(--charcoal)', cursor: 'pointer', fontWeight: 600 }}
-                                      onClick={() => setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_side: side } }))}>
-                                      {side === 'left' ? 'Izquierda' : 'Derecha'}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {secId === 'welcome_editorial' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
-                                Muestra el mensaje de bienvenida (pestaña Datos) con tipografía editorial grande, estilo revista de lujo.
-                              </div>
-                              <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label">Eyebrow / Etiqueta superior (opcional)</label>
-                                <input className="form-input" placeholder="Ej. Un mensaje para vosotros" value={(sections as any).welcome_editorial?.eyebrow ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_editorial: { ...(s.welcome_editorial ?? {}), eyebrow: e.target.value } }))} />
-                              </div>
                             </div>
                           )}
 
@@ -1433,6 +1545,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                         </div>
                       )}
                     </div>
+                    </Fragment>
                   )
                 })}
               </div>

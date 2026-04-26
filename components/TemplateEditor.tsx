@@ -1,17 +1,20 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, Fragment } from 'react'
 import {
   ChevronLeft, ChevronDown, Check, Loader2, ChefHat, LayoutTemplate,
   Upload, X, Monitor, Smartphone, RefreshCcw, ExternalLink,
-  PanelLeftOpen, PanelLeftClose, Info,
+  PanelLeftOpen, PanelLeftClose, Info, Palette,
 } from 'lucide-react'
-import type { SectionsData } from '@/lib/proposal-types'
+import type { SectionsData, VenueSpaceGroup } from '@/lib/proposal-types'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
+import MultipleZonesEditor from './MultipleZonesEditor'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
+import { getSectionLabel, SECTION_SPACE_TYPES, SPACE_TYPE_LABELS } from '@/lib/section-visibility'
 
 // ─── Section catalogue ────────────────────────────────────────────────────────
 
@@ -19,7 +22,7 @@ export const ALL_SECTION_IDS = [
   'hero', 'availability', 'sticky_nav',
   'welcome', 'welcome_light', 'welcome_split', 'welcome_editorial',
   'experience', 'gallery',
-  'zones', 'space_groups', 'venue_rental', 'inclusions', 'testimonials',
+  'single_space', 'zones', 'space_groups', 'venue_rental', 'inclusions', 'testimonials',
   'collaborators', 'accommodation', 'extra_services',
   'faq', 'schedule_visit', 'map', 'contact',
 ] as const
@@ -36,6 +39,7 @@ const SECTION_LABELS: Record<SectionId, string> = {
   welcome_editorial: 'Bienvenida · Editorial (tipografía grande)',
   experience:        'La experiencia',
   gallery:           'Galería de fotos',
+  single_space:      'Tu espacio',
   zones:             'Zonas del venue',
   space_groups:      'Grupos de espacios',
   venue_rental:      'Tarifas de alquiler (grid temporada × día)',
@@ -77,7 +81,7 @@ export default function TemplateEditor({
   const [description, setDescription] = useState(template.description ?? '')
   const [isDefault, setIsDefault]     = useState(template.is_default)
   const [sections, setSections]       = useState<SectionsData>(template.sections_data ?? {})
-  const [activeTab, setActiveTab]     = useState<'sections' | 'menus'>('sections')
+  const [activeTab, setActiveTab]     = useState<'sections' | 'menus' | 'visual'>('sections')
   const [saving, setSaving]           = useState(false)
   const [saved, setSaved]             = useState(false)
   const [saveError, setSaveError]     = useState<string | null>(null)
@@ -95,24 +99,49 @@ export default function TemplateEditor({
   // Upload states
   const [uploadingHero,    setUploadingHero]    = useState(false)
   const [uploadingGallery, setUploadingGallery] = useState(false)
+  const [uploadingLogo,    setUploadingLogo]    = useState(false)
   const heroInputRef    = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
+  const logoInputRef    = useRef<HTMLInputElement>(null)
 
   // Open/close section content cards
   const [openSecs, setOpenSecs] = useState<Set<string>>(new Set())
+
+  // Venue commercial config + zones — drives which sections appear and their labels,
+  // plus the multiple_independent zone picker
+  const [commercialConfig, setCommercialConfig] = useState<{ space_type: string; price_model: string } | null>(null)
+  const [venueSpaceGroups, setVenueSpaceGroups] = useState<VenueSpaceGroup[]>([])
+  useEffect(() => {
+    if (!user) return
+    const supabase = createClient()
+    ;(async () => {
+      const { data } = await supabase
+        .from('venue_settings')
+        .select('commercial_config, space_groups')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (data?.commercial_config) setCommercialConfig(data.commercial_config as any)
+      if (Array.isArray(data?.space_groups)) setVenueSpaceGroups(data.space_groups as VenueSpaceGroup[])
+    })()
+  }, [user])
 
   const iframeUrl = `/proposals/templates/${template.id}/preview`
 
   // ── postMessage live preview ──────────────────────────────────────────────
   const buildPatch = useCallback(() => ({
     couple_name:         'Sofía & Alejandro',
-    personal_message:    (sections as any).welcome_default ?? null,
+    personal_message:    (sections as any).welcome_default || 'Querida Sofía & Alejandro, es un placer teneros aquí. Hemos preparado esta propuesta pensando en vosotros.',
     guest_count:         150,
     wedding_date:        null,
     price_estimate:      null,
     show_availability:   false,
     show_price_estimate: false,
     sections_data:       sections,
+    branding: {
+      logo_url:      sections.logo_url ?? null,
+      primary_color: sections.primary_color ?? '#2d4a7a',
+      font_family:   sections.font_family ?? 'Georgia, serif',
+    },
   }), [sections])
 
   useEffect(() => {
@@ -146,6 +175,37 @@ export default function TemplateEditor({
 
   const toggleSection = (id: string, val: boolean) => {
     setSections(s => ({ ...s, sections_enabled: { ...(s.sections_enabled ?? {}), [id]: val } }))
+    markDirty()
+  }
+
+  const WELCOME_VARIANTS = ['welcome', 'welcome_light', 'welcome_split', 'welcome_editorial']
+  const WELCOME_VARIANT_LABELS: Record<string, string> = {
+    welcome: 'Oscura · cita centrada',
+    welcome_light: 'Fondo claro',
+    welcome_split: 'Dos columnas con imagen',
+    welcome_editorial: 'Editorial · tipografía grande',
+  }
+  const welcomeGroupOn = !WELCOME_VARIANTS.every(v => (sections.sections_enabled ?? {})[v] === false)
+  const activeWelcome = WELCOME_VARIANTS.find(v => (sections.sections_enabled ?? {})[v] === true)
+    ?? (welcomeGroupOn ? (WELCOME_VARIANTS.find(v => (sections.sections_enabled ?? {})[v] !== false) ?? 'welcome') : 'welcome')
+  const toggleWelcomeGroup = (on: boolean) => {
+    setSections(s => ({
+      ...s,
+      sections_enabled: {
+        ...(s.sections_enabled ?? {}),
+        ...Object.fromEntries(WELCOME_VARIANTS.map(v => [v, on ? v === activeWelcome : false]))
+      }
+    }))
+    markDirty()
+  }
+  const selectWelcomeVariant = (variant: string) => {
+    setSections(s => ({
+      ...s,
+      sections_enabled: {
+        ...(s.sections_enabled ?? {}),
+        ...Object.fromEntries(WELCOME_VARIANTS.map(wv => [wv, wv === variant]))
+      }
+    }))
     markDirty()
   }
 
@@ -183,6 +243,13 @@ export default function TemplateEditor({
     for (const f of Array.from(files)) { const u = await uploadImage(f, 'gallery'); if (u) urls.push(u) }
     if (urls.length) { setSections(s => ({ ...s, gallery_urls: [...(s.gallery_urls ?? []), ...urls] })); markDirty() }
     setUploadingGallery(false)
+  }
+
+  const handleLogoUpload = async (file: File) => {
+    setUploadingLogo(true)
+    const url = await uploadImage(file, 'logos')
+    if (url) { setSections(s => ({ ...s, logo_url: url })); markDirty() }
+    setUploadingLogo(false)
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
@@ -288,6 +355,34 @@ export default function TemplateEditor({
       </div>
     )
 
+    if (secId === 'single_space') {
+      const ss: any = (sections as any).single_space ?? {}
+      const setSs = (patch: any) => { setSections((s: any) => ({ ...s, single_space: { ...((s as any).single_space ?? {}), ...patch } })); markDirty() }
+      const features: string[] = Array.isArray(ss.features) ? ss.features : []
+      const setFeatures = (next: string[]) => setSs({ features: next })
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input className="form-input" placeholder="Título (ej. El Salón Principal)" style={{ fontSize: 12 }} value={ss.title ?? ''} onChange={e => setSs({ title: e.target.value })} />
+          <textarea className="form-textarea" style={{ minHeight: 70, fontSize: 12 }} placeholder="Descripción del espacio…" value={ss.description ?? ''} onChange={e => setSs({ description: e.target.value })} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input className="form-input" style={{ fontSize: 12 }} placeholder="m² (ej. 500)" value={ss.sqm ?? ''} onChange={e => setSs({ sqm: e.target.value })} />
+            <input className="form-input" style={{ fontSize: 12 }} placeholder="Capacidad máx. (ej. 200)" value={ss.max_guests ?? ''} onChange={e => setSs({ max_guests: e.target.value })} />
+          </div>
+          <input className="form-input" style={{ fontSize: 12 }} placeholder="URL imagen del espacio (opcional)" value={ss.image_url ?? ''} onChange={e => setSs({ image_url: e.target.value })} />
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Características destacadas</div>
+            {features.map((f, fi) => (
+              <div key={fi} style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                <input className="form-input" style={{ fontSize: 12 }} placeholder="Ej. Aire acondicionado" value={f} onChange={e => setFeatures(features.map((x, j) => j === fi ? e.target.value : x))} />
+                <button type="button" style={removeBtn} onClick={() => setFeatures(features.filter((_, j) => j !== fi))}><X size={12} /></button>
+              </div>
+            ))}
+            <button type="button" style={addBtn} onClick={() => setFeatures([...features, ''])}>+ Añadir característica</button>
+          </div>
+        </div>
+      )
+    }
+
     if (secId === 'zones') return (
       <div>
         {getOverride(overrideKey).map((z: any, i: number) => (
@@ -303,6 +398,9 @@ export default function TemplateEditor({
                 <input className="form-input" style={{ width: 75, flexShrink: 0, fontSize: 12 }} type="number" placeholder="m²" value={z.sqm ?? ''} onChange={e => updateItem(overrideKey, i, 'sqm', e.target.value ? Number(e.target.value) : undefined)} />
               </div>
               <input className="form-input" placeholder="Descripción" style={{ fontSize: 12 }} value={z.description ?? ''} onChange={e => updateItem(overrideKey, i, 'description', e.target.value)} />
+              <input className="form-input" style={{ fontSize: 12 }}
+                placeholder={commercialConfig?.space_type === 'single_with_supplements' ? 'Suplemento (ej. +500€)' : 'Precio (opcional)'}
+                value={z.price ?? ''} onChange={e => updateItem(overrideKey, i, 'price', e.target.value)} />
               <ZonePhotoUpload zone={z} onUpload={async (file) => { const url = await uploadImage(file, 'zones'); if (url) updateItem(overrideKey, i, 'photos', [url]) }} onRemove={() => updateItem(overrideKey, i, 'photos', [])} />
             </div>
           </details>
@@ -311,13 +409,25 @@ export default function TemplateEditor({
       </div>
     )
 
-    if (secId === 'space_groups') return (
-      <SpaceGroupEditor
-        groups={(sections as any).space_groups ?? []}
-        onChange={val => { setSections((s: any) => ({ ...s, space_groups: val })); markDirty() }}
-        uploadImage={uploadImage}
-      />
-    )
+    if (secId === 'space_groups') {
+      if (commercialConfig?.space_type === 'multiple_independent') {
+        return (
+          <MultipleZonesEditor
+            venueSpaceGroups={venueSpaceGroups}
+            groups={(sections as any).space_groups ?? []}
+            onChange={val => { setSections((s: any) => ({ ...s, space_groups: val })); markDirty() }}
+            uploadImage={uploadImage}
+          />
+        )
+      }
+      return (
+        <SpaceGroupEditor
+          groups={(sections as any).space_groups ?? []}
+          onChange={val => { setSections((s: any) => ({ ...s, space_groups: val })); markDirty() }}
+          uploadImage={uploadImage}
+        />
+      )
+    }
 
     if (secId === 'venue_rental') return (
       <div style={{ padding: '10px 12px', background: 'var(--cream)', borderRadius: 7, fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5, display: 'flex', gap: 8 }}>
@@ -576,6 +686,7 @@ export default function TemplateEditor({
           <div style={{ display: 'flex', borderBottom: '2px solid var(--ivory)', flexShrink: 0, alignItems: 'center' }}>
             {([
               { id: 'sections', label: 'Secciones', icon: <LayoutTemplate size={12} /> },
+              { id: 'visual',   label: 'Visual',     icon: <Palette size={12} /> },
               { id: 'menus',    label: 'Menús',      icon: <ChefHat size={12} /> },
             ] as const).map(tab => (
               <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
@@ -630,12 +741,85 @@ export default function TemplateEditor({
                 {/* Section list — each row has toggle + label + expand */}
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Secciones de la propuesta</div>
                 <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-                  {ALL_SECTION_IDS.map((secId, i) => {
+                  {(() => {
+                    const SPACE_GROUP_IDS = ['single_space', 'zones', 'space_groups', 'venue_rental']
+                    const isSpaceGroupOpen = openSecs.has('__space_group')
+                    const activeSpaceIds = SPACE_GROUP_IDS.filter(id => isSectionOn(id))
+                    const activeSpaceLabel = activeSpaceIds.length === 0
+                      ? 'Ninguna activa'
+                      : activeSpaceIds.map(id => getSectionLabel(id, commercialConfig?.space_type as any, SECTION_LABELS[id as SectionId])).join(' · ')
+                    const renderSpaceGroupHeader = () => (
+                      <div key="__sg_header" style={{ borderBottom: '1px solid var(--border)', background: 'rgba(196,151,90,0.06)' }}>
+                        <div
+                          onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('__space_group') ? n.delete('__space_group') : n.add('__space_group'); return n })}
+                          style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', cursor: 'pointer' }}
+                        >
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--charcoal)' }}>Espacios y precios</span>
+                              <span style={{ fontSize: 10, color: activeSpaceIds.length > 0 ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 7px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600 }}>{activeSpaceIds.length}/{SPACE_GROUP_IDS.length}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: activeSpaceIds.length === 0 ? 'var(--warm-gray)' : '#999', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeSpaceLabel}</div>
+                          </div>
+                          <ChevronDown size={13} style={{ color: 'var(--warm-gray)', transform: isSpaceGroupOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0, marginTop: 2 }} />
+                        </div>
+                      </div>
+                    )
+
+                    return ALL_SECTION_IDS.map((secId, i) => {
+                    if (['welcome_light', 'welcome_split', 'welcome_editorial'].includes(secId)) return null
+
+                    const isInSpaceGroup = SPACE_GROUP_IDS.includes(secId)
+                    const isFirstSpaceVisible = isInSpaceGroup && SPACE_GROUP_IDS[0] === secId
+                    if (isInSpaceGroup && !isSpaceGroupOpen) {
+                      return isFirstSpaceVisible ? renderSpaceGroupHeader() : null
+                    }
+
+                    if (secId === 'welcome') {
+                      const isWelcomeOpen = openSecs.has('welcome')
+                      const activeVariantLabel = welcomeGroupOn ? WELCOME_VARIANT_LABELS[activeWelcome] : 'Desactivada'
+                      return (
+                        <div key="welcome-group" style={{ borderBottom: '1px solid var(--border)', opacity: welcomeGroupOn ? 1 : 0.5, transition: 'opacity .15s', background: 'rgba(196,151,90,0.06)' }}>
+                          <div
+                            onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('welcome') ? n.delete('welcome') : n.add('welcome'); return n })}
+                            style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', cursor: 'pointer' }}
+                          >
+                            <div onClick={e => { e.stopPropagation(); toggleWelcomeGroup(!welcomeGroupOn) }} style={{ marginTop: 2 }}>
+                              <Toggle value={welcomeGroupOn} onChange={v => toggleWelcomeGroup(v)} />
+                            </div>
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--charcoal)' }}>Bienvenida</span>
+                                <span style={{ fontSize: 10, color: welcomeGroupOn ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 7px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600 }}>{welcomeGroupOn ? '1' : '0'}/{WELCOME_VARIANTS.length}</span>
+                              </div>
+                              <div style={{ fontSize: 11, color: welcomeGroupOn ? '#999' : 'var(--warm-gray)', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeVariantLabel}</div>
+                            </div>
+                            <ChevronDown size={13} style={{ color: 'var(--warm-gray)', transform: isWelcomeOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0, marginTop: 2 }} />
+                          </div>
+                          {isWelcomeOpen && (
+                            <div style={{ padding: '12px 14px 14px', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14, padding: '8px 10px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                                {WELCOME_VARIANTS.map(v => (
+                                  <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '3px 0' }}>
+                                    <input type="radio" name="welcome-variant-tpl" checked={activeWelcome === v} onChange={() => selectWelcomeVariant(v)} style={{ accentColor: 'var(--gold)' }} />
+                                    <span style={{ fontSize: 12, color: 'var(--charcoal)' }}>{WELCOME_VARIANT_LABELS[v]}</span>
+                                  </label>
+                                ))}
+                              </div>
+                              {renderSectionContent(activeWelcome as SectionId)}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
                     const isOn   = isSectionOn(secId)
                     const isOpen = openSecs.has(secId)
                     const isLast = i === ALL_SECTION_IDS.length - 1
                     return (
-                      <div key={secId} style={{ borderBottom: isLast ? 'none' : '1px solid var(--border)', opacity: isOn ? 1 : 0.5, transition: 'opacity .15s' }}>
+                      <Fragment key={secId}>
+                      {isInSpaceGroup && isFirstSpaceVisible && renderSpaceGroupHeader()}
+                      <div style={{ borderBottom: isLast ? 'none' : '1px solid var(--border)', opacity: isOn ? 1 : 0.5, transition: 'opacity .15s', ...(isInSpaceGroup ? { paddingLeft: 14, borderLeft: '2px solid rgba(196,151,90,0.25)', background: 'rgba(196,151,90,0.02)' } : {}) }}>
                         {/* Row header */}
                         <div
                           onClick={() => setOpenSecs(s => { const n = new Set(s); n.has(secId) ? n.delete(secId) : n.add(secId); return n })}
@@ -644,19 +828,205 @@ export default function TemplateEditor({
                           <div onClick={e => { e.stopPropagation(); toggleSection(secId, !isOn) }}>
                             <Toggle value={isOn} onChange={v => toggleSection(secId, v)} />
                           </div>
-                          <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', userSelect: 'none' }}>{SECTION_LABELS[secId]}</span>
+                          <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', userSelect: 'none' }}>{getSectionLabel(secId, commercialConfig?.space_type as any, SECTION_LABELS[secId])}</span>
                           <ChevronDown size={13} style={{ color: 'var(--warm-gray)', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
                         </div>
                         {/* Expandable content editor */}
                         {isOpen && (
                           <div style={{ padding: '12px 14px 14px', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
+                            {SECTION_SPACE_TYPES[secId] && (() => {
+                              const spaceType = commercialConfig?.space_type as any
+                              const allowedTypes = SECTION_SPACE_TYPES[secId]
+                              const matches = spaceType && allowedTypes.includes(spaceType)
+                              if (matches) {
+                                return (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, fontSize: 11, color: '#166534', lineHeight: 1.4 }}>
+                                    <Check size={13} style={{ flexShrink: 0 }} />
+                                    <span>Recomendada para tu configuración: <strong>{SPACE_TYPE_LABELS[spaceType]}</strong></span>
+                                  </div>
+                                )
+                              }
+                              const targetLabels = allowedTypes.map(t => SPACE_TYPE_LABELS[t]).join(' · ')
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 12, background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.4 }}>
+                                  <Info size={13} style={{ flexShrink: 0, color: 'var(--warm-gray)' }} />
+                                  <span style={{ flex: 1 }}>Aplica si tu configuración es: <strong>{targetLabels}</strong></span>
+                                  <a href="/estructura" style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)', textDecoration: 'none', whiteSpace: 'nowrap' }}>Cambiar →</a>
+                                </div>
+                              )
+                            })()}
                             {renderSectionContent(secId)}
                           </div>
                         )}
                       </div>
+                      </Fragment>
+                    )
+                    })
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* ── VISUAL tab ────────────────────────────────────────────────── */}
+            {activeTab === 'visual' && (
+              <div style={{ padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {/* Load fonts for preview */}
+                <link rel="stylesheet" href={ALL_FONTS_URL} />
+
+                {/* Design style */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Estilo de diseño</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 20 }}>
+                  {([
+                    { id: 1, icon: '⚡', name: 'Impacto Directo', desc: 'Dark luxury' },
+                    { id: 2, icon: '✨', name: 'Emoción Primero', desc: 'Cream editorial' },
+                    { id: 3, icon: '📋', name: 'Todo Claro',      desc: 'Estructurado' },
+                    { id: 4, icon: '💬', name: 'Social Proof',    desc: 'Stats + confianza' },
+                    { id: 5, icon: '◻',  name: 'Minimalista',     desc: 'CTA prominente' },
+                  ] as const).map(tpl => {
+                    const active = (sections.visual_template_id ?? 1) === tpl.id
+                    return (
+                      <button key={tpl.id} type="button"
+                        onClick={() => { setSections(s => ({ ...s, visual_template_id: tpl.id })); markDirty() }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                          borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                          border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                          background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
+                        }}>
+                        <span style={{ fontSize: 14 }}>{tpl.icon}</span>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)' }}>{tpl.name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{tpl.desc}</div>
+                        </div>
+                      </button>
                     )
                   })}
                 </div>
+
+                {/* Logo */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Logo del venue</div>
+                <div style={{ marginBottom: 20 }}>
+                  <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleLogoUpload(e.target.files[0])} />
+                  {sections.logo_url ? (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <img src={sections.logo_url} alt="logo" style={{ maxHeight: 56, maxWidth: '100%', borderRadius: 6, border: '1px solid var(--border)', display: 'block', background: '#fff', padding: 6 }} />
+                        <button onClick={() => { setSections(s => ({ ...s, logo_url: null })); markDirty() }}
+                          style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <X size={9} color="#fff" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                  <button className="btn btn-ghost btn-sm" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} style={{ width: '100%', justifyContent: 'center' }}>
+                    <Upload size={12} /> {uploadingLogo ? 'Subiendo…' : sections.logo_url ? 'Cambiar logo' : 'Subir logo'}
+                  </button>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 6, lineHeight: 1.5 }}>
+                    PNG transparente recomendado. Se mostrará en la cabecera de la propuesta.
+                  </div>
+                </div>
+
+                {/* Primary color */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Color principal</div>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+                    {['#2d4a7a','#7a5c3c','#6b2d42','#2a6b4a','#4a4a4a','#8b6914','#C4975A','#8B4513','#1a3a5c','#5c2d6b'].map(c => (
+                      <div key={c} onClick={() => { setSections(s => ({ ...s, primary_color: c })); markDirty() }}
+                        style={{
+                          width: 24, height: 24, borderRadius: 5, background: c, cursor: 'pointer', flexShrink: 0,
+                          border: (sections.primary_color ?? '#C4975A') === c ? '2px solid var(--espresso)' : '2px solid transparent',
+                          transform: (sections.primary_color ?? '#C4975A') === c ? 'scale(1.2)' : 'scale(1)', transition: 'transform .1s',
+                        }} />
+                    ))}
+                    <input type="color" value={sections.primary_color ?? '#C4975A'}
+                      onChange={e => { setSections(s => ({ ...s, primary_color: e.target.value })); markDirty() }}
+                      style={{ width: 24, height: 24, padding: 2, borderRadius: 5, border: '1px solid var(--border)', cursor: 'pointer', background: 'none' }} />
+                  </div>
+                  <div style={{ height: 5, borderRadius: 3, background: sections.primary_color ?? '#C4975A', opacity: 0.8 }} />
+                </div>
+
+                {/* Secondary color */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Color secundario</div>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+                    {['#8B6914','#7a5c3c','#6b2d42','#2a6b4a','#4a4a4a','#1a3a5c','#5c2d6b','#A0826D','#3D5A80','#293241'].map(c => (
+                      <div key={c} onClick={() => { setSections(s => ({ ...s, secondary_color: c })); markDirty() }}
+                        style={{
+                          width: 24, height: 24, borderRadius: 5, background: c, cursor: 'pointer', flexShrink: 0,
+                          border: sections.secondary_color === c ? '2px solid var(--espresso)' : '1px solid var(--border)',
+                          transform: sections.secondary_color === c ? 'scale(1.2)' : 'scale(1)', transition: 'transform .1s',
+                        }} />
+                    ))}
+                    <input type="color" value={sections.secondary_color ?? '#8B6914'}
+                      onChange={e => { setSections(s => ({ ...s, secondary_color: e.target.value })); markDirty() }}
+                      style={{ width: 24, height: 24, padding: 2, borderRadius: 5, border: '1px solid var(--border)', cursor: 'pointer', background: 'none' }} />
+                  </div>
+                  <div style={{ height: 5, borderRadius: 3, background: sections.secondary_color ?? '#8B6914', opacity: 0.8 }} />
+                  <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 6, lineHeight: 1.45 }}>
+                    Disponible como variable <code style={{ background: 'var(--cream)', padding: '0 4px', borderRadius: 3 }}>--tpl-secondary</code> para usos personalizados.
+                  </div>
+                </div>
+
+                {/* Color mode (light / dark variant of the chosen design) */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Modo</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 20 }}>
+                  {([
+                    { id: 'light', label: 'Claro',   bg: '#FAF7F2', fg: '#1A1A1A', sub: 'Fondo crema · texto oscuro' },
+                    { id: 'dark',  label: 'Oscuro',  bg: '#0A0A0A', fg: '#F5F5F5', sub: 'Fondo negro · texto claro' },
+                  ] as const).map(opt => {
+                    const active = (sections.color_mode ?? 'light') === opt.id
+                    return (
+                      <button key={opt.id} type="button"
+                        onClick={() => { setSections(s => ({ ...s, color_mode: opt.id })); markDirty() }}
+                        style={{
+                          display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 12px',
+                          borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                          border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                          background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
+                        }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ width: 16, height: 16, borderRadius: 4, background: opt.bg, border: '1px solid var(--border)', flexShrink: 0 }} />
+                          <span style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)' }}>{opt.label}</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{opt.sub}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Typography */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Tipografía</div>
+                <div style={{ padding: '8px 12px', background: 'var(--cream)', borderRadius: 8, marginBottom: 8, border: '1px solid var(--border)' }}>
+                  <span style={{ fontFamily: sections.font_family ?? 'Georgia, serif', fontSize: 15, color: 'var(--text)' }}>
+                    Aa — {getFontByValue(sections.font_family ?? 'Georgia, serif')?.label ?? 'Georgia'}
+                  </span>
+                </div>
+                <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {FONT_CATEGORIES.map(cat => (
+                    <div key={cat.key}>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>{cat.label}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {GOOGLE_FONTS.filter(f => f.category === cat.key).map(opt => {
+                          const isActive = (sections.font_family ?? 'Georgia, serif') === opt.value
+                          return (
+                            <button key={opt.value} type="button"
+                              onClick={() => { setSections(s => ({ ...s, font_family: opt.value })); markDirty() }}
+                              style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                padding: '7px 10px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                                border: `1.5px solid ${isActive ? 'var(--gold)' : 'var(--border)'}`,
+                                background: isActive ? 'rgba(196,151,90,0.08)' : 'var(--surface)',
+                              }}>
+                              <span style={{ fontFamily: opt.value, fontSize: 13, color: 'var(--text)' }}>{opt.label}</span>
+                              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{opt.desc}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
               </div>
             )}
 

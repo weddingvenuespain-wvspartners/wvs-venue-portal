@@ -302,7 +302,7 @@ export default function Sidebar() {
 
       <div className="sidebar-footer">
         {/* Trial / plan banners — solo venue owner */}
-        {isVenueOwner && features.isTrialExpired && (
+        {isVenueOwner && !features.loading && features.isTrialExpired && (
           <div style={{ marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
               <Hourglass size={12} style={{ color: '#f87171', flexShrink: 0 }} />
@@ -317,7 +317,7 @@ export default function Sidebar() {
           </div>
         )}
 
-        {isVenueOwner && features.isTrial && !features.isTrialExpired && (
+        {isVenueOwner && !features.loading && features.isTrial && !features.isTrialExpired && (
           <div style={{ marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
               <Hourglass size={12} style={{ color: 'var(--gold)', flexShrink: 0 }} />
@@ -341,14 +341,14 @@ export default function Sidebar() {
           </div>
         )}
 
-        {isVenueOwner && !features.isTrial && !features.isTrialExpired && features.hasPlan && features.planTier === 'basic' && (
+        {isVenueOwner && !features.loading && !features.isTrial && !features.isTrialExpired && features.hasPlan && features.planTier === 'basic' && (
           <Link href="/pricing" style={{ display: 'block', marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)', textDecoration: 'none' }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 4 }}>PASA A PREMIUM</div>
             <div style={{ fontSize: 11, color: 'var(--stone)', lineHeight: 1.5 }}>Propuestas, exportar leads y más.</div>
           </Link>
         )}
 
-        {isVenueOwner && !features.isTrial && !features.isTrialExpired && !features.hasPlan && (
+        {isVenueOwner && !features.loading && !features.isTrial && !features.isTrialExpired && !features.hasPlan && (
           <div style={{ marginBottom: 10, padding: '9px 12px', borderRadius: 8, background: '#1e293b', border: '1px solid #334155' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#f87171', marginBottom: 2 }}>Sin suscripción activa</div>
             <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.4, marginBottom: 8 }}>Activa tu plan para acceder al portal.</div>
@@ -370,7 +370,7 @@ export default function Sidebar() {
             </div>
             <div style={{ fontSize: 10, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
               {roleLabel}
-              {isVenueOwner && (
+              {isVenueOwner && !features.loading && (
                 <span style={{
                   background: !features.hasPlan ? '#1e293b' : features.isTrial ? '#78350f' : features.planTier === 'basic' ? '#1e3a5f' : '#451a03',
                   color: !features.hasPlan ? '#94a3b8' : features.isTrial ? '#fcd34d' : features.planTier === 'basic' ? '#93c5fd' : '#fde68a',

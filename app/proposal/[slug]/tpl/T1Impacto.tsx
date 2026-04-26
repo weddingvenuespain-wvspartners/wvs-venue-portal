@@ -8,8 +8,9 @@ import { useEffect, useRef, useState } from 'react'
 import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, StarRating, resolveContact, type ProposalData } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
-import SpaceGroupSelector from './SpaceGroupSelector'
+import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 import DateSelector from './DateSelector'
+import VisitBookingModal from '@/components/VisitBookingModal'
 
 export default function T1Impacto({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date,
@@ -21,6 +22,14 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
 
   // Use template default message as fallback when no personal message yet
   const displayMsg = personal_message || (sec as any).welcome_default || null
+
+  // Pick exactly one welcome variant. Defaults to 'welcome' when nothing is
+  // explicitly set; null only when every variant is explicitly disabled.
+  const welcomeVariantList = ['welcome', 'welcome_light', 'welcome_split', 'welcome_editorial'] as const
+  const sectionsEnabledMap = sec.sections_enabled ?? {}
+  const explicitWelcome = welcomeVariantList.find(v => sectionsEnabledMap[v] === true)
+  const allWelcomeOff = welcomeVariantList.every(v => sectionsEnabledMap[v] === false)
+  const activeWelcomeVariant: typeof welcomeVariantList[number] | null = explicitWelcome ?? (allWelcomeOff ? null : 'welcome')
 
   const primary = branding?.primary_color ?? '#8B6914'
   const rgb     = toRgb(primary)
@@ -36,6 +45,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const [scrolled, setScrolled]     = useState(false)
   const [ctaBar, setCtaBar]         = useState(false)
   const [openFaq, setOpenFaq]       = useState<number | null>(null)
+  const [visitModalOpen, setVisitModalOpen] = useState(false)
+  const [visitDone, setVisitDone]           = useState(false)
+  const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
   const heroRef                     = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
@@ -331,7 +343,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   `
 
   return (
-    <div className="t1">
+    <div className="t1 tpl-root">
       <style dangerouslySetInnerHTML={{ __html: css }} />
 
       {/* ── NAV ── */}
@@ -342,10 +354,11 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         }
         {on('sticky_nav') && (() => {
           const navLinks = [
-            (on('welcome') || on('welcome_light') || on('welcome_split') || on('welcome_editorial')) && personal_message
+            activeWelcomeVariant && displayMsg
               ? { label: 'Bienvenida', anchor: 'sec-welcome' } : null,
             expShow && on('experience') ? { label: 'Historia', anchor: 'sec-experience' } : null,
             on('gallery') && galleryPhotos.length > 0 ? { label: 'Galería', anchor: 'sec-gallery' } : null,
+            on('single_space') && (sec as any).single_space?.title ? { label: 'Vuestro espacio', anchor: 'sec-single-space' } : null,
             on('zones') && zonesShow.length > 0 ? { label: 'Espacios', anchor: 'sec-zones' } : null,
             hasCatering && on('menu') ? { label: 'Menús', anchor: 'menu' } : null,
             on('schedule_visit') ? { label: 'Visita', anchor: 'sec-schedule' } : null,
@@ -471,7 +484,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           MENSAJE PERSONAL + CONVERSION BLOCK
       ════════════════════════════════════════════ */}
-      {on('welcome') && displayMsg && (
+      {activeWelcomeVariant === 'welcome' && displayMsg && (
         <section id="sec-welcome" className="t1-sec" style={{ background: '#080808' }}>
           <FadeUp>
             <div className="t1-msg">
@@ -486,8 +499,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           BIENVENIDA · FONDO CLARO
       ════════════════════════════════════════════ */}
-      {on('welcome_light') && displayMsg && (
-        <section id={!on('welcome') ? 'sec-welcome' : undefined} className="t1-wl">
+      {activeWelcomeVariant === 'welcome_light' && displayMsg && (
+        <section id="sec-welcome" className="t1-wl">
           {(sec as any).welcome_light?.image_url && (
             <img className="t1-wl-bg" src={(sec as any).welcome_light.image_url} alt=""
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
@@ -505,8 +518,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           BIENVENIDA · DOS COLUMNAS
       ════════════════════════════════════════════ */}
-      {on('welcome_split') && displayMsg && (
-        <section id={!on('welcome') && !on('welcome_light') ? 'sec-welcome' : undefined}>
+      {activeWelcomeVariant === 'welcome_split' && displayMsg && (
+        <section id="sec-welcome">
           <div className="t1-ws">
             <div className={`t1-ws-img${(sec as any).welcome_split?.image_side === 'right' ? ' right' : ''}`}>
               {(sec as any).welcome_split?.image_url && (
@@ -528,8 +541,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           BIENVENIDA · EDITORIAL
       ════════════════════════════════════════════ */}
-      {on('welcome_editorial') && displayMsg && (
-        <section id={!on('welcome') && !on('welcome_light') && !on('welcome_split') ? 'sec-welcome' : undefined} className="t1-we">
+      {activeWelcomeVariant === 'welcome_editorial' && displayMsg && (
+        <section id="sec-welcome" className="t1-we">
           <FadeUp>
             <div className="t1-we-inner">
               {(sec as any).welcome_editorial?.eyebrow && (
@@ -580,6 +593,55 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <Gallery photos={galleryPhotos} primary={primary} dark />
         </FadeIn>
       )}
+
+      {/* ════════════════════════════════════════════
+          SINGLE SPACE (un único espacio)
+      ════════════════════════════════════════════ */}
+      {on('single_space') && (sec as any).single_space && (() => {
+        const ss: any = (sec as any).single_space
+        const features: string[] = Array.isArray(ss.features) ? ss.features : []
+        const heroImg = ss.image_url || (sec as any).hero_image_url
+        if (!ss.title && !ss.description && !heroImg && features.length === 0) return null
+        return (
+          <section id="sec-single-space" className="t1-sec" style={{ background: '#0c0c0c' }}>
+            <div className="w" style={{ display: 'grid', gridTemplateColumns: heroImg ? '1fr 1fr' : '1fr', gap: 48, alignItems: 'center' }}>
+              {heroImg && (
+                <FadeIn>
+                  <img src={heroImg} alt={ss.title || 'Espacio'} style={{ width: '100%', height: 420, objectFit: 'cover', borderRadius: 4, border: '1px solid rgba(255,255,255,.06)' }} />
+                </FadeIn>
+              )}
+              <FadeUp>
+                <span className="t1-label">Vuestro espacio</span>
+                {ss.title && <h2 className="t1-h2" style={{ marginBottom: 16 }}>{ss.title}</h2>}
+                {ss.description && <p className="t1-p" style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.7, marginBottom: 24 }}>{ss.description}</p>}
+                {(ss.sqm || ss.max_guests) && (
+                  <div style={{ display: 'flex', gap: 32, marginBottom: 20, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,.08)' }}>
+                    {ss.sqm && (
+                      <div>
+                        <div style={{ fontSize: '1.6rem', fontWeight: 300, color: '#fff', fontFamily: FONT, lineHeight: 1 }}>{ss.sqm}<span style={{ fontSize: '.7em', color: 'rgba(255,255,255,.5)' }}> m²</span></div>
+                        <div style={{ fontSize: '.65rem', letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,.4)', marginTop: 4 }}>Superficie</div>
+                      </div>
+                    )}
+                    {ss.max_guests && (
+                      <div>
+                        <div style={{ fontSize: '1.6rem', fontWeight: 300, color: '#fff', fontFamily: FONT, lineHeight: 1 }}>{ss.max_guests}</div>
+                        <div style={{ fontSize: '.65rem', letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,.4)', marginTop: 4 }}>Capacidad máx.</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {features.filter(Boolean).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {features.filter(Boolean).map((f, i) => (
+                      <span key={i} style={{ fontSize: '.72rem', padding: '5px 12px', border: '1px solid rgba(255,255,255,.15)', borderRadius: 999, color: 'rgba(255,255,255,.6)', letterSpacing: '.04em' }}>{f}</span>
+                    ))}
+                  </div>
+                )}
+              </FadeUp>
+            </div>
+          </section>
+        )
+      })()}
 
       {/* ════════════════════════════════════════════
           ESPACIOS / ZONES
@@ -645,6 +707,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           onPrimary={onPri}
           dark
           font={FONT}
+          guestCount={guest_count ? Number(guest_count) : undefined}
+          onSelectionChange={setSelectedSpaces}
         />
       )}
 
@@ -994,20 +1058,36 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 </div>
                 <h2 className="t1-sv-title">{svTitle}</h2>
                 <p className="t1-sv-sub">{svSub}</p>
-                {svUrl
-                  ? <a className="t1-sv-btn" href={svUrl} target="_blank" rel="noopener">{svCta}</a>
-                  : contactOn && (
-                    <button className="t1-sv-btn" onClick={() => contact.phone ? window.open(waHref, '_blank') : scrollToContact()}>
-                      {svCta}
-                    </button>
-                  )
-                }
+
+                {visitDone ? (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}22`, border: `1px solid ${primary}55`, borderRadius: 10, padding: '14px 24px', fontSize: '.88rem', color: primary, fontWeight: 600 }}>
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ¡Solicitud enviada! Os confirmaremos la visita pronto.
+                  </div>
+                ) : svUrl ? (
+                  <a className="t1-sv-btn" href={svUrl} target="_blank" rel="noopener">{svCta}</a>
+                ) : (
+                  <button className="t1-sv-btn" onClick={() => setVisitModalOpen(true)}>
+                    {svCta}
+                  </button>
+                )}
                 {sv.note && <div className="t1-sv-note">{sv.note}</div>}
               </div>
             </FadeUp>
           </section>
         )
       })()}
+
+      {visitModalOpen && (
+        <VisitBookingModal
+          proposalId={data.id}
+          coupleName={couple_name}
+          primaryColor={primary}
+          selectedSpaces={selectedSpaces}
+          onClose={() => setVisitModalOpen(false)}
+          onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
+        />
+      )}
 
       {/* ════════════════════════════════════════════
           MAPA

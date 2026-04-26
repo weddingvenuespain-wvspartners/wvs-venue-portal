@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, type ProposalData } from './shared'
 import { WeddingProposal } from './WeddingProposal'
+import VisitBookingModal from '@/components/VisitBookingModal'
 
 export default function T2Emocion({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
@@ -23,6 +24,8 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
   const photoList = venue?.photo_urls ?? []
   const scrollToContact = () => document.getElementById('cta')?.scrollIntoView({ behavior: 'smooth' })
 
+  const [visitModalOpen, setVisitModalOpen] = useState(false)
+  const [visitDone,      setVisitDone]      = useState(false)
   const [heroLoaded, setHeroLoaded] = useState(false)
   const heroImgRef = useRef<HTMLImageElement>(null)
   useEffect(() => { if (heroImgRef.current?.complete) setHeroLoaded(true) }, [])
@@ -87,7 +90,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
   `
 
   return (
-    <div style={{ fontFamily: font, background: CREAM, color: '#2c2418', minHeight: '100vh' }}>
+    <div className="tpl-root" style={{ fontFamily: font, background: CREAM, color: '#2c2418', minHeight: '100vh' }}>
       <style dangerouslySetInnerHTML={{ __html: css }} />
 
       {/* ══════════════════════════════════════════
@@ -581,6 +584,60 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
+      )}
+
+      {/* ══════════════════════════════════════════
+          AGENDAR VISITA
+      ══════════════════════════════════════════ */}
+      {on('schedule_visit') && (() => {
+        const sv = (sec as any).schedule_visit ?? {}
+        const svUrl   = sv.url
+        const svTitle = sv.title    || 'Visitadnos en persona'
+        const svSub   = sv.subtitle || 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
+        const svCta   = sv.cta_label || 'Reservar visita gratuita →'
+        return (
+          <section id="sec-schedule" style={{ padding: '100px 0', background: '#FAF7F2', textAlign: 'center' }}>
+            <FadeUp>
+              <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 24px' }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: `${primary}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                  <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                </div>
+                <h2 style={{ fontFamily: font, fontSize: 'clamp(1.8rem,3vw,2.6rem)', color: '#2A1F1A', marginBottom: 16, lineHeight: 1.2 }}>{svTitle}</h2>
+                <p style={{ fontSize: '1rem', color: '#7A6A5A', lineHeight: 1.7, marginBottom: 36 }}>{svSub}</p>
+                {visitDone ? (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}18`, border: `1px solid ${primary}44`, borderRadius: 10, padding: '14px 28px', fontSize: '.9rem', color: primary, fontWeight: 600 }}>
+                    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ¡Solicitud enviada! Os confirmaremos la visita pronto.
+                  </div>
+                ) : svUrl ? (
+                  <a href={svUrl} target="_blank" rel="noopener"
+                    style={{ display: 'inline-block', background: primary, color: onPri, padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 600, textDecoration: 'none', letterSpacing: '.04em' }}>
+                    {svCta}
+                  </a>
+                ) : (
+                  <button onClick={() => setVisitModalOpen(true)}
+                    style={{ background: primary, color: onPri, padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 600, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
+                    {svCta}
+                  </button>
+                )}
+                {sv.note && <p style={{ fontSize: '.8rem', color: '#9A8A7A', marginTop: 16 }}>{sv.note}</p>}
+              </div>
+            </FadeUp>
+          </section>
+        )
+      })()}
+
+      {visitModalOpen && (
+        <VisitBookingModal
+          proposalId={data.id}
+          coupleName={couple_name}
+          primaryColor={primary}
+          selectedSpaces={[]}
+          onClose={() => setVisitModalOpen(false)}
+          onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
+        />
       )}
 
       {/* ══════════════════════════════════════════

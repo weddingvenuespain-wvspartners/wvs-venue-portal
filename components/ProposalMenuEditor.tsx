@@ -47,7 +47,7 @@ const sectionBlock: React.CSSProperties = {
 }
 const sectionHeader: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-  marginBottom: 12, cursor: 'pointer', userSelect: 'none',
+  marginBottom: 12, userSelect: 'none',
 }
 const sectionTitle: React.CSSProperties = {
   fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', letterSpacing: '-0.01em',
@@ -258,6 +258,32 @@ export default function ProposalMenuEditor({
     </div>
   )
 
+  const vis = sections.menu_sections_visible ?? {}
+  const isVisible = (key: keyof typeof vis) => vis[key] !== false
+  const toggleVis = (key: keyof typeof vis) =>
+    setSections(s => ({ ...s, menu_sections_visible: { ...(s.menu_sections_visible ?? {}), [key]: !isVisible(key) } }))
+
+  const VisToggle = ({ skey }: { skey: keyof typeof vis }) => (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={isVisible(skey)}
+      title={isVisible(skey) ? 'Ocultar en propuesta' : 'Mostrar en propuesta'}
+      onClick={e => { e.stopPropagation(); toggleVis(skey) }}
+      style={{
+        width: 34, height: 19, borderRadius: 10, border: 'none', cursor: 'pointer', flexShrink: 0,
+        background: isVisible(skey) ? 'var(--gold)' : '#d1d5db',
+        position: 'relative', transition: 'background .2s',
+      }}
+    >
+      <span style={{
+        position: 'absolute', top: 2,
+        left: isVisible(skey) ? 17 : 2,
+        width: 15, height: 15, borderRadius: 8, background: '#fff', transition: 'left .2s',
+      }} />
+    </button>
+  )
+
   return (
     <div>
       <div style={{ fontSize: 12, color: 'var(--warm-gray)', background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, lineHeight: 1.55 }}>
@@ -307,15 +333,20 @@ export default function ProposalMenuEditor({
       {(() => {
         const cocktailExtras = extras.filter(e => e.category === 'station')
         return (
-          <div style={sectionBlock}>
-            <div style={sectionHeader} onClick={() => toggle('cocktail')}>
-              <span style={sectionTitle}>
-                Cóctel de bienvenida
-                <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--warm-gray)', marginLeft: 6 }}>
-                  {appetizers.length} grupos · {cocktailExtras.length} estaciones
+          <div style={{ ...sectionBlock, opacity: isVisible('cocktail') ? 1 : 0.5 }}>
+            <div style={sectionHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggle('cocktail')}>
+                <span style={sectionTitle}>
+                  Cóctel de bienvenida
+                  <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--warm-gray)', marginLeft: 6 }}>
+                    {appetizers.length} grupos · {cocktailExtras.length} estaciones
+                  </span>
                 </span>
-              </span>
-              <ChevronDown size={14} style={{ transform: openSections.has('cocktail') ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--warm-gray)' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <VisToggle skey="cocktail" />
+                <ChevronDown size={14} style={{ transform: openSections.has('cocktail') ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--warm-gray)', cursor: 'pointer' }} onClick={() => toggle('cocktail')} />
+              </div>
             </div>
 
             {openSections.has('cocktail') && (
@@ -354,10 +385,15 @@ export default function ProposalMenuEditor({
       })()}
 
       {/* ─── MENÚS PRINCIPALES ──────────────────────────────────────────────── */}
-      <div style={sectionBlock}>
-        <div style={sectionHeader} onClick={() => toggle('menus')}>
-          <span style={sectionTitle}>Menús principales ({menus.length})</span>
-          <ChevronDown size={14} style={{ transform: openSections.has('menus') ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--warm-gray)' }} />
+      <div style={{ ...sectionBlock, opacity: isVisible('menus') ? 1 : 0.5 }}>
+        <div style={sectionHeader}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggle('menus')}>
+            <span style={sectionTitle}>Menús principales ({menus.length})</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <VisToggle skey="menus" />
+            <ChevronDown size={14} style={{ transform: openSections.has('menus') ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--warm-gray)', cursor: 'pointer' }} onClick={() => toggle('menus')} />
+          </div>
         </div>
 
         {openSections.has('menus') && (
@@ -571,10 +607,15 @@ export default function ProposalMenuEditor({
       {(() => {
         const nightExtras = extras.filter(e => e.category === 'resopon' || e.category === 'open_bar')
         return (
-          <div style={sectionBlock}>
-            <div style={sectionHeader} onClick={() => toggle('night_extras')}>
-              <span style={sectionTitle}>Noche y madrugada ({nightExtras.length})</span>
-              <ChevronDown size={14} style={{ transform: openSections.has('night_extras') ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--warm-gray)' }} />
+          <div style={{ ...sectionBlock, opacity: isVisible('night') ? 1 : 0.5 }}>
+            <div style={sectionHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggle('night_extras')}>
+                <span style={sectionTitle}>Noche y madrugada ({nightExtras.length})</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <VisToggle skey="night" />
+                <ChevronDown size={14} style={{ transform: openSections.has('night_extras') ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--warm-gray)', cursor: 'pointer' }} onClick={() => toggle('night_extras')} />
+              </div>
             </div>
             {openSections.has('night_extras') && (
               <div>
@@ -591,10 +632,15 @@ export default function ProposalMenuEditor({
       {(() => {
         const eventExtras = extras.filter(e => ['ceremony','music','audiovisual','other'].includes(e.category))
         return (
-          <div style={sectionBlock}>
-            <div style={sectionHeader} onClick={() => toggle('event_extras')}>
-              <span style={sectionTitle}>Extras del evento ({eventExtras.length})</span>
-              <ChevronDown size={14} style={{ transform: openSections.has('event_extras') ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--warm-gray)' }} />
+          <div style={{ ...sectionBlock, opacity: isVisible('event_extras') ? 1 : 0.5 }}>
+            <div style={sectionHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggle('event_extras')}>
+                <span style={sectionTitle}>Extras del evento ({eventExtras.length})</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <VisToggle skey="event_extras" />
+                <ChevronDown size={14} style={{ transform: openSections.has('event_extras') ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--warm-gray)', cursor: 'pointer' }} onClick={() => toggle('event_extras')} />
+              </div>
             </div>
             {openSections.has('event_extras') && (
               <div>

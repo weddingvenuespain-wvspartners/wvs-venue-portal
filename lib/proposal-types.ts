@@ -1,4 +1,45 @@
 // Single source of truth for proposal section types.
+
+// ── Visit availability (configured in /estructura) ────────────────────────────
+export type DaySchedule = {
+  day: number       // 0=Monday … 6=Sunday
+  enabled: boolean
+  from: string      // "10:00"
+  to: string        // "19:00"
+}
+
+export type HourRange = { from: string; to: string }  // "HH:mm"
+
+export type BlockedDate = {
+  date: string                               // "YYYY-MM-DD"
+  type: 'full' | 'morning' | 'afternoon' | 'hours'
+  ranges?: HourRange[]                       // multiple hour ranges when type === 'hours'
+  from?: string                              // legacy single range (backward compat)
+  to?: string                               // legacy single range (backward compat)
+}
+
+export type VisitAvailability = {
+  slot_duration: 30 | 45 | 60 | 90 | 120   // minutes per slot
+  schedule: DaySchedule[]
+  block_booked_weddings: boolean            // block days with reservado/ganado calendar entries
+  block_calendar_unavailable: boolean       // block any day that is not 'libre' in calendar
+  blocked_dates: BlockedDate[]              // manual blocks
+}
+
+// ── Visit request (stored in proposals.visit_request) ────────────────────────
+export type VisitRequest = {
+  date: string        // "YYYY-MM-DD"
+  time: string        // "HH:MM"
+  message?: string
+  couple_name?: string
+  couple_email?: string
+  selected_spaces?: Array<{ group_name: string; space_name: string }>
+  selected_menus?: string[]
+  requested_at: string   // ISO timestamp
+  status: 'pending' | 'confirmed' | 'cancelled'
+}
+
+
 // Imported by:
 //  - app/proposal/[slug]/tpl/shared.tsx (re-exports these to templates)
 //  - components/ProposalEditor.tsx / ProposalMenuEditor.tsx
@@ -66,9 +107,11 @@ export type DateSlot = {
 
 export type VenueSpaceItem = {
   id?: string
+  zone_id?: string  // link to VenueSpace.id in venue_settings.space_groups
   name: string
   description?: string
   photo_url?: string
+  capacity_min?: number
   capacity_max?: number
   price?: string
   price_label?: string
@@ -76,11 +119,39 @@ export type VenueSpaceItem = {
 
 export type SpaceGroup = {
   id?: string
+  group_id?: string  // link to VenueSpaceGroup.id in venue_settings.space_groups
   name: string
   description?: string
   note?: string
-  requires_selection?: boolean
+  requires_selection?: boolean  // legacy
+  selection_mode?: 'pick_one' | 'pick_n' | 'optional'
+  pick_n_min?: number
+  pick_n_max?: number
+  pricing_mode?: 'group_base' | 'per_space'  // group_base: base + extras; per_space: each space has its own price
+  base_price?: string  // when pricing_mode === 'group_base'
   spaces: VenueSpaceItem[]
+}
+
+// ── Venue space groups — source of truth in venue_settings.space_groups ────────
+export type VenueSpace = {
+  id: string
+  name: string
+  description?: string
+  capacity_min?: number
+  capacity_max?: number
+  price?: string
+  photo_url?: string
+}
+
+export type VenueSpaceGroup = {
+  id: string
+  name: string
+  selection_mode: 'pick_one' | 'pick_n' | 'optional'
+  pick_n_min?: number   // minimum selections (pick_n mode)
+  pick_n_max?: number   // maximum selections (pick_n mode)
+  pricing_mode?: 'group_base' | 'per_space'  // default: per_space
+  base_price?: string  // when pricing_mode === 'group_base'
+  spaces: VenueSpace[]
 }
 
 export type SectionsData = {
@@ -88,6 +159,14 @@ export type SectionsData = {
   sections_enabled?: Record<string, boolean>
   iva_included?: boolean
   show_menu_prices?: boolean        // default true; false = menus shown without price (price comes from proposal estimate)
+  menu_sections_visible?: { cocktail?: boolean; menus?: boolean; night?: boolean; event_extras?: boolean }
+  // Visual branding (used by templates; copied to proposal branding on apply)
+  primary_color?: string
+  secondary_color?: string
+  background_color?: string
+  color_mode?: 'light' | 'dark'   // forces light/dark variant on top of any template
+  logo_url?: string | null
+  font_family?: string
   contact?: { phone?: string; email?: string }
   has_catering?: boolean
   venue_rental?: {
@@ -97,6 +176,14 @@ export type SectionsData = {
     rows?: Array<{ season: string; prices: Array<string | null> }>
     notes?: string
   }
+  single_space?: {
+    title?: string
+    description?: string
+    sqm?: string
+    max_guests?: string
+    features?: string[]
+    image_url?: string
+  } | null
   packages_override?:       Array<{ name: string; subtitle?: string; price?: string; description?: string; includes?: string[]; is_recommended?: boolean; min_guests?: number; max_guests?: number; is_active?: boolean }> | null
   zones_override?:          Array<{
     name: string
