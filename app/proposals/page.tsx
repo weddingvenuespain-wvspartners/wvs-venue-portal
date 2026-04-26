@@ -1,11 +1,12 @@
 'use client'
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Lock, Loader2, FileText, Building2, UtensilsCrossed, LayoutTemplate, type LucideIcon } from 'lucide-react'
+import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Lock, Loader2, FileText, Building2, UtensilsCrossed, LayoutTemplate, ChevronLeft, ChevronRight, Search, type LucideIcon } from 'lucide-react'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import { STARTER_TEMPLATES, type StarterTemplateId, type StarterTemplateIcon } from '@/lib/proposal-starter-templates'
 
@@ -15,6 +16,13 @@ const STARTER_ICON: Record<StarterTemplateIcon, LucideIcon> = {
 }
 
 const MAX_PROPOSALS_PER_LEAD = 6
+const PAGE_SIZE = 10
+
+// Module-level cache so re-entering this tab is instant (stale-while-revalidate).
+// Cleared on full page reload.
+let cachedProposals: Proposal[] | null = null
+let cachedLeads: any[] | null = null
+let cachedSmtpConfigured: boolean | null = null
 
 type Proposal = {
   id: string
@@ -26,6 +34,11 @@ type Proposal = {
   couple_email: string | null
   status: 'draft' | 'sent' | 'viewed' | 'expired'
   views: number
+  open_count?: number | null
+  unique_open_count?: number | null
+  sent_at?: string | null
+  first_viewed_at?: string | null
+  last_viewed_at?: string | null
   lead_id: string | null
   created_at: string
   branding?: { logo_url: string | null; primary_color: string } | null
@@ -51,9 +64,9 @@ function PropuestasPageContent() {
   const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
 
-  const [proposals, setProposals] = useState<Proposal[]>([])
-  const [leads, setLeads] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [proposals, setProposals] = useState<Proposal[]>(cachedProposals ?? [])
+  const [leads, setLeads] = useState<any[]>(cachedLeads ?? [])
+  const [loading, setLoading] = useState(cachedProposals === null)
   const [copied, setCopied] = useState<string | null>(null)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
@@ -62,8 +75,13 @@ function PropuestasPageContent() {
   const [sendEmail, setSendEmail] = useState('')
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [sendErrAlert, setSendErrAlert] = useState(false)
-  const [smtpConfigured, setSmtpConfigured] = useState<boolean | null>(null)
+  const [smtpConfigured, setSmtpConfigured] = useState<boolean | null>(cachedSmtpConfigured)
   const [newModalOpen, setNewModalOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'sent' | 'viewed' | 'expired'>('all')
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'last_7d' | 'last_30d'>('all')
+  const [sortBy, setSortBy] = useState<'recent' | 'views' | 'name'>('recent')
 
   useEffect(() => {
     if (authLoading) return
@@ -87,9 +105,10 @@ function PropuestasPageContent() {
       supabase.from('leads').select('id, name, email').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('venue_onboarding').select('smtp_from_email').eq('user_id', user.id).maybeSingle(),
     ])
-    setSmtpConfigured(!!(venueRow as any)?.smtp_from_email)
-    if (props) setProposals(props as Proposal[])
-    if (leadsData) setLeads(leadsData)
+    cachedSmtpConfigured = !!(venueRow as any)?.smtp_from_email
+    setSmtpConfigured(cachedSmtpConfigured)
+    if (props) { cachedProposals = props as Proposal[]; setProposals(cachedProposals) }
+    if (leadsData) { cachedLeads = leadsData; setLeads(leadsData) }
     setLoading(false)
   }
 
@@ -116,7 +135,11 @@ function PropuestasPageContent() {
     if (!confirm('¿Eliminar esta propuesta? La URL dejará de funcionar.')) return
     const supabase = createClient()
     await supabase.from('proposals').delete().eq('id', id)
-    setProposals(prev => prev.filter(p => p.id !== id))
+    setProposals(prev => {
+      const next = prev.filter(p => p.id !== id)
+      cachedProposals = next
+      return next
+    })
   }
 
   const resolveLeadEmail = (proposal: Proposal) => leads.find(l => l.id === proposal.lead_id)?.email ?? ''
@@ -147,7 +170,11 @@ function PropuestasPageContent() {
       const json = await res.json()
       setSendModal(null)
       if (!res.ok) { notify(json.error ?? 'Error al enviar', true); return }
-      setProposals(prev => prev.map(p => p.id === id ? { ...p, status: 'sent' } : p))
+      setProposals(prev => {
+        const next = prev.map(p => p.id === id ? { ...p, status: 'sent' as const, sent_at: p.sent_at ?? new Date().toISOString() } : p)
+        cachedProposals = next
+        return next
+      })
       if (json.emailSent) notify(`Email enviado a ${json.recipientEmail}`)
       else if (json.emailError) notify(`Error al enviar: ${json.emailError}`, true)
       else notify('Marcada como enviada — copia la URL y envíasela')
@@ -169,18 +196,48 @@ function PropuestasPageContent() {
 
   const counts = {
     total: proposals.length,
-    sent: proposals.filter(p => ['sent', 'viewed'].includes(p.status)).length,
-    viewed: proposals.filter(p => p.status === 'viewed').length,
-    views: proposals.reduce((a, p) => a + (p.views || 0), 0),
+    sent: proposals.filter(p => p.sent_at != null).length,
+    viewed: proposals.filter(p => p.first_viewed_at != null).length,
+    views: proposals.reduce((a, p) => a + (p.open_count ?? p.views ?? 0), 0),
   }
 
-  if (isBlocked) return null
+  const filteredProposals = useMemo(() => {
+    let arr = proposals
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      const leadNameById = new Map(leads.map(l => [l.id, (l.name ?? '').toLowerCase()]))
+      arr = arr.filter(p =>
+        p.couple_name.toLowerCase().includes(q) ||
+        (p.lead_id && leadNameById.get(p.lead_id)?.includes(q))
+      )
+    }
+    if (statusFilter !== 'all') {
+      arr = arr.filter(p => p.status === statusFilter)
+    }
+    if (dateFilter !== 'all') {
+      const now = Date.now()
+      const dayMs = 86400000
+      const cutoffs = { today: dayMs, last_7d: 7 * dayMs, last_30d: 30 * dayMs }
+      const cutoff = now - cutoffs[dateFilter]
+      arr = arr.filter(p => new Date(p.created_at).getTime() > cutoff)
+    }
+    if (sortBy === 'views') arr = [...arr].sort((a, b) => ((b.open_count ?? b.views) || 0) - ((a.open_count ?? a.views) || 0))
+    else if (sortBy === 'name') arr = [...arr].sort((a, b) => a.couple_name.localeCompare(b.couple_name))
+    // 'recent' is the default order from the query
+    return arr
+  }, [proposals, leads, searchQuery, statusFilter, dateFilter, sortBy])
 
-  if (loading) return (
-    <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: 'var(--gold)' }}>Cargando...</div>
-    </div>
-  )
+  const totalPages = Math.max(1, Math.ceil(filteredProposals.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const visibleProposals = filteredProposals.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+  useEffect(() => {
+    setPage(1)
+  }, [searchQuery, statusFilter, dateFilter, sortBy])
+
+  if (isBlocked) return null
 
   if (!features.propuestas) return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--cream)' }}>
@@ -260,29 +317,15 @@ function PropuestasPageContent() {
           </div>
         )}
 
-        <div className="page-content">
+        <Tabs
+          activeKey="proposals"
+          tabs={[
+            { key: 'proposals', label: 'Propuestas', icon: FileText },
+            { key: 'templates', label: 'Plantillas', icon: LayoutTemplate, href: '/proposals/templates' },
+          ]}
+        />
 
-          {/* Tab bar */}
-          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--ivory)', marginBottom: 24 }}>
-            <button style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px',
-              background: 'none', border: 'none', cursor: 'default',
-              borderBottom: '2px solid var(--gold)', marginBottom: -2,
-              color: 'var(--espresso)', transition: 'all 0.15s',
-            }}>
-              <FileText size={15} color="var(--gold)" />
-              <span style={{ fontSize: 13, fontWeight: 600 }}>Propuestas</span>
-            </button>
-            <a href="/proposals/templates" style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px',
-              textDecoration: 'none',
-              borderBottom: '2px solid transparent', marginBottom: -2,
-              color: 'var(--warm-gray)', transition: 'all 0.15s',
-            }}>
-              <LayoutTemplate size={15} color="var(--warm-gray)" />
-              <span style={{ fontSize: 13 }}>Plantillas</span>
-            </a>
-          </div>
+        <div className="page-content">
 
           {smtpConfigured === false && (
             <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -304,6 +347,12 @@ function PropuestasPageContent() {
             </div>
           )}
 
+          {loading ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
+              <div style={{ width: 24, height: 24, border: '2px solid var(--gold)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+            </div>
+          ) : (
+          <>
           <div className="stats-grid">
             <div className="stat-card accent">
               <div className="stat-label">Total creadas</div>
@@ -326,6 +375,49 @@ function PropuestasPageContent() {
               <div className="stat-sub">{counts.total > 0 ? (counts.views / counts.total).toFixed(1) : 0} de media</div>
             </div>
           </div>
+
+          {/* Filters row — 4 equal columns (25% each), search on the right with magnifier icon */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="form-input" style={{ flex: '1 1 0', minWidth: 0, height: 34 }}>
+              <option value="all">Todos los estados</option>
+              <option value="draft">Borrador</option>
+              <option value="sent">Enviada</option>
+              <option value="viewed">Vista</option>
+              <option value="expired">Expirada</option>
+            </select>
+            <select value={dateFilter} onChange={e => setDateFilter(e.target.value as any)} className="form-input" style={{ flex: '1 1 0', minWidth: 0, height: 34 }}>
+              <option value="all">Cualquier fecha</option>
+              <option value="today">Creada hoy</option>
+              <option value="last_7d">Últimos 7 días</option>
+              <option value="last_30d">Últimos 30 días</option>
+            </select>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="form-input" style={{ flex: '1 1 0', minWidth: 0, height: 34 }}>
+              <option value="recent">Más recientes</option>
+              <option value="views">Más vistas</option>
+              <option value="name">Nombre A-Z</option>
+            </select>
+            <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0 }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', pointerEvents: 'none' }} />
+              <input
+                type="search"
+                placeholder="Buscar por pareja o lead…"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="form-input"
+                style={{ height: 34, paddingLeft: 32, width: '100%' }}
+              />
+            </div>
+          </div>
+          {(searchQuery || statusFilter !== 'all' || dateFilter !== 'all' || sortBy !== 'recent') && (
+            <div style={{ marginBottom: 10, display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { setSearchQuery(''); setStatusFilter('all'); setDateFilter('all'); setSortBy('recent') }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--warm-gray)', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4, padding: 0 }}
+              >
+                <X size={12} /> Limpiar filtros
+              </button>
+            </div>
+          )}
 
           <div className="card">
             <div className="table-wrapper">
@@ -353,7 +445,14 @@ function PropuestasPageContent() {
                       </td>
                     </tr>
                   )}
-                  {proposals.map(p => {
+                  {proposals.length > 0 && filteredProposals.length === 0 && (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--warm-gray)', fontSize: 13 }}>
+                        Sin resultados con esos filtros.
+                      </td>
+                    </tr>
+                  )}
+                  {visibleProposals.map(p => {
                     const leadProposalCount = p.lead_id ? proposals.filter(x => x.lead_id === p.lead_id).length : null
                     const atLimit = leadProposalCount !== null && leadProposalCount >= MAX_PROPOSALS_PER_LEAD
                     const linkedLeadName = leads.find(l => l.id === p.lead_id)?.name
@@ -384,7 +483,7 @@ function PropuestasPageContent() {
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             <Eye size={11} style={{ color: 'var(--warm-gray)' }} />
-                            <span style={{ fontSize: 12 }}>{p.views || 0}</span>
+                            <span style={{ fontSize: 12 }}>{p.open_count ?? p.views ?? 0}</span>
                           </div>
                         </td>
                         <td>
@@ -431,6 +530,32 @@ function PropuestasPageContent() {
               </table>
             </div>
           </div>
+
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, padding: '20px 0 4px' }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                disabled={safePage === 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                style={safePage === 1 ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
+              >
+                <ChevronLeft size={13} /> Anterior
+              </button>
+              <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>
+                Página {safePage} de {totalPages}
+              </span>
+              <button
+                className="btn btn-ghost btn-sm"
+                disabled={safePage === totalPages}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                style={safePage === totalPages ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
+              >
+                Siguiente <ChevronRight size={13} />
+              </button>
+            </div>
+          )}
+          </>
+          )}
         </div>
       </div>
 

@@ -48,8 +48,8 @@ export async function POST(
       recipientEmail = lead?.email ?? null
     }
 
-    // Update status to sent (and save email if provided, silently ignore if column missing)
-    await supabase.from('proposals').update({ status: 'sent' }).eq('id', id)
+    // Update status to sent + sent_at timestamp.
+    await supabase.from('proposals').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id)
     if (emailOverride) {
       await supabase.from('proposals').update({ couple_email: emailOverride }).eq('id', id)
         .then(() => {}) // ignorar error si columna no existe

@@ -8,6 +8,7 @@ const PUBLIC_ROUTES = [
   '/api/admin/backup',          // uses Bearer API key for GitHub Actions cron
   '/api/redsys/notification',   // Redsys webhook (server-to-server, no session)
   '/api/plans',                 // public plan listing for pricing page
+  '/api/proposals/track-view',  // anonymous couple opens a proposal — RPC handles dedupe + self-view
 ]
 
 export async function middleware(req: NextRequest) {

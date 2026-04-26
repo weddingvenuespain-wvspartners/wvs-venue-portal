@@ -4,7 +4,6 @@
 // Sections: Hero + sidebar nav, Experience, Inclusions, Packages, Extras, FAQ, CTA
 
 import { useEffect, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { formatDate, formatPrice, isDark, toRgb, FadeUp, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoChat, IcoBuilding, ivaLabel, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, type ProposalData } from './shared'
 import { WeddingProposal } from './WeddingProposal'
@@ -67,9 +66,6 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
   const secN = Object.fromEntries(SECTIONS_DEF.map(s => [s.id, s.n])) as Record<string, string>
   const secLbl = (id: string, fallback: string) => `${secN[id] ?? ''}${secN[id] ? ' — ' : ''}${fallback}`
 
-  useEffect(() => {
-    createClient().from('proposals').update({ views: (data as any).views + 1 }).eq('id', data.id).then(()=>{})
-  }, [])
   useEffect(() => {
     const url = buildSingleFontUrl(font); if (!url) return
     const ex = document.querySelector('link[data-gf-p]')
