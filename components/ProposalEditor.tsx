@@ -10,6 +10,7 @@ import { useUnsavedChanges } from '@/lib/use-unsaved-changes'
 import ProposalPreview from './ProposalPreview'
 import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
+import ProposalDateModal from './ProposalDateModal'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
 
@@ -49,6 +50,7 @@ const PRESET_COLORS = ['#2d4a7a', '#7a5c3c', '#6b2d42', '#2a6b4a', '#4a4a4a', '#
 
 const SECTION_LABELS: Record<string, string> = {
   hero: 'Foto principal',
+  date_slots: 'Fechas disponibles',
   availability: 'Disponibilidad',
   sticky_nav: 'Menú de navegación (sticky top)',
   welcome: 'Bienvenida · Oscura (cita centrada)',
@@ -57,6 +59,7 @@ const SECTION_LABELS: Record<string, string> = {
   welcome_editorial: 'Bienvenida · Editorial (tipografía grande)',
   experience: 'La experiencia',
   gallery: 'Galería de fotos',
+  single_space: 'Tu espacio',
   zones: 'Zonas del venue',
   space_groups: 'Grupos de espacios',
   venue_rental: 'Tarifas de alquiler (grid temporada × día)',
@@ -83,26 +86,28 @@ const emptySections: SectionsData = {
 function getDefaultSections(cfg: { space_type: string; price_model: string; menu_included?: boolean; has_menu_types?: boolean; catering_own?: boolean }): Record<string, boolean> {
   const hasOwnMenu = cfg.menu_included === true || cfg.catering_own === true
   return {
-    hero:              true,
-    availability:      false,
-    sticky_nav:        false,
-    welcome:           true,
-    welcome_light:     false,
-    welcome_split:     false,
+    hero:             true,
+    availability:     false,
+    sticky_nav:       false,
+    welcome:          true,
+    welcome_light:    false,
+    welcome_split:    false,
     welcome_editorial: false,
-    experience:        true,
-    gallery:           true,
-    zones:             cfg.space_type === 'multiple_independent',
-    venue_rental:      cfg.price_model === 'rental',
-    inclusions:        cfg.price_model === 'package' && cfg.menu_included !== false,
-    testimonials:      true,
-    collaborators:     false,
-    accommodation:     false,
-    extra_services:    cfg.space_type === 'single_with_supplements' || cfg.space_type === 'multiple_independent',
-    faq:               false,
-    schedule_visit:    false,
-    map:               true,
-    contact:           true,
+    experience:       true,
+    gallery:          true,
+    single_space:     cfg.space_type === 'single',
+    zones:            cfg.space_type === 'single_with_supplements',
+    space_groups:     cfg.space_type === 'multiple_independent',
+    venue_rental:     cfg.price_model === 'rental' && cfg.space_type !== 'multiple_independent',
+    inclusions:       cfg.price_model === 'package' && cfg.menu_included !== false,
+    testimonials:     true,
+    collaborators:    false,
+    accommodation:    false,
+    extra_services:   cfg.space_type === 'single_with_supplements' || cfg.space_type === 'multiple_independent',
+    faq:              false,
+    schedule_visit:   false,
+    map:              true,
+    contact:          true,
   }
 }
 
@@ -122,6 +127,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   const [menuCatalog, setMenuCatalog] = useState<SectionsData | null>(null)
   const [contentTemplates, setContentTemplates] = useState<Array<{ id: string; name: string; description: string | null; sections_data: SectionsData; is_default: boolean }>>([])
   const [applyingTemplate, setApplyingTemplate] = useState(false)
+  const [showDateModal, setShowDateModal] = useState(false)
 
   const [form, setForm] = useState({
     lead_id: initial.lead_id ?? '',
@@ -502,7 +508,18 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 </div>
                 <div className="form-group">
                   <label className="form-label">Fecha de boda</label>
-                  <input className="form-input" type="date" value={form.wedding_date} onChange={e => onWeddingDateChange(e.target.value)} />
+                  <button type="button" className="form-input" onClick={() => setShowDateModal(true)}
+                    style={{ textAlign: 'left', cursor: 'pointer', color: form.wedding_date ? 'var(--charcoal)' : 'var(--warm-gray)' }}>
+                    {(() => {
+                      const slotDates: string[] = (sections as any).date_slots?.[0]?.dates ?? []
+                      if (slotDates.length > 1) {
+                        return slotDates.map(d => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })).join(' · ')
+                      }
+                      return form.wedding_date
+                        ? new Date(form.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+                        : 'Seleccionar fecha…'
+                    })()}
+                  </button>
                 </div>
               </div>
 
@@ -578,6 +595,38 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                   </div>
                 </div>
               )}
+
+              {/* Template selector */}
+              <div className="form-group" style={{ marginTop: 14 }}>
+                <label className="form-label">Diseño de la propuesta</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  {([
+                    { id: 1, icon: '⚡', name: 'Impacto Directo', desc: 'Dark luxury' },
+                    { id: 2, icon: '✨', name: 'Emoción Primero', desc: 'Cream editorial' },
+                    { id: 3, icon: '📋', name: 'Todo Claro', desc: 'Estructurado' },
+                    { id: 4, icon: '💬', name: 'Social Proof', desc: 'Stats + confianza' },
+                    { id: 5, icon: '◻', name: 'Minimalista', desc: 'CTA prominente' },
+                  ] as const).map(tpl => {
+                    const active = (sections.visual_template_id ?? 1) === tpl.id
+                    return (
+                      <button key={tpl.id} type="button"
+                        onClick={() => setSections(s => ({ ...s, visual_template_id: tpl.id }))}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                          borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                          border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                          background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
+                        }}>
+                        <span style={{ fontSize: 14 }}>{tpl.icon}</span>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)' }}>{tpl.name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{tpl.desc}</div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
 
               <div className="form-group" style={{ marginTop: 14 }}>
                 <label className="form-label">Tipo de servicio</label>
@@ -736,15 +785,15 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
           {activeTab === 'secciones' && (() => {
             // Sections in the same order the templates render them
             const ALL_SECTION_IDS = [
+              // Order matches T1Impacto render order top → bottom
+              'sticky_nav',
               'hero',
               'availability',
-              'sticky_nav',
-              'welcome',
-              'welcome_light',
-              'welcome_split',
-              'welcome_editorial',
+              'date_slots',
+              'welcome', 'welcome_light', 'welcome_split', 'welcome_editorial', // grouped
               'experience',
               'gallery',
+              'single_space',
               'zones',
               'space_groups',
               'venue_rental',
@@ -791,7 +840,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               }
             }))
 
-            const SPACE_GROUP_IDS = ['zones', 'space_groups', 'venue_rental']
+            const SPACE_GROUP_IDS = ['single_space', 'zones', 'space_groups', 'venue_rental']
             const visibleSpaceSubs = SPACE_GROUP_IDS.filter(id => isSectionAllowed(id, commercialConfig?.space_type as any))
             const isSpaceGroupOpen = openSecs.has('__space_group')
             const activeSpaceIds = visibleSpaceSubs.filter(id => isSectionOn(id))
@@ -827,6 +876,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                   if (['welcome_light', 'welcome_split', 'welcome_editorial'].includes(secId)) return null
                   if (!isSectionAllowed(secId, commercialConfig?.space_type as any)) return null
 
+                  // Space group: collapsed → only header at first sub; expanded → header + indented subs
                   const isInSpaceGroup = SPACE_GROUP_IDS.includes(secId)
                   const isFirstSpaceVisible = isInSpaceGroup && visibleSpaceSubs[0] === secId
                   if (isInSpaceGroup && !isSpaceGroupOpen) {
@@ -948,6 +998,59 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
                       {isOpen && (
                         <div className="sec-open-content" style={{ padding: '12px 14px 14px' }}>
+                          {/* DATE SLOTS */}
+                          {secId === 'date_slots' && (() => {
+                            const slots: any[] = (sections as any).date_slots ?? []
+                            const setSlots = (val: any[]) => setSections((s: any) => ({ ...s, date_slots: val }))
+                            const updateSlot = (i: number, patch: any) => setSlots(slots.map((s: any, j: number) => j === i ? { ...s, ...patch } : s))
+                            const removeSlot = (i: number) => setSlots(slots.filter((_: any, j: number) => j !== i))
+                            const addDate = (i: number) => updateSlot(i, { dates: [...(slots[i].dates ?? []), ''] })
+                            const updateDate = (i: number, di: number, val: string) => updateSlot(i, { dates: slots[i].dates.map((d: string, j: number) => j === di ? val : d) })
+                            const removeDate = (i: number, di: number) => updateSlot(i, { dates: slots[i].dates.filter((_: string, j: number) => j !== di) })
+
+                            return (
+                              <div>
+                                <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.6, marginBottom: 10, background: 'var(--cream)', borderRadius: 6, padding: '8px 10px' }}>
+                                  Añade una o varias franjas de fechas. Si tienen <strong>precios distintos</strong>, la pareja podrá seleccionar la que prefiera y el precio se mostrará dinámicamente.
+                                </div>
+                                {slots.map((slot: any, i: number) => (
+                                  <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
+                                    <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--charcoal)', background: 'var(--cream)', listStyle: 'none' }}>
+                                      <ChevronDown size={12} style={{ color: 'var(--warm-gray)' }} />
+                                      <span style={{ flex: 1 }}>{slot.label || <em style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>Franja {i + 1}</em>}</span>
+                                      {slot.price_per_person && <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 600 }}>{slot.price_per_person}</span>}
+                                      <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeSlot(i) }}><X size={13} /></button>
+                                    </summary>
+                                    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                      <input className="form-input" placeholder="Etiqueta  (ej. Temporada alta · Sábados)" value={slot.label ?? ''} onChange={e => updateSlot(i, { label: e.target.value })} />
+                                      <div style={{ display: 'flex', gap: 6 }}>
+                                        <input className="form-input" placeholder="Precio/persona  (ej. 110€/pax)" style={{ flex: 1 }} value={slot.price_per_person ?? ''} onChange={e => updateSlot(i, { price_per_person: e.target.value })} />
+                                        <input className="form-input" placeholder="Precio total  (ej. 8.000€)" style={{ flex: 1 }} value={slot.price_rental ?? ''} onChange={e => updateSlot(i, { price_rental: e.target.value })} />
+                                      </div>
+                                      <input className="form-input" placeholder="Nota  (ej. IVA no incluido · Viernes)" value={slot.notes ?? ''} onChange={e => updateSlot(i, { notes: e.target.value })} />
+                                      {/* Dates */}
+                                      <div style={{ background: 'var(--cream)', borderRadius: 6, padding: '8px 10px' }}>
+                                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 6 }}>Fechas</div>
+                                        {(slot.dates ?? []).map((d: string, di: number) => (
+                                          <div key={di} style={{ display: 'flex', gap: 5, alignItems: 'center', marginBottom: 4 }}>
+                                            <input className="form-input" type="date" style={{ flex: 1 }} value={d} onChange={e => updateDate(i, di, e.target.value)} />
+                                            <button type="button" style={removeBtn} onClick={() => removeDate(i, di)}><X size={11} /></button>
+                                          </div>
+                                        ))}
+                                        <button type="button" style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0' }} onClick={() => addDate(i)}>
+                                          + Añadir fecha
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </details>
+                                ))}
+                                <button type="button" style={addBtn} onClick={() => setSlots([...slots, { label: '', dates: [], price_per_person: '', notes: '' }])}>
+                                  + Añadir franja de fechas
+                                </button>
+                              </div>
+                            )
+                          })()}
+
                           {secId === 'hero' && (
                             <div>
                               <input ref={heroInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleHeroUpload(e.target.files[0])} />
@@ -1006,6 +1109,51 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                             )
                           })()}
 
+                          {/* SINGLE SPACE */}
+                          {secId === 'single_space' && (() => {
+                            const ss: any = (sections as any).single_space ?? {}
+                            const setSs = (patch: any) => setSections((s: any) => ({ ...s, single_space: { ...(s.single_space ?? {}), ...patch } }))
+                            const features: string[] = Array.isArray(ss.features) ? ss.features : []
+                            const setFeatures = (next: string[]) => setSs({ features: next })
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Título</label>
+                                  <input className="form-input" placeholder="Ej. El Salón Principal" value={ss.title ?? ''} onChange={e => setSs({ title: e.target.value })} />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Descripción</label>
+                                  <textarea className="form-textarea" style={{ minHeight: 70 }} placeholder="Cuenta cómo es el espacio, qué lo hace especial…" value={ss.description ?? ''} onChange={e => setSs({ description: e.target.value })} />
+                                </div>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                  <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                                    <label className="form-label">m²</label>
+                                    <input className="form-input" placeholder="500" value={ss.sqm ?? ''} onChange={e => setSs({ sqm: e.target.value })} />
+                                  </div>
+                                  <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                                    <label className="form-label">Capacidad máx.</label>
+                                    <input className="form-input" placeholder="200 invitados" value={ss.max_guests ?? ''} onChange={e => setSs({ max_guests: e.target.value })} />
+                                  </div>
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Imagen del espacio (opcional)</label>
+                                  <input className="form-input" placeholder="https://..." value={ss.image_url ?? ''} onChange={e => setSs({ image_url: e.target.value })} />
+                                  <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4 }}>Si la dejas vacía, se usará la foto principal.</div>
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Características destacadas</label>
+                                  {features.map((f, fi) => (
+                                    <div key={fi} style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                                      <input className="form-input" placeholder="Ej. Aire acondicionado" value={f} onChange={e => setFeatures(features.map((x, j) => j === fi ? e.target.value : x))} />
+                                      <button type="button" style={removeBtn} onClick={() => setFeatures(features.filter((_, j) => j !== fi))}><X size={11} /></button>
+                                    </div>
+                                  ))}
+                                  <button type="button" style={addBtn} onClick={() => setFeatures([...features, ''])}>+ Añadir característica</button>
+                                </div>
+                              </div>
+                            )
+                          })()}
+
                           {/* ZONES */}
                           {secId === 'zones' && (
                             <div>
@@ -1035,6 +1183,10 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                         <input className="form-input" style={{ width: 80, flexShrink: 0 }} type="number" placeholder="m²" value={z.sqm ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'sqm', e.target.value ? Number(e.target.value) : undefined)} />
                                       </div>
                                       <input className="form-input" placeholder="Descripción breve" value={z.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
+                                      <input className="form-input"
+                                        placeholder={commercialConfig?.space_type === 'single_with_supplements' ? 'Suplemento (ej. +500€)' : 'Precio (opcional)'}
+                                        value={z.price ?? ''}
+                                        onChange={e => updateOverrideItem(overrideKey, i, 'price', e.target.value)} />
 
                                       {/* Image upload */}
                                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -1488,6 +1640,26 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       <div style={{ flex: 1, minWidth: 0, height: '100vh' }}>
         <ProposalPreview slug={proposal.slug} patch={previewPatch} />
       </div>
+
+      {/* ── Date picker modal ── */}
+      {showDateModal && user && (
+        <ProposalDateModal
+          userId={user.id}
+          currentDate={form.wedding_date || null}
+          onClose={() => setShowDateModal(false)}
+          onConfirm={(dates) => {
+            const first = dates[0] ?? ''
+            onWeddingDateChange(first)
+            if (dates.length > 1) {
+              setSections((s: any) => ({
+                ...s,
+                date_slots: [{ label: 'Fechas propuestas', dates }],
+              }))
+            }
+            setShowDateModal(false)
+          }}
+        />
+      )}
 
       {/* ── Toast ── */}
       {toast && (

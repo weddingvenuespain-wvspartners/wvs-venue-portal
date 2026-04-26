@@ -55,6 +55,15 @@ export type AppetizerGroup = {
   items: string[]
 }
 
+export type DateSlot = {
+  id?: string
+  label?: string           // "Temporada alta", "Fin de semana premium"
+  dates: string[]          // ["2025-10-04", "2025-10-11"]
+  price_per_person?: string // "110€/pax"
+  price_rental?: string    // "5.000€"
+  notes?: string           // "Sábados · IVA no incluido"
+}
+
 export type VenueSpaceItem = {
   id?: string
   name: string
@@ -63,15 +72,6 @@ export type VenueSpaceItem = {
   capacity_max?: number
   price?: string
   price_label?: string
-}
-
-export type DateSlot = {
-  id?: string
-  label?: string
-  dates: string[]
-  price_per_person?: string
-  price_rental?: string
-  notes?: string
 }
 
 export type SpaceGroup = {
@@ -97,6 +97,14 @@ export type SectionsData = {
     rows?: Array<{ season: string; prices: Array<string | null> }>
     notes?: string
   }
+  single_space?: {
+    title?: string
+    description?: string
+    sqm?: string
+    max_guests?: string
+    features?: string[]
+    image_url?: string
+  } | null
   packages_override?:       Array<{ name: string; subtitle?: string; price?: string; description?: string; includes?: string[]; is_recommended?: boolean; min_guests?: number; max_guests?: number; is_active?: boolean }> | null
   zones_override?:          Array<{
     name: string
@@ -127,6 +135,8 @@ export type SectionsData = {
   // Per-proposal image overrides
   hero_image_url?: string
   gallery_urls?: string[]
+  // Date slots — multiple available dates with optional per-slot pricing
+  date_slots?: DateSlot[] | null
   // Space groups — grouped zone selector for venues with multiple zones
   space_groups?: SpaceGroup[] | null
   // Per-proposal map override (if empty, falls back to venueContent.map_info)
@@ -136,8 +146,6 @@ export type SectionsData = {
   visual_template_id?: number
   // Content template that was last applied to this proposal
   content_template_id?: string
-  // Date slots offered to the couple (different date options, possibly with different prices)
-  date_slots?: DateSlot[] | null
   // Sections — new blocks
   schedule_visit?: { title?: string; subtitle?: string; url?: string; cta_label?: string; note?: string } | null
   sticky_nav?: { links?: Array<{ label: string; anchor: string }> } | null

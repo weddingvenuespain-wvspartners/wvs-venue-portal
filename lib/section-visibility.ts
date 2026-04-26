@@ -13,6 +13,7 @@ export const SPACE_TYPE_LABELS: Record<string, string> = {
 // Which space_types each section is designed for. Used to render
 // "matches your config" banners inside template editors.
 export const SECTION_SPACE_TYPES: Record<string, Array<'single' | 'single_with_supplements' | 'multiple_independent'>> = {
+  single_space: ['single'],
   zones: ['single_with_supplements'],
   space_groups: ['multiple_independent'],
   venue_rental: ['single', 'single_with_supplements'],
@@ -22,6 +23,8 @@ export function isSectionAllowed(secId: string, spaceType: SpaceType): boolean {
   if (!spaceType) return true
 
   switch (secId) {
+    case 'single_space':
+      return spaceType === 'single'
     case 'zones':
       return spaceType === 'single_with_supplements'
     case 'space_groups':
@@ -35,6 +38,8 @@ export function isSectionAllowed(secId: string, spaceType: SpaceType): boolean {
 
 export function getSectionLabel(secId: string, spaceType: SpaceType, fallback: string): string {
   switch (secId) {
+    case 'single_space':
+      return 'Tu espacio'
     case 'zones':
       if (spaceType === 'single_with_supplements') return 'Zonas opcionales con suplemento'
       return fallback

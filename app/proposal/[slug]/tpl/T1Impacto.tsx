@@ -354,6 +354,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               ? { label: 'Bienvenida', anchor: 'sec-welcome' } : null,
             expShow && on('experience') ? { label: 'Historia', anchor: 'sec-experience' } : null,
             on('gallery') && galleryPhotos.length > 0 ? { label: 'Galería', anchor: 'sec-gallery' } : null,
+            on('single_space') && (sec as any).single_space?.title ? { label: 'Vuestro espacio', anchor: 'sec-single-space' } : null,
             on('zones') && zonesShow.length > 0 ? { label: 'Espacios', anchor: 'sec-zones' } : null,
             hasCatering && on('menu') ? { label: 'Menús', anchor: 'menu' } : null,
             on('schedule_visit') ? { label: 'Visita', anchor: 'sec-schedule' } : null,
@@ -588,6 +589,55 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <Gallery photos={galleryPhotos} primary={primary} dark />
         </FadeIn>
       )}
+
+      {/* ════════════════════════════════════════════
+          SINGLE SPACE (un único espacio)
+      ════════════════════════════════════════════ */}
+      {on('single_space') && (sec as any).single_space && (() => {
+        const ss: any = (sec as any).single_space
+        const features: string[] = Array.isArray(ss.features) ? ss.features : []
+        const heroImg = ss.image_url || (sec as any).hero_image_url
+        if (!ss.title && !ss.description && !heroImg && features.length === 0) return null
+        return (
+          <section id="sec-single-space" className="t1-sec" style={{ background: '#0c0c0c' }}>
+            <div className="w" style={{ display: 'grid', gridTemplateColumns: heroImg ? '1fr 1fr' : '1fr', gap: 48, alignItems: 'center' }}>
+              {heroImg && (
+                <FadeIn>
+                  <img src={heroImg} alt={ss.title || 'Espacio'} style={{ width: '100%', height: 420, objectFit: 'cover', borderRadius: 4, border: '1px solid rgba(255,255,255,.06)' }} />
+                </FadeIn>
+              )}
+              <FadeUp>
+                <span className="t1-label">Vuestro espacio</span>
+                {ss.title && <h2 className="t1-h2" style={{ marginBottom: 16 }}>{ss.title}</h2>}
+                {ss.description && <p className="t1-p" style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.7, marginBottom: 24 }}>{ss.description}</p>}
+                {(ss.sqm || ss.max_guests) && (
+                  <div style={{ display: 'flex', gap: 32, marginBottom: 20, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,.08)' }}>
+                    {ss.sqm && (
+                      <div>
+                        <div style={{ fontSize: '1.6rem', fontWeight: 300, color: '#fff', fontFamily: FONT, lineHeight: 1 }}>{ss.sqm}<span style={{ fontSize: '.7em', color: 'rgba(255,255,255,.5)' }}> m²</span></div>
+                        <div style={{ fontSize: '.65rem', letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,.4)', marginTop: 4 }}>Superficie</div>
+                      </div>
+                    )}
+                    {ss.max_guests && (
+                      <div>
+                        <div style={{ fontSize: '1.6rem', fontWeight: 300, color: '#fff', fontFamily: FONT, lineHeight: 1 }}>{ss.max_guests}</div>
+                        <div style={{ fontSize: '.65rem', letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,.4)', marginTop: 4 }}>Capacidad máx.</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {features.filter(Boolean).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {features.filter(Boolean).map((f, i) => (
+                      <span key={i} style={{ fontSize: '.72rem', padding: '5px 12px', border: '1px solid rgba(255,255,255,.15)', borderRadius: 999, color: 'rgba(255,255,255,.6)', letterSpacing: '.04em' }}>{f}</span>
+                    ))}
+                  </div>
+                )}
+              </FadeUp>
+            </div>
+          </section>
+        )
+      })()}
 
       {/* ════════════════════════════════════════════
           ESPACIOS / ZONES
