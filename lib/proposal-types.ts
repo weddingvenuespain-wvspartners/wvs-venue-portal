@@ -65,6 +65,15 @@ export type VenueSpaceItem = {
   price_label?: string
 }
 
+export type DateSlot = {
+  id?: string
+  label?: string
+  dates: string[]
+  price_per_person?: string
+  price_rental?: string
+  notes?: string
+}
+
 export type SpaceGroup = {
   id?: string
   name: string
@@ -125,6 +134,10 @@ export type SectionsData = {
   map_address?: string
   // Visual template selection (1–5)
   visual_template_id?: number
+  // Content template that was last applied to this proposal
+  content_template_id?: string
+  // Date slots offered to the couple (different date options, possibly with different prices)
+  date_slots?: DateSlot[] | null
   // Legacy fallback used by extractData for older proposals
   testimonials?: Array<{ names: string; couple_name?: string; date?: string; wedding_date?: string; guests?: number; text: string; rating?: number; photo_url?: string }>
   accommodation?: {
