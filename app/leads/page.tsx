@@ -7,6 +7,8 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
+import { expandLeadDates, expandBudgetDates, pad } from '@/lib/lead-dates'
+import { LeadDatesSection } from '@/components/LeadDatesSection'
 import {
   Plus, Search, X, Phone, Mail, MessageCircle,
   Calendar, Users, ChevronLeft, ChevronRight, RotateCcw, CheckCircle,
@@ -92,7 +94,6 @@ const SEASONS: { value: string; label: string; emoji: React.ReactNode }[] = [
 ]
 const YEAR_OPTS = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() + i)
 
-function pad(n: number) { return String(n).padStart(2,'0') }
 function toIso(y: number, m: number, d: number) { return `${y}-${pad(m+1)}-${pad(d)}` }
 function todayIso() {
   const t = new Date(); return `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`
@@ -286,39 +287,6 @@ function getLeadFirstDate(lead: any): string | null {
   return null
 }
 
-function expandLeadDates(lead: any): string[] {
-  const flex = lead.date_flexibility || 'exact'
-  const addRange = (from: string, to: string): string[] => {
-    const result: string[] = []
-    const d = new Date(from + 'T12:00:00')
-    const end = new Date((to || from) + 'T12:00:00')
-    while (d <= end) { result.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 1) }
-    return result
-  }
-  if (flex === 'exact') return lead.wedding_date ? [lead.wedding_date] : []
-  if (flex === 'range' && lead.wedding_date)
-    return addRange(lead.wedding_date, lead.wedding_date_to || lead.wedding_date)
-  if (flex === 'multi_range')
-    return (lead.wedding_date_ranges || []).flatMap((r: any) => r.from ? addRange(r.from, r.to || r.from) : [])
-  return []
-}
-
-function expandBudgetDates(lead: any): string[] {
-  const flex = lead.budget_date_flexibility || 'exact'
-  const addRange = (from: string, to: string): string[] => {
-    const result: string[] = []
-    const d = new Date(from + 'T12:00:00')
-    const end = new Date((to || from) + 'T12:00:00')
-    while (d <= end) { result.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 1) }
-    return result
-  }
-  if (flex === 'exact') return lead.budget_date ? [lead.budget_date] : []
-  if (flex === 'range' && lead.budget_date)
-    return addRange(lead.budget_date, lead.budget_date_to || lead.budget_date)
-  if (flex === 'multi_range')
-    return (lead.budget_date_ranges || []).flatMap((r: any) => r.from ? addRange(r.from, r.to || r.from) : [])
-  return []
-}
 
 const CAL_AVAIL_CFG: Record<string, { bg: string; border: string; dot: string; label: string }> = {
   libre:       { bg: '#fff',    border: '#e5e7eb', dot: '#d1fae5', label: 'Libre' },
@@ -3973,14 +3941,9 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
             </div>
           )}
 
-          {(() => {
-            const { line1, line2, color } = formatLeadDate(lead)
-            return (
+          {tab !== 'confirmed' && <LeadDatesSection lead={lead} />}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
-            {tab !== 'confirmed' && (
-              <InfoBlock icon={<Calendar size={13} />} label="Fecha de boda"
-                value={line1} sub={line2} subColor={color} />
-            )}
             {lead.visit_date && (
               <InfoBlock icon={<Landmark size={13} />} label="Fecha de visita"
                 value={new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })} />
@@ -3990,8 +3953,6 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
             <InfoBlock icon={null} label="Ceremonia" value={CEREMONY_LABEL[lead.ceremony_type] || '—'} />
             {lead.style && <InfoBlock icon={null} label="Estilo" value={lead.style} />}
           </div>
-            )
-          })()}
 
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Contacto</div>
