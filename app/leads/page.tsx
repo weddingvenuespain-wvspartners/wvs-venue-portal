@@ -395,6 +395,8 @@ export default function LeadsPage() {
   const [dateConfirmLead,   setDateConfirmLead]   = useState<any | null>(null)
   const [dateConfirmStatus, setDateConfirmStatus] = useState<DbStatus | null>(null)
   const [dateConfirmKey,    setDateConfirmKey]    = useState(0)
+  const [pdfDigitalLead,    setPdfDigitalLead]    = useState<any | null>(null)
+  const [pdfDigitalKey,     setPdfDigitalKey]     = useState(0)
   const [cancelVisitConfirm, setCancelVisitConfirm] = useState<{
     lead: any; targetStatus: DbStatus; requiresDateModal: boolean
   } | null>(null)
@@ -881,6 +883,18 @@ export default function LeadsPage() {
     }
   }
 
+  // PDF digital: takes the selected dates from the calendar modal and creates a proposal
+  const handlePdfDigitalDates = async (_leadUpdates: any, calendarDates: string[], _calStatus: any, _isVisit: boolean) => {
+    if (!pdfDigitalLead || !user) return
+    const dateSlots = calendarDates.length > 0
+      ? [{ label: 'Fechas propuestas', dates: calendarDates.sort() }]
+      : []
+    const params = new URLSearchParams({ lead_id: pdfDigitalLead.id })
+    if (dateSlots.length > 0) params.set('ds', btoa(JSON.stringify(dateSlots)))
+    setPdfDigitalLead(null)
+    router.push(`/proposals/new?${params.toString()}`)
+  }
+
   const requestDeleteLead = (id: string) => { setDeleteConfirmId(id) }
 
   const confirmDeleteLead = async () => {
@@ -1322,7 +1336,7 @@ export default function LeadsPage() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {activeTab === 'visit' ? (() => {
-                  const rowProps = { tab: activeTab as Tab, onMove: moveToStatusWithVisitCheck, onEdit: openEdit, onDelete: requestDeleteLead, onDetail: openEdit, onDateConfirm: triggerStatusChangeWithVisitCheck }
+                  const rowProps = { tab: activeTab as Tab, onMove: moveToStatusWithVisitCheck, onEdit: openEdit, onDelete: requestDeleteLead, onDetail: openEdit, onDateConfirm: triggerStatusChangeWithVisitCheck, onPdfDigital: (l: any) => { setPdfDigitalLead(l); setPdfDigitalKey(k => k + 1) } }
                   const filtered = visibleLeads.filter(l =>
                     visitSubFilter === 'scheduled' ? l.status === 'visit_scheduled' :
                     visitSubFilter === 'post'      ? l.status === 'post_visit' : true
@@ -1332,7 +1346,8 @@ export default function LeadsPage() {
                   <LeadRow key={lead.id} lead={lead} tab={activeTab}
                     onMove={moveToStatusWithVisitCheck} onEdit={openEdit}
                     onDelete={requestDeleteLead} onDetail={openEdit}
-                    onDateConfirm={triggerStatusChangeWithVisitCheck} />
+                    onDateConfirm={triggerStatusChangeWithVisitCheck}
+                    onPdfDigital={(l: any) => { setPdfDigitalLead(l); setPdfDigitalKey(k => k + 1) }} />
                 ))}
               </div>
             )}
@@ -1479,6 +1494,20 @@ export default function LeadsPage() {
             setDateConfirmStatus(null)
             if (leadToReopen) openEdit(leadToReopen)
           }) : undefined}
+        />
+      )}
+
+      {/* PDF digital — date selection before creating proposal */}
+      {pdfDigitalLead && (
+        <DateConfirmModal
+          key={pdfDigitalKey}
+          lead={pdfDigitalLead}
+          targetStatus={pdfDigitalLead.status === 'new' ? 'contacted' : pdfDigitalLead.status}
+          userId={user!.id}
+          allLeads={leads}
+          onConfirm={handlePdfDigitalDates}
+          onClose={() => setPdfDigitalLead(null)}
+          isPdfDigital
         />
       )}
 
@@ -1653,7 +1682,7 @@ export default function LeadsPage() {
 
 // ── Date Confirm Modal ─────────────────────────────────────────────────────────
 function DateConfirmModal({
-  lead, targetStatus, userId, allLeads, onConfirm, onClose, onBack,
+  lead, targetStatus, userId, allLeads, onConfirm, onClose, onBack, isPdfDigital = false,
 }: {
   lead: any
   targetStatus: DbStatus
@@ -1662,6 +1691,7 @@ function DateConfirmModal({
   onConfirm: (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean, halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>, visitTime?: string, visitDuration?: number, bufferDates?: { date: string; note: string }[]) => Promise<void>
   onClose: () => void
   onBack?: () => void
+  isPdfDigital?: boolean
 }) {
   const isVisitMode    = targetStatus === 'visit_scheduled'
   const isWonMode      = targetStatus === 'won'
@@ -2426,14 +2456,15 @@ function DateConfirmModal({
   const nextMonth = () => { if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) } else setViewMonth(m => m + 1) }
 
   // Header config per mode
-  const modeConfig = isVisitMode    ? { label: 'Agendar visita',          icon: <Landmark    size={16} />, gradient: 'linear-gradient(135deg,#fef3c7 0%,#fdf6ee 100%)', accent: 'var(--gold)',      avatarBg: 'var(--gold)' }
+  const modeConfig = isPdfDigital   ? { label: 'Selecciona las fechas para la propuesta digital', icon: <CalendarDays size={16} />, gradient: 'linear-gradient(135deg,#f0f4ff 0%,#f8f9ff 100%)', accent: '#4f6ef7', avatarBg: '#4f6ef7' }
+    : isVisitMode    ? { label: 'Agendar visita',          icon: <Landmark    size={16} />, gradient: 'linear-gradient(135deg,#fef3c7 0%,#fdf6ee 100%)', accent: 'var(--gold)',      avatarBg: 'var(--gold)' }
     : isWonMode      ? { label: 'Confirmar boda',            icon: <PartyPopper size={16} />, gradient: 'linear-gradient(135deg,#f0fdf4 0%,#fafdf8 100%)', accent: '#16a34a',        avatarBg: 'var(--sage)' }
     : isBudgetMode   ? { label: 'Presupuesto',               icon: <Receipt     size={16} />, gradient: 'linear-gradient(135deg,#fef3c7 0%,#fdf6ee 100%)', accent: 'var(--gold)',      avatarBg: 'var(--gold)' }
     : isEditDatesMode ? { label: 'Editar fechas propuestas', icon: <CalendarDays size={16} />, gradient: 'linear-gradient(135deg,#f0f4ff 0%,#f8f9ff 100%)', accent: '#4f6ef7',        avatarBg: '#4f6ef7' }
     :                  { label: 'Selecciona las fechas propuestas', icon: <CalendarDays size={16} />, gradient: 'linear-gradient(135deg,#f5f0ea 0%,#fafaf8 100%)', accent: 'var(--espresso)', avatarBg: 'var(--espresso)' }
 
   const dcmInitials = getInitials(lead.name || '')
-  const canConfirm = !saving && !budgetUploading && (!isVisitMode || selectedDates.length > 0)
+  const canConfirm = !saving && !budgetUploading && (!isVisitMode || selectedDates.length > 0 || isPdfDigital)
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(17,15,12,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 16 }}
@@ -3440,6 +3471,7 @@ function DateConfirmModal({
               opacity: !canConfirm ? 0.5 : 1,
             }}>
             {saving ? 'Guardando...'
+              : isPdfDigital    ? <><CalendarDays size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Continuar a propuesta →</>
               : isVisitMode    ? <><Calendar     size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Confirmar visita</>
               : isWonMode      ? <><PartyPopper  size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Confirmar boda</>
               : isBudgetMode   ? <><Receipt      size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Pasar a presupuesto</>
@@ -3483,13 +3515,14 @@ function timeAgo(dateStr: string): { text: string; urgent: boolean; warning: boo
 }
 
 // ── Lead Row ───────────────────────────────────────────────────────────────────
-function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm }: {
+function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm, onPdfDigital }: {
   lead: any; tab: Tab
   onMove: (id: string, s: DbStatus) => void
   onEdit: (l: any) => void
   onDelete: (id: string) => void
   onDetail: (l: any) => void
   onDateConfirm: (lead: any, s: DbStatus) => void
+  onPdfDigital?: (lead: any) => void
 }) {
 
   return (
@@ -3619,8 +3652,10 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm 
 }
 
 // ── En Seguimiento Dropdown Button ────────────────────────────────────────────
-function EnSeguimientoBtn({ lead, canProposal, onDateConfirm }: {
-  lead: any; canProposal: boolean; onDateConfirm: (lead: any, s: DbStatus) => void
+function EnSeguimientoBtn({ lead, canProposal, onDateConfirm, onPdfDigital }: {
+  lead: any; canProposal: boolean
+  onDateConfirm: (lead: any, s: DbStatus) => void
+  onPdfDigital: (lead: any) => void
 }) {
   const [open, setOpen] = useState(false)
   return (
@@ -3638,11 +3673,11 @@ function EnSeguimientoBtn({ lead, canProposal, onDateConfirm }: {
             <ChevronRight size={11} /> Mover a en seguimiento
           </button>
           {canProposal
-            ? <a href={`/proposals/new?lead_id=${lead.id}`} className="qa qa-ghost"
+            ? <button className="qa qa-ghost"
                 style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
-                onClick={() => setOpen(false)}>
+                onClick={() => { onPdfDigital(lead); setOpen(false) }}>
                 <Zap size={11} /> PDF digital
-              </a>
+              </button>
             : <span className="qa qa-ghost qa-locked"
                 style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
                 title="Disponible en plan Premium — actualiza para crear propuestas digitales">
@@ -3774,7 +3809,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
             </button>
           </>
         )}
-        {lead.source !== 'wedding_planner' && <EnSeguimientoBtn lead={lead} canProposal={canProposal} onDateConfirm={onDateConfirm} />}
+        {lead.source !== 'wedding_planner' && <EnSeguimientoBtn lead={lead} canProposal={canProposal} onDateConfirm={onDateConfirm} onPdfDigital={onPdfDigital ?? (() => {})} />}
         {lead.source !== 'wedding_planner' && <button className="qa qa-success" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>}
         <MoreMenu items={[
           { label: 'Enviar presupuesto', icon: <Receipt    size={11} />, onClick: () => onDateConfirm(lead, 'budget_sent') },
@@ -3789,7 +3824,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
         <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
         <MoreMenu items={[
           { label: 'Enviar presupuesto', icon: <Receipt    size={11} />, onClick: () => onDateConfirm(lead, 'budget_sent') },
-          { label: 'PDF digital',        icon: <FileText   size={11} />, locked: !canProposal, lockedHint: 'Disponible en plan Premium', onClick: () => window.location.href = '/proposals' },
+          { label: 'PDF digital',        icon: <FileText   size={11} />, locked: !canProposal, lockedHint: 'Disponible en plan Premium', onClick: () => onPdfDigital ? onPdfDigital(lead) : undefined },
           { label: 'Cambiar fechas',     icon: <Calendar   size={11} />, onClick: () => onDateConfirm(lead, lead.status) },
           { label: 'Volver a nuevos',    icon: <RotateCcw  size={11} />, onClick: () => onMove(lead.id, 'new') },
           { label: 'Perdido',            icon: <XCircle    size={11} />, danger: true, onClick: () => onMove(lead.id, 'lost') },

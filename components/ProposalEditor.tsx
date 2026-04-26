@@ -109,6 +109,8 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   const [modalities, setModalities] = useState<any[]>([])
   const [commercialConfig, setCommercialConfig] = useState<{ space_type: string; price_model: string } | null>(null)
   const [menuCatalog, setMenuCatalog] = useState<SectionsData | null>(null)
+  const [contentTemplates, setContentTemplates] = useState<Array<{ id: string; name: string; description: string | null; sections_data: SectionsData; is_default: boolean }>>([])
+  const [applyingTemplate, setApplyingTemplate] = useState(false)
 
   const [form, setForm] = useState({
     lead_id: initial.lead_id ?? '',
@@ -156,12 +158,13 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     if (!user) return
     const supabase = createClient()
     ;(async () => {
-      const [{ data: leadsData }, { data: tplData }, { data: venueRow }, { data: settingsRow }, modalRes] = await Promise.all([
+      const [{ data: leadsData }, { data: tplData }, { data: venueRow }, { data: settingsRow }, modalRes, ctplRes] = await Promise.all([
         supabase.from('leads').select('id, name, guests, email').eq('user_id', user.id).order('created_at', { ascending: false }),
         supabase.from('proposal_web_templates').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('venue_onboarding').select('name, city, region, contact_email, contact_phone, website, photo_urls').eq('user_id', user.id).maybeSingle(),
         supabase.from('venue_settings').select('commercial_config, menu_catalog').eq('user_id', user.id).maybeSingle(),
         fetch('/api/estructura/modalities'),
+        fetch('/api/proposal-templates'),
       ])
       if (leadsData) setLeads(leadsData)
       if (tplData) setTemplates(tplData as ProposalTemplate[])
@@ -181,6 +184,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
         setMenuCatalog(settingsRow.menu_catalog as SectionsData)
       }
       if (modalRes.ok) { const mj = await modalRes.json(); setModalities(mj.modalities ?? []) }
+      if (ctplRes.ok) { const ct = await ctplRes.json(); setContentTemplates(Array.isArray(ct) ? ct : []) }
     })()
     if (!document.querySelector('link[data-gf-editor]')) {
       const link = document.createElement('link')
@@ -343,6 +347,19 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  // ── Apply a content template to sections
+  const applyContentTemplate = (templateId: string) => {
+    const tpl = contentTemplates.find(t => t.id === templateId)
+    if (!tpl) return
+    setApplyingTemplate(true)
+    setSections(s => ({
+      ...s,
+      ...(tpl.sections_data ?? {}),
+      content_template_id: templateId,
+    }))
+    setTimeout(() => setApplyingTemplate(false), 500)
   }
 
   // ── Per-proposal content overrides
@@ -513,6 +530,43 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 <input type="checkbox" checked={form.show_availability} onChange={e => setForm(f => ({ ...f, show_availability: e.target.checked }))} />
                 Mostrar disponibilidad
               </label>
+
+              {contentTemplates.length > 0 && (
+                <div className="form-group" style={{ marginTop: 14 }}>
+                  <label className="form-label">Plantilla de contenido</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {contentTemplates.map(tpl => {
+                      const isActive = (sections as any).content_template_id === tpl.id
+                      return (
+                        <button key={tpl.id} type="button"
+                          onClick={() => applyContentTemplate(tpl.id)}
+                          style={{
+                            display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
+                            borderRadius: 8, cursor: 'pointer', textAlign: 'left', width: '100%',
+                            border: `1.5px solid ${isActive ? 'var(--gold)' : 'var(--border)'}`,
+                            background: isActive ? 'rgba(196,151,90,0.08)' : 'var(--surface)',
+                          }}>
+                          <div style={{ width: 28, height: 28, borderRadius: 6, background: isActive ? 'rgba(196,151,90,0.2)' : 'var(--cream)', border: `1px solid ${isActive ? 'var(--gold)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                            <ChefHat size={13} style={{ color: isActive ? 'var(--gold)' : 'var(--warm-gray)' }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: isActive ? 'var(--gold)' : 'var(--charcoal)', marginBottom: 1 }}>
+                              {tpl.name}
+                              {tpl.is_default && <span style={{ fontSize: 9, background: isActive ? 'var(--gold)' : 'var(--warm-gray)', color: '#fff', padding: '1px 5px', borderRadius: 8, marginLeft: 6, fontWeight: 700 }}>DEF</span>}
+                            </div>
+                            {tpl.description && <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{tpl.description}</div>}
+                            {isActive && applyingTemplate && <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 2 }}>✓ Aplicando…</div>}
+                            {isActive && !applyingTemplate && <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 2 }}>✓ Plantilla aplicada</div>}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 6, lineHeight: 1.5 }}>
+                    Al aplicar una plantilla se carga su configuración de secciones y contenido.
+                  </div>
+                </div>
+              )}
 
               <div className="form-group" style={{ marginTop: 14 }}>
                 <label className="form-label">Tipo de servicio</label>

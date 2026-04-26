@@ -37,6 +37,8 @@ function NuevaPropuestaContent() {
 
     const leadId = searchParams.get('lead_id')
     const starter = getStarterTemplate(searchParams.get('template'))
+    const dsParam = searchParams.get('ds')
+    const dateSlots = dsParam ? (() => { try { return JSON.parse(atob(dsParam)) } catch { return null } })() : null
 
     const createDraft = async () => {
       const supabase = createClient()
@@ -103,9 +105,12 @@ function NuevaPropuestaContent() {
       }
 
       const baseSectionsData = starter?.sections_data ?? { visual_template_id: 1 }
-      const finalSectionsData = contentSectionsData
-        ? { ...contentSectionsData, visual_template_id: (baseSectionsData as any).visual_template_id ?? 1 }
-        : baseSectionsData
+      const finalSectionsData = {
+        ...(contentSectionsData
+          ? { ...contentSectionsData, visual_template_id: (baseSectionsData as any).visual_template_id ?? 1 }
+          : baseSectionsData),
+        ...(dateSlots ? { date_slots: dateSlots } : {}),
+      }
 
       const slug = generateSlug(coupleName)
       const payload: any = {
