@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth-context'
 import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
+import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
 
 // ─── Section catalogue ────────────────────────────────────────────────────────
 
@@ -94,12 +95,27 @@ export default function TemplateEditor({
   // Open/close section content cards
   const [openSecs, setOpenSecs] = useState<Set<string>>(new Set())
 
+  // Venue commercial config — drives which sections appear and their labels
+  const [commercialConfig, setCommercialConfig] = useState<{ space_type: string; price_model: string } | null>(null)
+  useEffect(() => {
+    if (!user) return
+    const supabase = createClient()
+    ;(async () => {
+      const { data } = await supabase
+        .from('venue_settings')
+        .select('commercial_config')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (data?.commercial_config) setCommercialConfig(data.commercial_config as any)
+    })()
+  }, [user])
+
   const iframeUrl = `/proposals/templates/${template.id}/preview`
 
   // ── postMessage live preview ──────────────────────────────────────────────
   const buildPatch = useCallback(() => ({
     couple_name:         'Sofía & Alejandro',
-    personal_message:    (sections as any).welcome_default ?? null,
+    personal_message:    (sections as any).welcome_default || 'Querida Sofía & Alejandro, es un placer teneros aquí. Hemos preparado esta propuesta pensando en vosotros.',
     guest_count:         150,
     wedding_date:        null,
     price_estimate:      null,
@@ -592,6 +608,7 @@ export default function TemplateEditor({
                 <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
                   {ALL_SECTION_IDS.map((secId, i) => {
                     if (['welcome_light', 'welcome_split', 'welcome_editorial'].includes(secId)) return null
+                    if (!isSectionAllowed(secId, commercialConfig?.space_type as any)) return null
 
                     if (secId === 'welcome') {
                       const isWelcomeOpen = openSecs.has('welcome')
@@ -637,7 +654,7 @@ export default function TemplateEditor({
                           <div onClick={e => { e.stopPropagation(); toggleSection(secId, !isOn) }}>
                             <Toggle value={isOn} onChange={v => toggleSection(secId, v)} />
                           </div>
-                          <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', userSelect: 'none' }}>{SECTION_LABELS[secId]}</span>
+                          <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', userSelect: 'none' }}>{getSectionLabel(secId, commercialConfig?.space_type as any, SECTION_LABELS[secId])}</span>
                           <ChevronDown size={13} style={{ color: 'var(--warm-gray)', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
                         </div>
                         {/* Expandable content editor */}

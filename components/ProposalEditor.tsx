@@ -11,6 +11,7 @@ import ProposalPreview from './ProposalPreview'
 import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
+import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -800,6 +801,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
                 {tplSections.map(secId => {
                   if (['welcome_light', 'welcome_split', 'welcome_editorial'].includes(secId)) return null
+                  if (!isSectionAllowed(secId, commercialConfig?.space_type as any)) return null
 
                   if (secId === 'welcome') {
                     const isWelcomeOpen = openSecs.has('welcome')
@@ -887,7 +889,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                     )
                   }
 
-                  const label = SECTION_LABELS[secId] || secId
+                  const label = getSectionLabel(secId, commercialConfig?.space_type as any, SECTION_LABELS[secId] || secId)
                   const isOn = isSectionOn(secId)
                   const isOpen = openSecs.has(secId)
                   const overrideKey = `${secId}_override`
