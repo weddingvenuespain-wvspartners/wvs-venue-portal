@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, StarRating, resolveContact, type ProposalData } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
+import SpaceGroupSelector from './SpaceGroupSelector'
 
 export default function T1Impacto({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date,
@@ -15,7 +16,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow,
           testsShow, zonesShow, seasonsShow, collabsShow, menuShow,
           menusStructured, menuExtras, appetizersBase,
-          expShow, techspecs, accom } = extractData(data)
+          expShow, techspecs, accom, spaceGroups } = extractData(data)
 
   const primary = branding?.primary_color ?? '#8B6914'
   const rgb     = toRgb(primary)
@@ -487,6 +488,19 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
             })}
           </div>
         </section>
+      )}
+
+      {/* ════════════════════════════════════════════
+          GRUPOS DE ESPACIOS
+      ════════════════════════════════════════════ */}
+      {on('space_groups') && spaceGroups && spaceGroups.length > 0 && (
+        <SpaceGroupSelector
+          groups={spaceGroups}
+          primary={primary}
+          onPrimary={onPri}
+          dark
+          font={FONT}
+        />
       )}
 
       {/* ════════════════════════════════════════════

@@ -40,6 +40,7 @@ export async function POST(
     }
 
     // Normalizar campos del payload
+    const menuAllocations = Array.isArray(body.menu_allocations) ? body.menu_allocations : []
     const selection = {
       proposal_id: id,
       selected_menu_id:     body.selected_menu_id     ?? null,
@@ -51,6 +52,8 @@ export async function POST(
       selected_extras:      Array.isArray(body.selected_extras) ? body.selected_extras : [],
       comments:             body.comments ?? null,
       estimated_total:      typeof body.estimated_total === 'number' ? body.estimated_total : null,
+      menu_allocations:     menuAllocations,
+      wedding_date:         body.wedding_date ?? null,
     }
 
     const { error: insErr } = await supabase

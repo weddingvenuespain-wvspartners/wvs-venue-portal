@@ -70,13 +70,42 @@ function NuevaPropuestaContent() {
         }
       }
 
-      // Get default web template (for the visual layout / template_id)
+      // Get default web template (visual layout)
       const { data: defTpl } = await supabase
         .from('proposal_web_templates')
         .select('id')
         .eq('user_id', user.id)
         .eq('is_default', true)
         .maybeSingle()
+
+      // Get default content template to pre-fill sections_data
+      const contentTemplateId = searchParams.get('content_template_id')
+      let contentSectionsData: Record<string, unknown> | null = null
+      let resolvedContentTemplateId: string | null = contentTemplateId
+
+      if (contentTemplateId) {
+        const { data: ct } = await supabase
+          .from('proposal_content_templates')
+          .select('sections_data')
+          .eq('id', contentTemplateId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (ct) contentSectionsData = ct.sections_data
+      } else {
+        // Fall back to default content template
+        const { data: defCt } = await supabase
+          .from('proposal_content_templates')
+          .select('id, sections_data')
+          .eq('user_id', user.id)
+          .eq('is_default', true)
+          .maybeSingle()
+        if (defCt) { contentSectionsData = defCt.sections_data; resolvedContentTemplateId = defCt.id }
+      }
+
+      const baseSectionsData = starter?.sections_data ?? { visual_template_id: 1 }
+      const finalSectionsData = contentSectionsData
+        ? { ...contentSectionsData, visual_template_id: (baseSectionsData as any).visual_template_id ?? 1 }
+        : baseSectionsData
 
       const slug = generateSlug(coupleName)
       const payload: any = {
@@ -89,8 +118,9 @@ function NuevaPropuestaContent() {
         status: 'draft',
         show_availability: starter?.show_availability ?? true,
         show_price_estimate: starter?.show_price_estimate ?? true,
-        sections_data: starter?.sections_data ?? { visual_template_id: 1 },
+        sections_data: finalSectionsData,
         template_id: defTpl?.id ?? null,
+        content_template_id: resolvedContentTemplateId,
         ...(starter?.personal_message ? { personal_message: starter.personal_message } : {}),
         ...(starter?.price_estimate ? { price_estimate: starter.price_estimate } : {}),
       }

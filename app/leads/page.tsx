@@ -701,7 +701,7 @@ export default function LeadsPage() {
   }
 
   // Note: requires ALTER TABLE leads ADD COLUMN IF NOT EXISTS wedding_date_history JSONB DEFAULT '[]';
-  const handleDateConfirm = async (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean, halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>, visitTime?: string, visitDuration?: number) => {
+  const handleDateConfirm = async (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean, halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>, visitTime?: string, visitDuration?: number, bufferDates?: { date: string; note: string }[]) => {
     if (!dateConfirmLead || !dateConfirmStatus) return
     const supabase = createClient()
 
@@ -842,6 +842,21 @@ export default function LeadsPage() {
             await supabase.from('calendar_entries').update(entryPayload).eq('id', existing.id)
           } else {
             await supabase.from('calendar_entries').insert({ user_id: user!.id, date: d, ...entryPayload })
+          }
+        }
+      }
+      // Save buffer/blocking dates (prep before, teardown after) as bloqueado
+      if (bufferDates?.length) {
+        for (const { date: bd, note: bn } of bufferDates) {
+          const { data: existing } = await supabase.from('calendar_entries')
+            .select('id,status').eq('user_id', user!.id).eq('date', bd).maybeSingle()
+          // Don't overwrite reservado entries
+          if (existing?.status === 'reservado') continue
+          const bufPayload: any = { status: 'bloqueado', lead_id: dateConfirmLead.id, note: bn }
+          if (existing?.id) {
+            await supabase.from('calendar_entries').update(bufPayload).eq('id', existing.id)
+          } else {
+            await supabase.from('calendar_entries').insert({ user_id: user!.id, date: bd, ...bufPayload })
           }
         }
       }
@@ -1644,7 +1659,7 @@ function DateConfirmModal({
   targetStatus: DbStatus
   userId: string
   allLeads: any[]
-  onConfirm: (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean, halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>, visitTime?: string, visitDuration?: number) => Promise<void>
+  onConfirm: (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean, halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>, visitTime?: string, visitDuration?: number, bufferDates?: { date: string; note: string }[]) => Promise<void>
   onClose: () => void
   onBack?: () => void
 }) {
@@ -1724,6 +1739,8 @@ function DateConfirmModal({
   const [visitDuration, setVisitDuration] = useState<number>(lead.visit_duration || 60)
   const [weddingDuration, setWeddingDuration] = useState<number>(lead.wedding_duration_days || 1)
   const [editingDuration, setEditingDuration] = useState(false)
+  const [blockBefore, setBlockBefore] = useState<0 | 0.5 | 1>(0)
+  const [blockAfter,  setBlockAfter]  = useState<0 | 0.5 | 1>(0)
   // Overnight: 1 = selected date is the wedding day (next day = check-out), 2 = selected date is check-out (prev day = wedding)
   const [overnightDay, setOvernightDay] = useState<1 | 2>(1)
   // When venue has overnight/packages rules, auto-apply them unless user clicks "Ignorar reglas"
@@ -1765,7 +1782,16 @@ function DateConfirmModal({
   useEffect(() => {
     const supabase = createClient()
     supabase.from('venue_settings').select('date_rules').eq('user_id', userId).maybeSingle()
-      .then(({ data }) => { if (data?.date_rules) setDateRules(data.date_rules) })
+      .then(({ data }) => {
+        if (data?.date_rules) {
+          setDateRules(data.date_rules)
+          // Pre-fill buffer defaults from rules (0 | 0.5 | 1 — clamp anything >1 to 1)
+          const db = data.date_rules.days_before || 0
+          const da = data.date_rules.days_after  || 0
+          setBlockBefore(db >= 1 ? 1 : db >= 0.5 ? 0.5 : 0)
+          setBlockAfter( da >= 1 ? 1 : da >= 0.5 ? 0.5 : 0)
+        }
+      })
   }, [userId])
 
   // Set default duration from venue rules — rules always govern the default
@@ -2119,8 +2145,7 @@ function DateConfirmModal({
   // Whether venue rules should be auto-applied (overnight, packages, or simple with buffer days)
   const hasAutoRules = !isVisitMode && (
     dateRules?.type === 'overnight' ||
-    dateRules?.type === 'packages' ||
-    (dateRules?.type === 'simple' && ((dateRules.days_before || 0) > 0 || (dateRules.days_after || 0) > 0))
+    dateRules?.type === 'packages'
   )
 
   // Per-date half-day mode: user can mark any selected date as ½M (mañana) or ½T (tarde)
@@ -2234,7 +2259,25 @@ function DateConfirmModal({
       leadUpdates.budget_file_name = budgetFileName
     }
 
-    await onConfirm(leadUpdates, calendarDates, calStatus, isVisitMode, Object.keys(halfDayMap).length > 0 ? halfDayMap : undefined, isVisitMode && visitTime ? visitTime : undefined, isVisitMode ? visitDuration : undefined)
+    // Compute buffer dates for won mode (prep/teardown blocking)
+    let bufferDates: { date: string; note: string }[] | undefined
+    if (isWonMode && calendarDates.length > 0 && (blockBefore > 0 || blockAfter > 0)) {
+      const firstDate = calendarDates[0]
+      const lastDate  = calendarDates[calendarDates.length - 1]
+      bufferDates = []
+      if (blockBefore === 0.5) {
+        bufferDates.push({ date: shiftDate(firstDate, -1), note: 'medio_dia_manana' })
+      } else if (blockBefore === 1) {
+        bufferDates.push({ date: shiftDate(firstDate, -1), note: 'preparacion' })
+      }
+      if (blockAfter === 0.5) {
+        bufferDates.push({ date: shiftDate(lastDate, 1), note: 'medio_dia_manana' })
+      } else if (blockAfter === 1) {
+        bufferDates.push({ date: shiftDate(lastDate, 1), note: 'desmontaje' })
+      }
+    }
+
+    await onConfirm(leadUpdates, calendarDates, calStatus, isVisitMode, Object.keys(halfDayMap).length > 0 ? halfDayMap : undefined, isVisitMode && visitTime ? visitTime : undefined, isVisitMode ? visitDuration : undefined, bufferDates)
     setSaving(false)
   }
 
@@ -3343,6 +3386,49 @@ function DateConfirmModal({
             </div>
           )}
         </div>
+
+        {/* Prep/teardown buffer selector — only in won mode */}
+        {isWonMode && selectedDates.length > 0 && (() => {
+          const firstDate = selectedDates[0]
+          const lastDate  = selectedDates[selectedDates.length - 1]
+          const dayName = (d: string) => {
+            const names = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+            return names[new Date(d + 'T12:00:00').getDay()]
+          }
+          const beforeDayName = dayName(shiftDate(firstDate, -1))
+          const afterDayName  = dayName(shiftDate(lastDate,   1))
+          const pillStyle = (active: boolean): React.CSSProperties => ({
+            padding: '4px 10px', borderRadius: 20, fontSize: 12, cursor: 'pointer', border: 'none',
+            background: active ? 'var(--sage)' : 'var(--ivory)',
+            color: active ? '#fff' : 'var(--charcoal)',
+            fontWeight: active ? 600 : 400,
+          })
+          return (
+            <div style={{ padding: '10px 24px 0', borderTop: '1px solid var(--ivory)' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Bloquear días colindantes
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: 'var(--charcoal)' }}>Antes:</span>
+                  {([0, 0.5, 1] as const).map(v => (
+                    <button key={v} style={pillStyle(blockBefore === v)} onClick={() => setBlockBefore(v)}>
+                      {v === 0 ? 'Nada' : v === 0.5 ? `Mañana ${beforeDayName}` : `${beforeDayName} entero`}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: 'var(--charcoal)' }}>Después:</span>
+                  {([0, 0.5, 1] as const).map(v => (
+                    <button key={v} style={pillStyle(blockAfter === v)} onClick={() => setBlockAfter(v)}>
+                      {v === 0 ? 'Nada' : v === 0.5 ? `Mañana ${afterDayName}` : `${afterDayName} entero`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Footer */}
         <div style={{ padding: '14px 24px', borderTop: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

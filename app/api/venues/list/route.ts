@@ -18,8 +18,8 @@ async function getSession() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { get: (n: string) => cookieStore.get(n)?.value } }
   )
-  const { data: { session } } = await supabase.auth.getSession()
-  return session
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
 }
 
 // GET /api/venues/list — returns active venue_owner profiles (bypasses RLS)

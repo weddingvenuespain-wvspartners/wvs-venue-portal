@@ -18,8 +18,8 @@ async function getSession() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { get: (n: string) => cookieStore.get(n)?.value } }
   )
-  const { data: { session } } = await supabase.auth.getSession()
-  return session
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
 }
 
 // POST /api/wp/request-venue
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const plannerId = session.user.id
+  const plannerId = session.id
   const service = getServiceClient()
 
   // 1. Create lead in the venue's system

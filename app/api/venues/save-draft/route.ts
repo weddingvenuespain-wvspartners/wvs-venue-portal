@@ -11,8 +11,8 @@ export async function POST(req: NextRequest) {
       { cookies: { get: (name: string) => cookieStore.get(name)?.value } }
     )
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const body = await req.json()
     const { ficha_data, status, changes_data, changes_status } = body
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     if (changes_status !== undefined && !VALID_CHANGES_STATUS.includes(changes_status))
       return NextResponse.json({ error: 'Estado de cambios no válido' }, { status: 400 })
 
-    const update: Record<string, any> = { user_id: session.user.id }
+    const update: Record<string, any> = { user_id: user.id }
     if (ficha_data !== undefined)    update.ficha_data    = ficha_data
     if (status !== undefined)        update.status        = status
     if (changes_data !== undefined)  update.changes_data  = changes_data

@@ -33,16 +33,28 @@ export default function ProposalLanding({ data, preview }: { data: ProposalData;
   }, [preview])
 
   const effective = preview ? liveData : data
+
+  // Replace dynamic placeholders in personal_message
+  const withPlaceholders: typeof effective = {
+    ...effective,
+    personal_message: effective.personal_message
+      ?.replace(/\{\{pareja\}\}/gi, effective.couple_name ?? '')
+      ?.replace(/\{\{invitados\}\}/gi, String(effective.guest_count ?? ''))
+      ?.replace(/\{\{fecha\}\}/gi, effective.wedding_date
+        ? new Date(effective.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+        : '') ?? null,
+  }
+
   const templateId: number = (effective as any).sections_data?.visual_template_id
     ?? (effective as any).template_id
     ?? 1
 
   switch (templateId) {
-    case 2:  return <T2Emocion     data={effective} />
-    case 3:  return <T3TodoClaro   data={effective} />
-    case 4:  return <T4SocialProof data={effective} />
-    case 5:  return <T5Minimalista data={effective} />
+    case 2:  return <T2Emocion     data={withPlaceholders} />
+    case 3:  return <T3TodoClaro   data={withPlaceholders} />
+    case 4:  return <T4SocialProof data={withPlaceholders} />
+    case 5:  return <T5Minimalista data={withPlaceholders} />
     case 1:
-    default: return <T1Impacto     data={effective} />
+    default: return <T1Impacto     data={withPlaceholders} />
   }
 }
