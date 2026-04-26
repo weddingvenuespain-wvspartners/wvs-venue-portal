@@ -16,31 +16,38 @@ import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 // ─── Section catalogue ────────────────────────────────────────────────────────
 
 export const ALL_SECTION_IDS = [
-  'hero', 'availability', 'welcome', 'experience', 'gallery',
+  'hero', 'availability', 'sticky_nav',
+  'welcome', 'welcome_light', 'welcome_split', 'welcome_editorial',
+  'experience', 'gallery',
   'zones', 'space_groups', 'venue_rental', 'inclusions', 'testimonials',
   'collaborators', 'accommodation', 'extra_services',
-  'faq', 'map', 'contact',
+  'faq', 'schedule_visit', 'map', 'contact',
 ] as const
 
 type SectionId = typeof ALL_SECTION_IDS[number]
 
 const SECTION_LABELS: Record<SectionId, string> = {
-  hero:           'Foto principal',
-  availability:   'Disponibilidad',
-  welcome:        'Mensaje de bienvenida',
-  experience:     'La experiencia',
-  gallery:        'Galería de fotos',
-  zones:          'Zonas del venue',
-  space_groups:   'Grupos de espacios',
-  venue_rental:   'Tarifas de alquiler',
-  inclusions:     'Qué incluye',
-  testimonials:   'Testimonios',
-  collaborators:  'Colaboradores',
-  accommodation:  'Alojamiento',
-  extra_services: 'Servicios adicionales',
-  faq:            'Preguntas frecuentes',
-  map:            'Mapa y ubicación',
-  contact:        'Datos de contacto',
+  hero:              'Foto principal',
+  availability:      'Disponibilidad',
+  sticky_nav:        'Menú de navegación (sticky top)',
+  welcome:           'Bienvenida · Oscura (cita centrada)',
+  welcome_light:     'Bienvenida · Fondo claro',
+  welcome_split:     'Bienvenida · Dos columnas',
+  welcome_editorial: 'Bienvenida · Editorial (tipografía grande)',
+  experience:        'La experiencia',
+  gallery:           'Galería de fotos',
+  zones:             'Zonas del venue',
+  space_groups:      'Grupos de espacios',
+  venue_rental:      'Tarifas de alquiler (grid temporada × día)',
+  inclusions:        'Qué incluye',
+  testimonials:      'Testimonios',
+  collaborators:     'Colaboradores',
+  accommodation:     'Alojamiento',
+  extra_services:    'Servicios adicionales',
+  faq:               'Preguntas frecuentes',
+  schedule_visit:    'Agendar visita',
+  map:               'Mapa y ubicación',
+  contact:           'Datos de contacto',
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -448,6 +455,70 @@ export default function TemplateEditor({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <input className="form-input" placeholder="Teléfono / WhatsApp" style={{ fontSize: 12 }} value={c.phone ?? ''} onChange={e => p({ phone: e.target.value })} />
           <input className="form-input" type="email" placeholder="Email de contacto" style={{ fontSize: 12 }} value={c.email ?? ''} onChange={e => p({ email: e.target.value })} />
+        </div>
+      )
+    }
+
+    if (secId === 'sticky_nav') return (
+      <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.6, background: 'var(--cream)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border)' }}>
+        Añade enlaces de navegación a la barra superior. Aparecen al hacer scroll y llevan a las secciones activas (Galería, Espacios, Menús, Contactar…). Se generan automáticamente.
+      </div>
+    )
+
+    if (secId === 'welcome_light') return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+          Muestra el mensaje de bienvenida sobre fondo claro crema. Puedes añadir una imagen de fondo opcional.
+        </div>
+        <input className="form-input" placeholder="URL imagen de fondo (opcional)" style={{ fontSize: 12 }}
+          value={(sections as any).welcome_light?.image_url ?? ''}
+          onChange={e => { setSections(s => ({ ...s, welcome_light: { ...((s as any).welcome_light ?? {}), image_url: e.target.value } } as any)); markDirty() }} />
+      </div>
+    )
+
+    if (secId === 'welcome_split') {
+      const ws: any = (sections as any).welcome_split ?? {}
+      const p = (patch: any) => { setSections(s => ({ ...s, welcome_split: { ...((s as any).welcome_split ?? {}), ...patch } } as any)); markDirty() }
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+            Dos columnas: imagen a un lado, mensaje de bienvenida al otro.
+          </div>
+          <input className="form-input" placeholder="URL de la imagen" style={{ fontSize: 12 }} value={ws.image_url ?? ''} onChange={e => p({ image_url: e.target.value })} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['left', 'right'] as const).map(side => (
+              <button key={side} type="button"
+                style={{ flex: 1, padding: '6px 0', fontSize: 11, borderRadius: 6, border: '1px solid var(--border)', background: (ws.image_side ?? 'left') === side ? 'var(--gold)' : 'var(--surface)', color: (ws.image_side ?? 'left') === side ? '#fff' : 'var(--charcoal)', cursor: 'pointer', fontWeight: 600 }}
+                onClick={() => p({ image_side: side })}>
+                {side === 'left' ? 'Imagen izquierda' : 'Imagen derecha'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    if (secId === 'welcome_editorial') return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+          Tipografía editorial grande, estilo revista de lujo. Muestra el mensaje de bienvenida en grande.
+        </div>
+        <input className="form-input" placeholder="Eyebrow (ej. Un mensaje para vosotros)" style={{ fontSize: 12 }}
+          value={(sections as any).welcome_editorial?.eyebrow ?? ''}
+          onChange={e => { setSections(s => ({ ...s, welcome_editorial: { ...((s as any).welcome_editorial ?? {}), eyebrow: e.target.value } } as any)); markDirty() }} />
+      </div>
+    )
+
+    if (secId === 'schedule_visit') {
+      const sv: any = (sections as any).schedule_visit ?? {}
+      const p = (patch: any) => { setSections(s => ({ ...s, schedule_visit: { ...((s as any).schedule_visit ?? {}), ...patch } } as any)); markDirty() }
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <input className="form-input" placeholder="Título (ej. Visitadnos en persona)" style={{ fontSize: 12 }} value={sv.title ?? ''} onChange={e => p({ title: e.target.value })} />
+          <textarea className="form-textarea" style={{ minHeight: 60, fontSize: 12 }} placeholder="Subtítulo / descripción breve…" value={sv.subtitle ?? ''} onChange={e => p({ subtitle: e.target.value })} />
+          <input className="form-input" placeholder="URL Calendly / Cal.com (opcional)" style={{ fontSize: 12 }} value={sv.url ?? ''} onChange={e => p({ url: e.target.value })} />
+          <input className="form-input" placeholder="Texto del botón (ej. Reservar visita →)" style={{ fontSize: 12 }} value={sv.cta_label ?? ''} onChange={e => p({ cta_label: e.target.value })} />
+          <input className="form-input" placeholder="Nota pequeña (horarios, duración…)" style={{ fontSize: 12 }} value={sv.note ?? ''} onChange={e => p({ note: e.target.value })} />
         </div>
       )
     }
