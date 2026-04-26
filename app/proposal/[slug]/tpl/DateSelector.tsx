@@ -17,6 +17,37 @@ function fmtDate(iso: string) {
   return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
+// Group sorted ISO dates into consecutive runs, then format each run as a label
+function compressDates(dates: string[]): string[] {
+  if (!dates.length) return []
+  const sorted = [...dates].sort()
+  const runs: { from: string; to: string }[] = []
+  let from = sorted[0], to = sorted[0]
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = new Date(to + 'T12:00:00')
+    prev.setDate(prev.getDate() + 1)
+    if (sorted[i] === prev.toISOString().slice(0, 10)) {
+      to = sorted[i]
+    } else {
+      runs.push({ from, to })
+      from = sorted[i]; to = sorted[i]
+    }
+  }
+  runs.push({ from, to })
+
+  return runs.map(({ from, to }) => {
+    const f = new Date(from + 'T12:00:00')
+    const t = new Date(to + 'T12:00:00')
+    if (from === to) return fmtDate(from)
+    const sameMonth = f.getMonth() === t.getMonth() && f.getFullYear() === t.getFullYear()
+    if (sameMonth) {
+      const month = t.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+      return `${f.getDate()}–${t.getDate()} de ${month}`
+    }
+    return `${f.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} – ${t.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`
+  })
+}
+
 function allSamePrice(slots: DateSlot[]) {
   const prices = slots.map(s => (s.price_per_person ?? '') + '|' + (s.price_rental ?? ''))
   return prices.every(p => p === prices[0])
@@ -139,12 +170,12 @@ export default function DateSelector({ slots, primary, onPrimary, dark = false, 
                     )}
                   </div>
 
-                  {/* Dates list */}
+                  {/* Dates list — compressed into ranges */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {slot.dates.map((d, di) => (
+                    {compressDates(slot.dates).map((label, di) => (
                       <div key={di} style={{ fontSize: '.8rem', color: subColor, display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ width: 4, height: 4, borderRadius: '50%', background: primary, display: 'inline-block', flexShrink: 0 }} />
-                        {fmtDate(d)}
+                        {label}
                       </div>
                     ))}
                   </div>
@@ -190,20 +221,20 @@ export default function DateSelector({ slots, primary, onPrimary, dark = false, 
             </div>
             <div style={{ fontSize: '.82rem', color: subColor, lineHeight: 1.6 }}>
               Hemos notificado al venue vuestra preferencia.
-              {selected !== null && <> Habéis elegido: <strong>{slots[selected].label || slots[selected].dates.map(fmtDate).join(', ')}</strong>.</>}
+              {selected !== null && <> Habéis elegido: <strong>{slots[selected].label || compressDates(slots[selected].dates).join(', ')}</strong>.</>}
               {' '}Pronto recibiréis confirmación.
             </div>
           </div>
         )}
 
-        {/* Non-interactive: just show all dates flat */}
+        {/* Non-interactive: show dates compressed into ranges */}
         {!interactive && (
           <div style={{ marginTop: 32, textAlign: 'center' }}>
             {slots.flatMap(s => s.dates).length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
-                {slots.flatMap(s => s.dates).map((d, i) => (
+                {compressDates(slots.flatMap(s => s.dates)).map((label, i) => (
                   <span key={i} style={{ padding: '6px 16px', border: `1px solid ${cardBorder}`, borderRadius: 999, fontSize: '.78rem', color: textColor }}>
-                    {fmtDate(d)}
+                    {label}
                   </span>
                 ))}
               </div>

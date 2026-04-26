@@ -10,6 +10,7 @@ import { useUnsavedChanges } from '@/lib/use-unsaved-changes'
 import ProposalPreview from './ProposalPreview'
 import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
+import ProposalDateModal from './ProposalDateModal'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -50,7 +51,11 @@ const SECTION_LABELS: Record<string, string> = {
   hero: 'Foto principal',
   date_slots: 'Fechas disponibles',
   availability: 'Disponibilidad',
-  welcome: 'Mensaje de bienvenida',
+  sticky_nav: 'Menú de navegación (sticky top)',
+  welcome: 'Bienvenida · Oscura (cita centrada)',
+  welcome_light: 'Bienvenida · Fondo claro',
+  welcome_split: 'Bienvenida · Dos columnas',
+  welcome_editorial: 'Bienvenida · Editorial (tipografía grande)',
   experience: 'La experiencia',
   gallery: 'Galería de fotos',
   zones: 'Zonas del venue',
@@ -62,6 +67,7 @@ const SECTION_LABELS: Record<string, string> = {
   accommodation: 'Alojamiento',
   extra_services: 'Servicios adicionales',
   faq: 'Preguntas frecuentes',
+  schedule_visit: 'Agendar visita',
   map: 'Mapa y ubicación',
   contact: 'Datos de contacto',
 }
@@ -78,21 +84,26 @@ const emptySections: SectionsData = {
 function getDefaultSections(cfg: { space_type: string; price_model: string; menu_included?: boolean; has_menu_types?: boolean; catering_own?: boolean }): Record<string, boolean> {
   const hasOwnMenu = cfg.menu_included === true || cfg.catering_own === true
   return {
-    hero:           true,
-    availability:   false,
-    welcome:        true,
-    experience:     true,
-    gallery:        true,
-    zones:          cfg.space_type === 'multiple_independent',
-    venue_rental:   cfg.price_model === 'rental',
-    inclusions:     cfg.price_model === 'package' && cfg.menu_included !== false,
-    testimonials:   true,
-    collaborators:  false,
-    accommodation:  false,
-    extra_services: cfg.space_type === 'single_with_supplements' || cfg.space_type === 'multiple_independent',
-    faq:            false,
-    map:            true,
-    contact:        true,
+    hero:             true,
+    availability:     false,
+    sticky_nav:       false,
+    welcome:          true,
+    welcome_light:    false,
+    welcome_split:    false,
+    welcome_editorial: false,
+    experience:       true,
+    gallery:          true,
+    zones:            cfg.space_type === 'multiple_independent',
+    venue_rental:     cfg.price_model === 'rental',
+    inclusions:       cfg.price_model === 'package' && cfg.menu_included !== false,
+    testimonials:     true,
+    collaborators:    false,
+    accommodation:    false,
+    extra_services:   cfg.space_type === 'single_with_supplements' || cfg.space_type === 'multiple_independent',
+    faq:              false,
+    schedule_visit:   false,
+    map:              true,
+    contact:          true,
   }
 }
 
@@ -112,6 +123,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   const [menuCatalog, setMenuCatalog] = useState<SectionsData | null>(null)
   const [contentTemplates, setContentTemplates] = useState<Array<{ id: string; name: string; description: string | null; sections_data: SectionsData; is_default: boolean }>>([])
   const [applyingTemplate, setApplyingTemplate] = useState(false)
+  const [showDateModal, setShowDateModal] = useState(false)
 
   const [form, setForm] = useState({
     lead_id: initial.lead_id ?? '',
@@ -492,7 +504,18 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 </div>
                 <div className="form-group">
                   <label className="form-label">Fecha de boda</label>
-                  <input className="form-input" type="date" value={form.wedding_date} onChange={e => onWeddingDateChange(e.target.value)} />
+                  <button type="button" className="form-input" onClick={() => setShowDateModal(true)}
+                    style={{ textAlign: 'left', cursor: 'pointer', color: form.wedding_date ? 'var(--charcoal)' : 'var(--warm-gray)' }}>
+                    {(() => {
+                      const slotDates: string[] = (sections as any).date_slots?.[0]?.dates ?? []
+                      if (slotDates.length > 1) {
+                        return slotDates.map(d => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })).join(' · ')
+                      }
+                      return form.wedding_date
+                        ? new Date(form.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+                        : 'Seleccionar fecha…'
+                    })()}
+                  </button>
                 </div>
               </div>
 
@@ -761,7 +784,11 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               'hero',
               'date_slots',
               'availability',
+              'sticky_nav',
               'welcome',
+              'welcome_light',
+              'welcome_split',
+              'welcome_editorial',
               'experience',
               'gallery',
               'zones',
@@ -773,6 +800,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               'accommodation',
               'extra_services',
               'faq',
+              'schedule_visit',
               'map',
               'contact',
             ]
@@ -1219,6 +1247,90 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                             </div>
                           )}
 
+                          {secId === 'sticky_nav' && (
+                            <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.6, background: 'var(--cream)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border)' }}>
+                              Cuando está activo, aparecen enlaces de navegación en la barra superior para que la pareja pueda saltar directamente a las secciones más relevantes (galería, espacios, menús, contacto...).
+                              Los enlaces se generan automáticamente según las secciones que tengas activadas.
+                            </div>
+                          )}
+
+                          {secId === 'welcome_light' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                                Muestra el mensaje de bienvenida (pestaña Datos) sobre fondo claro crema. Ideal para venues con estética romántica y luminosa.
+                              </div>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Imagen de fondo (opcional)</label>
+                                <input className="form-input" placeholder="https://..." value={(sections as any).welcome_light?.image_url ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_light: { ...(s.welcome_light ?? {}), image_url: e.target.value } }))} />
+                              </div>
+                            </div>
+                          )}
+
+                          {secId === 'welcome_split' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                                Muestra el mensaje de bienvenida (pestaña Datos) en dos columnas: imagen a un lado, texto al otro.
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">URL de la imagen</label>
+                                <input className="form-input" placeholder="https://..." value={(sections as any).welcome_split?.image_url ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_url: e.target.value } }))} />
+                              </div>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Posición de la imagen</label>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                  {(['left', 'right'] as const).map(side => (
+                                    <button key={side} type="button"
+                                      style={{ flex: 1, padding: '7px 0', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: ((sections as any).welcome_split?.image_side ?? 'left') === side ? 'var(--gold)' : 'var(--surface)', color: ((sections as any).welcome_split?.image_side ?? 'left') === side ? '#fff' : 'var(--charcoal)', cursor: 'pointer', fontWeight: 600 }}
+                                      onClick={() => setSections((s: any) => ({ ...s, welcome_split: { ...(s.welcome_split ?? {}), image_side: side } }))}>
+                                      {side === 'left' ? 'Izquierda' : 'Derecha'}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {secId === 'welcome_editorial' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                                Muestra el mensaje de bienvenida (pestaña Datos) con tipografía editorial grande, estilo revista de lujo.
+                              </div>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Eyebrow / Etiqueta superior (opcional)</label>
+                                <input className="form-input" placeholder="Ej. Un mensaje para vosotros" value={(sections as any).welcome_editorial?.eyebrow ?? ''} onChange={e => setSections((s: any) => ({ ...s, welcome_editorial: { ...(s.welcome_editorial ?? {}), eyebrow: e.target.value } }))} />
+                              </div>
+                            </div>
+                          )}
+
+                          {secId === 'schedule_visit' && (() => {
+                            const sv: any = (sections as any).schedule_visit ?? {}
+                            const setSv = (patch: any) => setSections((s: any) => ({ ...s, schedule_visit: { ...sv, ...patch } }))
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div className="form-group">
+                                  <label className="form-label">Título</label>
+                                  <input className="form-input" placeholder="Visitadnos en persona" value={sv.title ?? ''} onChange={e => setSv({ title: e.target.value })} />
+                                </div>
+                                <div className="form-group">
+                                  <label className="form-label">Subtítulo</label>
+                                  <textarea className="form-textarea" style={{ minHeight: 60 }} placeholder="Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue." value={sv.subtitle ?? ''} onChange={e => setSv({ subtitle: e.target.value })} />
+                                </div>
+                                <div className="form-group">
+                                  <label className="form-label">URL para agendar (Calendly, Cal.com…)</label>
+                                  <input className="form-input" placeholder="https://calendly.com/..." value={sv.url ?? ''} onChange={e => setSv({ url: e.target.value })} />
+                                </div>
+                                <div className="form-group">
+                                  <label className="form-label">Texto del botón</label>
+                                  <input className="form-input" placeholder="Reservar visita gratuita →" value={sv.cta_label ?? ''} onChange={e => setSv({ cta_label: e.target.value })} />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Nota pequeña (opcional)</label>
+                                  <input className="form-input" placeholder="Visitas de lunes a viernes · Duración aprox. 45 min" value={sv.note ?? ''} onChange={e => setSv({ note: e.target.value })} />
+                                </div>
+                              </div>
+                            )
+                          })()}
+
                           {secId === 'map' && (() => {
                             const extractEmbedSrc = (raw: string): string => {
                               const trimmed = raw.trim()
@@ -1371,6 +1483,26 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       <div style={{ flex: 1, minWidth: 0, height: '100vh' }}>
         <ProposalPreview slug={proposal.slug} patch={previewPatch} />
       </div>
+
+      {/* ── Date picker modal ── */}
+      {showDateModal && user && (
+        <ProposalDateModal
+          userId={user.id}
+          currentDate={form.wedding_date || null}
+          onClose={() => setShowDateModal(false)}
+          onConfirm={(dates) => {
+            const first = dates[0] ?? ''
+            onWeddingDateChange(first)
+            if (dates.length > 1) {
+              setSections((s: any) => ({
+                ...s,
+                date_slots: [{ label: 'Fechas propuestas', dates }],
+              }))
+            }
+            setShowDateModal(false)
+          }}
+        />
+      )}
 
       {/* ── Toast ── */}
       {toast && (

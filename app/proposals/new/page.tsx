@@ -112,6 +112,9 @@ function NuevaPropuestaContent() {
         ...(dateSlots ? { date_slots: dateSlots } : {}),
       }
 
+      // Use the first proposed date as wedding_date if dates came from the PDF digital flow
+      const firstProposedDate = dateSlots?.[0]?.dates?.[0] ?? null
+
       const slug = generateSlug(coupleName)
       const payload: any = {
         user_id: user.id,
@@ -126,6 +129,7 @@ function NuevaPropuestaContent() {
         sections_data: finalSectionsData,
         template_id: defTpl?.id ?? null,
         content_template_id: resolvedContentTemplateId,
+        ...(firstProposedDate ? { wedding_date: firstProposedDate } : {}),
         ...(starter?.personal_message ? { personal_message: starter.personal_message } : {}),
         ...(starter?.price_estimate ? { price_estimate: starter.price_estimate } : {}),
       }
