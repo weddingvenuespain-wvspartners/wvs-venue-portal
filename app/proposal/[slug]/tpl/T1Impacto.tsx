@@ -19,6 +19,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           menusStructured, menuExtras, appetizersBase,
           expShow, techspecs, accom, spaceGroups, dateSlots } = extractData(data)
 
+  // Use template default message as fallback when no personal message yet
+  const displayMsg = personal_message || (sec as any).welcome_default || null
+
   const primary = branding?.primary_color ?? '#8B6914'
   const rgb     = toRgb(primary)
   const onPri   = isDark(primary) ? '#fff' : '#111'
@@ -468,12 +471,12 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           MENSAJE PERSONAL + CONVERSION BLOCK
       ════════════════════════════════════════════ */}
-      {on('welcome') && personal_message && (
+      {on('welcome') && displayMsg && (
         <section id="sec-welcome" className="t1-sec" style={{ background: '#080808' }}>
           <FadeUp>
             <div className="t1-msg">
               <div className="t1-msg-qmark">"</div>
-              <p className="t1-msg-text">{personal_message}</p>
+              <p className="t1-msg-text">{displayMsg}</p>
               {venue?.name && <div className="t1-msg-sig">— {venue.name}</div>}
             </div>
           </FadeUp>
@@ -483,7 +486,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           BIENVENIDA · FONDO CLARO
       ════════════════════════════════════════════ */}
-      {on('welcome_light') && personal_message && (
+      {on('welcome_light') && displayMsg && (
         <section id={!on('welcome') ? 'sec-welcome' : undefined} className="t1-wl">
           {(sec as any).welcome_light?.image_url && (
             <img className="t1-wl-bg" src={(sec as any).welcome_light.image_url} alt=""
@@ -492,7 +495,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <FadeUp>
             <div className="t1-wl-inner">
               <div className="t1-wl-line" />
-              <p className="t1-wl-body">{personal_message}</p>
+              <p className="t1-wl-body">{displayMsg}</p>
               {venue?.name && <div className="t1-wl-sig">— {venue.name}</div>}
             </div>
           </FadeUp>
@@ -502,7 +505,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           BIENVENIDA · DOS COLUMNAS
       ════════════════════════════════════════════ */}
-      {on('welcome_split') && personal_message && (
+      {on('welcome_split') && displayMsg && (
         <section id={!on('welcome') && !on('welcome_light') ? 'sec-welcome' : undefined}>
           <div className="t1-ws">
             <div className={`t1-ws-img${(sec as any).welcome_split?.image_side === 'right' ? ' right' : ''}`}>
@@ -514,7 +517,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
             <FadeUp>
               <div className={`t1-ws-text${(sec as any).welcome_split?.image_side === 'right' ? '' : ' after-img'}`}>
                 <span className="t1-ws-eyebrow">Un mensaje para vosotros</span>
-                <p className="t1-ws-body">{personal_message}</p>
+                <p className="t1-ws-body">{displayMsg}</p>
                 {venue?.name && <div className="t1-ws-sig">— {venue.name}</div>}
               </div>
             </FadeUp>
@@ -525,14 +528,14 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           BIENVENIDA · EDITORIAL
       ════════════════════════════════════════════ */}
-      {on('welcome_editorial') && personal_message && (
+      {on('welcome_editorial') && displayMsg && (
         <section id={!on('welcome') && !on('welcome_light') && !on('welcome_split') ? 'sec-welcome' : undefined} className="t1-we">
           <FadeUp>
             <div className="t1-we-inner">
               {(sec as any).welcome_editorial?.eyebrow && (
                 <span className="t1-we-eyebrow">{(sec as any).welcome_editorial.eyebrow}</span>
               )}
-              <p className="t1-we-body">{personal_message}</p>
+              <p className="t1-we-body">{displayMsg}</p>
               {venue?.name && <div className="t1-we-sig">— {venue.name}</div>}
             </div>
           </FadeUp>
