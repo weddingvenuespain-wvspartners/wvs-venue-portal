@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
+import MultipleZonesEditor from './MultipleZonesEditor'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 import { getSectionLabel, SECTION_SPACE_TYPES, SPACE_TYPE_LABELS } from '@/lib/section-visibility'
 
@@ -103,18 +104,21 @@ export default function TemplateEditor({
   // Open/close section content cards
   const [openSecs, setOpenSecs] = useState<Set<string>>(new Set())
 
-  // Venue commercial config — drives which sections appear and their labels
+  // Venue commercial config + zones — drives which sections appear and their labels,
+  // plus the multiple_independent zone picker
   const [commercialConfig, setCommercialConfig] = useState<{ space_type: string; price_model: string } | null>(null)
+  const [venueZones, setVenueZones] = useState<Array<{ id: string; name: string }>>([])
   useEffect(() => {
     if (!user) return
     const supabase = createClient()
     ;(async () => {
       const { data } = await supabase
         .from('venue_settings')
-        .select('commercial_config')
+        .select('commercial_config, zones')
         .eq('user_id', user.id)
         .maybeSingle()
       if (data?.commercial_config) setCommercialConfig(data.commercial_config as any)
+      if (Array.isArray(data?.zones)) setVenueZones(data.zones as Array<{ id: string; name: string }>)
     })()
   }, [user])
 
@@ -390,13 +394,25 @@ export default function TemplateEditor({
       </div>
     )
 
-    if (secId === 'space_groups') return (
-      <SpaceGroupEditor
-        groups={(sections as any).space_groups ?? []}
-        onChange={val => { setSections((s: any) => ({ ...s, space_groups: val })); markDirty() }}
-        uploadImage={uploadImage}
-      />
-    )
+    if (secId === 'space_groups') {
+      if (commercialConfig?.space_type === 'multiple_independent') {
+        return (
+          <MultipleZonesEditor
+            venueZones={venueZones}
+            groups={(sections as any).space_groups ?? []}
+            onChange={val => { setSections((s: any) => ({ ...s, space_groups: val })); markDirty() }}
+            uploadImage={uploadImage}
+          />
+        )
+      }
+      return (
+        <SpaceGroupEditor
+          groups={(sections as any).space_groups ?? []}
+          onChange={val => { setSections((s: any) => ({ ...s, space_groups: val })); markDirty() }}
+          uploadImage={uploadImage}
+        />
+      )
+    }
 
     if (secId === 'venue_rental') return (
       <div style={{ padding: '10px 12px', background: 'var(--cream)', borderRadius: 7, fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5, display: 'flex', gap: 8 }}>

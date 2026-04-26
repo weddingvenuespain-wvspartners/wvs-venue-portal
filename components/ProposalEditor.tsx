@@ -10,6 +10,7 @@ import { useUnsavedChanges } from '@/lib/use-unsaved-changes'
 import ProposalPreview from './ProposalPreview'
 import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
+import MultipleZonesEditor from './MultipleZonesEditor'
 import ProposalDateModal from './ProposalDateModal'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
@@ -124,6 +125,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
   const [modalities, setModalities] = useState<any[]>([])
   const [commercialConfig, setCommercialConfig] = useState<{ space_type: string; price_model: string } | null>(null)
+  const [venueZones, setVenueZones] = useState<Array<{ id: string; name: string }>>([])
   const [menuCatalog, setMenuCatalog] = useState<SectionsData | null>(null)
   const [contentTemplates, setContentTemplates] = useState<Array<{ id: string; name: string; description: string | null; sections_data: SectionsData; is_default: boolean }>>([])
   const [applyingTemplate, setApplyingTemplate] = useState(false)
@@ -179,13 +181,14 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
         supabase.from('leads').select('id, name, guests, email').eq('user_id', user.id).order('created_at', { ascending: false }),
         supabase.from('proposal_web_templates').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('venue_onboarding').select('name, city, region, contact_email, contact_phone, website, photo_urls').eq('user_id', user.id).maybeSingle(),
-        supabase.from('venue_settings').select('commercial_config, menu_catalog').eq('user_id', user.id).maybeSingle(),
+        supabase.from('venue_settings').select('commercial_config, menu_catalog, zones').eq('user_id', user.id).maybeSingle(),
         fetch('/api/estructura/modalities'),
         fetch('/api/proposal-templates'),
       ])
       if (leadsData) setLeads(leadsData)
       if (tplData) setTemplates(tplData as ProposalTemplate[])
       if (venueRow) setVenue(venueRow)
+      if (Array.isArray(settingsRow?.zones)) setVenueZones(settingsRow.zones as Array<{ id: string; name: string }>)
       if (settingsRow?.commercial_config) {
         const cfg = settingsRow.commercial_config as { space_type: string; price_model: string }
         setCommercialConfig(cfg)
@@ -1262,11 +1265,20 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
                           {/* SPACE GROUPS */}
                           {secId === 'space_groups' && (
-                            <SpaceGroupEditor
-                              groups={(sections as any).space_groups ?? []}
-                              onChange={val => setSections((s: any) => ({ ...s, space_groups: val }))}
-                              uploadImage={uploadImage}
-                            />
+                            commercialConfig?.space_type === 'multiple_independent' ? (
+                              <MultipleZonesEditor
+                                venueZones={venueZones}
+                                groups={(sections as any).space_groups ?? []}
+                                onChange={val => setSections((s: any) => ({ ...s, space_groups: val }))}
+                                uploadImage={uploadImage}
+                              />
+                            ) : (
+                              <SpaceGroupEditor
+                                groups={(sections as any).space_groups ?? []}
+                                onChange={val => setSections((s: any) => ({ ...s, space_groups: val }))}
+                                uploadImage={uploadImage}
+                              />
+                            )
                           )}
 
                           {/* INCLUSIONS */}

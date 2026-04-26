@@ -66,6 +66,7 @@ export type DateSlot = {
 
 export type VenueSpaceItem = {
   id?: string
+  zone_id?: string  // link to venue_settings.zones[].id when synced from /estructura
   name: string
   description?: string
   photo_url?: string
