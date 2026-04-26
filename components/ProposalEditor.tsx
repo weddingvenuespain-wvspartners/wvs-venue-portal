@@ -835,15 +835,24 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
                   if (secId === 'welcome') {
                     const isWelcomeOpen = openSecs.has('welcome')
+                    const activeVariantLabel = welcomeGroupOn ? WELCOME_VARIANT_LABELS[activeWelcome] : 'Desactivada'
                     return (
-                      <div key="welcome-group" className="sec-row" style={{ opacity: welcomeGroupOn ? 1 : 0.55 }}>
-                        <div className="sec-header" onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('welcome') ? n.delete('welcome') : n.add('welcome'); return n })}>
+                      <div key="welcome-group" className="sec-row" style={{ opacity: welcomeGroupOn ? 1 : 0.55, background: 'rgba(196,151,90,0.06)' }}>
+                        <div className="sec-header"
+                          onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('welcome') ? n.delete('welcome') : n.add('welcome'); return n })}
+                          style={{ alignItems: 'flex-start' }}>
                           <div onClick={e => { e.stopPropagation(); toggleWelcomeGroup(!welcomeGroupOn) }}
-                            style={{ width: 34, height: 19, borderRadius: 10, background: welcomeGroupOn ? 'var(--gold)' : '#d1c9b8', position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0 }}>
+                            style={{ width: 34, height: 19, borderRadius: 10, background: welcomeGroupOn ? 'var(--gold)' : '#d1c9b8', position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0, marginTop: 2 }}>
                             <div style={{ position: 'absolute', top: 2, left: welcomeGroupOn ? 15 : 2, width: 15, height: 15, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
                           </div>
-                          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)', flex: 1, userSelect: 'none' }}>Bienvenida</span>
-                          <ChevronDown size={14} style={{ color: 'var(--warm-gray)', transform: isWelcomeOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--charcoal)' }}>Bienvenida</span>
+                              <span style={{ fontSize: 10, color: welcomeGroupOn ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 7px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600 }}>{welcomeGroupOn ? '1' : '0'}/{WELCOME_VARIANTS.length}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: welcomeGroupOn ? '#999' : 'var(--warm-gray)', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeVariantLabel}</div>
+                          </div>
+                          <ChevronDown size={14} style={{ color: 'var(--warm-gray)', transform: isWelcomeOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0, marginTop: 2 }} />
                         </div>
 
                         {isWelcomeOpen && (
