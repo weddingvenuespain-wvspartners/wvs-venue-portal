@@ -11,6 +11,7 @@ import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 import DateSelector from './DateSelector'
 import VisitBookingModal from '@/components/VisitBookingModal'
+import { getActiveStyle, isSectionGroupEnabled } from '@/lib/section-styles'
 
 export default function T1Impacto({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date,
@@ -23,13 +24,19 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   // Use template default message as fallback when no personal message yet
   const displayMsg = personal_message || (sec as any).welcome_default || null
 
-  // Pick exactly one welcome variant. Defaults to 'welcome' when nothing is
-  // explicitly set; null only when every variant is explicitly disabled.
-  const welcomeVariantList = ['welcome', 'welcome_light', 'welcome_split', 'welcome_editorial'] as const
-  const sectionsEnabledMap = sec.sections_enabled ?? {}
-  const explicitWelcome = welcomeVariantList.find(v => sectionsEnabledMap[v] === true)
-  const allWelcomeOff = welcomeVariantList.every(v => sectionsEnabledMap[v] === false)
-  const activeWelcomeVariant: typeof welcomeVariantList[number] | null = explicitWelcome ?? (allWelcomeOff ? null : 'welcome')
+  // Pick exactly one welcome variant via the central style registry.
+  // Reads `sections.styles.welcome` first, falls back to legacy
+  // `sections_enabled.welcome_light` flags. Null when the group is off.
+  const welcomeStyleToLegacy: Record<string, 'welcome' | 'welcome_light' | 'welcome_split' | 'welcome_editorial'> = {
+    default: 'welcome',
+    light: 'welcome_light',
+    split: 'welcome_split',
+    editorial: 'welcome_editorial',
+  }
+  const activeWelcomeVariant: 'welcome' | 'welcome_light' | 'welcome_split' | 'welcome_editorial' | null =
+    isSectionGroupEnabled(sec, 'welcome')
+      ? (welcomeStyleToLegacy[getActiveStyle(sec, 'welcome')] ?? 'welcome')
+      : null
 
   const primary = branding?.primary_color ?? '#8B6914'
   const rgb     = toRgb(primary)

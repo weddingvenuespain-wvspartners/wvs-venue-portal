@@ -14,6 +14,13 @@ import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
 import MultipleZonesEditor from './MultipleZonesEditor'
 import { ImageUploader } from './ImageUploader'
+import {
+  SECTION_STYLES,
+  getActiveStyle,
+  setActiveStyle,
+  isSectionGroupEnabled,
+  toggleSectionGroup,
+} from '@/lib/section-styles'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 import { getSectionLabel, SECTION_SPACE_TYPES, SPACE_TYPE_LABELS } from '@/lib/section-visibility'
 
@@ -173,34 +180,25 @@ export default function TemplateEditor({
     markDirty()
   }
 
-  const WELCOME_VARIANTS = ['welcome', 'welcome_light', 'welcome_split', 'welcome_editorial']
-  const WELCOME_VARIANT_LABELS: Record<string, string> = {
-    welcome: 'Oscura · cita centrada',
-    welcome_light: 'Fondo claro',
-    welcome_split: 'Dos columnas con imagen',
-    welcome_editorial: 'Editorial · tipografía grande',
+  // Welcome section variants — driven by the central style registry.
+  const welcomeStyleConfig = SECTION_STYLES.welcome
+  const welcomeGroupOn = isSectionGroupEnabled(sections, 'welcome')
+  const activeWelcomeVariantId = getActiveStyle(sections, 'welcome')
+  // Map variant id back to legacy section id (e.g. 'light' -> 'welcome_light') so
+  // renderSectionContent keeps working with its existing per-variant editors.
+  const variantIdToLegacy: Record<string, string> = {
+    default: 'welcome',
+    light: 'welcome_light',
+    split: 'welcome_split',
+    editorial: 'welcome_editorial',
   }
-  const welcomeGroupOn = !WELCOME_VARIANTS.every(v => (sections.sections_enabled ?? {})[v] === false)
-  const activeWelcome = WELCOME_VARIANTS.find(v => (sections.sections_enabled ?? {})[v] === true)
-    ?? (welcomeGroupOn ? (WELCOME_VARIANTS.find(v => (sections.sections_enabled ?? {})[v] !== false) ?? 'welcome') : 'welcome')
+  const activeWelcome = variantIdToLegacy[activeWelcomeVariantId] ?? 'welcome'
   const toggleWelcomeGroup = (on: boolean) => {
-    setSections(s => ({
-      ...s,
-      sections_enabled: {
-        ...(s.sections_enabled ?? {}),
-        ...Object.fromEntries(WELCOME_VARIANTS.map(v => [v, on ? v === activeWelcome : false]))
-      }
-    }))
+    setSections(s => toggleSectionGroup(s, 'welcome', on) as SectionsData)
     markDirty()
   }
-  const selectWelcomeVariant = (variant: string) => {
-    setSections(s => ({
-      ...s,
-      sections_enabled: {
-        ...(s.sections_enabled ?? {}),
-        ...Object.fromEntries(WELCOME_VARIANTS.map(wv => [wv, wv === variant]))
-      }
-    }))
+  const selectWelcomeVariant = (variantId: string) => {
+    setSections(s => setActiveStyle(s, 'welcome', variantId) as SectionsData)
     markDirty()
   }
 
@@ -793,7 +791,8 @@ export default function TemplateEditor({
 
                     if (secId === 'welcome') {
                       const isWelcomeOpen = openSecs.has('welcome')
-                      const activeVariantLabel = welcomeGroupOn ? WELCOME_VARIANT_LABELS[activeWelcome] : 'Desactivada'
+                      const activeVariant = welcomeStyleConfig.variants.find(v => v.id === activeWelcomeVariantId)
+                      const activeVariantLabel = welcomeGroupOn ? (activeVariant?.label ?? '—') : 'Desactivada'
                       return (
                         <div key="welcome-group" style={{ borderBottom: '1px solid var(--border)', opacity: welcomeGroupOn ? 1 : 0.5, transition: 'opacity .15s', background: 'rgba(196,151,90,0.06)' }}>
                           <div
@@ -806,7 +805,7 @@ export default function TemplateEditor({
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--charcoal)' }}>Bienvenida</span>
-                                <span style={{ fontSize: 10, color: welcomeGroupOn ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 7px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600 }}>{welcomeGroupOn ? '1' : '0'}/{WELCOME_VARIANTS.length}</span>
+                                <span style={{ fontSize: 10, color: welcomeGroupOn ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 7px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600 }}>Estilo: {activeVariant?.label ?? '—'}</span>
                               </div>
                               <div style={{ fontSize: 11, color: welcomeGroupOn ? '#999' : 'var(--warm-gray)', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeVariantLabel}</div>
                             </div>
@@ -814,13 +813,36 @@ export default function TemplateEditor({
                           </div>
                           {isWelcomeOpen && (
                             <div style={{ padding: '12px 14px 14px', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14, padding: '8px 10px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                                {WELCOME_VARIANTS.map(v => (
-                                  <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '3px 0' }}>
-                                    <input type="radio" name="welcome-variant-tpl" checked={activeWelcome === v} onChange={() => selectWelcomeVariant(v)} style={{ accentColor: 'var(--gold)' }} />
-                                    <span style={{ fontSize: 12, color: 'var(--charcoal)' }}>{WELCOME_VARIANT_LABELS[v]}</span>
-                                  </label>
-                                ))}
+                              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Estilo visual</div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 16 }}>
+                                {welcomeStyleConfig.variants.map(v => {
+                                  const sel = activeWelcomeVariantId === v.id
+                                  return (
+                                    <button
+                                      key={v.id}
+                                      type="button"
+                                      onClick={() => selectWelcomeVariant(v.id)}
+                                      style={{
+                                        textAlign: 'left',
+                                        padding: '10px 12px',
+                                        border: `1.5px solid ${sel ? 'var(--gold)' : 'var(--border)'}`,
+                                        borderRadius: 8,
+                                        background: sel ? 'rgba(196,151,90,0.08)' : '#fff',
+                                        cursor: 'pointer',
+                                        transition: 'all .15s',
+                                        position: 'relative',
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                                        <span style={{ fontSize: 12, fontWeight: 600, color: sel ? 'var(--gold)' : 'var(--charcoal)' }}>{v.label}</span>
+                                        {sel && <Check size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />}
+                                      </div>
+                                      {v.description && (
+                                        <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{v.description}</div>
+                                      )}
+                                    </button>
+                                  )
+                                })}
                               </div>
                               {renderSectionContent(activeWelcome as SectionId)}
                             </div>
