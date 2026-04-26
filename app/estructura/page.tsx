@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
+import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
@@ -727,12 +728,7 @@ export default function EstructuraPage() {
       <Sidebar />
       <div className="main-layout">
         <div className="topbar">
-          <div>
-            <div className="topbar-title">Estructura comercial</div>
-            <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 1 }}>
-              {activeTab === 'modalidades' ? 'Define las modalidades de tu venue y sus tarifas por temporada' : 'Catálogo de menús, extras y aperitivos de tu venue'}
-            </div>
-          </div>
+          <div className="topbar-title">Estructura</div>
           {activeTab === 'modalidades' && (
             <button className="btn btn-primary btn-sm" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Plus size={14} /> Nueva modalidad
@@ -745,30 +741,30 @@ export default function EstructuraPage() {
           )}
         </div>
 
-        {/* Tabs */}
-        <div style={{ borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 0, padding: '0 24px', background: '#fff' }}>
-          <button onClick={() => setActiveTab('modalidades')}
-            style={{ padding: '10px 16px', fontSize: 13, fontWeight: activeTab === 'modalidades' ? 600 : 400, color: activeTab === 'modalidades' ? 'var(--charcoal)' : 'var(--warm-gray)', background: 'none', border: 'none', borderBottom: activeTab === 'modalidades' ? '2px solid var(--gold)' : '2px solid transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'color 0.15s', marginBottom: -1 }}>
-            Modalidades y tarifas
-          </button>
-          <button onClick={() => setActiveTab('menus')}
-            style={{ padding: '10px 16px', fontSize: 13, fontWeight: activeTab === 'menus' ? 600 : 400, color: activeTab === 'menus' ? 'var(--charcoal)' : 'var(--warm-gray)', background: 'none', border: 'none', borderBottom: activeTab === 'menus' ? '2px solid var(--gold)' : '2px solid transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'color 0.15s', marginBottom: -1 }}>
-            <ChefHat size={13} />
-            Menús y extras
-            {/* Status badge */}
-            {commercialConfig && !venueHasMenus && (
-              <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'var(--ivory)', color: 'var(--warm-gray)', letterSpacing: '0.04em' }}>N/A</span>
-            )}
-            {venueHasMenus && (menuCount > 0 || extraCount > 0) && (
-              <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'rgba(196,151,90,.12)', color: 'var(--gold)', letterSpacing: '0.04em' }}>
-                {[menuCount > 0 && `${menuCount} menú${menuCount > 1 ? 's' : ''}`, extraCount > 0 && `${extraCount} extra${extraCount > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
-              </span>
-            )}
-            {venueHasMenus && menuCount === 0 && extraCount === 0 && (
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', display: 'inline-block', marginLeft: 2 }} title="Sin menús configurados" />
-            )}
-          </button>
-        </div>
+        <Tabs
+          activeKey={activeTab}
+          onChange={k => setActiveTab(k as 'modalidades' | 'menus')}
+          tabs={[
+            { key: 'modalidades', label: 'Modalidades y tarifas', icon: LayoutGrid, desc: 'Modalidades y precios por temporada' },
+            { key: 'menus',       label: 'Menús y extras',        icon: ChefHat,    desc: 'Catálogo de menús, extras y aperitivos',
+              badge: (
+                <>
+                  {commercialConfig && !venueHasMenus && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'var(--ivory)', color: 'var(--warm-gray)', letterSpacing: '0.04em' }}>N/A</span>
+                  )}
+                  {venueHasMenus && (menuCount > 0 || extraCount > 0) && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'rgba(196,151,90,.12)', color: 'var(--gold)', letterSpacing: '0.04em' }}>
+                      {[menuCount > 0 && `${menuCount} menú${menuCount > 1 ? 's' : ''}`, extraCount > 0 && `${extraCount} extra${extraCount > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                  {venueHasMenus && menuCount === 0 && extraCount === 0 && (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', display: 'inline-block', marginLeft: 2 }} title="Sin menús configurados" />
+                  )}
+                </>
+              ),
+            },
+          ]}
+        />
 
         <div className="page-content">
           {error && <div className="alert alert-error" style={{ marginBottom: 20 }}>{error}</div>}
@@ -804,7 +800,7 @@ export default function EstructuraPage() {
                 </div>
               )}
               {/* Right: live preview */}
-              <div style={{ flex: 1, minWidth: 0, borderLeft: previewExpanded ? 'none' : '1px solid var(--ivory)', position: 'sticky', top: 112, alignSelf: 'flex-start', height: 'calc(100vh - 112px)', overflowY: 'auto', background: '#f9f6f2' }}>
+              <div style={{ flex: 1, minWidth: 0, borderLeft: previewExpanded ? 'none' : '1px solid var(--ivory)', position: 'sticky', top: 51, alignSelf: 'flex-start', height: 'calc(100vh - 51px)', overflowY: 'auto', background: '#f9f6f2' }}>
                 {/* Sticky toolbar */}
                 <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', justifyContent: 'flex-end', padding: '6px 10px', background: 'rgba(249,246,242,.85)', backdropFilter: 'blur(6px)', borderBottom: '1px solid var(--ivory)' }}>
                   <button

@@ -474,9 +474,19 @@ export function extractData(data: ProposalData) {
     collabsShow:    so.collaborators_override != null ? so.collaborators_override : vc.collaborators ?? [],
     extrasShow:     so.extra_services_override != null ? so.extra_services_override : vc.extra_services ?? [],
     menuShow:       so.menu_prices_override != null ? so.menu_prices_override : vc.menu_prices    ?? [],
-    menusStructured: (so.menus_override ?? null) as Menu[] | null,
-    menuExtras:      (so.menu_extras_override ?? null) as MenuExtra[] | null,
-    appetizersBase:  (so.appetizers_base_override ?? null) as AppetizerGroup[] | null,
+    menusStructured: (so.menu_sections_visible?.menus === false ? null : (so.menus_override ?? null)) as Menu[] | null,
+    menuExtras:      (() => {
+      const raw = (so.menu_extras_override ?? null) as MenuExtra[] | null
+      if (!raw) return null
+      const msv = so.menu_sections_visible ?? {}
+      return raw.filter(e => {
+        if (['station'].includes(e.category) && msv.cocktail === false) return false
+        if (['resopon', 'open_bar'].includes(e.category) && msv.night === false) return false
+        if (['ceremony', 'music', 'audiovisual', 'other'].includes(e.category) && msv.event_extras === false) return false
+        return true
+      })
+    })(),
+    appetizersBase:  (so.menu_sections_visible?.cocktail === false ? null : (so.appetizers_base_override ?? null)) as AppetizerGroup[] | null,
     expShow:        so.experience_override  != null ? so.experience_override  : vc.experience,
     testsShow:      so.testimonials_override != null
                       ? so.testimonials_override

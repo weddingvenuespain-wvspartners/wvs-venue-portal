@@ -4,11 +4,12 @@ import { useState, useCallback, useEffect, useRef, Fragment } from 'react'
 import {
   ChevronLeft, ChevronDown, Check, Loader2, ChefHat, LayoutTemplate,
   Upload, X, Monitor, Smartphone, RefreshCcw, ExternalLink,
-  PanelLeftOpen, PanelLeftClose, Info,
+  PanelLeftOpen, PanelLeftClose, Info, Palette,
 } from 'lucide-react'
-import type { SectionsData } from '@/lib/proposal-types'
+import type { SectionsData, VenueSpaceGroup } from '@/lib/proposal-types'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
 import MultipleZonesEditor from './MultipleZonesEditor'
@@ -80,7 +81,7 @@ export default function TemplateEditor({
   const [description, setDescription] = useState(template.description ?? '')
   const [isDefault, setIsDefault]     = useState(template.is_default)
   const [sections, setSections]       = useState<SectionsData>(template.sections_data ?? {})
-  const [activeTab, setActiveTab]     = useState<'sections' | 'menus'>('sections')
+  const [activeTab, setActiveTab]     = useState<'sections' | 'menus' | 'visual'>('sections')
   const [saving, setSaving]           = useState(false)
   const [saved, setSaved]             = useState(false)
   const [saveError, setSaveError]     = useState<string | null>(null)
@@ -98,8 +99,10 @@ export default function TemplateEditor({
   // Upload states
   const [uploadingHero,    setUploadingHero]    = useState(false)
   const [uploadingGallery, setUploadingGallery] = useState(false)
+  const [uploadingLogo,    setUploadingLogo]    = useState(false)
   const heroInputRef    = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
+  const logoInputRef    = useRef<HTMLInputElement>(null)
 
   // Open/close section content cards
   const [openSecs, setOpenSecs] = useState<Set<string>>(new Set())
@@ -107,18 +110,18 @@ export default function TemplateEditor({
   // Venue commercial config + zones — drives which sections appear and their labels,
   // plus the multiple_independent zone picker
   const [commercialConfig, setCommercialConfig] = useState<{ space_type: string; price_model: string } | null>(null)
-  const [venueZones, setVenueZones] = useState<Array<{ id: string; name: string }>>([])
+  const [venueSpaceGroups, setVenueSpaceGroups] = useState<VenueSpaceGroup[]>([])
   useEffect(() => {
     if (!user) return
     const supabase = createClient()
     ;(async () => {
       const { data } = await supabase
         .from('venue_settings')
-        .select('commercial_config, zones')
+        .select('commercial_config, space_groups')
         .eq('user_id', user.id)
         .maybeSingle()
       if (data?.commercial_config) setCommercialConfig(data.commercial_config as any)
-      if (Array.isArray(data?.zones)) setVenueZones(data.zones as Array<{ id: string; name: string }>)
+      if (Array.isArray(data?.space_groups)) setVenueSpaceGroups(data.space_groups as VenueSpaceGroup[])
     })()
   }, [user])
 
@@ -134,6 +137,11 @@ export default function TemplateEditor({
     show_availability:   false,
     show_price_estimate: false,
     sections_data:       sections,
+    branding: {
+      logo_url:      sections.logo_url ?? null,
+      primary_color: sections.primary_color ?? '#2d4a7a',
+      font_family:   sections.font_family ?? 'Georgia, serif',
+    },
   }), [sections])
 
   useEffect(() => {
@@ -235,6 +243,13 @@ export default function TemplateEditor({
     for (const f of Array.from(files)) { const u = await uploadImage(f, 'gallery'); if (u) urls.push(u) }
     if (urls.length) { setSections(s => ({ ...s, gallery_urls: [...(s.gallery_urls ?? []), ...urls] })); markDirty() }
     setUploadingGallery(false)
+  }
+
+  const handleLogoUpload = async (file: File) => {
+    setUploadingLogo(true)
+    const url = await uploadImage(file, 'logos')
+    if (url) { setSections(s => ({ ...s, logo_url: url })); markDirty() }
+    setUploadingLogo(false)
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
@@ -398,7 +413,7 @@ export default function TemplateEditor({
       if (commercialConfig?.space_type === 'multiple_independent') {
         return (
           <MultipleZonesEditor
-            venueZones={venueZones}
+            venueSpaceGroups={venueSpaceGroups}
             groups={(sections as any).space_groups ?? []}
             onChange={val => { setSections((s: any) => ({ ...s, space_groups: val })); markDirty() }}
             uploadImage={uploadImage}
@@ -671,6 +686,7 @@ export default function TemplateEditor({
           <div style={{ display: 'flex', borderBottom: '2px solid var(--ivory)', flexShrink: 0, alignItems: 'center' }}>
             {([
               { id: 'sections', label: 'Secciones', icon: <LayoutTemplate size={12} /> },
+              { id: 'visual',   label: 'Visual',     icon: <Palette size={12} /> },
               { id: 'menus',    label: 'Menús',      icon: <ChefHat size={12} /> },
             ] as const).map(tab => (
               <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
@@ -848,6 +864,169 @@ export default function TemplateEditor({
                     })
                   })()}
                 </div>
+              </div>
+            )}
+
+            {/* ── VISUAL tab ────────────────────────────────────────────────── */}
+            {activeTab === 'visual' && (
+              <div style={{ padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {/* Load fonts for preview */}
+                <link rel="stylesheet" href={ALL_FONTS_URL} />
+
+                {/* Design style */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Estilo de diseño</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 20 }}>
+                  {([
+                    { id: 1, icon: '⚡', name: 'Impacto Directo', desc: 'Dark luxury' },
+                    { id: 2, icon: '✨', name: 'Emoción Primero', desc: 'Cream editorial' },
+                    { id: 3, icon: '📋', name: 'Todo Claro',      desc: 'Estructurado' },
+                    { id: 4, icon: '💬', name: 'Social Proof',    desc: 'Stats + confianza' },
+                    { id: 5, icon: '◻',  name: 'Minimalista',     desc: 'CTA prominente' },
+                  ] as const).map(tpl => {
+                    const active = (sections.visual_template_id ?? 1) === tpl.id
+                    return (
+                      <button key={tpl.id} type="button"
+                        onClick={() => { setSections(s => ({ ...s, visual_template_id: tpl.id })); markDirty() }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                          borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                          border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                          background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
+                        }}>
+                        <span style={{ fontSize: 14 }}>{tpl.icon}</span>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)' }}>{tpl.name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{tpl.desc}</div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Logo */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Logo del venue</div>
+                <div style={{ marginBottom: 20 }}>
+                  <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleLogoUpload(e.target.files[0])} />
+                  {sections.logo_url ? (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <img src={sections.logo_url} alt="logo" style={{ maxHeight: 56, maxWidth: '100%', borderRadius: 6, border: '1px solid var(--border)', display: 'block', background: '#fff', padding: 6 }} />
+                        <button onClick={() => { setSections(s => ({ ...s, logo_url: null })); markDirty() }}
+                          style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <X size={9} color="#fff" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                  <button className="btn btn-ghost btn-sm" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} style={{ width: '100%', justifyContent: 'center' }}>
+                    <Upload size={12} /> {uploadingLogo ? 'Subiendo…' : sections.logo_url ? 'Cambiar logo' : 'Subir logo'}
+                  </button>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 6, lineHeight: 1.5 }}>
+                    PNG transparente recomendado. Se mostrará en la cabecera de la propuesta.
+                  </div>
+                </div>
+
+                {/* Primary color */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Color principal</div>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+                    {['#2d4a7a','#7a5c3c','#6b2d42','#2a6b4a','#4a4a4a','#8b6914','#C4975A','#8B4513','#1a3a5c','#5c2d6b'].map(c => (
+                      <div key={c} onClick={() => { setSections(s => ({ ...s, primary_color: c })); markDirty() }}
+                        style={{
+                          width: 24, height: 24, borderRadius: 5, background: c, cursor: 'pointer', flexShrink: 0,
+                          border: (sections.primary_color ?? '#C4975A') === c ? '2px solid var(--espresso)' : '2px solid transparent',
+                          transform: (sections.primary_color ?? '#C4975A') === c ? 'scale(1.2)' : 'scale(1)', transition: 'transform .1s',
+                        }} />
+                    ))}
+                    <input type="color" value={sections.primary_color ?? '#C4975A'}
+                      onChange={e => { setSections(s => ({ ...s, primary_color: e.target.value })); markDirty() }}
+                      style={{ width: 24, height: 24, padding: 2, borderRadius: 5, border: '1px solid var(--border)', cursor: 'pointer', background: 'none' }} />
+                  </div>
+                  <div style={{ height: 5, borderRadius: 3, background: sections.primary_color ?? '#C4975A', opacity: 0.8 }} />
+                </div>
+
+                {/* Secondary color */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Color secundario</div>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+                    {['#8B6914','#7a5c3c','#6b2d42','#2a6b4a','#4a4a4a','#1a3a5c','#5c2d6b','#A0826D','#3D5A80','#293241'].map(c => (
+                      <div key={c} onClick={() => { setSections(s => ({ ...s, secondary_color: c })); markDirty() }}
+                        style={{
+                          width: 24, height: 24, borderRadius: 5, background: c, cursor: 'pointer', flexShrink: 0,
+                          border: sections.secondary_color === c ? '2px solid var(--espresso)' : '1px solid var(--border)',
+                          transform: sections.secondary_color === c ? 'scale(1.2)' : 'scale(1)', transition: 'transform .1s',
+                        }} />
+                    ))}
+                    <input type="color" value={sections.secondary_color ?? '#8B6914'}
+                      onChange={e => { setSections(s => ({ ...s, secondary_color: e.target.value })); markDirty() }}
+                      style={{ width: 24, height: 24, padding: 2, borderRadius: 5, border: '1px solid var(--border)', cursor: 'pointer', background: 'none' }} />
+                  </div>
+                  <div style={{ height: 5, borderRadius: 3, background: sections.secondary_color ?? '#8B6914', opacity: 0.8 }} />
+                  <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 6, lineHeight: 1.45 }}>
+                    Disponible como variable <code style={{ background: 'var(--cream)', padding: '0 4px', borderRadius: 3 }}>--tpl-secondary</code> para usos personalizados.
+                  </div>
+                </div>
+
+                {/* Color mode (light / dark variant of the chosen design) */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Modo</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 20 }}>
+                  {([
+                    { id: 'light', label: 'Claro',   bg: '#FAF7F2', fg: '#1A1A1A', sub: 'Fondo crema · texto oscuro' },
+                    { id: 'dark',  label: 'Oscuro',  bg: '#0A0A0A', fg: '#F5F5F5', sub: 'Fondo negro · texto claro' },
+                  ] as const).map(opt => {
+                    const active = (sections.color_mode ?? 'light') === opt.id
+                    return (
+                      <button key={opt.id} type="button"
+                        onClick={() => { setSections(s => ({ ...s, color_mode: opt.id })); markDirty() }}
+                        style={{
+                          display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 12px',
+                          borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                          border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                          background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
+                        }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ width: 16, height: 16, borderRadius: 4, background: opt.bg, border: '1px solid var(--border)', flexShrink: 0 }} />
+                          <span style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)' }}>{opt.label}</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{opt.sub}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Typography */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Tipografía</div>
+                <div style={{ padding: '8px 12px', background: 'var(--cream)', borderRadius: 8, marginBottom: 8, border: '1px solid var(--border)' }}>
+                  <span style={{ fontFamily: sections.font_family ?? 'Georgia, serif', fontSize: 15, color: 'var(--text)' }}>
+                    Aa — {getFontByValue(sections.font_family ?? 'Georgia, serif')?.label ?? 'Georgia'}
+                  </span>
+                </div>
+                <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {FONT_CATEGORIES.map(cat => (
+                    <div key={cat.key}>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>{cat.label}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {GOOGLE_FONTS.filter(f => f.category === cat.key).map(opt => {
+                          const isActive = (sections.font_family ?? 'Georgia, serif') === opt.value
+                          return (
+                            <button key={opt.value} type="button"
+                              onClick={() => { setSections(s => ({ ...s, font_family: opt.value })); markDirty() }}
+                              style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                padding: '7px 10px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                                border: `1.5px solid ${isActive ? 'var(--gold)' : 'var(--border)'}`,
+                                background: isActive ? 'rgba(196,151,90,0.08)' : 'var(--surface)',
+                              }}>
+                              <span style={{ fontFamily: opt.value, fontSize: 13, color: 'var(--text)' }}>{opt.label}</span>
+                              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{opt.desc}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
               </div>
             )}
 

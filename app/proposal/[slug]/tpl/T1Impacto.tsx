@@ -8,8 +8,9 @@ import { useEffect, useRef, useState } from 'react'
 import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, StarRating, resolveContact, type ProposalData } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
-import SpaceGroupSelector from './SpaceGroupSelector'
+import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 import DateSelector from './DateSelector'
+import VisitBookingModal from '@/components/VisitBookingModal'
 
 export default function T1Impacto({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date,
@@ -44,6 +45,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const [scrolled, setScrolled]     = useState(false)
   const [ctaBar, setCtaBar]         = useState(false)
   const [openFaq, setOpenFaq]       = useState<number | null>(null)
+  const [visitModalOpen, setVisitModalOpen] = useState(false)
+  const [visitDone, setVisitDone]           = useState(false)
+  const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
   const heroRef                     = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
@@ -339,7 +343,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   `
 
   return (
-    <div className="t1">
+    <div className="t1 tpl-root">
       <style dangerouslySetInnerHTML={{ __html: css }} />
 
       {/* ── NAV ── */}
@@ -703,6 +707,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           onPrimary={onPri}
           dark
           font={FONT}
+          guestCount={guest_count ? Number(guest_count) : undefined}
+          onSelectionChange={setSelectedSpaces}
         />
       )}
 
@@ -1052,20 +1058,36 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 </div>
                 <h2 className="t1-sv-title">{svTitle}</h2>
                 <p className="t1-sv-sub">{svSub}</p>
-                {svUrl
-                  ? <a className="t1-sv-btn" href={svUrl} target="_blank" rel="noopener">{svCta}</a>
-                  : contactOn && (
-                    <button className="t1-sv-btn" onClick={() => contact.phone ? window.open(waHref, '_blank') : scrollToContact()}>
-                      {svCta}
-                    </button>
-                  )
-                }
+
+                {visitDone ? (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}22`, border: `1px solid ${primary}55`, borderRadius: 10, padding: '14px 24px', fontSize: '.88rem', color: primary, fontWeight: 600 }}>
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ¡Solicitud enviada! Os confirmaremos la visita pronto.
+                  </div>
+                ) : svUrl ? (
+                  <a className="t1-sv-btn" href={svUrl} target="_blank" rel="noopener">{svCta}</a>
+                ) : (
+                  <button className="t1-sv-btn" onClick={() => setVisitModalOpen(true)}>
+                    {svCta}
+                  </button>
+                )}
                 {sv.note && <div className="t1-sv-note">{sv.note}</div>}
               </div>
             </FadeUp>
           </section>
         )
       })()}
+
+      {visitModalOpen && (
+        <VisitBookingModal
+          proposalId={data.id}
+          coupleName={couple_name}
+          primaryColor={primary}
+          selectedSpaces={selectedSpaces}
+          onClose={() => setVisitModalOpen(false)}
+          onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
+        />
+      )}
 
       {/* ════════════════════════════════════════════
           MAPA

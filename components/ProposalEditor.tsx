@@ -3,8 +3,8 @@ import { useEffect, useState, useRef, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Check, X, Upload, AlertCircle, Zap, Sparkles, ClipboardList, MessageCircle, Target, ChevronDown, ArrowLeft, Copy, ChefHat } from 'lucide-react'
-import type { SectionsData } from '@/lib/proposal-types'
+import { Check, X, Upload, AlertCircle, ChevronDown, ArrowLeft, Copy, ChefHat } from 'lucide-react'
+import type { SectionsData, VenueSpaceGroup } from '@/lib/proposal-types'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes'
 import ProposalPreview from './ProposalPreview'
@@ -125,7 +125,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
   const [modalities, setModalities] = useState<any[]>([])
   const [commercialConfig, setCommercialConfig] = useState<{ space_type: string; price_model: string } | null>(null)
-  const [venueZones, setVenueZones] = useState<Array<{ id: string; name: string }>>([])
+  const [venueSpaceGroups, setVenueSpaceGroups] = useState<VenueSpaceGroup[]>([])
   const [menuCatalog, setMenuCatalog] = useState<SectionsData | null>(null)
   const [contentTemplates, setContentTemplates] = useState<Array<{ id: string; name: string; description: string | null; sections_data: SectionsData; is_default: boolean }>>([])
   const [applyingTemplate, setApplyingTemplate] = useState(false)
@@ -181,14 +181,14 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
         supabase.from('leads').select('id, name, guests, email').eq('user_id', user.id).order('created_at', { ascending: false }),
         supabase.from('proposal_web_templates').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('venue_onboarding').select('name, city, region, contact_email, contact_phone, website, photo_urls').eq('user_id', user.id).maybeSingle(),
-        supabase.from('venue_settings').select('commercial_config, menu_catalog, zones').eq('user_id', user.id).maybeSingle(),
+        supabase.from('venue_settings').select('commercial_config, menu_catalog, space_groups').eq('user_id', user.id).maybeSingle(),
         fetch('/api/estructura/modalities'),
         fetch('/api/proposal-templates'),
       ])
       if (leadsData) setLeads(leadsData)
       if (tplData) setTemplates(tplData as ProposalTemplate[])
       if (venueRow) setVenue(venueRow)
-      if (Array.isArray(settingsRow?.zones)) setVenueZones(settingsRow.zones as Array<{ id: string; name: string }>)
+      if (Array.isArray(settingsRow?.space_groups)) setVenueSpaceGroups(settingsRow.space_groups as VenueSpaceGroup[])
       if (settingsRow?.commercial_config) {
         const cfg = settingsRow.commercial_config as { space_type: string; price_model: string }
         setCommercialConfig(cfg)
@@ -379,6 +379,11 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       ...(tpl.sections_data ?? {}),
       content_template_id: templateId,
     }))
+    // Also apply visual branding from template if set
+    const sd = tpl.sections_data ?? {}
+    if (sd.primary_color) setForm(f => ({ ...f, primary_color: sd.primary_color! }))
+    if (sd.font_family)   setForm(f => ({ ...f, font_family: sd.font_family! }))
+    if (sd.logo_url)      setForm(f => ({ ...f, logo_url: sd.logo_url! }))
     setTimeout(() => setApplyingTemplate(false), 500)
   }
 
@@ -599,38 +604,6 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 </div>
               )}
 
-              {/* Template selector */}
-              <div className="form-group" style={{ marginTop: 14 }}>
-                <label className="form-label">Diseño de la propuesta</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  {([
-                    { id: 1, icon: '⚡', name: 'Impacto Directo', desc: 'Dark luxury' },
-                    { id: 2, icon: '✨', name: 'Emoción Primero', desc: 'Cream editorial' },
-                    { id: 3, icon: '📋', name: 'Todo Claro', desc: 'Estructurado' },
-                    { id: 4, icon: '💬', name: 'Social Proof', desc: 'Stats + confianza' },
-                    { id: 5, icon: '◻', name: 'Minimalista', desc: 'CTA prominente' },
-                  ] as const).map(tpl => {
-                    const active = (sections.visual_template_id ?? 1) === tpl.id
-                    return (
-                      <button key={tpl.id} type="button"
-                        onClick={() => setSections(s => ({ ...s, visual_template_id: tpl.id }))}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                          borderRadius: 7, cursor: 'pointer', textAlign: 'left',
-                          border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
-                          background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
-                        }}>
-                        <span style={{ fontSize: 14 }}>{tpl.icon}</span>
-                        <div>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)' }}>{tpl.name}</div>
-                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{tpl.desc}</div>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
               <div className="form-group" style={{ marginTop: 14 }}>
                 <label className="form-label">Tipo de servicio</label>
                 <div style={{ display: 'flex', gap: 10 }}>
@@ -686,36 +659,6 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
           {activeTab === 'visual' && (
             <div>
               <div style={secLabel}>Aspecto visual de la landing</div>
-
-              <div className="form-group" style={{ marginBottom: 20 }}>
-                <label className="form-label">Diseño de la landing</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
-                  {([
-                    { id: 1, icon: <Zap size={18} />, name: 'Impacto Directo', desc: 'Dark luxury · precio visible · CTA al frente' },
-                    { id: 2, icon: <Sparkles size={18} />, name: 'Emoción Primero', desc: 'Cream editorial · galería arriba · emotivo' },
-                    { id: 3, icon: <ClipboardList size={18} />, name: 'Todo Claro', desc: 'Sidebar + índice · estructurado' },
-                    { id: 4, icon: <MessageCircle size={18} />, name: 'Social Proof', desc: 'Stats + testimonios · confianza' },
-                    { id: 5, icon: <Target size={18} />, name: 'Minimalista', desc: 'Limpio · CTA muy prominente' },
-                  ] as const).map(tpl => {
-                    const active = (sections.visual_template_id ?? 1) === tpl.id
-                    return (
-                      <button key={tpl.id} type="button" onClick={() => setSections(s => ({ ...s, visual_template_id: tpl.id }))}
-                        style={{
-                          display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
-                          borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                          border: `2px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
-                          background: active ? 'rgba(196,151,90,0.10)' : 'var(--surface)',
-                        }}>
-                        <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>{tpl.icon}</span>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)', marginBottom: 2 }}>{tpl.name}</div>
-                          <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{tpl.desc}</div>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
 
               <div className="form-group">
                 <label className="form-label">Color principal</label>
@@ -1267,10 +1210,11 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                           {secId === 'space_groups' && (
                             commercialConfig?.space_type === 'multiple_independent' ? (
                               <MultipleZonesEditor
-                                venueZones={venueZones}
+                                venueSpaceGroups={venueSpaceGroups}
                                 groups={(sections as any).space_groups ?? []}
                                 onChange={val => setSections((s: any) => ({ ...s, space_groups: val }))}
                                 uploadImage={uploadImage}
+                                guestCount={leads.find(l => l.id === form.lead_id)?.guests ?? undefined}
                               />
                             ) : (
                               <SpaceGroupEditor

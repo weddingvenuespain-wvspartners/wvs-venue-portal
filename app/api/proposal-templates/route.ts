@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { requireFeature } from '@/lib/plan-server'
 
 async function getSupabase() {
   const cookieStore = await cookies()
@@ -13,6 +14,9 @@ async function getSupabase() {
 
 // GET /api/proposal-templates — list all templates for the authenticated user
 export async function GET() {
+  const gate = await requireFeature('propuestas')
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
+
   const supabase = await getSupabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -29,6 +33,9 @@ export async function GET() {
 
 // POST /api/proposal-templates — create a new template
 export async function POST(req: NextRequest) {
+  const gate = await requireFeature('propuestas')
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
+
   const supabase = await getSupabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })

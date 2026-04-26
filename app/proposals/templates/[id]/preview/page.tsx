@@ -61,6 +61,15 @@ export default async function TemplatePreviewPage({ params }: { params: Promise<
   }
 
   const sd = (template.sections_data ?? {}) as any
+  const baseBrand = brandingRow
+    ? { logo_url: null as string | null, primary_color: brandingRow.accent_color ?? '#2d4a7a', font_family: brandingRow.font_family }
+    : { logo_url: null as string | null, primary_color: '#2d4a7a' }
+  const branding = {
+    ...baseBrand,
+    ...(sd.primary_color ? { primary_color: sd.primary_color } : {}),
+    ...(sd.font_family   ? { font_family:   sd.font_family   } : {}),
+    ...(sd.logo_url      ? { logo_url:      sd.logo_url      } : {}),
+  }
   const proposalData: ProposalData = {
     id:                  `tpl-${id}`,
     slug:                `tpl-${id}`,
@@ -76,9 +85,7 @@ export default async function TemplatePreviewPage({ params }: { params: Promise<
     sections_data:       template.sections_data,
     venueContent,
     venue:               venueData ?? null,
-    branding:            brandingRow
-      ? { logo_url: null, primary_color: brandingRow.accent_color ?? '#2d4a7a', font_family: brandingRow.font_family }
-      : { logo_url: null, primary_color: '#2d4a7a' },
+    branding,
   }
 
   return <ProposalLanding data={proposalData} preview={true} />
