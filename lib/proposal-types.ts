@@ -138,6 +138,12 @@ export type SectionsData = {
   content_template_id?: string
   // Date slots offered to the couple (different date options, possibly with different prices)
   date_slots?: DateSlot[] | null
+  // Sections — new blocks
+  schedule_visit?: { title?: string; subtitle?: string; url?: string; cta_label?: string; note?: string } | null
+  sticky_nav?: { links?: Array<{ label: string; anchor: string }> } | null
+  welcome_light?: { image_url?: string } | null
+  welcome_split?: { image_url?: string; image_side?: 'left' | 'right' } | null
+  welcome_editorial?: { eyebrow?: string } | null
   // Legacy fallback used by extractData for older proposals
   testimonials?: Array<{ names: string; couple_name?: string; date?: string; wedding_date?: string; guests?: number; text: string; rating?: number; photo_url?: string }>
   accommodation?: {

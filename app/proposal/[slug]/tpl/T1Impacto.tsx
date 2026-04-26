@@ -241,6 +241,50 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
 
     /* ── CTA section ── */
     .t1-cta{background:#0d0d0d;padding:100px 0;border-top:2px solid ${primary}}
+
+    /* ── Sticky nav links ── */
+    .t1-nav-links{display:none;align-items:center;gap:24px}
+    .t1-nav.scrolled .t1-nav-links{display:flex}
+    .t1-nav-link{font-size:.64rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.38);cursor:pointer;transition:color .2s;background:none;border:none;padding:0;white-space:nowrap}
+    .t1-nav-link:hover{color:rgba(255,255,255,.85)}
+
+    /* ── Welcome light ── */
+    .t1-wl{padding:100px 0;background:#f8f4ee;position:relative;overflow:hidden}
+    .t1-wl-bg{position:absolute;inset:0;object-fit:cover;width:100%;height:100%;opacity:.12;filter:blur(6px) saturate(.6)}
+    .t1-wl-inner{position:relative;z-index:1;max-width:660px;margin:0 auto;padding:0 48px;text-align:center}
+    .t1-wl-line{width:36px;height:1.5px;background:${primary};margin:0 auto 32px}
+    .t1-wl-body{font-family:${FONT};font-size:clamp(1.05rem,2vw,1.35rem);font-style:italic;font-weight:300;color:#3a3530;line-height:1.9;white-space:pre-wrap}
+    .t1-wl-sig{margin-top:28px;font-size:.65rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:${primary};opacity:.7}
+
+    /* ── Welcome split ── */
+    .t1-ws{display:grid;grid-template-columns:1fr 1fr;min-height:560px}
+    .t1-ws-img{overflow:hidden;position:relative;background:#1a1a1a;order:0}
+    .t1-ws-img.right{order:1}
+    .t1-ws-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .8s ease}
+    .t1-ws:hover .t1-ws-img img{transform:scale(1.04)}
+    .t1-ws-text{background:#fff;padding:80px 64px;display:flex;flex-direction:column;justify-content:center;order:0}
+    .t1-ws-text.after-img{order:1}
+    .t1-ws-eyebrow{font-size:.6rem;font-weight:700;letter-spacing:.26em;text-transform:uppercase;color:${primary};margin-bottom:20px;display:block}
+    .t1-ws-body{font-family:${FONT};font-size:clamp(1rem,1.8vw,1.25rem);font-style:italic;font-weight:300;color:#3a3530;line-height:1.85;white-space:pre-wrap}
+    .t1-ws-sig{margin-top:24px;font-size:.65rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${primary};opacity:.65}
+    @media(max-width:780px){.t1-ws{grid-template-columns:1fr}.t1-ws-img{min-height:280px;order:0!important}.t1-ws-text{order:1!important;padding:48px 28px}}
+
+    /* ── Welcome editorial ── */
+    .t1-we{background:#0a0a0a;padding:100px 0;border-top:1px solid #181818}
+    .t1-we-inner{max-width:920px;margin:0 auto;padding:0 48px}
+    .t1-we-eyebrow{font-size:.6rem;font-weight:700;letter-spacing:.26em;text-transform:uppercase;color:${primary};margin-bottom:40px;display:block}
+    .t1-we-body{font-family:${FONT};font-size:clamp(1.5rem,3.2vw,2.6rem);font-weight:300;color:rgba(255,255,255,.88);line-height:1.4;font-style:italic;white-space:pre-wrap}
+    .t1-we-sig{margin-top:36px;padding-top:24px;border-top:1px solid #222;font-size:.65rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.25)}
+
+    /* ── Schedule visit ── */
+    .t1-sv{background:#111;padding:80px 0;border-top:1px solid #181818}
+    .t1-sv-inner{max-width:600px;margin:0 auto;padding:0 48px;text-align:center}
+    .t1-sv-icon{width:48px;height:48px;border-radius:50%;background:rgba(${rgb},.15);display:flex;align-items:center;justify-content:center;margin:0 auto 24px;border:1px solid rgba(${rgb},.3)}
+    .t1-sv-title{font-family:${FONT};font-size:clamp(1.6rem,3vw,2.4rem);font-weight:300;color:#fff;margin-bottom:16px;line-height:1.2}
+    .t1-sv-sub{font-size:.88rem;color:rgba(255,255,255,.42);line-height:1.8;margin-bottom:36px}
+    .t1-sv-btn{display:inline-block;background:${primary};color:${onPri};border:none;padding:16px 44px;font-size:.78rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;text-decoration:none;transition:opacity .2s}
+    .t1-sv-btn:hover{opacity:.85}
+    .t1-sv-note{margin-top:16px;font-size:.72rem;color:rgba(255,255,255,.25)}
     .t1-cta-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:start}
     .t1-cta-h{font-family:${FONT};font-size:clamp(2rem,4.5vw,3.6rem);font-weight:300;color:#fff;line-height:1.1;margin-bottom:20px}
     .t1-cta-sub{font-size:.9rem;color:rgba(255,255,255,.38);line-height:1.85;margin-bottom:32px}
@@ -292,6 +336,29 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           ? <img src={logo} alt={venue?.name || ''} style={{ height: 28, objectFit: 'contain' }} />
           : <span className="t1-nav-logo">{venue?.name}</span>
         }
+        {on('sticky_nav') && (() => {
+          const navLinks = [
+            (on('welcome') || on('welcome_light') || on('welcome_split') || on('welcome_editorial')) && personal_message
+              ? { label: 'Bienvenida', anchor: 'sec-welcome' } : null,
+            expShow && on('experience') ? { label: 'Historia', anchor: 'sec-experience' } : null,
+            on('gallery') && galleryPhotos.length > 0 ? { label: 'Galería', anchor: 'sec-gallery' } : null,
+            on('zones') && zonesShow.length > 0 ? { label: 'Espacios', anchor: 'sec-zones' } : null,
+            hasCatering && on('menu') ? { label: 'Menús', anchor: 'menu' } : null,
+            on('schedule_visit') ? { label: 'Visita', anchor: 'sec-schedule' } : null,
+            contactOn ? { label: 'Contactar', anchor: 't1-cta' } : null,
+          ].filter(Boolean) as { label: string; anchor: string }[]
+          if (!navLinks.length) return null
+          return (
+            <div className="t1-nav-links">
+              {navLinks.map(({ label, anchor }) => (
+                <button key={anchor} className="t1-nav-link"
+                  onClick={() => document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth' })}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )
+        })()}
         {(hasCatering || contactOn) && (
           <button className="t1-nav-cta" onClick={() => hasCatering ? document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' }) : scrollToContact()}>
             {hasCatering ? 'Ver menús' : 'Contactar'}
@@ -387,7 +454,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           MENSAJE PERSONAL + CONVERSION BLOCK
       ════════════════════════════════════════════ */}
       {on('welcome') && personal_message && (
-        <section className="t1-sec" style={{ background: '#080808' }}>
+        <section id="sec-welcome" className="t1-sec" style={{ background: '#080808' }}>
           <FadeUp>
             <div className="t1-msg">
               <div className="t1-msg-qmark">"</div>
@@ -399,10 +466,69 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       )}
 
       {/* ════════════════════════════════════════════
+          BIENVENIDA · FONDO CLARO
+      ════════════════════════════════════════════ */}
+      {on('welcome_light') && personal_message && (
+        <section id={!on('welcome') ? 'sec-welcome' : undefined} className="t1-wl">
+          {(sec as any).welcome_light?.image_url && (
+            <img className="t1-wl-bg" src={(sec as any).welcome_light.image_url} alt=""
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+          )}
+          <FadeUp>
+            <div className="t1-wl-inner">
+              <div className="t1-wl-line" />
+              <p className="t1-wl-body">{personal_message}</p>
+              {venue?.name && <div className="t1-wl-sig">— {venue.name}</div>}
+            </div>
+          </FadeUp>
+        </section>
+      )}
+
+      {/* ════════════════════════════════════════════
+          BIENVENIDA · DOS COLUMNAS
+      ════════════════════════════════════════════ */}
+      {on('welcome_split') && personal_message && (
+        <section id={!on('welcome') && !on('welcome_light') ? 'sec-welcome' : undefined}>
+          <div className="t1-ws">
+            <div className={`t1-ws-img${(sec as any).welcome_split?.image_side === 'right' ? ' right' : ''}`}>
+              {(sec as any).welcome_split?.image_url && (
+                <img src={(sec as any).welcome_split.image_url} alt=""
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+              )}
+            </div>
+            <FadeUp>
+              <div className={`t1-ws-text${(sec as any).welcome_split?.image_side === 'right' ? '' : ' after-img'}`}>
+                <span className="t1-ws-eyebrow">Un mensaje para vosotros</span>
+                <p className="t1-ws-body">{personal_message}</p>
+                {venue?.name && <div className="t1-ws-sig">— {venue.name}</div>}
+              </div>
+            </FadeUp>
+          </div>
+        </section>
+      )}
+
+      {/* ════════════════════════════════════════════
+          BIENVENIDA · EDITORIAL
+      ════════════════════════════════════════════ */}
+      {on('welcome_editorial') && personal_message && (
+        <section id={!on('welcome') && !on('welcome_light') && !on('welcome_split') ? 'sec-welcome' : undefined} className="t1-we">
+          <FadeUp>
+            <div className="t1-we-inner">
+              {(sec as any).welcome_editorial?.eyebrow && (
+                <span className="t1-we-eyebrow">{(sec as any).welcome_editorial.eyebrow}</span>
+              )}
+              <p className="t1-we-body">{personal_message}</p>
+              {venue?.name && <div className="t1-we-sig">— {venue.name}</div>}
+            </div>
+          </FadeUp>
+        </section>
+      )}
+
+      {/* ════════════════════════════════════════════
           HISTORIA / EXPERIENCE
       ════════════════════════════════════════════ */}
       {expShow && on('experience') && (
-        <section style={{ borderTop: '1px solid #181818' }}>
+        <section id="sec-experience" style={{ borderTop: '1px solid #181818' }}>
           <div className="t1-story">
             <FadeUp>
               <div className="t1-story-text">
@@ -432,6 +558,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       ════════════════════════════════════════════ */}
       {on('gallery') && galleryPhotos.length > 0 && (
         <FadeIn>
+          <div id="sec-gallery" />
           <Gallery photos={galleryPhotos} primary={primary} dark />
         </FadeIn>
       )}
@@ -440,7 +567,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           ESPACIOS / ZONES
       ════════════════════════════════════════════ */}
       {on('zones') && zonesShow.length > 0 && (
-        <section className="t1-sec">
+        <section id="sec-zones" className="t1-sec">
           <div className="w">
             <FadeUp>
               <span className="t1-label">Los espacios</span>
@@ -828,6 +955,41 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           </div>
         </section>
       )}
+
+      {/* ════════════════════════════════════════════
+          AGENDAR VISITA
+      ════════════════════════════════════════════ */}
+      {on('schedule_visit') && (() => {
+        const sv = (sec as any).schedule_visit ?? {}
+        const svUrl = sv.url
+        const svTitle = sv.title || 'Visitadnos en persona'
+        const svSub = sv.subtitle || 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
+        const svCta = sv.cta_label || 'Reservar visita gratuita →'
+        return (
+          <section id="sec-schedule" className="t1-sv">
+            <FadeUp>
+              <div className="t1-sv-inner">
+                <div className="t1-sv-icon">
+                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                </div>
+                <h2 className="t1-sv-title">{svTitle}</h2>
+                <p className="t1-sv-sub">{svSub}</p>
+                {svUrl
+                  ? <a className="t1-sv-btn" href={svUrl} target="_blank" rel="noopener">{svCta}</a>
+                  : contactOn && (
+                    <button className="t1-sv-btn" onClick={() => contact.phone ? window.open(waHref, '_blank') : scrollToContact()}>
+                      {svCta}
+                    </button>
+                  )
+                }
+                {sv.note && <div className="t1-sv-note">{sv.note}</div>}
+              </div>
+            </FadeUp>
+          </section>
+        )
+      })()}
 
       {/* ════════════════════════════════════════════
           MAPA

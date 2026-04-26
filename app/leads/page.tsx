@@ -3643,7 +3643,7 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
 
           {/* Actions row */}
           <div style={{ padding: '7px 14px 10px', background: 'var(--cream)', borderTop: '1px solid var(--ivory)' }}>
-            <QuickActions lead={lead} tab={tab} onMove={onMove} onEdit={onEdit} onDelete={onDelete} onDateConfirm={onDateConfirm} />
+            <QuickActions lead={lead} tab={tab} onMove={onMove} onEdit={onEdit} onDelete={onDelete} onDateConfirm={onDateConfirm} onPdfDigital={onPdfDigital} />
           </div>
         </div>
       </div>
@@ -3764,12 +3764,13 @@ function MoreMenu({ items }: { items: { label: string; icon: React.ReactNode; da
 }
 
 // ── Quick Actions ──────────────────────────────────────────────────────────────
-function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm }: {
+function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm, onPdfDigital }: {
   lead: any; tab: Tab
   onMove: (id: string, s: DbStatus) => void
   onEdit: (l: any) => void
   onDelete: (id: string) => void
   onDateConfirm: (lead: any, s: DbStatus) => void
+  onPdfDigital?: (lead: any) => void
 }) {
   const { propuestas: canProposal } = usePlanFeatures()
   const isPostVisit = lead.status === 'post_visit'
