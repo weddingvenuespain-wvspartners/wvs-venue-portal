@@ -338,7 +338,7 @@ export default function FichaPage() {
     setAccomNights(acf.accom_nights || '')
     setWvsAccomHelp(acf.wvs_accommodation_help === 'yes')
     setSpecificLocation(acf.Specific_Location || '')
-    setPlacesNearby(acf.Places_Nearby || '')
+    setPlacesNearby1(acf.Places_Nearby || '')
     setClosestAirport(acf.Closest_Airport_to_Venue || '')
     const hFields = ['h2_gallery','h2_gallery_copy','h2_gallery_copy2','h2_gallery_copy3',
                      'h2_gallery_copy4','h2_gallery_copy5','h2_gallery_copy6','h2_gallery_copy7']
