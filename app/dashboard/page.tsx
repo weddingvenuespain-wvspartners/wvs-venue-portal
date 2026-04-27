@@ -438,18 +438,18 @@ function VenueDashboard() {
           </div>
 
           {/* Quick actions */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
             {[
-              { href: '/leads?new=1', icon: <UserPlus size={18} />,    label: 'Nuevo lead',   sub: 'Añadir manualmente',       color: 'var(--gold)',  bg: '#fef9ec', border: '#f0d98a' },
-              { href: '/calendario',  icon: <CalendarDays size={18} />, label: 'Calendario',   sub: 'Ver disponibilidad',        color: '#3b82f6',     bg: '#eff6ff',  border: '#bfdbfe' },
-              { href: '/leads',       icon: <Users size={18} />,        label: 'Leads',        sub: 'Gestionar pipeline',        color: '#7c3aed',     bg: '#f5f3ff',  border: '#ddd6fe' },
-              { href: '/ficha',       icon: <TrendingUp size={18} />,   label: 'Editar ficha', sub: 'Info, fotos y precios',     color: '#be185d',     bg: '#fdf2f8',  border: '#fbcfe8' },
+              { href: '/leads?new=1', icon: <UserPlus size={16} />,    label: 'Nuevo lead',   sub: 'Añadir manualmente'   },
+              { href: '/calendario',  icon: <CalendarDays size={16} />, label: 'Calendario',   sub: 'Ver disponibilidad'   },
+              { href: '/leads',       icon: <Users size={16} />,        label: 'Leads',        sub: 'Gestionar pipeline'   },
+              { href: '/ficha',       icon: <TrendingUp size={16} />,   label: 'Editar ficha', sub: 'Info, fotos y precios'},
             ].map((item, i) => (
               <Link key={i} href={item.href}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: item.bg, border: `1px solid ${item.border}`, borderRadius: 12, textDecoration: 'none', transition: 'transform 0.1s' }}
-                onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
-                onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px', background: '#fff', border: '1px solid var(--border)', borderRadius: 10, textDecoration: 'none', transition: 'box-shadow 0.15s, border-color 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.07)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}>
+                <div style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>
                   {item.icon}
                 </div>
                 <div>
