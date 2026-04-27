@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import DatePicker from '@/components/DatePicker'
 import type { SectionsData, Menu, MenuCourse, MenuExtra, AppetizerGroup, MenuSeasonPrice } from '@/lib/proposal-types'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 const COCKTAIL_EXTRA_OPTIONS: Array<{ value: MenuExtra['category']; label: string }> = [
   { value: 'station', label: 'Estaciones / Buffets' },
@@ -227,11 +228,14 @@ export default function ProposalMenuEditor({
     <div key={i} style={extraCard}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         {showCategory && (
-          <select className="form-input" value={e.category}
-            onChange={ev => updateExtra(i, { category: ev.target.value as MenuExtra['category'] })}
-            style={{ width: 140, flexShrink: 0, fontSize: 12 }}>
-            {categoryOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          <div style={{ width: 140, flexShrink: 0 }}>
+            <Select value={e.category} onValueChange={(v) => updateExtra(i, { category: v as MenuExtra['category'] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {categoryOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         )}
         <input className="form-input" placeholder="Nombre" value={e.name}
           onChange={ev => updateExtra(i, { name: ev.target.value })} style={{ flex: 1 }} />
@@ -243,12 +247,13 @@ export default function ProposalMenuEditor({
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px 130px', gap: 6 }}>
         <input className="form-input" placeholder="Precio (ej. 25€)" value={e.price}
           onChange={ev => updateExtra(i, { price: ev.target.value })} />
-        <select className="form-input" value={e.price_type}
-          onChange={ev => updateExtra(i, { price_type: ev.target.value as MenuExtra['price_type'] })}
-          style={{ fontSize: 12 }}>
-          <option value="per_person">Por persona</option>
-          <option value="flat">Precio total</option>
-        </select>
+        <Select value={e.price_type} onValueChange={(v) => updateExtra(i, { price_type: v as MenuExtra['price_type'] })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="per_person">Por persona</SelectItem>
+            <SelectItem value="flat">Precio total</SelectItem>
+          </SelectContent>
+        </Select>
         <input className="form-input" type="number" min={0} placeholder="Mín. pax (opc.)"
           value={e.min_guests ?? ''}
           onChange={ev => updateExtra(i, { min_guests: ev.target.value ? parseInt(ev.target.value) : undefined })}
@@ -558,11 +563,14 @@ export default function ProposalMenuEditor({
                       <GripVertical size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
                       <input className="form-input" placeholder="Ej. Primer plato" value={c.label}
                         onChange={e => updateCourse(mi, ci, { label: e.target.value })} style={{ flex: 1 }} />
-                      <select className="form-input" value={c.mode ?? 'fixed'}
-                        onChange={e => updateCourse(mi, ci, { mode: e.target.value as MenuCourse['mode'] })}
-                        style={{ width: 160, flexShrink: 0 }}>
-                        {MODE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
+                      <div style={{ width: 160, flexShrink: 0 }}>
+                        <Select value={c.mode ?? 'fixed'} onValueChange={(v) => updateCourse(mi, ci, { mode: v as MenuCourse['mode'] })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {MODE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       {c.mode === 'pick_n' && (
                         <input className="form-input" type="number" min={1} placeholder="N"
                           value={c.pick_count ?? 1}

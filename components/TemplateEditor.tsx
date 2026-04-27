@@ -14,6 +14,9 @@ import ProposalMenuEditor from './ProposalMenuEditor'
 import SpaceGroupEditor from './SpaceGroupEditor'
 import MultipleZonesEditor from './MultipleZonesEditor'
 import { ImageUploader } from './ImageUploader'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   SECTION_STYLES,
   getActiveStyle,
@@ -547,10 +550,15 @@ export default function TemplateEditor({
               <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 7, marginBottom: 7, padding: '8px 10px', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
                   <div style={{ display: 'flex', gap: 5 }}>
-                    <select className="form-input" style={{ width: 160, fontSize: 11, flexShrink: 0 }} value={x.icon ?? ''} onChange={e => updateItem(overrideKey, i, 'icon', e.target.value)}>
-                      <option value="">— icono —</option>
-                      {INCLUSION_ICON_CHOICES.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                    </select>
+                    <div style={{ width: 160, flexShrink: 0 }}>
+                      <Select value={x.icon || '__none__'} onValueChange={(v) => updateItem(overrideKey, i, 'icon', v === '__none__' ? '' : v)}>
+                        <SelectTrigger><SelectValue placeholder="— icono —" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">— icono —</SelectItem>
+                          {INCLUSION_ICON_CHOICES.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <input className="form-input" placeholder="Título *" style={{ fontSize: 12 }} value={x.title ?? ''} onChange={e => updateItem(overrideKey, i, 'title', e.target.value)} />
                   </div>
                   <input className="form-input" placeholder="Descripción (opcional)" style={{ fontSize: 12 }} value={x.description ?? ''} onChange={e => updateItem(overrideKey, i, 'description', e.target.value)} />
@@ -620,7 +628,9 @@ export default function TemplateEditor({
                 <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', gap: 5 }}>
                     <input className="form-input" placeholder="Nombres pareja *" style={{ fontSize: 12 }} value={t.couple_name ?? ''} onChange={e => updateItem(overrideKey, i, 'couple_name', e.target.value)} />
-                    <input className="form-input" type="date" style={{ width: 145, flexShrink: 0, fontSize: 12 }} value={t.wedding_date ?? ''} onChange={e => updateItem(overrideKey, i, 'wedding_date', e.target.value)} />
+                    <div style={{ width: 165, flexShrink: 0 }}>
+                      <DatePicker value={t.wedding_date ?? ''} onChange={(v) => updateItem(overrideKey, i, 'wedding_date', v)} placeholder="Fecha" />
+                    </div>
                   </div>
                   <textarea className="form-textarea" style={{ minHeight: 70, fontSize: 12 }} placeholder="Testimonio…" value={t.text ?? ''} onChange={e => updateItem(overrideKey, i, 'text', e.target.value)} />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--warm-gray)' }}>
@@ -885,9 +895,8 @@ export default function TemplateEditor({
           {saved && <Check size={11} strokeWidth={2.5} />}
         </span>
         <div style={{ flex: 1 }} />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--warm-gray)', cursor: 'pointer', userSelect: 'none', marginRight: 16 }}>
-          <input type="checkbox" checked={isDefault} onChange={e => { setIsDefault(e.target.checked); markDirty() }}
-            style={{ accentColor: 'var(--gold)', width: 13, height: 13 }} />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--warm-gray)', cursor: 'pointer', userSelect: 'none', marginRight: 16 }}>
+          <Checkbox checked={isDefault} onCheckedChange={(v) => { setIsDefault(v === true); markDirty() }} />
           Por defecto
         </label>
         <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving || (!dirty && !saveError)} style={{ minWidth: 140 }}>

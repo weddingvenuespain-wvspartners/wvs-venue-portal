@@ -15,6 +15,7 @@ import ProposalDateModal from './ProposalDateModal'
 import { ImageUploader } from './ImageUploader'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
+import { Checkbox } from '@/components/ui/checkbox'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
 
@@ -474,10 +475,13 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               {leads.length > 0 && (
                 <div className="form-group">
                   <label className="form-label">Vincular a un lead (opcional)</label>
-                  <select className="form-input" value={form.lead_id} onChange={e => onLeadChange(e.target.value)}>
-                    <option value="">— Sin lead —</option>
-                    {leads.map(l => <option key={l.id} value={l.id}>{l.name}{l.guests ? ` · ${l.guests} inv.` : ''}</option>)}
-                  </select>
+                  <Select value={form.lead_id || '__none__'} onValueChange={(v) => onLeadChange(v === '__none__' ? '' : v)}>
+                    <SelectTrigger><SelectValue placeholder="— Sin lead —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— Sin lead —</SelectItem>
+                      {leads.map(l => <SelectItem key={l.id} value={l.id}>{l.name}{l.guests ? ` · ${l.guests} inv.` : ''}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 
@@ -553,7 +557,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               </div>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.show_availability} onChange={e => setForm(f => ({ ...f, show_availability: e.target.checked }))} />
+                <Checkbox checked={form.show_availability} onCheckedChange={(v) => setForm(f => ({ ...f, show_availability: v === true }))} />
                 Mostrar disponibilidad
               </label>
 
@@ -988,7 +992,9 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 6 }}>Fechas</div>
                                         {(slot.dates ?? []).map((d: string, di: number) => (
                                           <div key={di} style={{ display: 'flex', gap: 5, alignItems: 'center', marginBottom: 4 }}>
-                                            <input className="form-input" type="date" style={{ flex: 1 }} value={d} onChange={e => updateDate(i, di, e.target.value)} />
+                                            <div style={{ flex: 1 }}>
+                                              <DatePicker value={d} onChange={(v) => updateDate(i, di, v)} placeholder="Fecha" />
+                                            </div>
                                             <button type="button" style={removeBtn} onClick={() => removeDate(i, di)}><X size={11} /></button>
                                           </div>
                                         ))}
@@ -1168,14 +1174,18 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                         <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>Capacidades</div>
                                         {caps.map((c: any, ci: number) => (
                                           <div key={ci} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-                                            <select className="form-input" style={{ flex: 1 }} value={c.type ?? 'other'}
-                                              onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, type: e.target.value } : x))}>
-                                              <option value="ceremony">Ceremonia</option>
-                                              <option value="cocktail">Coctel</option>
-                                              <option value="banquet">Banquete</option>
-                                              <option value="party">Fiesta</option>
-                                              <option value="other">Otro</option>
-                                            </select>
+                                            <div style={{ flex: 1 }}>
+                                              <Select value={c.type ?? 'other'} onValueChange={(v) => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, type: v } : x))}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                  <SelectItem value="ceremony">Ceremonia</SelectItem>
+                                                  <SelectItem value="cocktail">Coctel</SelectItem>
+                                                  <SelectItem value="banquet">Banquete</SelectItem>
+                                                  <SelectItem value="party">Fiesta</SelectItem>
+                                                  <SelectItem value="other">Otro</SelectItem>
+                                                </SelectContent>
+                                              </Select>
+                                            </div>
                                             <input className="form-input" type="number" placeholder="pax" style={{ width: 80 }} value={c.count ?? ''}
                                               onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, count: e.target.value ? Number(e.target.value) : undefined } : x))} />
                                             <input className="form-input" placeholder="Etiqueta (opc.)" style={{ flex: 1 }} value={c.label ?? ''}
@@ -1189,21 +1199,26 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                         </button>
                                       </div>
 
-                                      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, color: 'var(--charcoal)' }}>
-                                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                                          <input type="checkbox" checked={!!z.climatized} onChange={e => updateOverrideItem(overrideKey, i, 'climatized', e.target.checked)} />
+                                      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: 'var(--charcoal)' }}>
+                                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                                          <Checkbox checked={!!z.climatized} onCheckedChange={(v) => updateOverrideItem(overrideKey, i, 'climatized', v === true)} />
                                           Climatizado
                                         </label>
-                                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                                          <input type="checkbox" checked={!!z.plan_b} onChange={e => updateOverrideItem(overrideKey, i, 'plan_b', e.target.checked)} />
+                                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                                          <Checkbox checked={!!z.plan_b} onCheckedChange={(v) => updateOverrideItem(overrideKey, i, 'plan_b', v === true)} />
                                           Plan B (cubierto)
                                         </label>
-                                        <select className="form-input" style={{ width: 170 }} value={z.covered ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'covered', e.target.value || undefined)}>
-                                          <option value="">— tipo —</option>
-                                          <option value="indoor">Interior</option>
-                                          <option value="outdoor">Exterior</option>
-                                          <option value="covered-outdoor">Exterior cubierto</option>
-                                        </select>
+                                        <div style={{ width: 170 }}>
+                                          <Select value={z.covered || '__none__'} onValueChange={(v) => updateOverrideItem(overrideKey, i, 'covered', v === '__none__' ? undefined : v)}>
+                                            <SelectTrigger><SelectValue placeholder="— tipo —" /></SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="__none__">— tipo —</SelectItem>
+                                              <SelectItem value="indoor">Interior</SelectItem>
+                                              <SelectItem value="outdoor">Exterior</SelectItem>
+                                              <SelectItem value="covered-outdoor">Exterior cubierto</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
                                       </div>
 
                                       <input className="form-input" placeholder="Notas adicionales (ej. *Opción haima +coste)" value={z.notes ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'notes', e.target.value)} />
@@ -1246,10 +1261,15 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                   </summary>
                                   <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
                                     <div style={{ display: 'flex', gap: 6 }}>
-                                      <select className="form-input" style={{ width: 200, flexShrink: 0 }} value={x.icon ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'icon', e.target.value)}>
-                                        <option value="">— icono —</option>
-                                        {INCLUSION_ICON_CHOICES.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                                      </select>
+                                      <div style={{ width: 200, flexShrink: 0 }}>
+                                        <Select value={x.icon || '__none__'} onValueChange={(v) => updateOverrideItem(overrideKey, i, 'icon', v === '__none__' ? '' : v)}>
+                                          <SelectTrigger><SelectValue placeholder="— icono —" /></SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="__none__">— icono —</SelectItem>
+                                            {INCLUSION_ICON_CHOICES.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
                                       <input className="form-input" placeholder="Título *" value={x.title ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'title', e.target.value)} />
                                     </div>
                                     <input className="form-input" placeholder="Descripción (opcional)" value={x.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
@@ -1516,7 +1536,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                         </div>
                                         <input className="form-input" placeholder="Descripción breve (opcional)" value={opt.description ?? ''} onChange={e => patchOpt({ description: e.target.value })} />
                                         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--charcoal)', cursor: 'pointer' }}>
-                                          <input type="checkbox" checked={!!opt.included} onChange={e => patchOpt({ included: e.target.checked })} />
+                                          <Checkbox checked={!!opt.included} onCheckedChange={(v) => patchOpt({ included: v === true })} />
                                           Incluido en la tarifa del venue
                                         </label>
                                         {!opt.included && (
