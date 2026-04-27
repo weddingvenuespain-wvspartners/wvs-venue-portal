@@ -1793,8 +1793,9 @@ function DateConfirmModal({
   // Load date rules from venue settings
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('venue_settings').select('date_rules').eq('user_id', userId).maybeSingle()
-      .then(({ data }) => {
+    ;(async () => {
+      try {
+        const { data } = await supabase.from('venue_settings').select('date_rules').eq('user_id', userId).maybeSingle()
         if (data?.date_rules) {
           setDateRules(data.date_rules)
           // Pre-fill buffer defaults from rules (0 | 0.5 | 1 — clamp anything >1 to 1)
@@ -1803,8 +1804,10 @@ function DateConfirmModal({
           setBlockBefore(db >= 1 ? 1 : db >= 0.5 ? 0.5 : 0)
           setBlockAfter( da >= 1 ? 1 : da >= 0.5 ? 0.5 : 0)
         }
-      })
-      .catch((err: any) => console.error('[DateConfirmModal] date_rules fetch error', err))
+      } catch (err: any) {
+        console.error('[DateConfirmModal] date_rules fetch error', err)
+      }
+    })()
   }, [userId])
 
   // Set default duration from venue rules — rules always govern the default
