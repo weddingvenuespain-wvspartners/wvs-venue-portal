@@ -497,20 +497,20 @@ export default function CalendarioPage() {
 
             {/* Lead search */}
             <div style={{ position: 'relative' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#faf8f5', border: '1px solid var(--ivory)', borderRadius: 8, padding: '5px 10px' }}>
-                <Search size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#faf8f5', border: '1px solid var(--ivory)', borderRadius: 6, padding: '0 12px', minHeight: 40, boxSizing: 'border-box' }}>
+                <Search size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
                 <input
                   value={leadSearch}
                   onChange={e => { setLeadSearch(e.target.value); setSearchOpen(true) }}
                   onFocus={() => setSearchOpen(true)}
                   onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
                   placeholder="Buscar pareja…"
-                  style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, width: 150, color: 'var(--charcoal)' }}
+                  style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, width: 160, color: 'var(--charcoal)', height: '100%' }}
                 />
                 {leadSearch && (
                   <button type="button" onClick={() => { setLeadSearch(''); setLeadSearchResults([]) }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 0, display: 'flex' }}>
-                    <X size={12} />
+                    <X size={13} />
                   </button>
                 )}
               </div>
@@ -572,10 +572,10 @@ export default function CalendarioPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <button className="btn btn-primary btn-sm" onClick={applyBulk} disabled={saving || bulkDates.size === 0}>
+                <button className="btn btn-primary" onClick={applyBulk} disabled={saving || bulkDates.size === 0}>
                   {saving ? 'Guardando...' : 'Aplicar al rango'}
                 </button>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setBulkMode(false); setBulkDates(new Set()); setBulkStart(null); wasDragBulkRef.current = false }}>
+                <button className="btn btn-ghost" onClick={() => { setBulkMode(false); setBulkDates(new Set()); setBulkStart(null); wasDragBulkRef.current = false }}>
                   Cancelar
                 </button>
               </>

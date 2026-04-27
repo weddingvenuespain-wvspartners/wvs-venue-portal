@@ -87,8 +87,8 @@
 .stat-sub { font-size: 11px; color: var(--warm-gray); margin-top: 5px; }
 .stat-sub.warn { color: var(--gold); }
 
-/* ── Buttons ────────────────────────────────────────────── */
-.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 12.5px; font-weight: 500; cursor: pointer; transition: all 0.15s; border: none; text-decoration: none; font-family: 'Manrope', sans-serif; white-space: nowrap; }
+/* ── Buttons — alineado con shadcn (h-10 = 40px) ──────────── */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; min-height: 40px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; border: none; text-decoration: none; font-family: 'Manrope', sans-serif; white-space: nowrap; }
 .btn-primary { background: var(--gold); color: #fff; }
 .btn-primary:hover { background: #b8894f; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -96,7 +96,7 @@
 .btn-ghost:hover { background: var(--ivory); }
 .btn-danger { background: transparent; border: 1px solid #fca5a5; color: #dc2626; }
 .btn-danger:hover { background: #fef2f2; }
-.btn-sm { padding: 8px 16px; font-size: 12.5px; }
+.btn-sm { padding: 0 12px; min-height: 36px; font-size: 12.5px; }
 
 /* ── Quick-action buttons (leads pipeline) ─────────────── */
 .qa { display: inline-flex; align-items: center; gap: 5px; padding: 5px 13px; border-radius: 20px; cursor: pointer; font-size: 11px; font-weight: 600; white-space: nowrap; transition: all 0.15s; text-decoration: none; font-family: 'Manrope', sans-serif; line-height: 1.4; min-height: 28px; box-sizing: border-box; }
@@ -114,9 +114,9 @@
 /* ── Forms ──────────────────────────────────────────────── */
 .form-group { margin-bottom: 16px; }
 .form-label { display: block; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 6px; }
-.form-input { width: 100%; padding: 8px 12px; border: 1px solid var(--ivory); border-radius: 8px; font-size: 12.5px; font-family: 'Manrope', sans-serif; background: #fff; color: var(--charcoal); transition: all 0.15s; outline: none; }
+.form-input { width: 100%; min-height: 40px; padding: 8px 12px; border: 1px solid var(--ivory); border-radius: 6px; font-size: 13px; font-family: 'Manrope', sans-serif; background: #fff; color: var(--charcoal); transition: all 0.15s; outline: none; }
 .form-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(196,151,90,0.1); }
-.form-textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--ivory); border-radius: 8px; font-size: 12.5px; font-family: 'Manrope', sans-serif; background: #fff; color: var(--charcoal); resize: vertical; outline: none; transition: all 0.15s; }
+.form-textarea { width: 100%; min-height: 80px; padding: 10px 12px; border: 1px solid var(--ivory); border-radius: 6px; font-size: 13px; font-family: 'Manrope', sans-serif; background: #fff; color: var(--charcoal); resize: vertical; outline: none; transition: all 0.15s; }
 .form-textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(196,151,90,0.1); }
 select.form-input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A7F76' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px; cursor: pointer; }
 select.form-input option { font-family: 'Manrope', sans-serif; font-size: 12.5px; padding: 8px 12px; background: #fff; color: var(--charcoal); }

@@ -18,18 +18,12 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
       className={cn("p-3", className)}
       classNames={{
         months: "flex flex-col sm:flex-row gap-2",
-        month: "flex flex-col gap-4",
-        month_caption: "flex justify-center pt-1 relative items-center w-full",
+        month: "flex flex-col gap-4 relative",
+        month_caption: "flex justify-center pt-1 items-center w-full h-9",
         caption_label: "text-sm font-medium",
-        nav: "flex items-center gap-1 absolute right-1 top-1",
-        button_previous: cn(
-          buttonVariants({ variant: "outline" }),
-          "size-7 bg-transparent p-0 opacity-60 hover:opacity-100"
-        ),
-        button_next: cn(
-          buttonVariants({ variant: "outline" }),
-          "size-7 bg-transparent p-0 opacity-60 hover:opacity-100"
-        ),
+        nav: "absolute right-1 top-1 z-10 flex items-center gap-1",
+        button_previous: "inline-flex h-7 w-7 items-center justify-center rounded-md border border-input bg-transparent text-foreground opacity-60 hover:opacity-100 hover:bg-accent hover:text-accent-foreground transition-colors disabled:pointer-events-none disabled:opacity-30 [&_svg]:pointer-events-none",
+        button_next: "inline-flex h-7 w-7 items-center justify-center rounded-md border border-input bg-transparent text-foreground opacity-60 hover:opacity-100 hover:bg-accent hover:text-accent-foreground transition-colors disabled:pointer-events-none disabled:opacity-30 [&_svg]:pointer-events-none",
         month_grid: "w-full border-collapse space-x-1",
         weekdays: "flex",
         weekday: "text-muted-foreground rounded-md w-8 font-normal text-[0.8rem]",
