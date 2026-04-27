@@ -10,6 +10,8 @@ import { type BillingCycle, EMPTY_CYCLE, CYCLE_PRESETS } from '@/lib/billing-typ
 
 // ─── Feature definitions (imported from lib) ─────────────────────────────────
 import { FEATURE_DEFS, BASIC_FALLBACK, PREMIUM_FALLBACK } from '@/lib/use-plan-features'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 
 const PERMISSIONS_BASIC   = BASIC_FALLBACK
 const PERMISSIONS_PREMIUM = PREMIUM_FALLBACK
@@ -141,8 +143,7 @@ function FeatureRow({ def, checked, onChange }: { def: import('@/lib/use-plan-fe
       background: checked ? (isRestriction ? '#fff5f5' : isPremium ? '#fef9ec' : '#f0fdf4') : '#f8f8f8',
       border: `1px solid ${checked ? (isRestriction ? '#fca5a5' : isPremium ? '#fde68a' : '#bbf7d0') : 'var(--ivory)'}`,
     }}>
-      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
-        style={{ marginTop: 2, width: 15, height: 15, accentColor: isRestriction ? '#dc2626' : 'var(--gold)', flexShrink: 0 }} />
+      <Checkbox checked={checked} onCheckedChange={(v) => onChange(v === true)} className="mt-0.5 shrink-0" />
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--espresso)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {def.label}
@@ -449,12 +450,7 @@ export default function PlanesPage() {
 
                 {/* Master toggle — big and clear */}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none', padding: '8px 14px', borderRadius: 8, background: trialConfig.is_active ? '#f0fdf4' : '#f9fafb', border: `1px solid ${trialConfig.is_active ? '#bbf7d0' : 'var(--ivory)'}` }}>
-                  <input
-                    type="checkbox"
-                    checked={trialConfig.is_active}
-                    onChange={e => setTrialConfig(c => ({ ...c, is_active: e.target.checked }))}
-                    style={{ width: 15, height: 15, accentColor: '#16a34a' }}
-                  />
+                  <Checkbox checked={trialConfig.is_active} onCheckedChange={(v) => setTrialConfig(c => ({ ...c, is_active: v === true }))} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: trialConfig.is_active ? '#15803d' : 'var(--warm-gray)' }}>
                     {trialConfig.is_active ? 'Activo' : 'Inactivo'}
                   </span>
@@ -701,20 +697,20 @@ export default function PlanesPage() {
               {/* Tipo de usuario */}
               <div className="form-group" style={{ marginTop: 4 }}>
                 <label className="form-label">Tipo de usuario</label>
-                <select className="form-input" value={form.target_role}
-                  onChange={e => setForm(f => ({ ...f, target_role: e.target.value as TargetRole }))}>
-                  <option value="venue_owner">Venue / Finca</option>
-                  <option value="wedding_planner">Wedding Planner</option>
-                  <option value="catering">Catering</option>
-                </select>
+                <Select value={form.target_role} onValueChange={(v) => setForm(f => ({ ...f, target_role: v as TargetRole }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="venue_owner">Venue / Finca</SelectItem>
+                    <SelectItem value="wedding_planner">Wedding Planner</SelectItem>
+                    <SelectItem value="catering">Catering</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Estado y visibilidad */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, background: form.is_active ? '#f0fdf4' : '#f9fafb', border: `1px solid ${form.is_active ? '#bbf7d0' : 'var(--ivory)'}`, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={form.is_active}
-                    onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
-                    style={{ width: 15, height: 15, accentColor: '#16a34a' }} />
+                  <Checkbox checked={form.is_active} onCheckedChange={(v) => setForm(f => ({ ...f, is_active: v === true }))} />
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: form.is_active ? '#16a34a' : 'var(--warm-gray)' }}>
                       Plan activo
@@ -723,9 +719,7 @@ export default function PlanesPage() {
                   </div>
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, background: form.visible_on_web ? '#f0f9ff' : '#f9fafb', border: `1px solid ${form.visible_on_web ? '#bae6fd' : 'var(--ivory)'}`, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={form.visible_on_web}
-                    onChange={e => setForm(f => ({ ...f, visible_on_web: e.target.checked }))}
-                    style={{ width: 15, height: 15, accentColor: '#0369a1' }} />
+                  <Checkbox checked={form.visible_on_web} onCheckedChange={(v) => setForm(f => ({ ...f, visible_on_web: v === true }))} />
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: form.visible_on_web ? '#0369a1' : 'var(--warm-gray)' }}>
                       Visible en web
@@ -823,11 +817,10 @@ export default function PlanesPage() {
 
                         {/* Section header = master toggle */}
                         <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: bgColor, userSelect: 'none' }}>
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={masterOn}
-                            onChange={e => toggleSection(section.masterKey, section.subFeatures, e.target.checked)}
-                            style={{ width: 15, height: 15, accentColor: isPremium ? 'var(--gold)' : '#16a34a', flexShrink: 0, marginTop: 1 }}
+                            onCheckedChange={(v) => toggleSection(section.masterKey, section.subFeatures, v === true)}
+                            className="mt-0.5 shrink-0"
                           />
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', display: 'flex', alignItems: 'center', gap: 6 }}>

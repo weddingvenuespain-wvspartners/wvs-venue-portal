@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { Search, Building2, MapPin, Send, X, Heart } from 'lucide-react'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 const VENUE_TYPES = ['Todos', 'Finca', 'Hotel', 'Castillo / Palacio', 'Jardín / Exterior', 'Masía', 'Otro']
 
@@ -179,9 +180,14 @@ export default function VenueSearchPage() {
             <MapPin size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
             <input placeholder="Ciudad..." value={cityFilter} onChange={e => setCityFilter(e.target.value)} style={{ ...inputSt, paddingLeft: 30 }} />
           </div>
-          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ ...inputSt, flex: '0 1 180px', paddingLeft: 12 }}>
-            {VENUE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <div style={{ flex: '0 1 180px' }}>
+            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {VENUE_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {dataLoading ? (
@@ -318,10 +324,13 @@ export default function VenueSearchPage() {
 
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 6 }}>Para qué pareja *</label>
-              <select value={selectedClient} onChange={e => setSelectedClient(e.target.value)} style={{ ...inputSt, background: 'var(--cream)' }}>
-                <option value="">Selecciona una pareja</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <Select value={selectedClient || '__none__'} onValueChange={(v) => setSelectedClient(v === '__none__' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecciona una pareja" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Selecciona una pareja</SelectItem>
+                  {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
 
             <div style={{ marginBottom: 24 }}>

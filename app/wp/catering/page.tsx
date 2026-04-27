@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { Search, UtensilsCrossed, MapPin, Send, X } from 'lucide-react'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 export default function CateringSearchPage() {
   const router = useRouter()
@@ -240,11 +241,13 @@ export default function CateringSearchPage() {
 
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 6 }}>Para qué pareja *</label>
-              <select value={selectedClient} onChange={e => setSelectedClient(e.target.value)}
-                style={{ ...inputSt, background: 'var(--cream)' }}>
-                <option value="">Selecciona una pareja</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <Select value={selectedClient || '__none__'} onValueChange={(v) => setSelectedClient(v === '__none__' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecciona una pareja" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Selecciona una pareja</SelectItem>
+                  {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
 
             <div style={{ marginBottom: 24 }}>

@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Search, Plus, X, Check, Edit2, ExternalLink, RefreshCw,
   AlertTriangle, CreditCard, UserPlus, Mail, Building2, History,
@@ -221,28 +224,31 @@ function CreateUserModal({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div className="form-group">
                 <label className="form-label">Plan</label>
-                <select className="form-input" value={form.plan_id} onChange={e => set('plan_id', e.target.value)}>
-                  <option value="">Sin plan ahora</option>
-                  {plans.filter(p => p.is_active).map(p => (
-                    <option key={p.id} value={p.id}>
-                      {planLabel(p)} — {p.name === 'basic' ? 'Básico' : 'Premium'}
-                    </option>
-                  ))}
-                </select>
+                <Select value={form.plan_id || '__none__'} onValueChange={(v) => set('plan_id', v === '__none__' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Sin plan ahora" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sin plan ahora</SelectItem>
+                    {plans.filter(p => p.is_active).map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {planLabel(p)} — {p.name === 'basic' ? 'Básico' : 'Premium'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="form-group">
                 <label className="form-label">Ciclo de pago</label>
-                <select className="form-input" value={form.billing_cycle}
-                  onChange={e => set('billing_cycle', e.target.value)}
-                  disabled={!form.plan_id}>
-                  {!form.plan_id && <option value="">Elige plan primero</option>}
-                  {(selectedPlan?.billing_cycles ?? []).map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.label} — {c.price}€
-                      {c.commitment_months > 0 ? ` (${c.commitment_months}m compromiso)` : ''}
-                    </option>
-                  ))}
-                </select>
+                <Select value={form.billing_cycle || '__none__'} onValueChange={(v) => set('billing_cycle', v === '__none__' ? '' : v)} disabled={!form.plan_id}>
+                  <SelectTrigger><SelectValue placeholder={!form.plan_id ? 'Elige plan primero' : 'Selecciona ciclo'} /></SelectTrigger>
+                  <SelectContent>
+                    {!form.plan_id && <SelectItem value="__none__">Elige plan primero</SelectItem>}
+                    {(selectedPlan?.billing_cycles ?? []).map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.label} — {c.price}€{c.commitment_months > 0 ? ` (${c.commitment_months}m compromiso)` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -250,9 +256,7 @@ function CreateUserModal({
             {form.plan_id && (
               <div style={{ background: 'var(--cream)', borderRadius: 8, padding: '12px 14px', marginTop: 4 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={form.start_trial}
-                    onChange={e => set('start_trial', e.target.checked)}
-                    style={{ width: 16, height: 16, accentColor: 'var(--gold)' }} />
+                  <Checkbox checked={form.start_trial} onCheckedChange={(v) => set('start_trial', v === true)} />
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>Iniciar trial gratuito</div>
                     <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
@@ -1024,8 +1028,7 @@ function UserPanel({
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
                       <label className="form-label" style={{ color: '#92400e' }}>Fecha inicio</label>
-                      <input className="form-input" type="date" value={migrateStartDate}
-                        onChange={e => setMigrateStartDate(e.target.value)} />
+                      <DatePicker value={migrateStartDate} onChange={(v) => setMigrateStartDate(v)} placeholder="Fecha inicio" />
                     </div>
                   </div>
 
@@ -1171,8 +1174,7 @@ function UserPanel({
                 </div>
                 <div className="form-group">
                   <label className="form-label">Fecha inicio</label>
-                  <input className="form-input" type="date" value={subForm.start_date}
-                    onChange={e => setSubForm(f => ({ ...f, start_date: e.target.value }))} />
+                  <DatePicker value={subForm.start_date} onChange={(v) => setSubForm(f => ({ ...f, start_date: v }))} placeholder="Fecha inicio" />
                 </div>
 
                 {/* Trial end — si status=trial (editable) o trial_expired (solo lectura) */}
@@ -1192,10 +1194,12 @@ function UserPanel({
                         </span>
                       )}
                     </label>
-                    <input className="form-input" type="date" value={subForm.trial_end_date}
-                      readOnly={subForm.status === 'trial_expired'}
-                      style={subForm.status === 'trial_expired' ? { background: '#fee2e2', color: '#c0392b', cursor: 'default' } : {}}
-                      onChange={e => subForm.status === 'trial' && setSubForm(f => ({ ...f, trial_end_date: e.target.value }))} />
+                    <DatePicker
+                      value={subForm.trial_end_date}
+                      disabled={subForm.status === 'trial_expired'}
+                      onChange={(v) => subForm.status === 'trial' && setSubForm(f => ({ ...f, trial_end_date: v }))}
+                      placeholder="Fin del trial"
+                    />
                     {subForm.trial_end_date && (() => {
                       const d = trialDaysLeft(subForm.trial_end_date)
                       return <div style={{ fontSize: 10, color: subForm.status === 'trial_expired' ? '#c0392b' : '#b45309', marginTop: 3 }}>
@@ -1213,8 +1217,7 @@ function UserPanel({
                     <label className="form-label">
                       {subForm.cancel_at_period_end ? <><Calendar size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Fecha de fin de servicio</> : 'Próxima renovación / cobro'}
                     </label>
-                    <input className="form-input" type="date" value={subForm.renewal_date}
-                      onChange={e => setSubForm(f => ({ ...f, renewal_date: e.target.value }))} />
+                    <DatePicker value={subForm.renewal_date} onChange={(v) => setSubForm(f => ({ ...f, renewal_date: v }))} placeholder="Fecha de renovación" />
                     {subForm.renewal_date && !subForm.cancel_at_period_end && activeCycle && (() => {
                       const deadline = cancelDeadline(subForm.renewal_date, activeCycle.cancel_notice_days)
                       return (
@@ -1274,9 +1277,7 @@ function UserPanel({
                     Renovación y cancelación
                   </div>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 8, padding: '10px 12px', borderRadius: 8, background: subForm.cancel_at_period_end ? '#fff5f5' : '#f9fafb', border: `1px solid ${subForm.cancel_at_period_end ? '#fecaca' : 'var(--ivory)'}` }}>
-                    <input type="checkbox" checked={subForm.cancel_at_period_end}
-                      onChange={e => setSubForm(f => ({ ...f, cancel_at_period_end: e.target.checked }))}
-                      style={{ width: 15, height: 15, accentColor: '#c0392b' }} />
+                    <Checkbox checked={subForm.cancel_at_period_end} onCheckedChange={(v) => setSubForm(f => ({ ...f, cancel_at_period_end: v === true }))} />
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 500, color: subForm.cancel_at_period_end ? '#c0392b' : 'var(--charcoal)' }}>
                         Sin renovación automática

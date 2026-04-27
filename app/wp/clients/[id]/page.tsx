@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import {
   Heart, Building2, UtensilsCrossed, FileText, ChevronLeft, Calendar, Users,
   Trash2, CheckCircle, ExternalLink, Send, Copy, Lock, Search, MapPin, X, Plus, MessageSquare,
@@ -204,9 +205,14 @@ function SearchProviderModal({
             <input placeholder="Ciudad…" value={cityFilter} onChange={e => setCityFilter(e.target.value)} style={{ ...inputSt, paddingLeft: 28 }} />
           </div>
           {mode === 'venue' && (
-            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ ...inputSt, flex: '0 1 160px' }}>
-              {VENUE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <div style={{ flex: '0 1 160px' }}>
+              <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {VENUE_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           )}
         </div>
 
@@ -618,13 +624,15 @@ export default function ClientDetailPage() {
                         <div style={{ padding: '14px 18px 16px', borderTop: '1px solid var(--ivory)', background: '#faf9f7', display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 10, alignItems: 'end' }}>
                           <div>
                             <label style={{ display: 'block', fontSize: 11, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 5 }}>Estado</label>
-                            <select value={editStatus[v.id] || status} onChange={e => setEditStatus(prev => ({ ...prev, [v.id]: e.target.value }))}
-                              style={{ width: '100%', padding: '7px 10px', borderRadius: 7, border: '1px solid var(--ivory)', background: '#fff', fontSize: 12, fontFamily: 'Manrope, sans-serif', color: 'var(--charcoal)', outline: 'none' }}>
-                              <option value="pending">Sin solicitar</option>
-                              <option value="requested">Solicitado</option>
-                              <option value="available">Disponible</option>
-                              <option value="unavailable">No disponible</option>
-                            </select>
+                            <Select value={editStatus[v.id] || status} onValueChange={(val) => setEditStatus(prev => ({ ...prev, [v.id]: val }))}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Sin solicitar</SelectItem>
+                                <SelectItem value="requested">Solicitado</SelectItem>
+                                <SelectItem value="available">Disponible</SelectItem>
+                                <SelectItem value="unavailable">No disponible</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                           <div>
                             <label style={{ display: 'block', fontSize: 11, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 5 }}>Enlace presupuesto / propuesta</label>
@@ -702,13 +710,15 @@ export default function ClientDetailPage() {
                         <div style={{ padding: '14px 18px 16px', borderTop: '1px solid var(--ivory)', background: '#faf9f7', display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 10, alignItems: 'end' }}>
                           <div>
                             <label style={{ display: 'block', fontSize: 11, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 5 }}>Estado</label>
-                            <select value={editStatus[c.id] || status} onChange={e => setEditStatus(prev => ({ ...prev, [c.id]: e.target.value }))}
-                              style={{ width: '100%', padding: '7px 10px', borderRadius: 7, border: '1px solid var(--ivory)', background: '#fff', fontSize: 12, fontFamily: 'Manrope, sans-serif', color: 'var(--charcoal)', outline: 'none' }}>
-                              <option value="pending">Sin solicitar</option>
-                              <option value="requested">Solicitado</option>
-                              <option value="available">Disponible</option>
-                              <option value="unavailable">No disponible</option>
-                            </select>
+                            <Select value={editStatus[c.id] || status} onValueChange={(val) => setEditStatus(prev => ({ ...prev, [c.id]: val }))}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Sin solicitar</SelectItem>
+                                <SelectItem value="requested">Solicitado</SelectItem>
+                                <SelectItem value="available">Disponible</SelectItem>
+                                <SelectItem value="unavailable">No disponible</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                           <div>
                             <label style={{ display: 'block', fontSize: 11, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 5 }}>Enlace presupuesto / propuesta</label>

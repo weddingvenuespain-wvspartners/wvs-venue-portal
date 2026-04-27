@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { Heart, Plus, Search, ChevronRight, Building2, Calendar, Users, Send, Eye, FileText, X, Trash2 } from 'lucide-react'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { DatePicker as ShadcnDatePicker } from '@/components/ui/date-picker'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -153,8 +155,7 @@ function DatePicker({ form, set, inputSt }: { form: ReturnType<typeof emptyForm>
 
       {/* EXACT */}
       {form.date_flexibility === 'exact' && (
-        <input type="date" value={form.wedding_date} onChange={e => set('wedding_date', e.target.value)}
-          style={inputSt} />
+        <ShadcnDatePicker value={form.wedding_date} onChange={(v) => set('wedding_date', v)} placeholder="Fecha de boda" />
       )}
 
       {/* RANGE */}
@@ -162,11 +163,11 @@ function DatePicker({ form, set, inputSt }: { form: ReturnType<typeof emptyForm>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div>
             <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Desde</div>
-            <input type="date" value={form.wedding_date} onChange={e => set('wedding_date', e.target.value)} style={inputSt} />
+            <ShadcnDatePicker value={form.wedding_date} onChange={(v) => set('wedding_date', v)} placeholder="Desde" />
           </div>
           <div>
             <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Hasta</div>
-            <input type="date" value={form.wedding_date_to} onChange={e => set('wedding_date_to', e.target.value)} min={form.wedding_date || undefined} style={inputSt} />
+            <ShadcnDatePicker value={form.wedding_date_to} onChange={(v) => set('wedding_date_to', v)} placeholder="Hasta" disabledDays={form.wedding_date ? { before: new Date(form.wedding_date + 'T12:00:00') } : undefined} />
           </div>
         </div>
       )}
@@ -177,9 +178,13 @@ function DatePicker({ form, set, inputSt }: { form: ReturnType<typeof emptyForm>
           {form.wedding_date_ranges.map((r, i) => (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <span style={{ fontSize: 11, color: 'var(--warm-gray)', flexShrink: 0, minWidth: 56 }}>Opción {i + 1}</span>
-              <input type="date" value={r.from} onChange={e => updateRange(i, 'from', e.target.value)} style={{ ...inputSt, flex: 1 }} />
+              <div style={{ flex: 1 }}>
+                <ShadcnDatePicker value={r.from} onChange={(v) => updateRange(i, 'from', v)} placeholder="Desde" />
+              </div>
               <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>–</span>
-              <input type="date" value={r.to} onChange={e => updateRange(i, 'to', e.target.value)} min={r.from || undefined} style={{ ...inputSt, flex: 1 }} />
+              <div style={{ flex: 1 }}>
+                <ShadcnDatePicker value={r.to} onChange={(v) => updateRange(i, 'to', v)} placeholder="Hasta" disabledDays={r.from ? { before: new Date(r.from + 'T12:00:00') } : undefined} />
+              </div>
               <button type="button" onClick={() => removeRange(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4, display: 'flex', alignItems: 'center' }}>
                 <Trash2 size={13} />
               </button>
@@ -195,12 +200,16 @@ function DatePicker({ form, set, inputSt }: { form: ReturnType<typeof emptyForm>
       {/* MONTH */}
       {form.date_flexibility === 'month' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10 }}>
-          <select value={form.wedding_month} onChange={e => set('wedding_month', e.target.value)} style={inputSt}>
-            {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-          </select>
-          <select value={form.wedding_year} onChange={e => set('wedding_year', e.target.value)} style={{ ...inputSt, width: 110 }}>
-            {YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <Select value={String(form.wedding_month)} onValueChange={(v) => set('wedding_month', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent>
+          </Select>
+          <div style={{ width: 110 }}>
+            <Select value={String(form.wedding_year)} onValueChange={(v) => set('wedding_year', v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{YEAR_OPTS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
         </div>
       )}
 
@@ -216,9 +225,12 @@ function DatePicker({ form, set, inputSt }: { form: ReturnType<typeof emptyForm>
               </button>
             )
           })}
-          <select value={form.wedding_year} onChange={e => set('wedding_year', e.target.value)} style={{ ...inputSt, width: 110 }}>
-            {YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <div style={{ width: 110 }}>
+            <Select value={String(form.wedding_year)} onValueChange={(v) => set('wedding_year', v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{YEAR_OPTS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
         </div>
       )}
 
@@ -527,9 +539,12 @@ export default function ClientsPage() {
               {/* Tipo de ceremonia */}
               <div>
                 <label style={labelSt}>Tipo de ceremonia</label>
-                <select value={form.ceremony_type} onChange={e => set('ceremony_type', e.target.value)} style={inputSt}>
-                  {CEREMONY_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
+                <Select value={form.ceremony_type} onValueChange={(v) => set('ceremony_type', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CEREMONY_OPTS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Idioma */}
@@ -541,10 +556,13 @@ export default function ClientsPage() {
               {/* Presupuesto */}
               <div>
                 <label style={labelSt}>Presupuesto orientativo *</label>
-                <select value={form.budget} onChange={e => set('budget', e.target.value)} style={inputSt}>
-                  <option value="">Selecciona un rango</option>
-                  {BUDGET_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
+                <Select value={form.budget || '__none__'} onValueChange={(v) => set('budget', v === '__none__' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecciona un rango" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Selecciona un rango</SelectItem>
+                    {BUDGET_OPTS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Notas internas */}
