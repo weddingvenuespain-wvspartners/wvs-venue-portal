@@ -436,10 +436,23 @@ export default function EstructuraPage() {
     setLoading(false)
   }
 
+  const saveSettings = async (patch: Record<string, unknown>) => {
+    const res = await fetch('/api/estructura/save-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      console.error('[saveSettings]', json.error)
+      return false
+    }
+    return true
+  }
+
   const saveCommercialConfig = async (cfg: CommercialConfig) => {
     setConfigSaving(true)
-    const supabase = createClient()
-    await supabase.from('venue_settings').upsert({ user_id: user!.id, commercial_config: cfg }, { onConflict: 'user_id' })
+    await saveSettings({ commercial_config: cfg })
     setCommercialConfig(cfg)
     setConfigSaving(false)
     setConfigWizardOpen(false)
@@ -447,17 +460,14 @@ export default function EstructuraPage() {
 
   const saveZonesSupplements = async (newZones: ZoneItem[], newSupps: SupplementItem[]) => {
     setSavingZS(true)
-    const supabase = createClient()
-    await supabase.from('venue_settings').upsert({ user_id: user!.id, zones: newZones, supplements: newSupps }, { onConflict: 'user_id' })
+    await saveSettings({ zones: newZones, supplements: newSupps })
     setSavingZS(false)
   }
 
   const saveVisitAvail = async (va: VisitAvailability) => {
     setSavingVisit(true)
-    const supabase = createClient()
-    const { error } = await supabase.from('venue_settings').upsert({ user_id: user!.id, visit_availability: va }, { onConflict: 'user_id' })
-    if (error) console.error('[saveVisitAvail]', error)
-    else setVisitAvailDirty(false)
+    const ok = await saveSettings({ visit_availability: va })
+    if (ok) setVisitAvailDirty(false)
     setSavingVisit(false)
   }
 

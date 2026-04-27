@@ -6100,7 +6100,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 7, background: '#f5f0ea', border: '1px solid var(--ivory)', marginTop: 8 }}>
                       <Clock size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>Guardado:</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>Fecha guardada actualmente:</span>
                       <span style={{ fontSize: 12, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{txt}</span>
                     </div>
                   )
