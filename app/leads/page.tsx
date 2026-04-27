@@ -17,6 +17,7 @@ import {
   AlertTriangle, PartyPopper, Snowflake, Sparkles, Eye, Landmark, XCircle,
   Sprout, Sun, Leaf, Zap, LockKeyhole, OctagonAlert, Flower2, Info,
   List, LayoutGrid, Receipt, ChevronDown, ChevronUp, Paperclip, Upload, CheckCircle2, CalendarDays,
+  CalendarCheck, Timer,
 } from 'lucide-react'
 
 // ── Types & config ─────────────────────────────────────────────────────────────
@@ -361,9 +362,10 @@ export default function LeadsPage() {
   const [returnToEditAfterVisit, setReturnToEditAfterVisit] = useState(false)
   const [returnToCalendarDate,  setReturnToCalendarDate]  = useState<string | null>(null)
   const [visitSubFilter, setVisitSubFilter] = useState<'all' | 'scheduled' | 'post'>('all')
-  const [dateConfirmLead,   setDateConfirmLead]   = useState<any | null>(null)
-  const [dateConfirmStatus, setDateConfirmStatus] = useState<DbStatus | null>(null)
-  const [dateConfirmKey,    setDateConfirmKey]    = useState(0)
+  const [dateConfirmLead,    setDateConfirmLead]    = useState<any | null>(null)
+  const [dateConfirmStatus,  setDateConfirmStatus]  = useState<DbStatus | null>(null)
+  const [dateConfirmIsVisit, setDateConfirmIsVisit] = useState(false)
+  const [dateConfirmKey,     setDateConfirmKey]     = useState(0)
   const [pdfDigitalLead,    setPdfDigitalLead]    = useState<any | null>(null)
   const [pdfDigitalKey,     setPdfDigitalKey]     = useState(0)
   const [cancelVisitConfirm, setCancelVisitConfirm] = useState<{
@@ -1389,6 +1391,7 @@ export default function LeadsPage() {
             setShowForm(false)
             setDateConfirmLead(editLead)
             setDateConfirmStatus('visit_scheduled')
+            setDateConfirmIsVisit(true)
             setDateConfirmKey(k => k + 1)
           }}
           onDeleteVisit={async () => {
@@ -1417,8 +1420,8 @@ export default function LeadsPage() {
             setReturnToEditAfterDates(true)
             setShowForm(false)
             setDateConfirmLead(editLead)
-            // Preserve current status — don't downgrade to 'contacted'
             setDateConfirmStatus(editLead.status)
+            setDateConfirmIsVisit(false)
             setDateConfirmKey(k => k + 1)
           }}
           onChangeBudgetDates={() => {
@@ -1427,12 +1430,13 @@ export default function LeadsPage() {
             setShowForm(false)
             setDateConfirmLead(editLead)
             setDateConfirmStatus('budget_sent')
+            setDateConfirmIsVisit(false)
             setDateConfirmKey(k => k + 1)
           }}
         />
       )}
 
-      {dateConfirmLead && dateConfirmStatus && dateConfirmStatus === 'visit_scheduled' && (
+      {dateConfirmLead && dateConfirmStatus && dateConfirmStatus === 'visit_scheduled' && dateConfirmIsVisit && (
         <VisitScheduleModal
           key={dateConfirmKey}
           lead={dateConfirmLead}
@@ -1450,11 +1454,12 @@ export default function LeadsPage() {
         />
       )}
 
-      {dateConfirmLead && dateConfirmStatus && dateConfirmStatus !== 'visit_scheduled' && (
+      {dateConfirmLead && dateConfirmStatus && (dateConfirmStatus !== 'visit_scheduled' || !dateConfirmIsVisit) && (
         <DateConfirmModal
           key={dateConfirmKey}
           lead={dateConfirmLead}
           targetStatus={dateConfirmStatus}
+          editDatesOnly={!dateConfirmIsVisit && dateConfirmStatus === 'visit_scheduled'}
           userId={user!.id}
           allLeads={leads}
           onConfirm={handleDateConfirm}
@@ -1658,7 +1663,7 @@ export default function LeadsPage() {
 
 // ── Date Confirm Modal ─────────────────────────────────────────────────────────
 function DateConfirmModal({
-  lead, targetStatus, userId, allLeads, onConfirm, onClose, onBack, isPdfDigital = false,
+  lead, targetStatus, userId, allLeads, onConfirm, onClose, onBack, isPdfDigital = false, editDatesOnly = false,
 }: {
   lead: any
   targetStatus: DbStatus
@@ -1668,12 +1673,13 @@ function DateConfirmModal({
   onClose: () => void
   onBack?: () => void
   isPdfDigital?: boolean
+  editDatesOnly?: boolean
 }) {
-  const isVisitMode    = targetStatus === 'visit_scheduled'
+  const isVisitMode    = !editDatesOnly && targetStatus === 'visit_scheduled'
   const isWonMode      = targetStatus === 'won'
   const isBudgetMode   = targetStatus === 'budget_sent'
   // "Cambiar fechas": targetStatus === lead.status → solo editar fechas, sin cambiar estado
-  const isEditDatesMode = !isVisitMode && !isWonMode && !isBudgetMode && targetStatus === lead.status && !['new', 'lost'].includes(lead.status)
+  const isEditDatesMode = editDatesOnly || (!isVisitMode && !isWonMode && !isBudgetMode && targetStatus === lead.status && !['new', 'lost'].includes(lead.status))
   const [dateRules,  setDateRules]  = useState<any>(null)
   // Declare calEntries early so dateLeadCounts useMemo can reference it
   const [calEntries,    setCalEntries]    = useState<Record<string, any>>({})
@@ -5423,7 +5429,7 @@ function DateSummaryCard({
         <div style={{ fontSize: 10, fontWeight: 700, color: accent === 'gold' ? 'var(--gold)' : 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 }}>
           {miniLabel}
         </div>
-        <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 17, color: 'var(--espresso)', fontWeight: 500, lineHeight: 1.15 }}>
+        <div style={{ fontSize: 15, color: 'var(--espresso)', fontWeight: 600, lineHeight: 1.2 }}>
           {title}
         </div>
         {subtitle && (
@@ -5591,16 +5597,16 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
   const leadStatus = editLead?.status as DbStatus | undefined
   const isNewPhase = !isEdit || !leadStatus || leadStatus === 'new' || leadStatus === 'lost'
 
-  const dateSectionTitle = isNewPhase ? 'Fecha que quiere la pareja' : 'Fechas propuestas a la pareja'
+  const dateSectionTitle = isNewPhase ? 'Fecha deseada' : 'Fechas propuestas a la pareja'
   const dateSectionHint  = isNewPhase
-    ? 'Es lo que el lead pide. Puede que la fecha final que acordéis no sea la misma.'
+    ? 'Preferencia inicial — puede ajustarse durante la negociación.'
     : 'Estas son las fechas que estás trabajando con la pareja (negociación / acordadas).'
   const SectionTitle = ({ icon, title, hint }: { icon: React.ReactNode; title: string; hint?: string }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-      <div style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>{icon}</div>
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--espresso)' }}>{title}</div>
-        {hint && <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.3 }}>{hint}</div>}
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+      <span style={{ color: 'var(--gold)', display: 'flex', alignItems: 'center', marginTop: 2 }}>{icon}</span>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)' }}>{title}</div>
+        {hint && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2, lineHeight: 1.4 }}>{hint}</div>}
       </div>
     </div>
   )
@@ -5661,90 +5667,83 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
 
   return (
     <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: 620, width: '100%' }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 740, width: '100%' }} onClick={e => e.stopPropagation()}>
 
-        {/* Header — gradient with avatar */}
-        <div style={{ position: 'relative', padding: '20px 24px 18px', background: 'linear-gradient(135deg, #fef3c7 0%, #fdf6ee 100%)', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+        {/* Header — clean white with bottom border */}
+        <div style={{ position: 'relative', padding: '14px 20px 12px', background: '#fff', borderBottom: '1px solid var(--border)', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
           <button
             onClick={onClose}
             aria-label="Cerrar"
-            style={{ position: 'absolute', top: 14, right: 14, width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.75)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--espresso)' }}
+            style={{ position: 'absolute', top: 14, right: 14, width: 30, height: 30, borderRadius: '50%', background: 'rgba(0,0,0,0.05)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--espresso)' }}
           >
             <X size={16} />
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: '50%', background: isEdit ? 'var(--gold)' : '#fff', color: isEdit ? '#fff' : 'var(--gold)', border: isEdit ? 'none' : '2px dashed var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, fontFamily: 'Manrope, sans-serif', flexShrink: 0, boxShadow: isEdit ? '0 4px 14px rgba(212,160,60,0.4)' : 'none' }}>
+            <div style={{ width: 42, height: 42, borderRadius: '50%', background: isEdit ? 'var(--gold)' : '#fff', color: isEdit ? '#fff' : 'var(--gold)', border: isEdit ? 'none' : '2px dashed var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, fontFamily: 'Manrope, sans-serif', flexShrink: 0, boxShadow: isEdit ? '0 2px 8px rgba(0,0,0,0.10)' : 'none' }}>
               {isEdit ? initials : <Plus size={20} />}
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2 }}>
-                {isEdit ? 'Editar lead' : 'Nuevo lead'}
-              </div>
-              <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 22, fontWeight: 500, color: 'var(--espresso)', lineHeight: 1.15, textTransform: 'capitalize' }}>
-                {isEdit ? (form.name || 'Pareja sin nombre') : 'Nueva pareja interesada'}
-              </div>
-              {isEdit && leadStatus && (() => {
-                const STATUS_INFO: Record<string, { label: string; bg: string; border: string; color: string; icon: React.ReactNode }> = {
-                  new:             { label: 'Lead nuevo',          bg: 'rgba(219,234,254,0.7)', border: '#bfdbfe', color: '#1d4ed8', icon: <Sparkles size={11} /> },
-                  contacted:       { label: 'En seguimiento',      bg: 'rgba(255,251,235,0.8)', border: '#fde68a', color: '#92400e', icon: <RotateCcw size={11} /> },
-                  proposal_sent:   { label: 'Propuesta enviada',   bg: 'rgba(255,251,235,0.8)', border: '#fde68a', color: '#92400e', icon: <FileText size={11} /> },
-                  visit_scheduled: { label: 'Visita agendada',     bg: 'rgba(209,250,229,0.7)', border: '#a7f3d0', color: '#047857', icon: <Calendar size={11} /> },
-                  post_visit:      { label: 'Post-visita',         bg: 'rgba(207,250,254,0.7)', border: '#a5f3fc', color: '#0e7490', icon: <CheckCircle size={11} /> },
-                  budget_sent:     { label: 'Presupuesto enviado', bg: 'rgba(255,251,235,0.8)', border: '#fde68a', color: '#92400e', icon: <Receipt size={11} /> },
-                  won:             { label: 'Boda confirmada',     bg: 'rgba(220,252,231,0.7)', border: '#86efac', color: '#15803d', icon: <PartyPopper size={11} /> },
-                  lost:            { label: 'Perdido',             bg: 'rgba(254,226,226,0.7)', border: '#fecaca', color: '#b91c1c', icon: <XCircle size={11} /> },
-                }
-                const info = STATUS_INFO[leadStatus] || STATUS_INFO.new
-                const hasVisit = form.visit_date
-                return (
-                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 5,
-                      padding: '3px 10px 3px 8px', borderRadius: 20,
-                      background: info.bg, border: `1px solid ${info.border}`,
-                      fontSize: 12, fontWeight: 600, color: info.color,
-                      backdropFilter: 'blur(4px)',
-                    }}>
-                      {info.icon} {info.label}
-                    </span>
-                    {hasVisit && (
-                      <span style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, background: '#ecfdf5', border: '1px solid #6ee7b7', color: '#047857', fontWeight: 600 }}>
-                        <Landmark size={10} />
-                        Visita: {new Date(form.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                        {form.visit_time ? ` · ${form.visit_time}` : ''}
+              <div className="lead-modal-sublabel">{isEdit ? 'Editar lead' : 'Nuevo lead'}</div>
+              <div className="lead-modal-name-badges-row">
+                <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--espresso)', lineHeight: 1.2, textTransform: 'capitalize' }}>
+                  {isEdit ? (form.name || 'Pareja sin nombre') : 'Nueva pareja interesada'}
+                </div>
+                {isEdit && leadStatus && (() => {
+                  const STATUS_INFO: Record<string, { label: string; bg: string; border: string; color: string; icon: React.ReactNode }> = {
+                    new:             { label: 'Lead nuevo',          bg: 'rgba(219,234,254,0.7)', border: '#bfdbfe', color: '#1d4ed8', icon: <Sparkles size={10} /> },
+                    contacted:       { label: 'En seguimiento',      bg: 'rgba(255,251,235,0.8)', border: '#fde68a', color: '#92400e', icon: <RotateCcw size={10} /> },
+                    proposal_sent:   { label: 'Propuesta enviada',   bg: 'rgba(255,251,235,0.8)', border: '#fde68a', color: '#92400e', icon: <FileText size={10} /> },
+                    visit_scheduled: { label: 'Visita agendada',     bg: 'rgba(209,250,229,0.7)', border: '#a7f3d0', color: '#047857', icon: <Calendar size={10} /> },
+                    post_visit:      { label: 'Post-visita',         bg: 'rgba(207,250,254,0.7)', border: '#a5f3fc', color: '#0e7490', icon: <CheckCircle size={10} /> },
+                    budget_sent:     { label: 'Presupuesto enviado', bg: 'rgba(255,251,235,0.8)', border: '#fde68a', color: '#92400e', icon: <Receipt size={10} /> },
+                    won:             { label: 'Boda confirmada',     bg: 'rgba(220,252,231,0.7)', border: '#86efac', color: '#15803d', icon: <PartyPopper size={10} /> },
+                    lost:            { label: 'Perdido',             bg: 'rgba(254,226,226,0.7)', border: '#fecaca', color: '#b91c1c', icon: <XCircle size={10} /> },
+                  }
+                  const info = STATUS_INFO[leadStatus] || STATUS_INFO.new
+                  return (
+                    <div className="lead-modal-badges">
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px 3px 7px', borderRadius: 20, background: info.bg, border: `1px solid ${info.border}`, fontSize: 11, fontWeight: 600, color: info.color }}>
+                        {info.icon} {info.label}
                       </span>
-                    )}
-                  </div>
-                )
-              })()}
+                      {form.visit_date && (
+                        <span style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 12, background: '#ecfdf5', border: '1px solid #6ee7b7', color: '#047857', fontWeight: 600 }}>
+                          <Landmark size={10} />
+                          Visita: {new Date(form.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                          {form.visit_time ? ` · ${form.visit_time}` : ''}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Tab navigation */}
-        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--ivory)', padding: '0 24px', background: '#fafaf8' }}>
+        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', padding: '0 24px', background: '#fff' }}>
           {((() => {
             if (!isEdit) return [
-              { key: 'pareja', label: 'Pareja', icon: <Users        size={12} /> },
-              { key: 'boda',   label: 'Boda',   icon: <CalendarDays size={12} /> },
+              { key: 'pareja', label: 'Pareja', icon: <Users        size={13} /> },
+              { key: 'boda',   label: 'Boda',   icon: <CalendarDays size={13} /> },
             ]
             if (!isNewPhase) return [
-              { key: 'boda',   label: 'Boda',   icon: <CalendarDays size={12} /> },
-              { key: 'oferta', label: 'Oferta', icon: <Flower2      size={12} /> },
-              { key: 'pareja', label: 'Pareja', icon: <Users        size={12} /> },
+              { key: 'boda',   label: 'Boda',   icon: <CalendarDays size={13} /> },
+              { key: 'oferta', label: 'Oferta', icon: <Flower2      size={13} /> },
+              { key: 'pareja', label: 'Pareja', icon: <Users        size={13} /> },
             ]
             return [
-              { key: 'boda',   label: 'Boda',   icon: <CalendarDays size={12} /> },
-              { key: 'pareja', label: 'Pareja', icon: <Users        size={12} /> },
+              { key: 'boda',   label: 'Boda',   icon: <CalendarDays size={13} /> },
+              { key: 'pareja', label: 'Pareja', icon: <Users        size={13} /> },
             ]
           })() as { key: 'boda' | 'oferta' | 'pareja'; label: string; icon: React.ReactNode }[]).map(t => (
             <button key={t.key} type="button" onClick={() => setActiveModalTab(t.key)} style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '10px 16px', border: 'none', background: 'transparent', cursor: 'pointer',
-              fontSize: 12.5, fontWeight: activeModalTab === t.key ? 700 : 500,
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '13px 22px', border: 'none', background: 'transparent', cursor: 'pointer',
+              fontSize: 13, fontWeight: activeModalTab === t.key ? 700 : 500,
               color: activeModalTab === t.key ? 'var(--espresso)' : 'var(--warm-gray)',
               borderBottom: activeModalTab === t.key ? '2px solid var(--gold)' : '2px solid transparent',
-              marginBottom: -1, whiteSpace: 'nowrap', transition: 'all 0.15s',
+              marginBottom: -1, whiteSpace: 'nowrap', transition: 'color 0.15s',
             }}>
               {t.icon} {t.label}
             </button>
@@ -5752,7 +5751,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
         </div>
 
         {/* Body — scrollable tab content */}
-        <div className="modal-body" style={{ padding: '20px 24px' }}>
+        <div className="modal-body" style={{ padding: '14px 20px', background: '#fff' }}>
 
           {/* ── TAB: BODA ──────────────────────────────────────────────────────── */}
           {activeModalTab === 'boda' && (<>
@@ -5821,7 +5820,74 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
             {/* ── En seguimiento+: read-only layout ─────────────────────────────── */}
             {!isNewPhase && editLead ? (
               <>
-                {/* Sub-section B: Fechas propuestas — moved to Oferta tab for all edit states */}
+                {/* Fechas de trabajo — ofertadas o presupuestadas según estado */}
+                {(leadStatus === 'budget_sent' || leadStatus === 'won') ? (
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <SectionTitle icon={<Receipt size={14} />} title="Fechas presupuestadas" hint="Fechas confirmadas en el presupuesto enviado" />
+                      {onChangeBudgetDates && (
+                        <button type="button" onClick={onChangeBudgetDates} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, flexShrink: 0, marginBottom: 12, background: '#f0f4ff', border: '1.5px solid #c7d7fd', color: '#4f6ef7', fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none' }}>
+                          <Edit2 size={10} /> Cambiar fechas
+                        </button>
+                      )}
+                    </div>
+                    {(() => {
+                      const dates = expandBudgetDates(editLead)
+                      if (!dates.length) return (
+                        <div style={{ padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px dashed #d1d5db', fontSize: 12, color: 'var(--warm-gray)', textAlign: 'center' }}>
+                          Sin fechas — usa "Cambiar fechas" para fijarlas
+                        </div>
+                      )
+                      return (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                          {dates.map((d: string) => (
+                            <span key={d} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 16, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 600, color: '#1e3a8a' }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
+                              {formatDateLabel(d)}
+                            </span>
+                          ))}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <SectionTitle icon={<Flower2 size={14} />} title="Fechas ofertadas" hint="Fechas que estás negociando con la pareja" />
+                      {onChangeDates && leadStatus !== 'lost' && (
+                        <button type="button" onClick={onChangeDates} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, flexShrink: 0, marginBottom: 12, background: '#f0f4ff', border: '1.5px solid #c7d7fd', color: '#4f6ef7', fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none' }}>
+                          <Edit2 size={10} /> Cambiar fechas
+                        </button>
+                      )}
+                    </div>
+                    {(() => {
+                      const dates = expandLeadDates(editLead)
+                      if (!dates.length) return (
+                        <div style={{ padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px dashed #d1d5db', fontSize: 12, color: 'var(--warm-gray)', textAlign: 'center' }}>
+                          Sin fechas — usa "Cambiar fechas" para seleccionarlas en el calendario
+                        </div>
+                      )
+                      return (
+                        <div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
+                            {dates.map((d: string) => (
+                              <span key={d} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 16, background: '#fef3c7', border: '1px solid #fde68a', fontSize: 12, fontWeight: 600, color: '#78350f' }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }} />
+                                {formatDateLabel(d)}
+                              </span>
+                            ))}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Calendar size={10} />
+                            Duración: <strong style={{ color: 'var(--charcoal)', marginLeft: 2 }}>{editLead.wedding_duration_days || 1} {(editLead.wedding_duration_days || 1) === 1 ? 'día' : 'días'}</strong>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
+
+                {/* Sub-section B: old dead code */}
                 {false && (<>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                     <SectionTitle icon={<Flower2 size={14} />} title="Fechas propuestas a la pareja" hint="Negociadas con la pareja" />
@@ -5873,124 +5939,6 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   <div style={{ borderTop: '1px dashed var(--ivory)', marginBottom: 18 }} />
                 </>)}
 
-                {/* Sub-section A: Lo que pidió originalmente la pareja — collapsible */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: (showOriginal || editingOriginal) ? 12 : 0 }}>
-                  <button type="button" onClick={() => setShowOriginal((v: boolean) => !v)} style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    background: 'none', border: 'none', padding: 0, cursor: 'pointer', outline: 'none', flex: 1, textAlign: 'left',
-                  }}>
-                    <div style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>
-                      <CalendarDays size={14} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--espresso)' }}>Lo que pidió originalmente la pareja</div>
-                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.3 }}>Solicitud inicial antes de negociar fechas</div>
-                    </div>
-                    {(showOriginal || editingOriginal)
-                      ? <ChevronUp size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                      : <ChevronDown size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
-                  </button>
-                  {(showOriginal || editingOriginal) && (
-                    <button type="button" onClick={() => setEditingOriginal((v: boolean) => !v)} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
-                      padding: '5px 10px', borderRadius: 8,
-                      background: editingOriginal ? '#ecfdf5' : '#f9fafb',
-                      border: `1.5px solid ${editingOriginal ? '#86efac' : '#e5e7eb'}`,
-                      color: editingOriginal ? '#15803d' : 'var(--warm-gray)',
-                      fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none',
-                    }}>
-                      {editingOriginal ? <><CheckCircle2 size={10} /> Listo</> : <><Edit2 size={10} /> Editar</>}
-                    </button>
-                  )}
-                </div>
-
-                {(showOriginal || editingOriginal) && (editingOriginal ? (
-                  /* ── Editable pickers for original request ── */
-                  <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px solid #e5e7eb' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Tipo de solicitud</div>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>
-                      {DATE_FLEX_OPTS.map(opt => (
-                        <button key={opt.value} type="button" onClick={() => setOrig('date_flexibility', opt.value)} style={{
-                          padding: '4px 11px', borderRadius: 20, fontSize: 12, cursor: 'pointer', border: '1px solid', fontWeight: 500,
-                          borderColor: form.original_date_flexibility === opt.value ? 'var(--gold)' : 'var(--ivory)',
-                          background:  form.original_date_flexibility === opt.value ? 'var(--gold)' : 'transparent',
-                          color:       form.original_date_flexibility === opt.value ? '#fff' : 'var(--warm-gray)',
-                        }}>{opt.label}</button>
-                      ))}
-                    </div>
-                    {form.original_date_flexibility === 'exact' && (
-                      <MiniCalendarPicker userId={userId} value={form.original_wedding_date} onChange={d => setOrig('wedding_date', d)} />
-                    )}
-                    {form.original_date_flexibility === 'range' && (
-                      <RangeCalendarPicker userId={userId} from={form.original_wedding_date} to={form.original_wedding_date_to} onChange={(f, t) => { setOrig('wedding_date', f); setOrig('wedding_date_to', t) }} />
-                    )}
-                    {form.original_date_flexibility === 'multi_range' && (
-                      <MultiRangeCalendarPicker userId={userId} ranges={form.original_wedding_date_ranges || []} onChange={r => setOrig('wedding_date_ranges', r)} />
-                    )}
-                    {form.original_date_flexibility === 'month' && (
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <Select value={String(form.original_wedding_month)} onValueChange={(v) => setOrig('wedding_month', v)}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
-                        </Select>
-                        <div style={{ width: 110 }}>
-                          <Select value={String(form.original_wedding_year)} onValueChange={(v) => setOrig('wedding_year', v)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>{YEAR_OPTS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    )}
-                    {form.original_date_flexibility === 'season' && (
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                        {SEASONS.map(s => { const active = form.original_wedding_season === s.value; return <button key={s.value} type="button" onClick={() => setOrig('wedding_season', s.value)} style={{ padding: '6px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer', outline: 'none', border: `1.5px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`, background: active ? 'var(--gold)' : '#fff', color: active ? '#fff' : 'var(--charcoal)', fontWeight: active ? 700 : 500, transition: 'all 0.15s', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{s.emoji} {s.label}</button> })}
-                        <div style={{ width: 110 }}>
-                          <Select value={String(form.original_wedding_year)} onValueChange={(v) => setOrig('wedding_year', v)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>{YEAR_OPTS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    )}
-                    {(form.original_date_flexibility === 'flexible' || !form.original_date_flexibility) && (
-                      <div style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>
-                        {form.original_date_flexibility === 'flexible' ? 'La pareja era flexible — sin fecha concreta' : 'Selecciona el tipo de solicitud arriba'}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* ── Read-only display from form.original_* ── */
-                  (() => {
-                    const origFlex   = form.original_date_flexibility as string
-                    const origDate1  = form.original_wedding_date as string
-                    const origDate2  = form.original_wedding_date_to as string
-                    const origRanges = form.original_wedding_date_ranges as { from: string; to?: string }[]
-                    const origYear   = parseInt(form.original_wedding_year)
-                    const origMonth  = parseInt(form.original_wedding_month)
-                    const origSeason = form.original_wedding_season as string
-                    const fmtShort = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
-                    const fmtFull  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
-                    const fmtLong  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-                    let typeLabel = ''; let lines: string[] = []
-                    if (origFlex === 'exact' && origDate1)                   { typeLabel = 'Fecha exacta';       lines = [fmtLong(origDate1)] }
-                    else if (origFlex === 'range' && origDate1)               { typeLabel = 'Rango de fechas';    lines = [`${fmtShort(origDate1)}${origDate2 ? ` – ${fmtFull(origDate2)}` : ''}`] }
-                    else if (origFlex === 'multi_range' && origRanges?.length){ typeLabel = 'Varias opciones';    lines = origRanges.map((r, i) => `Opción ${i + 1}: ${fmtShort(r.from)}${r.to ? ` – ${fmtFull(r.to)}` : ''}`) }
-                    else if (origFlex === 'month' && origYear && origMonth)   { typeLabel = 'Mes concreto';       lines = [`${MONTHS[origMonth - 1]} de ${origYear}`] }
-                    else if (origFlex === 'season')                           { typeLabel = 'Temporada';          lines = [`${SEASONS.find(s => s.value === origSeason)?.label ?? origSeason ?? '—'} ${origYear || ''}`] }
-                    else if (origFlex === 'flexible')                         { typeLabel = 'Sin fecha definida'; lines = ['La pareja era flexible en fechas'] }
-                    if (!typeLabel) return (
-                      <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, background: '#f9fafb', border: '1px dashed #d1d5db', fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>
-                        Sin datos de solicitud original — haz clic en "Editar" para añadir
-                      </div>
-                    )
-                    return (
-                      <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 10, background: '#faf8f5', border: '1px solid var(--ivory)' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{typeLabel}</div>
-                        {lines.map((line, i) => <div key={i} style={{ fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.6 }}>{line}</div>)}
-                      </div>
-                    )
-                  })()
-                ))}
 
               </>
             ) : (
@@ -6146,7 +6094,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   else if (flex === 'season' && date1) txt = `${SEASONS.find(s => s.value === date1)?.label || date1} ${date2 || ''}`
                   if (!txt) return null
                   return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 7, background: '#f5f0ea', border: '1px solid var(--ivory)', marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 7, background: '#f5f0ea', border: '1px solid var(--ivory)', marginTop: 8 }}>
                       <Clock size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
                       <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>Guardado:</span>
                       <span style={{ fontSize: 12, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{txt}</span>
@@ -6154,39 +6102,30 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   )
                 })()}
 
+                {isEdit && editLead && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 10, fontSize: 11, color: 'var(--warm-gray)' }}>
+                    <Info size={11} style={{ flexShrink: 0 }} />
+                    <span>La fecha de la solicitud original queda guardada por separado.{' '}
+                      <button type="button" onClick={() => setShowOriginal((v: boolean) => !v)}
+                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--gold)', fontWeight: 600, fontSize: 11, textDecoration: 'underline', textUnderlineOffset: 2 }}>
+                        {showOriginal || editingOriginal ? 'Ocultar' : 'Ver →'}
+                      </button>
+                    </span>
+                  </div>
+                )}
+
                 {/* Lo que pidió originalmente — also shown when editing a 'new' lead */}
                 {isEdit && editLead && (
-                  <div style={{ marginTop: 14 }}>
-                    <div style={{ borderTop: '1px dashed var(--ivory)', marginBottom: 14 }} />
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: (showOriginal || editingOriginal) ? 12 : 0 }}>
-                      <button type="button" onClick={() => setShowOriginal((v: boolean) => !v)} style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        background: 'none', border: 'none', padding: 0, cursor: 'pointer', outline: 'none', flex: 1, textAlign: 'left',
-                      }}>
-                        <div style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>
-                          <CalendarDays size={14} />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--espresso)' }}>Lo que pidió originalmente la pareja</div>
-                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.3 }}>Solicitud inicial — se guarda automáticamente</div>
-                        </div>
-                        {(showOriginal || editingOriginal)
-                          ? <ChevronUp size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                          : <ChevronDown size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
-                      </button>
-                      {(showOriginal || editingOriginal) && (
-                        <button type="button" onClick={() => setEditingOriginal((v: boolean) => !v)} style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
-                          padding: '5px 10px', borderRadius: 8,
-                          background: editingOriginal ? '#ecfdf5' : '#f9fafb',
-                          border: `1.5px solid ${editingOriginal ? '#86efac' : '#e5e7eb'}`,
-                          color: editingOriginal ? '#15803d' : 'var(--warm-gray)',
-                          fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none',
-                        }}>
-                          {editingOriginal ? <><CheckCircle2 size={10} /> Listo</> : <><Edit2 size={10} /> Editar</>}
+                  <div style={{ marginTop: 12 }}>
+                    {(showOriginal || editingOriginal) && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Solicitud original</span>
+                        <button type="button" onClick={() => setEditingOriginal((v: boolean) => !v)}
+                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: editingOriginal ? '#15803d' : 'var(--gold)', fontWeight: 600, fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          {editingOriginal ? <><CheckCircle2 size={11} /> Listo</> : <><Edit2 size={11} /> Editar</>}
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {(showOriginal || editingOriginal) && (editingOriginal ? (
                       <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px solid #e5e7eb' }}>
@@ -6373,64 +6312,129 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
             )}
           </div>
 
+          {/* Solicitud original — al fondo del tab Boda, solo en seguimiento */}
+          {!isNewPhase && editLead && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ borderTop: '1px dashed var(--ivory)', marginBottom: 14 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: (showOriginal || editingOriginal) ? 12 : 0 }}>
+                <button type="button" onClick={() => setShowOriginal((v: boolean) => !v)} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: 0, background: 'none', border: 'none',
+                  color: 'var(--warm-gray)', fontSize: 12, fontWeight: 500,
+                  cursor: 'pointer', outline: 'none',
+                  textDecoration: 'underline', textDecorationColor: 'var(--ivory)',
+                  textUnderlineOffset: 3,
+                }}>
+                  {(showOriginal || editingOriginal) ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                  Solicitud original
+                </button>
+                {(showOriginal || editingOriginal) && (
+                  <button type="button" onClick={() => setEditingOriginal((v: boolean) => !v)} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
+                    padding: '3px 8px', borderRadius: 6,
+                    background: editingOriginal ? '#ecfdf5' : '#f9fafb',
+                    border: `1.5px solid ${editingOriginal ? '#86efac' : '#e5e7eb'}`,
+                    color: editingOriginal ? '#15803d' : 'var(--warm-gray)',
+                    fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none',
+                  }}>
+                    {editingOriginal ? <><CheckCircle2 size={10} /> Listo</> : <><Edit2 size={10} /> Editar</>}
+                  </button>
+                )}
+              </div>
+
+              {(showOriginal || editingOriginal) && (editingOriginal ? (
+                <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Tipo de solicitud</div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>
+                    {DATE_FLEX_OPTS.map(opt => (
+                      <button key={opt.value} type="button" onClick={() => setOrig('date_flexibility', opt.value)} style={{
+                        padding: '4px 11px', borderRadius: 20, fontSize: 12, cursor: 'pointer', border: '1px solid', fontWeight: 500,
+                        borderColor: form.original_date_flexibility === opt.value ? 'var(--gold)' : 'var(--ivory)',
+                        background:  form.original_date_flexibility === opt.value ? 'var(--gold)' : 'transparent',
+                        color:       form.original_date_flexibility === opt.value ? '#fff' : 'var(--warm-gray)',
+                      }}>{opt.label}</button>
+                    ))}
+                  </div>
+                  {form.original_date_flexibility === 'exact' && <MiniCalendarPicker userId={userId} value={form.original_wedding_date} onChange={d => setOrig('wedding_date', d)} />}
+                  {form.original_date_flexibility === 'range' && <RangeCalendarPicker userId={userId} from={form.original_wedding_date} to={form.original_wedding_date_to} onChange={(f, t) => { setOrig('wedding_date', f); setOrig('wedding_date_to', t) }} />}
+                  {form.original_date_flexibility === 'multi_range' && <MultiRangeCalendarPicker userId={userId} ranges={form.original_wedding_date_ranges || []} onChange={r => setOrig('wedding_date_ranges', r)} />}
+                  {form.original_date_flexibility === 'month' && (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Select value={String(form.original_wedding_month)} onValueChange={(v) => setOrig('wedding_month', v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <div style={{ width: 110 }}>
+                        <Select value={String(form.original_wedding_year)} onValueChange={(v) => setOrig('wedding_year', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>{YEAR_OPTS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                  {form.original_date_flexibility === 'season' && (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {SEASONS.map(s => { const active = form.original_wedding_season === s.value; return <button key={s.value} type="button" onClick={() => setOrig('wedding_season', s.value)} style={{ padding: '6px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer', outline: 'none', border: `1.5px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`, background: active ? 'var(--gold)' : '#fff', color: active ? '#fff' : 'var(--charcoal)', fontWeight: active ? 700 : 500, transition: 'all 0.15s', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{s.emoji} {s.label}</button> })}
+                      <div style={{ width: 110 }}>
+                        <Select value={String(form.original_wedding_year)} onValueChange={(v) => setOrig('wedding_year', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>{YEAR_OPTS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                  {(form.original_date_flexibility === 'flexible' || !form.original_date_flexibility) && (
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>
+                      {form.original_date_flexibility === 'flexible' ? 'La pareja era flexible — sin fecha concreta' : 'Selecciona el tipo de solicitud arriba'}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                (() => {
+                  const origFlex   = form.original_date_flexibility as string
+                  const origDate1  = form.original_wedding_date as string
+                  const origDate2  = form.original_wedding_date_to as string
+                  const origRanges = form.original_wedding_date_ranges as { from: string; to?: string }[]
+                  const origYear   = parseInt(form.original_wedding_year)
+                  const origMonth  = parseInt(form.original_wedding_month)
+                  const origSeason = form.original_wedding_season as string
+                  const fmtShort = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+                  const fmtFull  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+                  const fmtLong  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                  let typeLabel = ''; let lines: string[] = []
+                  if (origFlex === 'exact' && origDate1)                   { typeLabel = 'Fecha exacta';       lines = [fmtLong(origDate1)] }
+                  else if (origFlex === 'range' && origDate1)               { typeLabel = 'Rango de fechas';    lines = [`${fmtShort(origDate1)}${origDate2 ? ` – ${fmtFull(origDate2)}` : ''}`] }
+                  else if (origFlex === 'multi_range' && origRanges?.length){ typeLabel = 'Varias opciones';    lines = origRanges.map((r, i) => `Opción ${i + 1}: ${fmtShort(r.from)}${r.to ? ` – ${fmtFull(r.to)}` : ''}`) }
+                  else if (origFlex === 'month' && origYear && origMonth)   { typeLabel = 'Mes concreto';       lines = [`${MONTHS[origMonth - 1]} de ${origYear}`] }
+                  else if (origFlex === 'season')                           { typeLabel = 'Temporada';          lines = [`${SEASONS.find(s => s.value === origSeason)?.label ?? origSeason ?? '—'} ${origYear || ''}`] }
+                  else if (origFlex === 'flexible')                         { typeLabel = 'Sin fecha definida'; lines = ['La pareja era flexible en fechas'] }
+                  if (!typeLabel) return (
+                    <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, background: '#f9fafb', border: '1px dashed #d1d5db', fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>
+                      Sin datos de solicitud original — haz clic en "Editar" para añadir
+                    </div>
+                  )
+                  return (
+                    <div style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0, marginRight: 2 }}>{typeLabel}:</span>
+                      {lines.map((line, i) => (
+                        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 10, background: '#f5f0ea', border: '1px solid var(--ivory)', fontSize: 11, fontWeight: 500, color: '#5c4a3a' }}>
+                          {line}
+                        </span>
+                      ))}
+                    </div>
+                  )
+                })()
+              ))}
+            </div>
+          )}
+
           </>)}
 
           {/* ── TAB: OFERTA ───────────────────────────────────────────────────────── */}
           {activeModalTab === 'oferta' && editLead && (<>
 
-          {/* ════ EN SEGUIMIENTO + VISITA + PERDIDOS: Fechas ofertadas → Presupuesto → Pres.digital → Prop.digital ════ */}
+          {/* ════ EN SEGUIMIENTO + VISITA + PERDIDOS: Presupuesto → Pres.digital → Prop.digital ════ */}
           {(leadStatus === 'contacted' || leadStatus === 'proposal_sent' || leadStatus === 'visit_scheduled' || leadStatus === 'post_visit' || leadStatus === 'lost') && (<>
-
-            {/* Fechas ofertadas */}
-            <div style={{ marginBottom: 22 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <SectionTitle icon={<Flower2 size={14} />} title="Fechas ofertadas" hint="Fechas que estás negociando con la pareja" />
-                {onChangeDates && leadStatus !== 'lost' && (
-                  <button type="button" onClick={onChangeDates} style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    padding: '6px 12px', borderRadius: 8, flexShrink: 0, marginBottom: 12,
-                    background: '#f0f4ff', border: '1.5px solid #c7d7fd',
-                    color: '#4f6ef7', fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none',
-                  }}>
-                    <Edit2 size={10} /> Cambiar fechas
-                  </button>
-                )}
-              </div>
-              {(() => {
-                const dates = expandLeadDates(editLead)
-                if (!dates.length) return (
-                  <div style={{ padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px dashed #d1d5db', fontSize: 12, color: 'var(--warm-gray)', textAlign: 'center' }}>
-                    Sin fechas — usa "Cambiar fechas" para seleccionarlas en el calendario
-                  </div>
-                )
-                return (
-                  <div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
-                      {dates.map((d: string) => (
-                        <span key={d} style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          padding: '5px 10px', borderRadius: 16,
-                          background: '#fef3c7', border: '1.5px solid #fde68a',
-                          fontSize: 12, fontWeight: 600, color: '#92400e',
-                        }}>
-                          <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#f59e0b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, lineHeight: 1 }}>✓</span>
-                          </span>
-                          {formatDateLabel(d)}
-                        </span>
-                      ))}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Calendar size={10} />
-                      Duración: <strong style={{ color: 'var(--charcoal)', marginLeft: 2 }}>{editLead.wedding_duration_days || 1} {(editLead.wedding_duration_days || 1) === 1 ? 'día' : 'días'}</strong>
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
-
-            {/* Divider */}
-            <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
 
             {/* Presupuesto */}
             <div style={{ marginBottom: 22 }}>
@@ -6555,85 +6559,8 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
 
           </>)}
 
-          {/* ════ PRESUPUESTO + GANADA: Fechas presup → Presupuesto → Pres.digital → Fechas ofertadas → Prop.digital ════ */}
+          {/* ════ PRESUPUESTO + GANADA: Presupuesto → Pres.digital → Prop.digital ════ */}
           {(leadStatus === 'budget_sent' || leadStatus === 'won') && (<>
-
-            {/* Visita previa — si hubo visita antes de mandar el presupuesto */}
-            {editLead?.visit_date && (
-              <>
-                <div style={{ marginBottom: 22 }}>
-                  <SectionTitle icon={<Landmark size={14} />} title="Visita realizada" hint="Visita previa a la elaboración del presupuesto" />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: '#ecfdf5', border: '1.5px solid #6ee7b7' }}>
-                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Landmark size={14} style={{ color: '#fff' }} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#047857' }}>
-                        {new Date(editLead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
-                      </div>
-                      {editLead.visit_time && (
-                        <div style={{ fontSize: 11, color: '#059669', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <Clock size={10} /> {editLead.visit_time}{editLead.visit_duration ? ` · ${editLead.visit_duration} min` : ''}
-                        </div>
-                      )}
-                    </div>
-                    {onEditVisit && (
-                      <button type="button" onClick={onEditVisit} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.7)', border: '1px solid #a7f3d0', color: '#047857', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-                        <Edit2 size={10} /> Editar
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
-              </>
-            )}
-
-            {/* Fechas presupuestadas */}
-            <div style={{ marginBottom: 22 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <SectionTitle icon={<Receipt size={14} />} title="Fechas presupuestadas" hint="Fechas confirmadas en el presupuesto enviado" />
-                {onChangeBudgetDates && (
-                  <button type="button" onClick={onChangeBudgetDates} style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    padding: '6px 12px', borderRadius: 8, flexShrink: 0, marginBottom: 12,
-                    background: '#f0f4ff', border: '1.5px solid #c7d7fd',
-                    color: '#4f6ef7', fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none',
-                  }}>
-                    <Edit2 size={10} /> Cambiar fechas
-                  </button>
-                )}
-              </div>
-              {(() => {
-                const dates = expandBudgetDates(editLead)
-                if (!dates.length) return (
-                  <div style={{ padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px dashed #d1d5db', fontSize: 12, color: 'var(--warm-gray)', textAlign: 'center' }}>
-                    Sin fechas de presupuesto — usa "Cambiar fechas" para fijarlas
-                  </div>
-                )
-                return (
-                  <div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
-                      {dates.map((d: string) => (
-                        <span key={d} style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          padding: '5px 10px', borderRadius: 16,
-                          background: '#eff6ff', border: '1.5px solid #bfdbfe',
-                          fontSize: 12, fontWeight: 600, color: '#1e40af',
-                        }}>
-                          <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#3b82f6', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, lineHeight: 1 }}>✓</span>
-                          </span>
-                          {formatDateLabel(d)}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
-
-            {/* Divider */}
-            <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
 
             {/* Presupuesto (libre) */}
             <div style={{ marginBottom: 22 }}>
@@ -6854,9 +6781,9 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
         </div>
 
         {/* Footer — sticky */}
-        <div className="modal-footer">
+        <div className="modal-footer" style={{ padding: '14px 24px', borderTop: '1px solid var(--border)', background: '#fff' }}>
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-primary" onClick={onSubmit} disabled={saving}>
+          <button className="btn btn-primary" onClick={onSubmit} disabled={saving} style={{ minWidth: 130 }}>
             {saving ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear lead'}
           </button>
         </div>
@@ -7265,125 +7192,132 @@ function VisitScheduleModal({
           </div>
 
           {/* Step 2 · Time & duration */}
-          <div style={{ marginBottom: 16, opacity: selected ? 1 : 0.5, pointerEvents: selected ? 'auto' : 'none', transition: 'opacity 0.2s' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <div style={{ width: 22, height: 22, borderRadius: '50%', background: selected ? 'var(--gold)' : 'var(--ivory)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>2</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>Hora y duración <span style={{ fontWeight: 400, color: 'var(--warm-gray)' }}>(opcional)</span></div>
+          <div style={{ marginBottom: 16, opacity: selected ? 1 : 0.45, pointerEvents: selected ? 'auto' : 'none', transition: 'opacity 0.2s' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', background: selected ? 'var(--gold)' : '#d1cdc6', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, transition: 'background 0.2s' }}>2</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>Hora y duración <span style={{ fontWeight: 400, color: 'var(--warm-gray)', fontSize: 12 }}>(opcional)</span></div>
             </div>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, alignItems: 'center' }}>
-              <Clock size={13} style={{ color: 'var(--warm-gray)', marginRight: 2 }} />
-              {timePresets.map(t => {
-                const active = visitTime === t
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setVisitTime(active ? '' : t)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: 999,
-                      cursor: 'pointer',
-                      outline: 'none',
-                      fontSize: 12, fontWeight: 600,
-                      border: `1.5px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`,
-                      background: active ? 'var(--gold)' : '#fff',
-                      color: active ? '#fff' : 'var(--charcoal)',
-                      transition: 'all 0.15s',
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    {t}
-                  </button>
-                )
-              })}
-              <input
-                type="time"
-                value={visitTime}
-                onChange={e => setVisitTime(e.target.value)}
-                style={{
-                  padding: '6px 10px',
-                  borderRadius: 8,
-                  border: '1.5px solid var(--ivory)',
-                  fontSize: 12,
-                  color: 'var(--charcoal)',
-                  fontFamily: 'Manrope, sans-serif',
-                  outline: 'none',
-                  width: 110,
-                }}
-              />
+            {/* Hora */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Clock size={10} /> Hora
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
+                {timePresets.map(t => {
+                  const active = visitTime === t
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setVisitTime(active ? '' : t)}
+                      style={{
+                        padding: '5px 11px',
+                        borderRadius: 999,
+                        cursor: 'pointer',
+                        outline: 'none',
+                        fontSize: 12, fontWeight: 600,
+                        border: `1.5px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`,
+                        background: active ? 'var(--gold)' : '#fff',
+                        color: active ? '#fff' : 'var(--charcoal)',
+                        transition: 'all 0.15s',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {t}
+                    </button>
+                  )
+                })}
+                <input
+                  type="time"
+                  value={visitTime}
+                  onChange={e => setVisitTime(e.target.value)}
+                  style={{
+                    padding: '5px 9px',
+                    borderRadius: 8,
+                    border: '1.5px solid var(--ivory)',
+                    fontSize: 12,
+                    color: visitTime ? 'var(--charcoal)' : 'var(--warm-gray)',
+                    fontFamily: 'Manrope, sans-serif',
+                    outline: 'none',
+                    width: 100,
+                  }}
+                />
+              </div>
             </div>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {durations.map(d => {
-                const active = visitDuration === d.v
-                return (
-                  <button
-                    key={d.v}
-                    type="button"
-                    onClick={() => setVisitDuration(d.v)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: 999,
-                      cursor: 'pointer',
-                      outline: 'none',
-                      fontSize: 12, fontWeight: 600,
-                      border: `1.5px solid ${active ? 'var(--espresso)' : 'var(--ivory)'}`,
-                      background: active ? 'var(--espresso)' : '#fff',
-                      color: active ? '#fff' : 'var(--charcoal)',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {d.label}
-                  </button>
-                )
-              })}
+            {/* Duración */}
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Timer size={10} /> Duración
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {durations.map(d => {
+                  const active = visitDuration === d.v
+                  return (
+                    <button
+                      key={d.v}
+                      type="button"
+                      onClick={() => setVisitDuration(d.v)}
+                      style={{
+                        padding: '5px 11px',
+                        borderRadius: 999,
+                        cursor: 'pointer',
+                        outline: 'none',
+                        fontSize: 12, fontWeight: 600,
+                        border: `1.5px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`,
+                        background: active ? 'var(--gold)' : '#fff',
+                        color: active ? '#fff' : 'var(--charcoal)',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {d.label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
 
           {/* Summary */}
           <div
             style={{
-              borderRadius: 14,
-              padding: '16px 18px',
-              background: selected ? 'linear-gradient(135deg, #fef3c7 0%, #fdf6ee 100%)' : 'var(--cream)',
-              border: `1.5px solid ${selected ? 'var(--gold)' : 'var(--ivory)'}`,
-              display: 'flex', alignItems: 'center', gap: 14,
+              borderRadius: 12,
+              padding: '14px 16px',
+              background: selected ? '#fef9ec' : 'var(--cream)',
+              border: `1px solid ${selected ? '#fde68a' : 'var(--ivory)'}`,
               transition: 'all 0.2s',
             }}
           >
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: selected ? 'var(--gold)' : '#fff', border: selected ? 'none' : '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Calendar size={20} style={{ color: selected ? '#fff' : 'var(--warm-gray)' }} />
-            </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              {selected ? (
-                <>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2 }}>
-                    Resumen de la visita
+            {selected ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <CalendarCheck size={13} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Visita programada</span>
+                </div>
+                <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 19, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize', lineHeight: 1.2, marginBottom: visitTime ? 6 : 0 }}>
+                  {formatLong(selected)}
+                </div>
+                {visitTime && (
+                  <div style={{ fontSize: 12, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 5, fontVariantNumeric: 'tabular-nums' }}>
+                    <Clock size={11} style={{ color: 'var(--gold)' }} />
+                    {visitTime}{endTime ? ` – ${endTime}` : ''} <span style={{ color: 'var(--warm-gray)' }}>· {durations.find(d => d.v === visitDuration)?.label}</span>
                   </div>
-                  <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize', lineHeight: 1.2 }}>
-                    {formatLong(selected)}
+                )}
+                {/* Previous visit info — shown when editing and the date or time changed */}
+                {isEditing && originalVisitDate && (selected !== originalVisitDate || visitTime !== (originalVisitTime || '')) && (
+                  <div style={{ marginTop: 8, padding: '7px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.04)', border: '1px dashed var(--ivory)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <RotateCcw size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                      Anterior: <strong style={{ color: 'var(--charcoal)' }}>
+                        {new Date(originalVisitDate + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        {originalVisitTime ? ` · ${originalVisitTime}` : ''}
+                        {originalVisitDuration ? ` · ${originalVisitDuration} min` : ''}
+                      </strong>
+                    </span>
                   </div>
-                  {visitTime && (
-                    <div style={{ fontSize: 12, color: 'var(--charcoal)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, fontVariantNumeric: 'tabular-nums' }}>
-                      <Clock size={12} style={{ color: 'var(--gold)' }} />
-                      {visitTime}{endTime ? ` – ${endTime}` : ''} <span style={{ color: 'var(--warm-gray)' }}>· {durations.find(d => d.v === visitDuration)?.label}</span>
-                    </div>
-                  )}
-                  {/* Previous visit info — shown when editing and the date or time changed */}
-                  {isEditing && originalVisitDate && (selected !== originalVisitDate || visitTime !== (originalVisitTime || '')) && (
-                    <div style={{ marginTop: 8, padding: '7px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.04)', border: '1px dashed var(--ivory)', display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <RotateCcw size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                      <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
-                        Anterior: <strong style={{ color: 'var(--charcoal)' }}>
-                          {new Date(originalVisitDate + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
-                          {originalVisitTime ? ` · ${originalVisitTime}` : ''}
-                          {originalVisitDuration ? ` · ${originalVisitDuration} min` : ''}
-                        </strong>
-                      </span>
-                    </div>
-                  )}
-                  {selected && (otherVisitsByDate[selected]?.length || 0) > 0 && (() => {
+                )}
+                {selected && (otherVisitsByDate[selected]?.length || 0) > 0 && (() => {
                     const dayVisits = [...otherVisitsByDate[selected]].sort((a, b) => (a.visit_time || 'zz').localeCompare(b.visit_time || 'zz'))
                     // Compute overlap with the time being chosen now
                     const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
@@ -7450,16 +7384,11 @@ function VisitScheduleModal({
                   })()}
                 </>
               ) : (
-                <>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2 }}>
-                    Sin fecha
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>
-                    Elige una fecha en el calendario para agendar la visita.
-                  </div>
-                </>
+                <div style={{ fontSize: 12, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Calendar size={13} style={{ color: 'var(--ivory)', flexShrink: 0 }} />
+                  Elige un día en el calendario para agendar la visita
+                </div>
               )}
-            </div>
           </div>
         </div>
 

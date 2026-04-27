@@ -45,7 +45,7 @@ type CommercialConfig = {
   catering_mandatory?: boolean   // si catering_own: ¿es obligatorio contratarlo?
 }
 
-type WizardQuestion = 'space_type' | 'price_model' | 'menu_included' | 'catering_own' | 'catering_mandatory' | 'has_menu_types'
+type WizardQuestion = 'space_type' | 'price_model'
 type WizardConfig   = Partial<CommercialConfig>
 
 type ZoneItem       = { id: string; name: string }
@@ -509,20 +509,7 @@ export default function EstructuraPage() {
   }
 
   const isWizardDone = (cfg: WizardConfig): cfg is CommercialConfig => {
-    if (!cfg.space_type || !cfg.price_model) return false
-    const model = cfg.price_model
-    if (model === 'rental') {
-      if (cfg.catering_own === undefined) return false
-      if (cfg.catering_own && cfg.catering_mandatory === undefined) return false
-    } else {
-      if (cfg.menu_included === undefined) return false
-      if (cfg.menu_included && cfg.has_menu_types === undefined) return false
-      if (!cfg.menu_included) {
-        if (cfg.catering_own === undefined) return false
-        if (cfg.catering_own && cfg.catering_mandatory === undefined) return false
-      }
-    }
-    return true
+    return !!(cfg.space_type && cfg.price_model)
   }
 
   const toggle = (id: string) => setExpanded(prev => {
@@ -727,7 +714,7 @@ export default function EstructuraPage() {
   if (authLoading || loading) return (
     <div style={{ display: 'flex' }}><Sidebar />
       <div className="main-layout">
-        <div className="topbar"><div className="topbar-title">Estructura</div></div>
+        <div className="topbar"><div className="topbar-title">Configuración</div></div>
         <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
           <div style={{ color: 'var(--warm-gray)', fontSize: 13 }}>Cargando...</div>
         </div>
@@ -761,7 +748,7 @@ export default function EstructuraPage() {
       <Sidebar />
       <div className="main-layout">
         <div className="topbar">
-          <div className="topbar-title">Estructura</div>
+          <div className="topbar-title">Configuración</div>
           {activeTab === 'modalidades' && (
             <button className="btn btn-primary btn-sm" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Plus size={14} /> Nueva modalidad
@@ -1752,12 +1739,8 @@ export default function EstructuraPage() {
       {/* ── Commercial config wizard ───────────────────────────────────────── */}
       {configWizardOpen && (() => {
         const QUESTION_LABELS: Record<WizardQuestion, string> = {
-          space_type:          '¿Cómo está organizado tu espacio?',
-          price_model:         '¿Cómo cobras el espacio?',
-          menu_included:       wizardConfig.price_model === 'per_person' ? '¿El precio por persona incluye menú?' : '¿El paquete incluye menú?',
-          catering_own:        '¿Ofreces catering / menú propio?',
-          catering_mandatory:  '¿Es obligatorio contratar el catering interno?',
-          has_menu_types:      '¿Hay diferentes tipos de menú (menú A, menú B…)?',
+          space_type:  '¿Cómo está organizado tu espacio?',
+          price_model: '¿Cómo cobras el espacio?',
         }
 
         const cardOpts = (q: WizardQuestion) => {
@@ -1780,45 +1763,23 @@ export default function EstructuraPage() {
         ]
 
         const currentVal = (() => {
-          if (wizardQuestion === 'space_type')         return wizardConfig.space_type
-          if (wizardQuestion === 'price_model')        return wizardConfig.price_model
-          if (wizardQuestion === 'menu_included')      return wizardConfig.menu_included
-          if (wizardQuestion === 'catering_own')       return wizardConfig.catering_own
-          if (wizardQuestion === 'catering_mandatory') return wizardConfig.catering_mandatory
-          if (wizardQuestion === 'has_menu_types')     return wizardConfig.has_menu_types
+          if (wizardQuestion === 'space_type')  return wizardConfig.space_type
+          if (wizardQuestion === 'price_model') return wizardConfig.price_model
         })()
 
         const handleAnswer = (val: any) => {
           let next: WizardConfig = { ...wizardConfig }
           if (wizardQuestion === 'space_type') {
-            next = { space_type: val }  // reset downstream when space changes
+            next = { space_type: val }
           } else if (wizardQuestion === 'price_model') {
-            next = { ...next, price_model: val, menu_included: undefined, catering_own: undefined, catering_mandatory: undefined, has_menu_types: undefined }
-          } else if (wizardQuestion === 'menu_included') {
-            next = { ...next, menu_included: val, catering_own: undefined, catering_mandatory: undefined, has_menu_types: undefined }
-          } else if (wizardQuestion === 'catering_own') {
-            next = { ...next, catering_own: val, catering_mandatory: undefined }
-          } else if (wizardQuestion === 'catering_mandatory') {
-            next = { ...next, catering_mandatory: val }
-          } else if (wizardQuestion === 'has_menu_types') {
-            next = { ...next, has_menu_types: val }
+            next = { ...next, price_model: val }
           }
           setWizardConfig(next)
 
-          // Determine next question
-          const model = next.price_model
-          let goTo: WizardQuestion | 'DONE' = 'DONE'
-          if (wizardQuestion === 'space_type')         goTo = 'price_model'
-          else if (wizardQuestion === 'price_model')   goTo = model === 'rental' ? 'catering_own' : 'menu_included'
-          else if (wizardQuestion === 'menu_included') goTo = val ? 'has_menu_types' : 'catering_own'
-          else if (wizardQuestion === 'catering_own')  goTo = val ? 'catering_mandatory' : 'DONE'
-          else if (wizardQuestion === 'catering_mandatory') goTo = 'DONE'
-          else if (wizardQuestion === 'has_menu_types')     goTo = 'DONE'
-
-          if (goTo === 'DONE') {
-            if (isWizardDone(next)) saveCommercialConfig(next)
+          if (wizardQuestion === 'space_type') {
+            wizardNext('price_model')
           } else {
-            wizardNext(goTo)
+            if (isWizardDone(next)) saveCommercialConfig(next)
           }
         }
 

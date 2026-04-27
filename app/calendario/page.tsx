@@ -559,32 +559,24 @@ export default function CalendarioPage() {
             {bulkMode ? (
               <>
                 <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>
-                  {bulkStart ? 'Haz click en otra fecha para seleccionar el rango' : `${bulkDates.size} fechas seleccionadas`}
+                  {bulkStart ? 'Haz click en otra fecha para completar el rango' : `${bulkDates.size} fecha${bulkDates.size !== 1 ? 's' : ''} seleccionada${bulkDates.size !== 1 ? 's' : ''}`}
                 </span>
-                <div style={{ minWidth: 180 }}>
-                  <Select value={bulkStatus} onValueChange={(v) => setBulkStatus(v as Status)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="negociacion">En negociación</SelectItem>
-                      <SelectItem value="reservado">Reservado</SelectItem>
-                      <SelectItem value="bloqueado">Bloqueado</SelectItem>
-                      <SelectItem value="libre">Libre (desbloquear)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <button className="btn btn-primary" onClick={applyBulk} disabled={saving || bulkDates.size === 0}>
-                  {saving ? 'Guardando...' : 'Aplicar al rango'}
+                <button className="btn btn-sm" onClick={() => { setBulkStatus('bloqueado'); applyBulk() }} disabled={saving || bulkDates.size === 0}
+                  style={{ background: '#1c1917', color: '#fff', border: 'none' }}>
+                  {saving ? 'Guardando...' : 'Bloquear'}
                 </button>
-                <button className="btn btn-ghost" onClick={() => { setBulkMode(false); setBulkDates(new Set()); setBulkStart(null); wasDragBulkRef.current = false }}>
+                <button className="btn btn-sm" onClick={() => { setBulkStatus('libre'); applyBulk() }} disabled={saving || bulkDates.size === 0}
+                  style={{ background: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7' }}>
+                  {saving ? 'Guardando...' : 'Desbloquear'}
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setBulkMode(false); setBulkDates(new Set()); setBulkStart(null); wasDragBulkRef.current = false }}>
                   Cancelar
                 </button>
               </>
             ) : (
-              <>
-                <button className="btn btn-ghost btn-sm" onClick={() => setBulkMode(true)}>
-                  <Calendar size={13} /> Seleccionar rango
-                </button>
-              </>
+              <button className="btn btn-ghost btn-sm" onClick={() => setBulkMode(true)}>
+                <Calendar size={13} /> Seleccionar rango
+              </button>
             )}
           </div>
         </div>

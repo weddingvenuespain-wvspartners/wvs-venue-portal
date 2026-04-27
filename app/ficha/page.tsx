@@ -8,7 +8,7 @@ import { ImageUploader } from '@/components/ImageUploader'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Info, FileText, Tag, MapPin, Image as ImageIcon, Star, Settings } from 'lucide-react'
+import { X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Info, FileText, Tag, MapPin, Image as ImageIcon, Star, Settings, ExternalLink, Mail, Lightbulb, Globe } from 'lucide-react'
 import DOMPurify from 'dompurify'
 
 type Tab = 'info' | 'descripcion' | 'precios' | 'ubicacion' | 'fotos' | 'resenas' | 'config'
@@ -108,7 +108,9 @@ export default function FichaPage() {
 
   // ── Ubicación ───────────────────────────────────────────────────────────────
   const [specificLocation, setSpecificLocation] = useState('')
-  const [placesNearby,     setPlacesNearby]     = useState('')
+  const [placesNearby1,    setPlacesNearby1]    = useState('')
+  const [placesNearby2,    setPlacesNearby2]    = useState('')
+  const [placesNearby3,    setPlacesNearby3]    = useState('')
   const [closestAirport,   setClosestAirport]   = useState('')
 
   // ── Fotos ───────────────────────────────────────────────────────────────────
@@ -387,7 +389,10 @@ export default function FichaPage() {
     setAccomNights(d.accomNights || '')
     setWvsAccomHelp(!!d.wvsAccomHelp)
     setSpecificLocation(d.specificLocation || '')
-    setPlacesNearby(d.placesNearby || '')
+    const parts = (d.placesNearby || '').split('·').map((s: string) => s.trim())
+    setPlacesNearby1(parts[0] || '')
+    setPlacesNearby2(parts[1] || '')
+    setPlacesNearby3(parts[2] || '')
     setClosestAirport(d.closestAirport || '')
     setLeadsEmail(d.leadsEmail || '')
     setLeadsEmailSaved(d.leadsEmail || '')
@@ -457,7 +462,9 @@ export default function FichaPage() {
       cateringFeeValue, cateringFeeUnit,
       breakdown3: buildCateringFee(), breakdown3text,
       accommodation, accomGuests, accomNights, wvsAccomHelp,
-      specificLocation, placesNearby, closestAirport,
+      specificLocation,
+      placesNearby: [placesNearby1, placesNearby2, placesNearby3].filter(Boolean).join(' · '),
+      closestAirport,
       leadsEmail,
       gallery: hGallery.map(p => p ? { id: p.id, url: p.url } : null),
       reviewsEnabled, reviews,
@@ -539,8 +546,8 @@ export default function FichaPage() {
     if (!heroImage)                       errs.push({ field: 'Imagen hero',             tab: 'info',        msg: 'Sube la foto principal' })
     if (venuePriceMode === 'auto' && !venuePriceInput.trim())
       errs.push({ field: 'Precio del venue', tab: 'info', msg: 'Introduce el precio o selecciona otra opción' })
-    if (menuPriceUnit !== '' && !menuPriceValue.trim())
-      errs.push({ field: 'Starting price del menú', tab: 'info', msg: 'Introduce el precio o selecciona "no mostrar"' })
+    if (!menuPriceValue.trim())
+      errs.push({ field: 'Starting price del menú', tab: 'info', msg: 'Obligatorio' })
 
     // Descripción
     if (!miniDesc.trim())                errs.push({ field: 'Mini título (H2)',          tab: 'descripcion', msg: 'Obligatorio' })
@@ -559,6 +566,8 @@ export default function FichaPage() {
     // Ubicación
     if (!specificLocation.trim())
       errs.push({ field: 'Ubicación específica', tab: 'ubicacion', msg: 'Obligatorio' })
+    if (!placesNearby1.trim() || !placesNearby2.trim() || !placesNearby3.trim())
+      errs.push({ field: '3 lugares cercanos', tab: 'ubicacion', msg: 'Rellena los 3 lugares cercanos' })
     if (!closestAirport.trim())
       errs.push({ field: 'Aeropuerto más cercano', tab: 'ubicacion', msg: 'Obligatorio' })
 
@@ -698,6 +707,13 @@ export default function FichaPage() {
     { key: 'config',      label: 'Configuración',   icon: Settings },
   ]
 
+  const venueSlug = H1_Venue.trim()
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+
   const wcH1    = wordCount(H1_Venue)
   const wcShort = wordCount(shortDesc)
   const wcMini  = wordCount(miniDesc)
@@ -758,11 +774,11 @@ export default function FichaPage() {
 
           {/* English content notice */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, marginBottom: 18 }}>
-            <span style={{ fontSize: 16, flexShrink: 0 }}>🇬🇧</span>
+            <Globe size={15} style={{ color: '#92400e', flexShrink: 0, marginTop: 1 }} />
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 2 }}>Contenido en inglés</div>
               <div style={{ fontSize: 12, color: '#78350f', lineHeight: 1.5 }}>
-                Toda la información de tu ficha debe rellenarse <strong>en inglés</strong>. Tu ficha se muestra a parejas internacionales que buscan venues en España.
+                Toda la información de tu ficha debe rellenarse <strong>en inglés</strong>.
               </div>
             </div>
           </div>
@@ -831,7 +847,7 @@ export default function FichaPage() {
               {/* Section title */}
               <div style={{ marginBottom: 24 }}>
                 <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--espresso)' }}>Información principal</div>
-                <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginTop: 4 }}>Gestiona los detalles básicos y la apariencia visual de tu venue.</div>
+                <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginTop: 4 }}>Gestiona los detalles básicos y la apariencia visual de tu perfil en weddingvenuesspain.com.</div>
               </div>
 
               {/* Two-column layout */}
@@ -849,9 +865,14 @@ export default function FichaPage() {
                       style={{ borderColor: wcH1 > 8 || hasError('Nombre del venue') ? ERR : undefined }}
                       disabled={isLocked} />
                     {wcH1 > 8 && <FieldError msg="Máximo 8 palabras." />}
-                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 5, lineHeight: 1.4 }}>
-                      ⚠ El nombre forma parte del slug (URL) de la página. Si lo cambias, cambiará la URL del venue en WeddingVenuesSpain.com.
-                    </div>
+                    {venueSlug && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, padding: '6px 10px', background: 'var(--ivory)', borderRadius: 7, border: '1px solid var(--border)' }}>
+                        <ExternalLink size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                        <span style={{ fontSize: 11, color: 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          weddingvenuesspain.com/wedding-venues/<strong style={{ color: 'var(--espresso)' }}>{venueSlug}</strong>/
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
@@ -872,9 +893,11 @@ export default function FichaPage() {
                       <span>Descripción corta</span>
                       <span style={{ fontSize: 11, fontWeight: 400, color: WC_COLORS(wcShort, 30) }}>{wcShort} / 30 palabras</span>
                     </label>
-                    <div style={{ fontSize: 11, color: 'var(--stone)', marginBottom: 6, lineHeight: 1.6 }}>
-                      <em>"A tranquil haven in the heart of Mallorca, surrounded by olive groves and the majestic Serra de Tramuntana, offering unmatched charm and serenity."</em>
-                      <br />En pocas palabras, ¿cómo describirías tu venue? Evoca el lugar y la sensación.
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 8, lineHeight: 1.5 }}>
+                      En pocas palabras, ¿cómo describirías tu venue? Evoca el lugar y la sensación.
+                      <span style={{ display: 'block', marginTop: 5, color: 'var(--stone)', fontStyle: 'italic' }}>
+                        Ej: "A tranquil haven in the heart of Mallorca, surrounded by olive groves and the majestic Serra de Tramuntana, offering unmatched charm and serenity."
+                      </span>
                     </div>
                     <textarea className="form-textarea" style={{ minHeight: 100, borderColor: wcShort > 30 || hasError('Descripción corta') ? ERR : undefined }}
                       value={shortDesc} onChange={e => setShortDesc(e.target.value)}
@@ -896,31 +919,29 @@ export default function FichaPage() {
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Precio base del menú</label>
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 6, lineHeight: 1.5 }}>
+                      Precio por comensal desde el que parten los menús. Si no tienes catering propio, indica el precio de los caterings con los que sueles colaborar.
+                    </div>
                     <div style={{ position: 'relative' }}>
                       <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--warm-gray)', pointerEvents: 'none' }}>€</span>
                       <input className="form-input" style={{ paddingLeft: 30, borderColor: hasError('Starting price del menú') ? ERR : undefined }} type="number" min={0} value={menuPriceValue}
                         onChange={e => setMenuPriceValue(e.target.value)} placeholder="185.00" disabled={isLocked} />
                     </div>
-                    {menuPriceValue && (
-                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4 }}>
-                        Precio base por comensal (IVA no incluido)
-                      </div>
-                    )}
                   </div>
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Precio del venue</label>
                     {!isLocked && (
                       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-                        {(['auto', 'included', 'none'] as VenuePriceMode[]).map(m => (
+                        {(['auto'] as VenuePriceMode[]).map(m => (
                           <button key={m} type="button" onClick={() => setVenuePriceMode(m)} style={{
                             padding: '7px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', border: '1px solid',
-                            borderColor: venuePriceMode === m ? 'var(--charcoal)' : 'var(--ivory)',
-                            background: venuePriceMode === m ? 'var(--charcoal)' : '#fff',
-                            color: venuePriceMode === m ? '#fff' : 'var(--charcoal)',
-                            fontWeight: venuePriceMode === m ? 500 : 400,
+                            borderColor: 'var(--charcoal)',
+                            background: 'var(--charcoal)',
+                            color: '#fff',
+                            fontWeight: 500,
                           }}>
-                            {m === 'auto' ? 'Precio ($/$$/$$$ automático)' : m === 'included' ? 'Incluido' : 'No mostrar'}
+                            Precio ($/$$/$$$ automático)
                           </button>
                         ))}
                       </div>
@@ -947,7 +968,10 @@ export default function FichaPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 32, marginTop: 28 }}>
                 {/* Imagen hero */}
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Imagen de fondo (hero)</label>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Imagen de fondo (hero)
+                    <InfoTooltip text="Usa una foto horizontal de alta resolución (mínimo 1920×1080px). Las imágenes que transmiten emoción y muestran el espacio en su mejor momento aumentan significativamente la tasa de contacto." />
+                  </label>
                   <ImageUploader
                     value={heroImage?.url ?? heroLocalPreview ?? null}
                     aspectRatio={16 / 9}
@@ -974,13 +998,6 @@ export default function FichaPage() {
                   />
                 </div>
 
-                {/* Consejo */}
-                <div style={{ padding: '20px 22px', background: 'var(--cream)', borderRadius: 10, alignSelf: 'start' }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, fontStyle: 'italic', color: 'var(--espresso)', marginBottom: 8 }}>Consejo</div>
-                  <div style={{ fontSize: 12.5, color: 'var(--warm-gray)', lineHeight: 1.7 }}>
-                    Los venues con imágenes de alta resolución y descripciones que evocan sentimientos tienen un 40% más de tasa de conversión. Asegúrate de que el "Starting Price" sea competitivo para tu región.
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -1218,11 +1235,10 @@ export default function FichaPage() {
 
                 <div className="form-group">
                   <label className="form-label">Ubicación específica</label>
-                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 6, lineHeight: 1.7 }}>
-                    Dirección y/o zona concreta. No solo la región general — indica el pueblo, municipio o área. <br />
-                    <em>Ej: Camí de Son Grau, s/n, Puigpunyent, Mallorca · o · Sitges, Barcelona</em>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 6, lineHeight: 1.5 }}>
+                    Ej: <em>Camí de Son Grau, s/n, Puigpunyent, Mallorca</em>
                   </div>
-                  <textarea className="form-textarea" style={{ minHeight: 80, borderColor: hasError('Ubicación específica') ? ERR : undefined }} value={specificLocation}
+                  <input className="form-input" style={{ borderColor: hasError('Ubicación específica') ? ERR : undefined }} value={specificLocation}
                     onChange={e => setSpecificLocation(e.target.value)}
                     placeholder="Dirección completa o zona específica (pueblo, municipio...)"
                     disabled={isLocked} />
@@ -1230,13 +1246,22 @@ export default function FichaPage() {
 
                 <div className="form-group">
                   <label className="form-label">3 lugares cercanos</label>
-                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 6, lineHeight: 1.7 }}>
-                    Nombre del lugar y minutos en coche. Ej: <em>Puerto de Palma – 22 min · Deià – 50 min · Alcúdia – 50 min</em>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {[
+                      { val: placesNearby1, set: setPlacesNearby1, ph: 'Lugar – XX min' },
+                      { val: placesNearby2, set: setPlacesNearby2, ph: 'Lugar – XX min' },
+                      { val: placesNearby3, set: setPlacesNearby3, ph: 'Lugar – XX min' },
+                    ].map((f, i) => (
+                      <>
+                        {i > 0 && <span key={`sep-${i}`} style={{ color: 'var(--warm-gray)', flexShrink: 0 }}>·</span>}
+                        <input key={i} className="form-input" value={f.val}
+                          onChange={e => f.set(e.target.value)}
+                          placeholder={f.ph}
+                          disabled={isLocked}
+                          style={{ flex: 1, minWidth: 0 }} />
+                      </>
+                    ))}
                   </div>
-                  <textarea className="form-textarea" style={{ minHeight: 80 }} value={placesNearby}
-                    onChange={e => setPlacesNearby(e.target.value)}
-                    placeholder={'Lugar 1 – XX min\nLugar 2 – XX min\nLugar 3 – XX min'}
-                    disabled={isLocked} />
                 </div>
 
                 <div className="form-group">
@@ -1259,8 +1284,10 @@ export default function FichaPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
               {/* Photo tip */}
-              <div style={{ padding: '12px 16px', background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 10, fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.7 }}>
-                Acepta JPG, PNG o WebP. Tras seleccionar la foto podrás <strong style={{ color: 'var(--charcoal)' }}>recortarla al ratio correcto</strong> antes de subirla.
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'var(--ivory)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                  Acepta <strong style={{ color: 'var(--espresso)' }}>JPG, PNG o WebP</strong>. Tras seleccionar la imagen podrás recortarla al ratio correcto antes de subirla.
+                </div>
               </div>
 
               {/* Foto vertical */}
@@ -1414,81 +1441,85 @@ export default function FichaPage() {
           {/* Bottom buttons */}
           {/* ── CONFIGURACIÓN ────────────────────────────────────────── */}
           {activeTab === 'config' && (
-            <div className="card" style={{ border: '1px solid var(--ivory)', borderRadius: 12 }}>
-              <div style={{ padding: '24px 28px 18px' }}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--espresso)', letterSpacing: '-0.01em' }}>Configuración</div>
-                <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>Emails de contacto y ajustes de tu ficha.</div>
-              </div>
-              <div style={{ padding: '0 28px 28px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 600 }}>
 
-                <div className="form-group">
-                  <label className="form-label">Emails para recibir consultas</label>
-                  <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 8, lineHeight: 1.6 }}>
-                    Introduce hasta <strong>2 emails</strong> separados por coma donde recibirás las consultas de tu página en Wedding Venues Spain.<br />
-                    Ej: <em>reservas@tuvenue.com, info@tuvenue.com</em>
+              {/* Email card */}
+              <div className="card" style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 24px', borderBottom: '1px solid var(--ivory)' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 9, background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Mail size={16} style={{ color: 'var(--gold)' }} />
                   </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>Emails de contacto</div>
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 1 }}>Dónde recibirás las consultas de parejas desde weddingvenuesspain.com</div>
+                  </div>
+                </div>
+
+                <div style={{ padding: '20px 24px' }}>
+                  <label className="form-label">Hasta 2 emails separados por coma</label>
                   <input
                     className="form-input"
                     type="text"
-                    placeholder="email1@tuvenue.com, email2@tuvenue.com"
+                    placeholder="reservas@tuvenue.com, info@tuvenue.com"
                     value={leadsEmail}
                     onChange={e => {
                       const parts = e.target.value.split(',')
                       if (parts.length <= 2) setLeadsEmail(e.target.value)
                     }}
-                    style={{ maxWidth: 480 }}
                   />
                   {leadsEmail && (
-                    <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {leadsEmail.split(',').map((em, i) => em.trim() && (
-                        <span key={i} style={{ fontSize: 12, background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 20, padding: '2px 10px', color: 'var(--charcoal)' }}>
+                        <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, background: 'var(--ivory)', border: '1px solid var(--border)', borderRadius: 20, padding: '3px 12px', color: 'var(--espresso)' }}>
+                          <Mail size={11} style={{ color: 'var(--warm-gray)' }} />
                           {em.trim()}
                         </span>
                       ))}
                     </div>
                   )}
-                </div>
 
-                {configMsg && (
-                  <div style={{ fontSize: 13, color: configMsg.includes('✓') ? 'var(--gold)' : '#dc2626', marginBottom: 8 }}>
-                    {configMsg}
+                  {configMsg && (
+                    <div style={{ marginTop: 12, fontSize: 12, color: configMsg.includes('✓') ? '#059669' : '#dc2626', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      {configMsg.includes('✓') ? <CheckCircle size={13} /> : <AlertCircle size={13} />}
+                      {configMsg}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                    <button
+                      className="btn btn-primary"
+                      disabled={savingConfig || leadsEmail === leadsEmailSaved}
+                      onClick={async () => {
+                        setSavingConfig(true)
+                        setConfigMsg('')
+                        try {
+                          const res = await fetch('/api/venues/save-config', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ leadsEmail }),
+                          })
+                          const data = await res.json()
+                          if (!res.ok) { setConfigMsg(data.error || 'Error al guardar'); return }
+                          setLeadsEmailSaved(leadsEmail)
+                          setConfigMsg('Guardado correctamente ✓')
+                          setTimeout(() => setConfigMsg(''), 3000)
+                        } catch { setConfigMsg('Error de conexión') }
+                        finally { setSavingConfig(false) }
+                      }}
+                    >
+                      {savingConfig ? 'Guardando...' : 'Guardar cambios'}
+                    </button>
+                    <button
+                      className="btn btn-ghost"
+                      disabled={savingConfig || leadsEmail === leadsEmailSaved}
+                      onClick={() => setLeadsEmail(leadsEmailSaved)}
+                    >
+                      Cancelar
+                    </button>
                   </div>
-                )}
-
-                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                  <button
-                    className="btn btn-primary"
-                    disabled={savingConfig || leadsEmail === leadsEmailSaved}
-                    onClick={async () => {
-                      setSavingConfig(true)
-                      setConfigMsg('')
-                      try {
-                        const res = await fetch('/api/venues/save-config', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ leadsEmail }),
-                        })
-                        const data = await res.json()
-                        if (!res.ok) { setConfigMsg(data.error || 'Error al guardar'); return }
-                        setLeadsEmailSaved(leadsEmail)
-                        setConfigMsg('Guardado correctamente ✓')
-                        setTimeout(() => setConfigMsg(''), 3000)
-                      } catch { setConfigMsg('Error de conexión') }
-                      finally { setSavingConfig(false) }
-                    }}
-                  >
-                    {savingConfig ? 'Guardando...' : 'Guardar'}
-                  </button>
-                  <button
-                    className="btn btn-ghost"
-                    disabled={savingConfig || leadsEmail === leadsEmailSaved}
-                    onClick={() => setLeadsEmail(leadsEmailSaved)}
-                  >
-                    Cancelar
-                  </button>
                 </div>
-
               </div>
+
             </div>
           )}
 
@@ -1884,6 +1915,34 @@ function Divider() {
 function FieldError({ msg }: { msg: string }) {
   return <div style={{ fontSize: 11, color: '#c0392b', marginTop: 4 }}>{msg}</div>
 }
+function InfoTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex' }}
+      onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <Info size={14} style={{ color: open ? 'var(--gold)' : 'var(--stone)', cursor: 'default', flexShrink: 0, transition: 'color 0.15s' }} />
+      {open && (
+        <span style={{
+          position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)',
+          background: '#1c1917', color: '#f5f5f4',
+          fontSize: 12, lineHeight: 1.6, fontWeight: 400,
+          textTransform: 'none', letterSpacing: 'normal',
+          padding: '10px 14px', borderRadius: 10, width: 260, zIndex: 200,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18)', pointerEvents: 'none',
+        }}>
+          {text}
+          <span style={{
+            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+            width: 0, height: 0,
+            borderLeft: '6px solid transparent', borderRight: '6px solid transparent',
+            borderTop: '6px solid #1c1917',
+          }} />
+        </span>
+      )}
+    </span>
+  )
+}
+
 function StatusBanner({ type, title, body }: { type: 'pending' | 'error'; title: string; body: string }) {
   const isPending = type === 'pending'
   return (
