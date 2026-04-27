@@ -9,6 +9,7 @@ import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import { expandLeadDates, expandBudgetDates, pad } from '@/lib/lead-dates'
 import { LeadDatesSection } from '@/components/LeadDatesSection'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import {
   Plus, Search, X, Phone, Mail, MessageCircle,
   Calendar, Users, ChevronLeft, ChevronRight, RotateCcw, CheckCircle,
@@ -1128,17 +1129,24 @@ export default function LeadsPage() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
-              <select className="form-input" style={{ width: 'auto' }}
-                value={filterSrc} onChange={e => setFilterSrc(e.target.value)}>
-                <option value="all">Fuente: Todas</option>
-                {Object.entries(SOURCE_LABEL).map(([v,l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-              <select className="form-input" style={{ width: 'auto' }}
-                value={filterBudget} onChange={e => setFilterBudget(e.target.value)}>
-                <option value="all">Presupuesto: Todos</option>
-                {BUDGET_OPTS.filter(v => v !== 'sin_definir').map(v =>
-                  <option key={v} value={v}>{BUDGET_LABEL[v]}</option>)}
-              </select>
+              <div style={{ minWidth: 170 }}>
+                <Select value={filterSrc} onValueChange={(v) => setFilterSrc(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Fuente: Todas</SelectItem>
+                    {Object.entries(SOURCE_LABEL).map(([v, l]) => <SelectItem key={v} value={v}>{l as string}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div style={{ minWidth: 200 }}>
+                <Select value={filterBudget} onValueChange={(v) => setFilterBudget(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Presupuesto: Todos</SelectItem>
+                    {BUDGET_OPTS.filter(v => v !== 'sin_definir').map(v => <SelectItem key={v} value={v}>{BUDGET_LABEL[v]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
               {/* Date range filter */}
               <FilterDateRangePicker
                 from={filterDateFrom} to={filterDateTo}
@@ -3293,12 +3301,16 @@ function DateConfirmModal({
                   <>
                     {editingDuration ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                        <select style={{ fontSize: 12, padding: '2px 6px', borderRadius: 6, border: '1.5px solid var(--gold)', background: '#fff', color: 'var(--espresso)', fontFamily: 'Manrope,sans-serif', fontWeight: 700, cursor: 'pointer', outline: 'none' }}
-                          value={weddingDuration} onChange={e => setWeddingDuration(Number(e.target.value))}>
-                          {Array.from({ length: Math.max(1, selectedDates.length || 10) }, (_, i) => i + 1).map(d => (
-                            <option key={d} value={d}>{d} {d === 1 ? 'día' : 'días'}</option>
-                          ))}
-                        </select>
+                        <div style={{ minWidth: 100 }}>
+                          <Select value={String(weddingDuration)} onValueChange={(v) => setWeddingDuration(Number(v))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: Math.max(1, selectedDates.length || 10) }, (_, i) => i + 1).map(d => (
+                                <SelectItem key={d} value={String(d)}>{d} {d === 1 ? 'día' : 'días'}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <button type="button" onClick={() => setEditingDuration(false)} style={{ fontSize: 11, color: '#16a34a', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}>OK</button>
                       </span>
                     ) : (
@@ -5917,14 +5929,27 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     )}
                     {form.original_date_flexibility === 'month' && (
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <select className="form-input" value={form.original_wedding_month} onChange={e => setOrig('wedding_month', e.target.value)}>{MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}</select>
-                        <select className="form-input" style={{ width: 110 }} value={form.original_wedding_year} onChange={e => setOrig('wedding_year', e.target.value)}>{YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}</select>
+                        <Select value={String(form.original_wedding_month)} onValueChange={(v) => setOrig('wedding_month', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <div style={{ width: 110 }}>
+                          <Select value={String(form.original_wedding_year)} onValueChange={(v) => setOrig('wedding_year', v)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>{YEAR_OPTS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     )}
                     {form.original_date_flexibility === 'season' && (
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                         {SEASONS.map(s => { const active = form.original_wedding_season === s.value; return <button key={s.value} type="button" onClick={() => setOrig('wedding_season', s.value)} style={{ padding: '6px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer', outline: 'none', border: `1.5px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`, background: active ? 'var(--gold)' : '#fff', color: active ? '#fff' : 'var(--charcoal)', fontWeight: active ? 700 : 500, transition: 'all 0.15s', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{s.emoji} {s.label}</button> })}
-                        <select className="form-input" style={{ width: 110 }} value={form.original_wedding_year} onChange={e => setOrig('wedding_year', e.target.value)}>{YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}</select>
+                        <div style={{ width: 110 }}>
+                          <Select value={String(form.original_wedding_year)} onValueChange={(v) => setOrig('wedding_year', v)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>{YEAR_OPTS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     )}
                     {(form.original_date_flexibility === 'flexible' || !form.original_date_flexibility) && (
@@ -6029,9 +6054,14 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                             right={(
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
                                 <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Boda dura</span>
-                                <select value={curDur} onChange={e => set('wedding_duration_days', e.target.value)} style={{ padding: '5px 10px', borderRadius: 8, border: '1.5px solid var(--gold)', background: '#fff', color: 'var(--espresso)', fontSize: 12, fontWeight: 700, fontFamily: 'Manrope, sans-serif', cursor: 'pointer', outline: 'none' }}>
-                                  {Array.from({ length: maxDur }, (_, i) => i + 1).map(d => <option key={d} value={String(d)}>{d} {d === 1 ? 'día' : 'días'}</option>)}
-                                </select>
+                                <div style={{ minWidth: 110 }}>
+                                  <Select value={String(curDur)} onValueChange={(v) => set('wedding_duration_days', v)}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      {Array.from({ length: maxDur }, (_, i) => i + 1).map(d => <SelectItem key={d} value={String(d)}>{d} {d === 1 ? 'día' : 'días'}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               </div>
                             )}
                           />
@@ -6059,8 +6089,16 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     return (
                       <div>
                         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                          <select className="form-input" value={form.wedding_month} onChange={e => set('wedding_month', e.target.value)}>{MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}</select>
-                          <select className="form-input" style={{ width: 110 }} value={form.wedding_year} onChange={e => set('wedding_year', e.target.value)}>{YEAR_OPTS.map(yr => <option key={yr} value={yr}>{yr}</option>)}</select>
+                          <Select value={String(form.wedding_month)} onValueChange={(v) => set('wedding_month', v)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
+                          </Select>
+                          <div style={{ width: 110 }}>
+                            <Select value={String(form.wedding_year)} onValueChange={(v) => set('wedding_year', v)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>{YEAR_OPTS.map(yr => <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
                         </div>
                         <MiniCalendarPicker userId={userId} readOnly value={undefined} highlights={Array.from({ length: days }, (_, i) => `${y}-${String(mo).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`)} />
                         <DateSummaryCard miniLabel="Mes deseado" title={`${MONTHS[mo - 1]} de ${y}`} subtitle={`Cualquier día del mes (${days} días disponibles)`} />
@@ -6078,7 +6116,12 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                             const active = form.wedding_season === s.value
                             return <button key={s.value} type="button" onClick={() => set('wedding_season', s.value)} style={{ padding: '7px 14px', borderRadius: 999, fontSize: 12, cursor: 'pointer', outline: 'none', border: `1.5px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`, background: active ? 'var(--gold)' : '#fff', color: active ? '#fff' : 'var(--charcoal)', fontWeight: active ? 700 : 500, transition: 'all 0.15s', display: 'inline-flex', alignItems: 'center', gap: 5 }}>{s.emoji} {s.label}</button>
                           })}
-                          <select className="form-input" style={{ width: 110 }} value={form.wedding_year} onChange={e => set('wedding_year', e.target.value)}>{YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}</select>
+                          <div style={{ width: 110 }}>
+                            <Select value={String(form.wedding_year)} onValueChange={(v) => set('wedding_year', v)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>{YEAR_OPTS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
                         </div>
                         {sObj && <DateSummaryCard miniLabel="Estación deseada" title={`${sObj.emoji} ${sObj.label} de ${form.wedding_year}`} subtitle="La pareja prefiere casarse en esta época del año" />}
                       </div>
@@ -6163,14 +6206,27 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                         {form.original_date_flexibility === 'multi_range' && <MultiRangeCalendarPicker userId={userId} ranges={form.original_wedding_date_ranges || []} onChange={r => setOrig('wedding_date_ranges', r)} />}
                         {form.original_date_flexibility === 'month' && (
                           <div style={{ display: 'flex', gap: 8 }}>
-                            <select className="form-input" value={form.original_wedding_month} onChange={e => setOrig('wedding_month', e.target.value)}>{MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}</select>
-                            <select className="form-input" style={{ width: 110 }} value={form.original_wedding_year} onChange={e => setOrig('wedding_year', e.target.value)}>{YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}</select>
+                            <Select value={String(form.original_wedding_month)} onValueChange={(v) => setOrig('wedding_month', v)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <div style={{ width: 110 }}>
+                              <Select value={String(form.original_wedding_year)} onValueChange={(v) => setOrig('wedding_year', v)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>{YEAR_OPTS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
                           </div>
                         )}
                         {form.original_date_flexibility === 'season' && (
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                             {SEASONS.map(s => { const active = form.original_wedding_season === s.value; return <button key={s.value} type="button" onClick={() => setOrig('wedding_season', s.value)} style={{ padding: '6px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer', outline: 'none', border: `1.5px solid ${active ? 'var(--gold)' : 'var(--ivory)'}`, background: active ? 'var(--gold)' : '#fff', color: active ? '#fff' : 'var(--charcoal)', fontWeight: active ? 700 : 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}>{s.emoji} {s.label}</button> })}
-                            <select className="form-input" style={{ width: 110 }} value={form.original_wedding_year} onChange={e => setOrig('wedding_year', e.target.value)}>{YEAR_OPTS.map(y => <option key={y} value={y}>{y}</option>)}</select>
+                            <div style={{ width: 110 }}>
+                              <Select value={String(form.original_wedding_year)} onValueChange={(v) => setOrig('wedding_year', v)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>{YEAR_OPTS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
                           </div>
                         )}
                         {(form.original_date_flexibility === 'flexible' || !form.original_date_flexibility) && (
@@ -6249,12 +6305,15 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 <div className="two-col">
                   <div className="form-group">
                     <label className="form-label">Tipo de ceremonia</label>
-                    <select className="form-input" value={form.ceremony_type} onChange={e => set('ceremony_type', e.target.value)}>
-                      <option value="sin_definir">Sin definir</option>
-                      <option value="civil">Civil</option>
-                      <option value="religiosa">Religiosa</option>
-                      <option value="simbolica">Simbólica</option>
-                    </select>
+                    <Select value={form.ceremony_type} onValueChange={(v) => set('ceremony_type', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sin_definir">Sin definir</SelectItem>
+                        <SelectItem value="civil">Civil</SelectItem>
+                        <SelectItem value="religiosa">Religiosa</SelectItem>
+                        <SelectItem value="simbolica">Simbólica</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="form-group">
                     <LanguagePicker value={form.language} onChange={v => set('language', v)} />
@@ -6267,12 +6326,15 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   </div>
                   <div className="form-group">
                     <label className="form-label">Catering</label>
-                    <select className="form-input" value={form.catering_needed} onChange={e => set('catering_needed', e.target.value)}>
-                      <option value="sin_definir">Sin definir</option>
-                      <option value="incluido">Incluido en el venue</option>
-                      <option value="externo">Traen catering externo</option>
-                      <option value="por_definir">Por definir</option>
-                    </select>
+                    <Select value={form.catering_needed} onValueChange={(v) => set('catering_needed', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sin_definir">Sin definir</SelectItem>
+                        <SelectItem value="incluido">Incluido en el venue</SelectItem>
+                        <SelectItem value="externo">Traen catering externo</SelectItem>
+                        <SelectItem value="por_definir">Por definir</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="two-col">
@@ -6297,11 +6359,14 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 {isNewPhase && (
                   <div className="form-group" style={{ marginTop: 12, marginBottom: 0 }}>
                     <label className="form-label">Presupuesto orientativo</label>
-                    <select className="form-input" value={form.budget} onChange={e => set('budget', e.target.value)}>
-                      {BUDGET_OPTS.map(v => (
-                        <option key={v} value={v}>{v === 'sin_definir' ? 'Sin definir' : BUDGET_LABEL[v].replace('k€', '.000 €')}</option>
-                      ))}
-                    </select>
+                    <Select value={form.budget} onValueChange={(v) => set('budget', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {BUDGET_OPTS.map(v => (
+                          <SelectItem key={v} value={v}>{v === 'sin_definir' ? 'Sin definir' : BUDGET_LABEL[v].replace('k€', '.000 €')}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
               </>
@@ -6424,11 +6489,14 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 <SectionTitle icon={<Receipt size={14} />} title="Presupuesto" hint="Importe orientativo del presupuesto" />
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Importe orientativo</label>
-                  <select className="form-input" value={form.budget} onChange={e => set('budget', e.target.value)}>
-                    {BUDGET_OPTS.map(v => (
-                      <option key={v} value={v}>{v === 'sin_definir' ? 'Sin definir' : BUDGET_LABEL[v].replace('k€', '.000 €')}</option>
-                    ))}
-                  </select>
+                  <Select value={form.budget} onValueChange={(v) => set('budget', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BUDGET_OPTS.map(v => (
+                        <SelectItem key={v} value={v}>{v === 'sin_definir' ? 'Sin definir' : BUDGET_LABEL[v].replace('k€', '.000 €')}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </>)}
             </div>
@@ -6575,11 +6643,14 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               {leadStatus === 'won' && (
                 <div className="form-group">
                   <label className="form-label">Importe</label>
-                  <select className="form-input" value={form.budget} onChange={e => set('budget', e.target.value)}>
-                    {BUDGET_OPTS.map(v => (
-                      <option key={v} value={v}>{v === 'sin_definir' ? 'Sin definir' : BUDGET_LABEL[v].replace('k€', '.000 €')}</option>
-                    ))}
-                  </select>
+                  <Select value={form.budget} onValueChange={(v) => set('budget', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BUDGET_OPTS.map(v => (
+                        <SelectItem key={v} value={v}>{v === 'sin_definir' ? 'Sin definir' : BUDGET_LABEL[v].replace('k€', '.000 €')}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 
@@ -6763,9 +6834,12 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
 
             <div className="form-group">
               <label className="form-label">¿Cómo nos ha conocido?</label>
-              <select className="form-input" value={form.source} onChange={e => set('source', e.target.value)}>
-                {Object.entries(SOURCE_LABEL).map(([v,l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
+              <Select value={form.source} onValueChange={(v) => set('source', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(SOURCE_LABEL).map(([v, l]) => <SelectItem key={v} value={v}>{l as string}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>

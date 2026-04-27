@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
 import {
   ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
   FileText, Calendar, Search, AlertCircle, Trash2, Flower2, Edit2,
@@ -559,13 +561,17 @@ export default function CalendarioPage() {
                 <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>
                   {bulkStart ? 'Haz click en otra fecha para seleccionar el rango' : `${bulkDates.size} fechas seleccionadas`}
                 </span>
-                <select className="form-input" style={{ width: 'auto' }}
-                  value={bulkStatus} onChange={e => setBulkStatus(e.target.value as Status)}>
-                  <option value="negociacion">En negociación</option>
-                  <option value="reservado">Reservado</option>
-                  <option value="bloqueado">Bloqueado</option>
-                  <option value="libre">Libre (desbloquear)</option>
-                </select>
+                <div style={{ minWidth: 180 }}>
+                  <Select value={bulkStatus} onValueChange={(v) => setBulkStatus(v as Status)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="negociacion">En negociación</SelectItem>
+                      <SelectItem value="reservado">Reservado</SelectItem>
+                      <SelectItem value="bloqueado">Bloqueado</SelectItem>
+                      <SelectItem value="libre">Libre (desbloquear)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <button className="btn btn-primary btn-sm" onClick={applyBulk} disabled={saving || bulkDates.size === 0}>
                   {saving ? 'Guardando...' : 'Aplicar al rango'}
                 </button>
@@ -2100,7 +2106,7 @@ function QuickCreateLead({
         </div>
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label className="form-label" style={{ fontSize: 11 }}>Fecha de boda</label>
-          <input className="form-input" type="date" value={form.wedding_date} onChange={e => set('wedding_date', e.target.value)} />
+          <DatePicker value={form.wedding_date} onChange={(v) => set('wedding_date', v)} placeholder="Fecha de boda" />
         </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>

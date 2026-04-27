@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { ImageUploader } from '@/components/ImageUploader'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Info, FileText, Tag, MapPin, Image as ImageIcon, Star, Settings } from 'lucide-react'
@@ -855,10 +856,15 @@ export default function FichaPage() {
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Región</label>
-                    <select className="form-input" value={location} onChange={e => setLocation(e.target.value)} disabled={isLocked} style={{ borderColor: hasError('Región') ? ERR : undefined }}>
-                      <option value="">Selecciona una región...</option>
-                      {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
+                    <Select value={location || '__none__'} onValueChange={(v) => setLocation(v === '__none__' ? '' : v)} disabled={isLocked}>
+                      <SelectTrigger style={{ borderColor: hasError('Región') ? ERR : undefined }}>
+                        <SelectValue placeholder="Selecciona una región..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Selecciona una región...</SelectItem>
+                        {REGIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1074,15 +1080,19 @@ export default function FichaPage() {
                             placeholder="36.600" disabled={isLocked} />
                         </div>
                         <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>€</span>
-                        <select className="form-input" style={{ width: 180 }} value={venueFeeNights}
-                          onChange={e => setVenueFeeNights(parseInt(e.target.value))} disabled={isLocked}>
-                          <option value={0}>Sin noches incluidas</option>
-                          <option value={1}>incl. 1 noche</option>
-                          <option value={2}>incl. 2 noches</option>
-                          <option value={3}>incl. 3 noches</option>
-                          <option value={4}>incl. 4 noches</option>
-                          <option value={5}>incl. 5 noches</option>
-                        </select>
+                        <div style={{ width: 180 }}>
+                          <Select value={String(venueFeeNights)} onValueChange={(v) => setVenueFeeNights(parseInt(v))} disabled={isLocked}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">Sin noches incluidas</SelectItem>
+                              <SelectItem value="1">incl. 1 noche</SelectItem>
+                              <SelectItem value="2">incl. 2 noches</SelectItem>
+                              <SelectItem value="3">incl. 3 noches</SelectItem>
+                              <SelectItem value="4">incl. 4 noches</SelectItem>
+                              <SelectItem value="5">incl. 5 noches</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </>
                     )}
                   </div>
@@ -1115,12 +1125,16 @@ export default function FichaPage() {
                         value={cateringFeeValue} onChange={e => setCateringFeeValue(e.target.value)}
                         placeholder="120" disabled={isLocked} />
                     </div>
-                    <select className="form-input" style={{ width: 130 }} value={cateringFeeUnit}
-                      onChange={e => setCateringFeeUnit(e.target.value as any)} disabled={isLocked}>
-                      <option value="person">€/person</option>
-                      <option value="day">€/day</option>
-                      <option value="event">€/event</option>
-                    </select>
+                    <div style={{ width: 130 }}>
+                      <Select value={cateringFeeUnit} onValueChange={(v) => setCateringFeeUnit(v as any)} disabled={isLocked}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="person">€/person</SelectItem>
+                          <SelectItem value="day">€/day</SelectItem>
+                          <SelectItem value="event">€/event</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   {buildCateringFee() && (
                     <div style={{ fontSize: 12, color: 'var(--warm-gray)', padding: '6px 10px', background: 'var(--cream)', borderRadius: 6, display: 'inline-block' }}>
@@ -1142,12 +1156,17 @@ export default function FichaPage() {
                 <SectionTitle>Alojamiento</SectionTitle>
 
                 <div className="form-group">
-                  <select className="form-input" style={{ borderColor: hasError('Alojamiento') ? ERR : undefined }} value={accommodation} onChange={e => setAccommodation(e.target.value)} disabled={isLocked}>
-                    <option value="">Selecciona...</option>
-                    <option value="yes">Incluido en el venue fee</option>
-                    <option value="optional">Opcional / disponible aparte</option>
-                    <option value="no">No incluido</option>
-                  </select>
+                  <Select value={accommodation || '__none__'} onValueChange={(v) => setAccommodation(v === '__none__' ? '' : v)} disabled={isLocked}>
+                    <SelectTrigger style={{ borderColor: hasError('Alojamiento') ? ERR : undefined }}>
+                      <SelectValue placeholder="Selecciona..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Selecciona...</SelectItem>
+                      <SelectItem value="yes">Incluido en el venue fee</SelectItem>
+                      <SelectItem value="optional">Opcional / disponible aparte</SelectItem>
+                      <SelectItem value="no">No incluido</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {accommodation === 'yes' && (

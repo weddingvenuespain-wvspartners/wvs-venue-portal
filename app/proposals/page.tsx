@@ -9,6 +9,7 @@ import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Lock, Loader2, FileText, Building2, UtensilsCrossed, LayoutTemplate, ChevronLeft, ChevronRight, Search, type LucideIcon } from 'lucide-react'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import { STARTER_TEMPLATES, type StarterTemplateId, type StarterTemplateIcon } from '@/lib/proposal-starter-templates'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 const STARTER_ICON: Record<StarterTemplateIcon, LucideIcon> = {
   'building-2': Building2,
@@ -378,24 +379,39 @@ function PropuestasPageContent() {
 
           {/* Filters row — 4 equal columns (25% each), search on the right with magnifier icon */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="form-input" style={{ flex: '1 1 0', minWidth: 0, height: 34 }}>
-              <option value="all">Todos los estados</option>
-              <option value="draft">Borrador</option>
-              <option value="sent">Enviada</option>
-              <option value="viewed">Vista</option>
-              <option value="expired">Expirada</option>
-            </select>
-            <select value={dateFilter} onChange={e => setDateFilter(e.target.value as any)} className="form-input" style={{ flex: '1 1 0', minWidth: 0, height: 34 }}>
-              <option value="all">Cualquier fecha</option>
-              <option value="today">Creada hoy</option>
-              <option value="last_7d">Últimos 7 días</option>
-              <option value="last_30d">Últimos 30 días</option>
-            </select>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="form-input" style={{ flex: '1 1 0', minWidth: 0, height: 34 }}>
-              <option value="recent">Más recientes</option>
-              <option value="views">Más vistas</option>
-              <option value="name">Nombre A-Z</option>
-            </select>
+            <div style={{ flex: '1 1 0', minWidth: 0 }}>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="sent">Enviada</SelectItem>
+                  <SelectItem value="viewed">Vista</SelectItem>
+                  <SelectItem value="expired">Expirada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div style={{ flex: '1 1 0', minWidth: 0 }}>
+              <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Cualquier fecha</SelectItem>
+                  <SelectItem value="today">Creada hoy</SelectItem>
+                  <SelectItem value="last_7d">Últimos 7 días</SelectItem>
+                  <SelectItem value="last_30d">Últimos 30 días</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div style={{ flex: '1 1 0', minWidth: 0 }}>
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recent">Más recientes</SelectItem>
+                  <SelectItem value="views">Más vistas</SelectItem>
+                  <SelectItem value="name">Nombre A-Z</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0 }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', pointerEvents: 'none' }} />
               <input

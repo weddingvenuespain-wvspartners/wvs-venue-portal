@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { Save, CheckCircle, Building2, MapPin, Globe, Phone, User } from 'lucide-react'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 export default function CateringFichaPage() {
   const router = useRouter()
@@ -116,10 +117,13 @@ export default function CateringFichaPage() {
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={labelSt}>Tipo de cocina</label>
-                  <select value={form.venue_type} onChange={e => set('venue_type', e.target.value)} style={inputSt}>
-                    <option value="">Seleccionar…</option>
-                    {CATERING_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                  <Select value={form.venue_type || '__none__'} onValueChange={(v) => set('venue_type', v === '__none__' ? '' : v)}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar…" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Seleccionar…</SelectItem>
+                      {CATERING_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={labelSt}>Teléfono</label>

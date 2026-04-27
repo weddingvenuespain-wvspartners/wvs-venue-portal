@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 const STATUS_LABELS: Record<string, string> = {
   new: 'Nuevo', contacted: 'Contactado', visit: 'Visita',
@@ -124,13 +125,16 @@ export default function CrmPage() {
                     </div>
                     <div className="form-group">
                       <label className="form-label">Origen</label>
-                      <select className="form-select" value={form.source} onChange={e => setForm({...form, source: e.target.value})}>
-                        <option value="manual">Manual</option>
-                        <option value="web">Web WVS</option>
-                        <option value="instagram">Instagram</option>
-                        <option value="referral">Referido</option>
-                        <option value="other">Otro</option>
-                      </select>
+                      <Select value={form.source} onValueChange={(v) => setForm({...form, source: v})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manual">Manual</SelectItem>
+                          <SelectItem value="web">Web WVS</SelectItem>
+                          <SelectItem value="instagram">Instagram</SelectItem>
+                          <SelectItem value="referral">Referido</SelectItem>
+                          <SelectItem value="other">Otro</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   <div className="form-group">

@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import {
   MessageCircle, Mail, FileText, Plus, Trash2, Send, X,
   Copy, Check, Upload, Eye, Sparkles, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
@@ -831,17 +832,23 @@ function MessagesTab({ templates, leads, userId, onRefresh }: {
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Categoría</label>
-                <select className="form-input" value={form.category} onChange={e => setF('category', e.target.value)}>
-                  {MSG_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
+                <Select value={form.category} onValueChange={(v) => setF('category', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {MSG_CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Canal</label>
-                <select className="form-input" value={form.channel} onChange={e => setF('channel', e.target.value)}>
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="email">Email</option>
-                  <option value="both">Ambos canales</option>
-                </select>
+                <Select value={form.channel} onValueChange={(v) => setF('channel', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="both">Ambos canales</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

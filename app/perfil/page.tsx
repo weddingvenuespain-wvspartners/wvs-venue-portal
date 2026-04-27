@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import { useTheme, type Theme } from '@/lib/theme-context'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import {
   User, Lock, Bell, CreditCard, ShieldAlert, Settings,
   CheckCircle2, XCircle, Eye, EyeOff, Smartphone,
@@ -1133,29 +1134,38 @@ function PerfilPageContent() {
                   <Section title="Localización" description="Configura tu zona horaria, idioma y formato de fecha.">
                     <div className="form-group">
                       <label className="form-label">Zona horaria</label>
-                      <select className="form-input" value={timezone} onChange={e => setTimezone(e.target.value)}>
-                        <option value="Europe/Madrid">Europe/Madrid (GMT+1/+2)</option>
-                        <option value="Europe/London">Europe/London (GMT+0/+1)</option>
-                        <option value="America/New_York">America/New_York (GMT-5/-4)</option>
-                        <option value="America/Mexico_City">America/Mexico_City (GMT-6/-5)</option>
-                        <option value="America/Argentina/Buenos_Aires">America/Buenos_Aires (GMT-3)</option>
-                      </select>
+                      <Select value={timezone} onValueChange={(v) => setTimezone(v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Europe/Madrid">Europe/Madrid (GMT+1/+2)</SelectItem>
+                          <SelectItem value="Europe/London">Europe/London (GMT+0/+1)</SelectItem>
+                          <SelectItem value="America/New_York">America/New_York (GMT-5/-4)</SelectItem>
+                          <SelectItem value="America/Mexico_City">America/Mexico_City (GMT-6/-5)</SelectItem>
+                          <SelectItem value="America/Argentina/Buenos_Aires">America/Buenos_Aires (GMT-3)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="two-col">
                       <div className="form-group">
                         <label className="form-label">Idioma</label>
-                        <select className="form-input" value={language} onChange={e => setLanguage(e.target.value)}>
-                          <option value="es">Español</option>
-                          <option value="en" disabled>English (próximamente)</option>
-                        </select>
+                        <Select value={language} onValueChange={(v) => setLanguage(v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="es">Español</SelectItem>
+                            <SelectItem value="en" disabled>English (próximamente)</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="form-group">
                         <label className="form-label">Formato de fecha</label>
-                        <select className="form-input" value={dateFormat} onChange={e => setDateFormat(e.target.value)}>
-                          <option value="DD/MM/YYYY">DD/MM/AAAA</option>
-                          <option value="MM/DD/YYYY">MM/DD/AAAA</option>
-                          <option value="YYYY-MM-DD">AAAA-MM-DD</option>
-                        </select>
+                        <Select value={dateFormat} onValueChange={(v) => setDateFormat(v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="DD/MM/YYYY">DD/MM/AAAA</SelectItem>
+                            <SelectItem value="MM/DD/YYYY">MM/DD/AAAA</SelectItem>
+                            <SelectItem value="YYYY-MM-DD">AAAA-MM-DD</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     <button className="btn btn-primary" onClick={handleSavePreferences} disabled={saving}>

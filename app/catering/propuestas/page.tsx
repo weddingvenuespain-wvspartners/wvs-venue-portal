@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { FileText, Plus, Send, Eye, Clock, Copy, CheckCircle } from 'lucide-react'
+import { DatePicker } from '@/components/ui/date-picker'
 
 const STATUS_LABEL: Record<string, string> = { draft: 'Borrador', sent: 'Enviada', viewed: 'Vista', expired: 'Expirada' }
 const STATUS_COLOR: Record<string, string>  = { draft: 'var(--warm-gray)', sent: '#f59e0b', viewed: '#22c55e', expired: '#ef4444' }
@@ -170,7 +171,7 @@ export default function CateringPropuestasPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 5 }}>Fecha boda</label>
-                  <input type="date" value={form.wedding_date} onChange={e => set('wedding_date', e.target.value)} style={inputSt} />
+                  <DatePicker value={form.wedding_date} onChange={(v) => set('wedding_date', v)} placeholder="Seleccionar fecha" />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 5 }}>Invitados</label>
