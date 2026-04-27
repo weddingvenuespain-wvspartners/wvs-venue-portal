@@ -1757,10 +1757,6 @@ export default function EstructuraPage() {
           return null
         }
 
-        const yesNoOpts = [
-          { key: true,  label: 'Sí', color: '#059669', bg: '#ECFDF5' },
-          { key: false, label: 'No', color: '#6B7280', bg: '#F9FAFB' },
-        ]
 
         const currentVal = (() => {
           if (wizardQuestion === 'space_type')  return wizardConfig.space_type
@@ -1784,7 +1780,6 @@ export default function EstructuraPage() {
         }
 
         const cards = cardOpts(wizardQuestion)
-        const isYesNo = !cards
         const stepNum = wizardHistory.length + 1
 
         return (
@@ -1827,23 +1822,6 @@ export default function EstructuraPage() {
                   </div>
                 )}
 
-                {/* Yes/No options */}
-                {isYesNo && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    {yesNoOpts.map(opt => {
-                      const sel = currentVal === opt.key
-                      return (
-                        <button key={String(opt.key)} onClick={() => handleAnswer(opt.key)}
-                          style={{ padding: '20px 16px', border: `2px solid ${sel ? opt.color : 'var(--ivory)'}`, borderRadius: 10, background: sel ? opt.bg : '#fff', cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s', outline: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: sel ? `${opt.color}22` : 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {opt.key ? <Check size={18} style={{ color: sel ? opt.color : 'var(--warm-gray)' }} /> : <X size={18} style={{ color: sel ? opt.color : 'var(--warm-gray)' }} />}
-                          </div>
-                          <span style={{ fontSize: 15, fontWeight: 700, color: sel ? opt.color : 'var(--charcoal)' }}>{opt.label}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
 
                 {/* Back button */}
                 {wizardHistory.length > 0 && (
