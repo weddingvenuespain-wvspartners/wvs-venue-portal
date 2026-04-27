@@ -13,6 +13,8 @@ import SpaceGroupEditor from './SpaceGroupEditor'
 import MultipleZonesEditor from './MultipleZonesEditor'
 import ProposalDateModal from './ProposalDateModal'
 import { ImageUploader } from './ImageUploader'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
 
@@ -514,12 +516,20 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               {modalities.filter(m => m.is_active).length > 0 && (
                 <div className="form-group">
                   <label className="form-label">Modalidad</label>
-                  <select className="form-input" value={form.modality_id} onChange={e => onModalityChange(e.target.value)}>
-                    <option value="">— Sin modalidad —</option>
-                    {modalities.filter(m => m.is_active).map((m: any) => (
-                      <option key={m.id} value={m.id}>{m.name}{m.duration_label ? ` · ${m.duration_label}` : ''}</option>
-                    ))}
-                  </select>
+                  <Select
+                    value={form.modality_id || '__none__'}
+                    onValueChange={(v) => onModalityChange(v === '__none__' ? '' : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="— Sin modalidad —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— Sin modalidad —</SelectItem>
+                      {modalities.filter(m => m.is_active).map((m: any) => (
+                        <SelectItem key={m.id} value={m.id}>{m.name}{m.duration_label ? ` · ${m.duration_label}` : ''}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {form.modality_id && form.wedding_date && (() => {
                     const price = getPriceForDate(form.modality_id, form.wedding_date)
                     const pkgLabel = getMatchedPackageLabel(form.modality_id, form.wedding_date)
@@ -1386,7 +1396,9 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                   <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
                                     <div style={{ display: 'flex', gap: 6 }}>
                                       <input className="form-input" placeholder="Nombres pareja (ej. Marina & David)" value={t.couple_name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'couple_name', e.target.value)} />
-                                      <input className="form-input" type="date" style={{ width: 160, flexShrink: 0 }} value={t.wedding_date ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'wedding_date', e.target.value)} />
+                                      <div style={{ width: 180, flexShrink: 0 }}>
+                                        <DatePicker value={t.wedding_date ?? ''} onChange={(v) => updateOverrideItem(overrideKey, i, 'wedding_date', v)} placeholder="Fecha de boda" />
+                                      </div>
                                     </div>
                                     <textarea className="form-textarea" style={{ minHeight: 80 }} placeholder="Testimonio..." value={t.text ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'text', e.target.value)} />
                                     <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
