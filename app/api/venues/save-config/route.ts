@@ -52,10 +52,14 @@ export async function POST(req: NextRequest) {
     const updatePayload: any = { ficha_data: updatedFicha }
     if (updatedChanges) updatePayload.changes_data = updatedChanges
 
-    await svc
+    const { error: updateErr } = await svc
       .from('venue_onboarding')
       .update(updatePayload)
       .eq('user_id', user.id)
+    if (updateErr) {
+      console.error('[save-config] update error', updateErr)
+      return NextResponse.json({ error: 'Error al guardar la configuración' }, { status: 500 })
+    }
 
     // If venue already has a WP post, update email_del_venue directly in WordPress
     const { data: profile } = await svc

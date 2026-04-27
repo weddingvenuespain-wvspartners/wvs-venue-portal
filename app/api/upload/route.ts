@@ -66,8 +66,13 @@ export async function POST(req: NextRequest) {
 
     const fileBuffer = await file.arrayBuffer()
 
-    // Ensure bucket exists (creates if missing, ignores if already exists)
-    await svc.storage.createBucket(BUCKET, { public: true, fileSizeLimit: 20971520 }).catch(() => {})
+    // Ensure bucket exists (creates if missing, ignores "already exists" error)
+    await svc.storage.createBucket(BUCKET, { public: true, fileSizeLimit: 20971520 })
+      .catch((err: any) => {
+        if (!String(err?.message ?? '').toLowerCase().includes('already exist')) {
+          console.error('[/api/upload] bucket create error:', err)
+        }
+      })
 
     const { error: uploadError } = await svc.storage
       .from(BUCKET)

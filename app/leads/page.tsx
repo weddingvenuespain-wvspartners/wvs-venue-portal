@@ -1804,6 +1804,7 @@ function DateConfirmModal({
           setBlockAfter( da >= 1 ? 1 : da >= 0.5 ? 0.5 : 0)
         }
       })
+      .catch((err: any) => console.error('[DateConfirmModal] date_rules fetch error', err))
   }, [userId])
 
   // Set default duration from venue rules — rules always govern the default
@@ -4648,7 +4649,7 @@ function MiniCalendarPicker({
         }
         setLeadCounts(counts)
       }
-    })
+    }).catch((err: any) => console.error('[Calendar] data fetch error', err))
   }, [year, month, userId])
 
   const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']

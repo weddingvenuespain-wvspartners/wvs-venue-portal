@@ -49,7 +49,14 @@ export async function POST(
     }
 
     // Update status to sent + sent_at timestamp.
-    await supabase.from('proposals').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id)
+    const { error: sentErr } = await supabase
+      .from('proposals')
+      .update({ status: 'sent', sent_at: new Date().toISOString() })
+      .eq('id', id)
+    if (sentErr) {
+      console.error('[proposals/send] status update error', sentErr)
+      return NextResponse.json({ error: 'Error al actualizar el estado de la propuesta' }, { status: 500 })
+    }
     if (emailOverride) {
       await supabase.from('proposals').update({ couple_email: emailOverride }).eq('id', id)
         .then(() => {}) // ignorar error si columna no existe

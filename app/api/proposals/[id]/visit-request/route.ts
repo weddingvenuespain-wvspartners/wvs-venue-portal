@@ -46,17 +46,19 @@ export async function POST(
     }
 
     // 2. Save visit_request on proposal
-    await supabase
+    const { error: proposalErr } = await supabase
       .from('proposals')
       .update({ visit_request: visitRequest })
       .eq('id', id)
+    if (proposalErr) console.error('[visit-request] proposal update error', proposalErr)
 
     // 3. Update lead if linked
     if (proposal.lead_id) {
-      await supabase
+      const { error: leadErr } = await supabase
         .from('leads')
         .update({ visit_date: date, visit_time: time, status: 'visit_scheduled' })
         .eq('id', proposal.lead_id)
+      if (leadErr) console.error('[visit-request] lead update error', leadErr)
     }
 
     // 4. Send email notification to venue
