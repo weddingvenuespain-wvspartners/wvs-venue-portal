@@ -678,24 +678,70 @@ export default function TemplateEditor({
       </div>
     )
 
-    if (secId === 'faq') return (
-      <div>
-        {getOverride(overrideKey).map((f: any, i: number) => (
-          <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 7, marginBottom: 7, overflow: 'hidden' }}>
-            <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
-              <ChevronDown size={11} color="var(--warm-gray)" />
-              <span style={{ flex: 1 }}>{f.question || <em style={{ color: 'var(--warm-gray)' }}>Nueva pregunta</em>}</span>
-              <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeItem(overrideKey, i) }}><X size={12} /></button>
-            </summary>
-            <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <input className="form-input" placeholder="Pregunta *" style={{ fontSize: 12 }} value={f.question ?? ''} onChange={e => updateItem(overrideKey, i, 'question', e.target.value)} />
-              <textarea className="form-textarea" style={{ minHeight: 65, fontSize: 12 }} placeholder="Respuesta *" value={f.answer ?? ''} onChange={e => updateItem(overrideKey, i, 'answer', e.target.value)} />
+    if (secId === 'faq') {
+      const faqStyleConfig = SECTION_STYLES.faq
+      const activeFaqVariantId = getActiveStyle(sections, 'faq')
+      const selectFaqVariant = (variantId: string) => {
+        setSections(s => setActiveStyle(s, 'faq', variantId) as SectionsData)
+        markDirty()
+      }
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Style picker */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Estilo visual</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {faqStyleConfig.variants.map(v => {
+                const sel = activeFaqVariantId === v.id
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => selectFaqVariant(v.id)}
+                    style={{
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      border: `1.5px solid ${sel ? 'var(--gold)' : 'var(--border)'}`,
+                      borderRadius: 8,
+                      background: sel ? 'rgba(196,151,90,0.08)' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: sel ? 'var(--gold)' : 'var(--charcoal)' }}>{v.label}</span>
+                      {sel && <Check size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />}
+                    </div>
+                    {v.description && (
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{v.description}</div>
+                    )}
+                  </button>
+                )
+              })}
             </div>
-          </details>
-        ))}
-        <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { question: '', answer: '' })}>+ Añadir pregunta</button>
-      </div>
-    )
+          </div>
+
+          {/* FAQ list */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Preguntas</div>
+            {getOverride(overrideKey).map((f: any, i: number) => (
+              <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 7, marginBottom: 7, overflow: 'hidden' }}>
+                <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
+                  <ChevronDown size={11} color="var(--warm-gray)" />
+                  <span style={{ flex: 1 }}>{f.question || <em style={{ color: 'var(--warm-gray)' }}>Nueva pregunta</em>}</span>
+                  <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeItem(overrideKey, i) }}><X size={12} /></button>
+                </summary>
+                <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <input className="form-input" placeholder="Pregunta *" style={{ fontSize: 12 }} value={f.question ?? ''} onChange={e => updateItem(overrideKey, i, 'question', e.target.value)} />
+                  <textarea className="form-textarea" style={{ minHeight: 65, fontSize: 12 }} placeholder="Respuesta *" value={f.answer ?? ''} onChange={e => updateItem(overrideKey, i, 'answer', e.target.value)} />
+                </div>
+              </details>
+            ))}
+            <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { question: '', answer: '' })}>+ Añadir pregunta</button>
+          </div>
+        </div>
+      )
+    }
 
     if (secId === 'map') {
       const m: any = (sections as any).map_override ?? {}

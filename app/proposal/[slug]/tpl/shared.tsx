@@ -697,6 +697,120 @@ export function TestimonialsCompact({ items, primary, dark = true }: { items: Te
   )
 }
 
+// ─── FAQ ─────────────────────────────────────────────────────────────────────
+// Three layout variants: accordion (default), cards (expandable with shadow), numbered (always-visible).
+
+type FaqItem = { question?: string; answer?: string }
+
+export function FaqAccordion({ items, primary, dark = true }: { items: FaqItem[]; primary: string; dark?: boolean }) {
+  const [openIdx, setOpenIdx] = useState<number | null>(null)
+  if (!items.length) return null
+  const divider = dark ? '#181818' : 'rgba(0,0,0,.08)'
+  const qColor = dark ? 'rgba(255,255,255,.75)' : '#181410'
+  const aColor = dark ? 'rgba(255,255,255,.42)' : '#5a544f'
+  return (
+    <div>
+      {items.map((item, i) => {
+        const isOpen = openIdx === i
+        return (
+          <div key={i} style={{ borderBottom: `1px solid ${divider}` }}>
+            <button
+              type="button"
+              onClick={() => setOpenIdx(isOpen ? null : i)}
+              style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 20 }}
+            >
+              <span style={{ fontSize: '.95rem', fontWeight: 500, color: isOpen ? primary : qColor, transition: 'color .2s' }}>
+                {item.question}
+              </span>
+              <span style={{ fontSize: '1.4rem', fontWeight: 200, color: primary, flexShrink: 0, transform: isOpen ? 'rotate(45deg)' : 'none', transition: 'transform .25s' }}>+</span>
+            </button>
+            <div style={{ overflow: 'hidden', maxHeight: isOpen ? 400 : 0, transition: 'max-height .4s cubic-bezier(.22,1,.36,1)' }}>
+              <div style={{ fontSize: '.87rem', color: aColor, lineHeight: 1.85, paddingBottom: 20 }}>
+                {item.answer}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export function FaqCards({ items, primary, dark = true }: { items: FaqItem[]; primary: string; dark?: boolean }) {
+  const [openIdx, setOpenIdx] = useState<number | null>(null)
+  if (!items.length) return null
+  const rgb = toRgb(primary)
+  const cardBg = dark ? 'rgba(255,255,255,.02)' : '#fff'
+  const border = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
+  const qColor = dark ? 'rgba(255,255,255,.92)' : '#181410'
+  const aColor = dark ? 'rgba(255,255,255,.55)' : '#5a544f'
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {items.map((item, i) => {
+        const isOpen = openIdx === i
+        return (
+          <div
+            key={i}
+            style={{
+              border: `1px solid ${isOpen ? `rgba(${rgb}, .35)` : border}`,
+              borderRadius: 12,
+              background: cardBg,
+              overflow: 'hidden',
+              transition: 'border-color .25s, box-shadow .25s',
+              boxShadow: isOpen ? `0 8px 24px rgba(0,0,0,${dark ? .35 : .08})` : 'none',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setOpenIdx(isOpen ? null : i)}
+              style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 20 }}
+            >
+              <span style={{ fontSize: '.95rem', fontWeight: 600, color: isOpen ? primary : qColor, transition: 'color .2s' }}>
+                {item.question}
+              </span>
+              <span style={{ flexShrink: 0, width: 28, height: 28, borderRadius: '50%', background: isOpen ? primary : `rgba(${rgb}, .14)`, color: isOpen ? '#fff' : primary, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 300, transform: isOpen ? 'rotate(45deg)' : 'none', transition: 'transform .25s, background .2s, color .2s' }}>+</span>
+            </button>
+            <div style={{ overflow: 'hidden', maxHeight: isOpen ? 600 : 0, transition: 'max-height .4s cubic-bezier(.22,1,.36,1)' }}>
+              <div style={{ fontSize: '.87rem', color: aColor, lineHeight: 1.8, padding: '0 22px 22px' }}>
+                {item.answer}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export function FaqNumbered({ items, primary, dark = true }: { items: FaqItem[]; primary: string; dark?: boolean }) {
+  if (!items.length) return null
+  const qColor = dark ? '#fff' : '#181410'
+  const aColor = dark ? 'rgba(255,255,255,.55)' : '#5a544f'
+  const divider = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {items.map((item, i) => {
+        const isLast = i === items.length - 1
+        return (
+          <div key={i} style={{ display: 'flex', gap: 24, padding: '28px 0', borderBottom: isLast ? 'none' : `1px solid ${divider}` }}>
+            <div style={{ flexShrink: 0, fontSize: '.78rem', fontWeight: 600, color: primary, letterSpacing: '.12em', minWidth: 28 }}>
+              {String(i + 1).padStart(2, '0')}
+            </div>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: '1rem', fontWeight: 600, color: qColor, lineHeight: 1.45 }}>
+                {item.question}
+              </div>
+              <div style={{ fontSize: '.87rem', color: aColor, lineHeight: 1.8 }}>
+                {item.answer}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── Venue Rental Grid — tarifas temporada × día ─────────────────────────────
 export function VenueRentalGrid({
   data, primary, dark = false,

@@ -5,7 +5,7 @@
 //            → Qué incluye → Testimoniales → Colaboradores → Extras → FAQ → CTA
 
 import { useEffect, useRef, useState } from 'react'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, StarRating, resolveContact, type ProposalData } from './shared'
+import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, FaqAccordion, FaqCards, FaqNumbered, StarRating, resolveContact, type ProposalData } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
@@ -1007,29 +1007,23 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           FAQ
       ════════════════════════════════════════════ */}
-      {on('faq') && faqShow.length > 0 && (
-        <section className="t1-sec" style={{ background: '#050505' }}>
-          <div className="w-sm">
-            <FadeUp>
-              <span className="t1-label">Dudas</span>
-              <h2 className="t1-h2">Preguntas frecuentes</h2>
-            </FadeUp>
-            {faqShow.map((item: any, i: number) => (
-              <FadeUp key={i} delay={i * .04}>
-                <div className="t1-faq-item">
-                  <button className={`t1-faq-q ${openFaq === i ? 'open' : ''}`} onClick={() => setOpenFaq(openFaq === i ? null : i)}>
-                    <span className="t1-faq-q-text">{item.question}</span>
-                    <span className="t1-faq-plus" style={{ transform: openFaq === i ? 'rotate(45deg)' : 'none' }}>+</span>
-                  </button>
-                  <div className="t1-faq-a" style={{ maxHeight: openFaq === i ? '400px' : '0' }}>
-                    <div className="t1-faq-a-inner">{item.answer}</div>
-                  </div>
-                </div>
+      {on('faq') && faqShow.length > 0 && (() => {
+        const faqStyle = getActiveStyle(sec, 'faq')
+        const FaqComp = faqStyle === 'cards' ? FaqCards : faqStyle === 'numbered' ? FaqNumbered : FaqAccordion
+        return (
+          <section className="t1-sec" style={{ background: '#050505' }}>
+            <div className="w-sm">
+              <FadeUp>
+                <span className="t1-label">Dudas</span>
+                <h2 className="t1-h2">Preguntas frecuentes</h2>
               </FadeUp>
-            ))}
-          </div>
-        </section>
-      )}
+              <FadeUp delay={.05}>
+                <FaqComp items={faqShow} primary={primary} dark />
+              </FadeUp>
+            </div>
+          </section>
+        )
+      })()}
 
       {/* ════════════════════════════════════════════
           AGENDAR VISITA

@@ -78,6 +78,15 @@ export const SECTION_STYLES: Record<string, SectionStyleConfig> = {
       { id: 'compact', label: 'Compacto', description: 'Lista con avatar de iniciales y texto corto' },
     ],
   },
+  faq: {
+    sectionId: 'faq',
+    defaultVariant: 'accordion',
+    variants: [
+      { id: 'accordion', label: 'Acordeón',  description: 'Pregunta clicable que abre la respuesta' },
+      { id: 'cards',     label: 'Tarjetas',  description: 'Cards expandibles con borde y sombra' },
+      { id: 'numbered',  label: 'Numerada',  description: 'Lista numerada con respuestas siempre visibles' },
+    ],
+  },
 }
 
 export function getSectionStyle(sectionId: string): SectionStyleConfig | undefined {
