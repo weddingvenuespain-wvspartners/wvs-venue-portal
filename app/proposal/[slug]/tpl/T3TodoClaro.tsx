@@ -25,6 +25,19 @@ const SECTIONS_ALL = [
   { id: 'contact',       label: 'Contacto' },
 ]
 
+function EmptySec({ label }: { label: string }) {
+  return (
+    <section style={{ padding: '24px 0' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ padding: '14px 22px', border: '1.5px dashed rgba(0,0,0,.15)', borderRadius: 10, color: 'rgba(0,0,0,.3)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 15, opacity: .5 }}>+</span>
+          <span><b style={{ color: 'rgba(0,0,0,.45)', fontWeight: 600 }}>{label}</b> — sección activa, añade contenido para verla</span>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function T3TodoClaro({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
   const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow, expShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, testsShow, seasonsShow, collabsShow, accom } = extractData(data)
@@ -45,6 +58,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
   const sectionRefs = useRef<Record<string, HTMLElement|null>>({})
 
   // Dynamic menu of sections — only those with actual content
+  const _preview = !!(data as any)._preview
   const pkgs = packagesShow.filter((p: any) => p.is_active !== false)
   const SECTIONS_DEF = SECTIONS_ALL.filter(s => {
     switch (s.id) {
@@ -285,12 +299,12 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           )}
 
           {/* Gallery strip in content */}
-          {on('gallery') && gallery.length > 0 && (
+          {on('gallery') && (gallery.length > 0 ? (
             <Gallery photos={gallery} primary={primary} dark={false} />
-          )}
+          ) : _preview ? <EmptySec label="Galería" /> : null)}
 
           {/* Zones */}
-          {on('zones') && zonesShow.length > 0 && (
+          {on('zones') && (zonesShow.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['zones'] = el }}>
               <FadeUp>
                 <div className="sec-n">{secLbl('zones', 'Los espacios')}</div>
@@ -334,10 +348,10 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 })}
               </div>
             </div>
-          )}
+          ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
           {/* Inclusions */}
-          {on('inclusions') && inclusionsShow.length > 0 && (
+          {on('inclusions') && (inclusionsShow.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['inclusions'] = el }}>
               <FadeUp>
                 <div className="sec-n">{secLbl('inclusions', 'Qué incluye')}</div>
@@ -357,10 +371,10 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 ))}
               </div>
             </div>
-          )}
+          ) : _preview ? <EmptySec label="Qué incluye" /> : null)}
 
           {/* Packages */}
-          {on('packages') && pkgs.length > 0 && (
+          {on('packages') && (pkgs.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['packages'] = el }}>
               <FadeUp>
                 <div className="sec-n">{secLbl('packages', 'Paquetes y precios')}</div>
@@ -396,10 +410,10 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 ))}
               </div>
             </div>
-          )}
+          ) : _preview ? <EmptySec label="Paquetes" /> : null)}
 
           {/* Venue rental (grid temporada × día) */}
-          {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+          {on('venue_rental') && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['venue_rental'] = el }}>
               <FadeUp>
                 <div className="sec-n">{secLbl('venue_rental', sec.venue_rental.title || 'Tarifas de alquiler')}</div>
@@ -409,10 +423,10 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 <VenueRentalGrid data={sec.venue_rental} primary={primary} />
               </FadeUp>
             </div>
-          )}
+          ) : _preview ? <EmptySec label="Tarifas de alquiler" /> : null)}
 
           {/* Season prices */}
-          {on('season_prices') && seasonsShow.length > 0 && (
+          {on('season_prices') && (seasonsShow.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['season_prices'] = el }}>
               <FadeUp>
                 <div className="sec-n">{secLbl('season_prices', 'Temporadas')}</div>
@@ -433,7 +447,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 ))}
               </div>
             </div>
-          )}
+          ) : _preview ? <EmptySec label="Temporadas" /> : null)}
 
           {/* WeddingProposal — configuración interactiva */}
           {hasCatering && on('menu') && (menusStructured?.length || menuExtras?.length || appetizersBase?.length || menuShow.length > 0) && (
@@ -509,7 +523,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           )}
 
           {/* Extra services */}
-          {on('extra_services') && extrasShow.length > 0 && (
+          {on('extra_services') && (extrasShow.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['extras'] = el }}>
               <FadeUp>
                 <div className="sec-n">{secLbl('extras', 'Servicios adicionales')}</div>
@@ -527,10 +541,10 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 </FadeUp>
               ))}
             </div>
-          )}
+          ) : _preview ? <EmptySec label="Servicios adicionales" /> : null)}
 
           {/* Testimonials */}
-          {on('testimonials') && testsShow.length > 0 && (
+          {on('testimonials') && (testsShow.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['testimonials'] = el }}>
               <FadeUp>
                 <div className="sec-n">{secLbl('testimonials', 'Lo dicen las parejas')}</div>
@@ -556,10 +570,10 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 })}
               </div>
             </div>
-          )}
+          ) : _preview ? <EmptySec label="Testimoniales" /> : null)}
 
           {/* Collaborators */}
-          {on('collaborators') && collabsShow.length > 0 && (
+          {on('collaborators') && (collabsShow.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['collaborators'] = el }}>
               <FadeUp>
                 <div className="sec-n">{secLbl('collaborators', 'Colaboradores')}</div>
@@ -577,10 +591,10 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 ))}
               </div>
             </div>
-          )}
+          ) : _preview ? <EmptySec label="Colaboradores" /> : null)}
 
           {/* FAQ */}
-          {on('faq') && faqShow.length > 0 && (
+          {on('faq') && (faqShow.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['faq'] = el }}>
               <FadeUp>
                 <div className="sec-n">{secLbl('faq', 'Dudas frecuentes')}</div>
@@ -600,7 +614,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 ))}
               </div>
             </div>
-          )}
+          ) : _preview ? <EmptySec label="FAQ" /> : null)}
 
           {/* Agendar visita */}
           {on('schedule_visit') && (() => {

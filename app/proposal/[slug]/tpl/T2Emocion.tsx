@@ -9,9 +9,23 @@ import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsAp
 import { WeddingProposal } from './WeddingProposal'
 import VisitBookingModal from '@/components/VisitBookingModal'
 
+function EmptySec({ label }: { label: string }) {
+  return (
+    <section style={{ padding: '24px 0' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ padding: '14px 22px', border: '1.5px dashed rgba(0,0,0,.15)', borderRadius: 10, color: 'rgba(0,0,0,.3)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 15, opacity: .5 }}>+</span>
+          <span><b style={{ color: 'rgba(0,0,0,.45)', fontWeight: 600 }}>{label}</b> — sección activa, añade contenido para verla</span>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function T2Emocion({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
   const { sec, on, hasCatering, packagesShow, inclusionsShow, testsShow, extrasShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, collabsShow, accom } = extractData(data)
+  const _preview = !!(data as any)._preview
 
   const primary = branding?.primary_color ?? '#6B4F3A'
   const rgb     = toRgb(primary)
@@ -143,13 +157,13 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       {/* ══════════════════════════════════════════
           GALLERY — full-bleed, immediately
       ══════════════════════════════════════════ */}
-      {on('gallery') && gallery.length > 0 && (
+      {on('gallery') && (gallery.length > 0 ? (
         <section>
           <FadeIn>
             <Gallery photos={gallery} primary={primary} dark={false} />
           </FadeIn>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Galería" /> : null)}
 
 
       {/* ══════════════════════════════════════════
@@ -203,7 +217,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       {/* ══════════════════════════════════════════
           ZONES
       ══════════════════════════════════════════ */}
-      {on('zones') && zonesShow.length > 0 && (
+      {on('zones') && (zonesShow.length > 0 ? (
         <section style={{ background: CREAM, padding: '100px 0' }}>
           <div className="w-full">
             <FadeUp>
@@ -251,12 +265,12 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
       {/* ══════════════════════════════════════════
           VENUE RENTAL — grid temporada × día
       ══════════════════════════════════════════ */}
-      {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+      {on('venue_rental') && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
         <section style={{ background: '#fff', padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
@@ -270,12 +284,12 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             </FadeUp>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Tarifas de alquiler" /> : null)}
 
       {/* ══════════════════════════════════════════
           SEASON PRICES
       ══════════════════════════════════════════ */}
-      {on('season_prices') && seasonsShow.length > 0 && (
+      {on('season_prices') && (seasonsShow.length > 0 ? (
         <section style={{ background: WARM, padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
@@ -300,12 +314,12 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Temporadas" /> : null)}
 
       {/* ══════════════════════════════════════════
           TESTIMONIALS — large editorial quotes
       ══════════════════════════════════════════ */}
-      {on('testimonials') && testsShow.length > 0 && (
+      {on('testimonials') && (testsShow.length > 0 ? (
         <section style={{ background: '#fff', padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
@@ -337,13 +351,13 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Testimoniales" /> : null)}
 
 
       {/* ══════════════════════════════════════════
           INCLUSIONS — clean centered grid
       ══════════════════════════════════════════ */}
-      {on('inclusions') && inclusionsShow.length > 0 && (
+      {on('inclusions') && (inclusionsShow.length > 0 ? (
         <section style={{ background: WARM, padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
@@ -367,13 +381,13 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Qué incluye" /> : null)}
 
 
       {/* ══════════════════════════════════════════
           PACKAGES — elegant cards
       ══════════════════════════════════════════ */}
-      {on('packages') && pkgs.length > 0 && (
+      {on('packages') && (pkgs.length > 0 ? (
         <section style={{ background: '#fff', padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
@@ -413,7 +427,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Paquetes" /> : null)}
 
 
       {/* ══════════════════════════════════════════
@@ -500,7 +514,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       {/* ══════════════════════════════════════════
           EXTRA SERVICES
       ══════════════════════════════════════════ */}
-      {on('extra_services') && extrasShow.length > 0 && (
+      {on('extra_services') && (extrasShow.length > 0 ? (
         <section style={{ background: '#fff', padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
@@ -522,12 +536,12 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             ))}
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Servicios adicionales" /> : null)}
 
       {/* ══════════════════════════════════════════
           COLLABORATORS
       ══════════════════════════════════════════ */}
-      {on('collaborators') && collabsShow.length > 0 && (
+      {on('collaborators') && (collabsShow.length > 0 ? (
         <section style={{ background: WARM, padding: '100px 0' }}>
           <div className="w-full">
             <FadeUp>
@@ -549,12 +563,12 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Colaboradores" /> : null)}
 
       {/* ══════════════════════════════════════════
           FAQ
       ══════════════════════════════════════════ */}
-      {on('faq') && faqShow.length > 0 && (
+      {on('faq') && (faqShow.length > 0 ? (
         <section style={{ background: '#fff', padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
@@ -580,7 +594,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="FAQ" /> : null)}
 
       {/* ══════════════════════════════════════════
           AGENDAR VISITA

@@ -409,10 +409,24 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) =
   }
 `
 
+function EmptySec({ label }: { label: string }) {
+  return (
+    <section style={{ padding: '24px 0' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ padding: '14px 22px', border: '1.5px dashed rgba(0,0,0,.15)', borderRadius: 10, color: 'rgba(0,0,0,.3)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 15, opacity: .5 }}>+</span>
+          <span><b style={{ color: 'rgba(0,0,0,.45)', fontWeight: 600 }}>{label}</b> — sección activa, añade contenido para verla</span>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 // ─── Main ──────────────────────────────────────────────────────────────────────
 export default function T5Minimalista({ data }: { data: ProposalData }) {
   const { sec, on, hasCatering, packagesShow, inclusionsShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, testsShow, collabsShow, extrasShow, accom } = extractData(data)
 
+  const _preview = !!(data as any)._preview
   const branding  = data.branding
   const primary   = branding?.primary_color || '#1A1A1A'
   const priRgb    = toRgb(primary)
@@ -587,12 +601,12 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       )}
 
       {/* GALLERY */}
-      {on('gallery') && galleryPhotos.length > 0 && (
+      {on('gallery') && (galleryPhotos.length > 0 ? (
         <Gallery photos={galleryPhotos} primary={primary} dark={false} />
-      )}
+      ) : _preview ? <EmptySec label="Galería" /> : null)}
 
       {/* ZONES */}
-      {on('zones') && zonesShow.length > 0 && (
+      {on('zones') && (zonesShow.length > 0 ? (
         <section style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
@@ -638,10 +652,10 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
       {/* INCLUSIONS — bloque de color primario */}
-      {inclusionsShow.length > 0 && on('inclusions') && (
+      {on('inclusions') && (inclusionsShow.length > 0 ? (
         <section className="t5-inc-block" id="t5-inc">
           <div className="t5-inc-inner">
             <FadeUp>
@@ -670,7 +684,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Qué incluye" /> : null)}
 
       {/* RECEIPT / PRICING */}
       {data.show_price_estimate && data.price_estimate && (
@@ -731,7 +745,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       )}
 
       {/* PACKAGES */}
-      {activePkgs.length > 0 && on('packages') && (
+      {on('packages') && (activePkgs.length > 0 ? (
         <section className="t5-pkg-section" id="t5-pkg">
           <div className="t5-pkg-inner">
             <FadeUp>
@@ -771,10 +785,10 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Paquetes" /> : null)}
 
       {/* VENUE RENTAL — grid temporada × día */}
-      {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+      {on('venue_rental') && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
         <section style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
@@ -786,10 +800,10 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             </FadeUp>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Tarifas de alquiler" /> : null)}
 
       {/* SEASON PRICES */}
-      {on('season_prices') && seasonsShow.length > 0 && (
+      {on('season_prices') && (seasonsShow.length > 0 ? (
         <section style={{ padding: '80px 0', background: WHITE }}>
           <div style={{ maxWidth: 780, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
@@ -812,10 +826,10 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Temporadas" /> : null)}
 
       {/* FAQ minimal */}
-      {faqShow.length > 0 && on('faq') && (
+      {on('faq') && (faqShow.length > 0 ? (
         <section style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 40px' }}>
             <FadeUp>
@@ -846,7 +860,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="FAQ" /> : null)}
 
       {/* WeddingProposal — configuración interactiva */}
       {hasCatering && on('menu') && (menusStructured?.length || menuExtras?.length || appetizersBase?.length || menuShow.length > 0) && (
@@ -926,7 +940,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       )}
 
       {/* EXTRA SERVICES */}
-      {on('extra_services') && extrasShow.length > 0 && (
+      {on('extra_services') && (extrasShow.length > 0 ? (
         <section style={{ padding: '80px 0', background: WHITE }}>
           <div style={{ maxWidth: 780, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
@@ -948,10 +962,10 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Servicios adicionales" /> : null)}
 
       {/* TESTIMONIALS */}
-      {on('testimonials') && testsShow.length > 0 && (
+      {on('testimonials') && (testsShow.length > 0 ? (
         <section style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
@@ -979,10 +993,10 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Testimoniales" /> : null)}
 
       {/* COLLABORATORS */}
-      {on('collaborators') && collabsShow.length > 0 && (
+      {on('collaborators') && (collabsShow.length > 0 ? (
         <section style={{ padding: '80px 0', background: WHITE }}>
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
@@ -1002,7 +1016,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Colaboradores" /> : null)}
 
       {/* AGENDAR VISITA */}
       {on('schedule_visit') && (() => {

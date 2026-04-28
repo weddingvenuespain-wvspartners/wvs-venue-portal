@@ -19,8 +19,26 @@ type Plan = {
   visible_on_web: boolean
 }
 
-// All features shown on pricing page (restrictions never shown)
-const PREMIUM_FEATURES = FEATURE_DEFS.filter(f => f.tier !== 'restriction')
+// Curated short feature list shown on pricing cards
+const PRICING_FEATURE_KEYS = [
+  'ficha', 'leads', 'calendario', 'estadisticas',
+  'pipeline', 'propuestas', 'comunicacion', 'estadisticas_avanzadas', 'soporte_prioritario',
+] as const
+const PRICING_FEATURE_LABELS: Record<string, string> = {
+  ficha:                  'Ficha en el directorio',
+  leads:                  'Gestión de leads',
+  calendario:             'Calendario de disponibilidad',
+  estadisticas:           'Estadísticas básicas',
+  pipeline:               'Pipeline de ventas',
+  propuestas:             'Propuestas digitales',
+  comunicacion:           'Tarifas y configuración',
+  estadisticas_avanzadas: 'Estadísticas avanzadas',
+  soporte_prioritario:    'Soporte prioritario',
+}
+const PRICING_FEATURES = PRICING_FEATURE_KEYS.map(key => ({
+  ...FEATURE_DEFS.find(f => f.key === key)!,
+  label: PRICING_FEATURE_LABELS[key],
+}))
 
 function PricingPageInner() {
   const router = useRouter()
@@ -37,10 +55,10 @@ function PricingPageInner() {
 
   const isLoggedIn = !!user
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
+    window.location.replace('/login')
+    supabase.auth.signOut()
   }
 
   // Load plans
@@ -161,6 +179,7 @@ function PricingPageInner() {
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           {isLoggedIn ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              {hasPlan && !isTrialExpired && (
               <button
                 onClick={() => router.push('/dashboard')}
                 style={{
@@ -171,6 +190,7 @@ function PricingPageInner() {
               >
                 <ArrowLeft size={14} /> Volver al portal
               </button>
+            )}
               <button
                 onClick={handleLogout}
                 style={{
@@ -368,7 +388,7 @@ function PricingPageInner() {
           {plans.map(plan => {
             const isPremium = plan.name.toLowerCase().includes('premium')
             // Both tiers show all non-restriction features; basic shows premium ones as strikethrough
-            const featureDefs = PREMIUM_FEATURES
+            const featureDefs = PRICING_FEATURES
             const isCurrentPlan = isLoggedIn && hasPlan && (
               (isPremium && planTier === 'premium') ||
               (!isPremium && planTier === 'basic')

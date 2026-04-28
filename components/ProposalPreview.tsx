@@ -7,18 +7,27 @@ type PreviewPatch = Record<string, any>
 export default function ProposalPreview({ slug, patch }: { slug: string; patch: PreviewPatch }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
-  const [iframeReady, setIframeReady] = useState(false)
   const [loading, setLoading] = useState(true)
   const patchRef = useRef(patch)
   patchRef.current = patch
 
-  // Listen for the iframe's "ready" message
+  // Remove loading overlay once iframe has loaded (or after 5s max)
+  useEffect(() => {
+    setLoading(true)
+    const fallback = setTimeout(() => setLoading(false), 5000)
+    const iframe = iframeRef.current
+    const onLoad = () => {
+      clearTimeout(fallback)
+      setLoading(false)
+    }
+    iframe?.addEventListener('load', onLoad)
+    return () => { clearTimeout(fallback); iframe?.removeEventListener('load', onLoad) }
+  }, [slug, device])
+
+  // Listen for ready signal from iframe, then send initial patch
   useEffect(() => {
     const onMessage = (e: MessageEvent<any>) => {
       if (e.data?.type === 'proposal-preview-ready') {
-        setIframeReady(true)
-        setLoading(false)
-        // Send current state immediately
         iframeRef.current?.contentWindow?.postMessage({ type: 'proposal-preview-update', patch: patchRef.current }, '*')
       }
     }
@@ -28,24 +37,16 @@ export default function ProposalPreview({ slug, patch }: { slug: string; patch: 
 
   // Send patch to iframe whenever it changes (debounced)
   useEffect(() => {
-    if (!iframeReady) return
     const t = setTimeout(() => {
       iframeRef.current?.contentWindow?.postMessage({ type: 'proposal-preview-update', patch }, '*')
     }, 150)
     return () => clearTimeout(t)
-  }, [patch, iframeReady])
+  }, [patch])
 
   const reload = () => {
     setLoading(true)
-    setIframeReady(false)
     if (iframeRef.current) iframeRef.current.src = iframeRef.current.src
   }
-
-  // Reset ready state when device changes (iframe unmounts/remounts)
-  useEffect(() => {
-    setIframeReady(false)
-    setLoading(true)
-  }, [device])
 
   const src = slug ? `/proposal/${slug}?preview=1` : ''
   const frameWidth = device === 'mobile' ? 390 : '100%'
@@ -115,7 +116,6 @@ export default function ProposalPreview({ slug, patch }: { slug: string; patch: 
           Guarda la propuesta para ver el preview en vivo.
         </div>
       ) : device === 'desktop' ? (
-        /* Desktop: iframe fills the whole preview area */
         <div style={{ flex: 1, minHeight: 0, position: 'relative', background: 'var(--surface)' }}>
           {loading && (
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2, color: 'var(--warm-gray)', fontSize: 12, gap: 8 }}>
@@ -130,7 +130,6 @@ export default function ProposalPreview({ slug, patch }: { slug: string; patch: 
           />
         </div>
       ) : (
-        /* Mobile: centered phone-like frame with scroll fallback */
         <div style={{
           flex: 1, minHeight: 0, overflow: 'auto',
           background: 'repeating-linear-gradient(45deg, #f5f1e9, #f5f1e9 10px, #f0ebe1 10px, #f0ebe1 20px)',

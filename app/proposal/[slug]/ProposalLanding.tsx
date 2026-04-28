@@ -17,17 +17,20 @@ export type PreviewMessage = {
 }
 
 export default function ProposalLanding({ data, preview }: { data: ProposalData; preview?: boolean }) {
-  const [liveData, setLiveData] = useState<ProposalData>(data)
+  const [liveData, setLiveData] = useState<ProposalData>({ ...data, _preview: preview })
 
   useEffect(() => {
     if (!preview) return
     const onMessage = (e: MessageEvent<any>) => {
       const msg = e.data
-      if (!msg || msg.type !== 'proposal-preview-update') return
-      setLiveData(prev => ({ ...prev, ...msg.patch }))
+      if (!msg) return
+      if (msg.type === 'proposal-preview-update') {
+        setLiveData(prev => ({ ...prev, ...msg.patch, _preview: true }))
+      } else if (msg.type === 'proposal-preview-probe') {
+        window.parent?.postMessage({ type: 'proposal-preview-ready' }, '*')
+      }
     }
     window.addEventListener('message', onMessage)
-    // Notify parent we're ready to receive state
     window.parent?.postMessage({ type: 'proposal-preview-ready' }, '*')
     return () => window.removeEventListener('message', onMessage)
   }, [preview])
@@ -89,7 +92,9 @@ export default function ProposalLanding({ data, preview }: { data: ProposalData;
   const cssParts: string[] = []
 
   // Color mode: forces a light or dark variant on top of any template.
-  if (colorMode) {
+  // T1 (templateId=1) handles color_mode natively via its own palette, so skip the global override
+  // to avoid !important conflicts with the template's nuanced styling.
+  if (colorMode && templateId !== 1) {
     const p = colorMode === 'dark'
       ? { canvas: '#0A0A0A', section: '#111111', altSection: '#0E0E0E', text: '#F5F5F5', border: 'rgba(255,255,255,.10)' }
       : { canvas: '#FAF7F2', section: '#FFFFFF', altSection: '#F5F0E8', text: '#1A1A1A', border: 'rgba(0,0,0,.08)' }

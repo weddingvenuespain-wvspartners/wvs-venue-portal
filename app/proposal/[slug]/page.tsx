@@ -43,6 +43,7 @@ export type ProposalData = {
   status: string
   ctas: string[]
   sections_data?: SectionsData | null
+  _preview?: boolean
   venueContent: VenueContent
   // venue — used only for hero name/city and contact
   venue: {

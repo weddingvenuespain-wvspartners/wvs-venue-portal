@@ -562,10 +562,24 @@ function FaqItem({ q, a, idx }: { q: string; a: string; idx: number }) {
   )
 }
 
+function EmptySec({ label }: { label: string }) {
+  return (
+    <section style={{ padding: '24px 0' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ padding: '14px 22px', border: '1.5px dashed rgba(0,0,0,.15)', borderRadius: 10, color: 'rgba(0,0,0,.3)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 15, opacity: .5 }}>+</span>
+          <span><b style={{ color: 'rgba(0,0,0,.45)', fontWeight: 600 }}>{label}</b> — sección activa, añade contenido para verla</span>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function T4SocialProof({ data }: { data: ProposalData }) {
   const { sec, on, hasCatering, packagesShow, zonesShow, inclusionsShow, faqShow, expShow, testsShow, menuShow, menusStructured, menuExtras, appetizersBase, seasonsShow, collabsShow, extrasShow, accom } = extractData(data)
 
+  const _preview = !!(data as any)._preview
   const branding  = data.branding
   const primary   = branding?.primary_color || TERRA
   const priRgb    = toRgb(primary)
@@ -666,7 +680,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       )}
 
       {/* TESTIMONIALS — first content section */}
-      {testsShow.length > 0 && on('testimonials') && (
+      {on('testimonials') && (testsShow.length > 0 ? (
         <section className="t4-section t4-tests-bg">
           <div className="t4-inner">
             <FadeUp>
@@ -681,10 +695,10 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Testimoniales" /> : null)}
 
       {/* GALLERY */}
-      {galleryPhotos.length > 0 && on('gallery') && (
+      {on('gallery') && (galleryPhotos.length > 0 ? (
         <section className="t4-gallery-bg">
           <div className="t4-gallery-header">
             <FadeUp>
@@ -695,7 +709,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           </div>
           <Gallery photos={galleryPhotos} primary={primary} dark />
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Galería" /> : null)}
 
       {/* PERSONAL MESSAGE */}
       {on('welcome') && data.personal_message && (
@@ -732,7 +746,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       )}
 
       {/* INCLUSIONS */}
-      {inclusionsShow.length > 0 && on('inclusions') && (
+      {on('inclusions') && (inclusionsShow.length > 0 ? (
         <section className="t4-section t4-inclusions-bg">
           <div className="t4-inner">
             <FadeUp>
@@ -755,10 +769,10 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Qué incluye" /> : null)}
 
       {/* PACKAGES */}
-      {packagesShow.length > 0 && on('packages') && (
+      {on('packages') && (packagesShow.length > 0 ? (
         <section className="t4-section">
           <div className="t4-inner">
             <FadeUp>
@@ -796,10 +810,10 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Paquetes" /> : null)}
 
       {/* ZONES */}
-      {zonesShow.length > 0 && on('zones') && (
+      {on('zones') && (zonesShow.length > 0 ? (
         <section className="t4-section" style={{ background: WARM }}>
           <div className="t4-inner">
             <FadeUp>
@@ -848,10 +862,10 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
       {/* VENUE RENTAL — grid temporada × día */}
-      {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+      {on('venue_rental') && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
         <section className="t4-section" style={{ background: CREAM }}>
           <div className="t4-inner">
             <FadeUp>
@@ -866,10 +880,10 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             </FadeUp>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Tarifas de alquiler" /> : null)}
 
       {/* SEASON PRICES */}
-      {on('season_prices') && seasonsShow.length > 0 && (
+      {on('season_prices') && (seasonsShow.length > 0 ? (
         <section className="t4-section" style={{ background: SAND }}>
           <div className="t4-inner">
             <FadeUp>
@@ -893,7 +907,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Temporadas" /> : null)}
 
       {/* WeddingProposal — configuración interactiva */}
       {hasCatering && on('menu') && (menusStructured?.length || menuExtras?.length || appetizersBase?.length || menuShow.length > 0) && (
@@ -974,7 +988,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       )}
 
       {/* EXTRA SERVICES */}
-      {on('extra_services') && extrasShow.length > 0 && (
+      {on('extra_services') && (extrasShow.length > 0 ? (
         <section className="t4-section" style={{ background: WARM }}>
           <div className="t4-inner">
             <FadeUp>
@@ -997,10 +1011,10 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Servicios adicionales" /> : null)}
 
       {/* COLLABORATORS */}
-      {on('collaborators') && collabsShow.length > 0 && (
+      {on('collaborators') && (collabsShow.length > 0 ? (
         <section className="t4-section" style={{ background: CREAM }}>
           <div className="t4-inner">
             <FadeUp>
@@ -1021,10 +1035,10 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="Colaboradores" /> : null)}
 
       {/* FAQ */}
-      {faqShow.length > 0 && on('faq') && (
+      {on('faq') && (faqShow.length > 0 ? (
         <section className="t4-section t4-faq-bg">
           <div className="t4-inner">
             <FadeUp>
@@ -1039,7 +1053,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+      ) : _preview ? <EmptySec label="FAQ" /> : null)}
 
       {/* AGENDAR VISITA */}
       {on('schedule_visit') && (() => {
