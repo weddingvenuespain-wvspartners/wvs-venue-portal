@@ -5869,7 +5869,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   <div style={{ marginBottom: 18 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                       <SectionTitle icon={<Flower2 size={14} />} title="Fechas ofertadas" hint="Fechas que estás negociando con la pareja" />
-                      {onChangeDates && leadStatus !== 'lost' && (
+                      {onChangeDates && (
                         <button type="button" onClick={onChangeDates} style={{
                           display: 'inline-flex', alignItems: 'center', gap: 5,
                           padding: '6px 12px', borderRadius: 8, flexShrink: 0, marginBottom: 12,
