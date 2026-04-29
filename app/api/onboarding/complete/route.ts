@@ -13,7 +13,10 @@ export async function POST() {
     const userId = session.user.id
     const svc = getServiceClient()
 
-    // Check if user already has a subscription (avoid duplicates)
+    // Check if user already has ANY subscription across all their venues.
+    // This acts as the guard that prevents a second (or third) venue from
+    // getting an automatic trial — only the very first venue ever gets one.
+    // Admins can still manually grant a trial via the CRM for any venue.
     const { data: existing } = await svc
       .from('venue_subscriptions')
       .select('id')
@@ -37,6 +40,17 @@ export async function POST() {
       return NextResponse.json({ error: 'No se encontró el plan básico' }, { status: 500 })
     }
 
+    // Best-effort: find the user's primary venue to link the trial to a venue_id.
+    // At onboarding time the user_venues row may not exist yet — if so, venue_id
+    // stays null and will be backfilled when the admin later assigns the venue
+    // via assign-venue or apply-changes.
+    const { data: primaryVenue } = await svc
+      .from('user_venues')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_primary', true)
+      .maybeSingle()
+
     // Create trial subscription
     const trialEnd = new Date()
     trialEnd.setDate(trialEnd.getDate() + 14)
@@ -45,6 +59,7 @@ export async function POST() {
       .from('venue_subscriptions')
       .insert({
         user_id: userId,
+        venue_id: primaryVenue?.id ?? null,
         plan_id: basicPlan.id,
         status: 'trial',
         trial_end_date: trialEnd.toISOString(),
