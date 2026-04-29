@@ -104,6 +104,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       localStorage.setItem(ACTIVE_VENUE_KEY, venueId)
     }
+    // Re-fetch subscription for the new venue (only matters for multi-venue accounts)
+    if (userVenues.length > 1) {
+      fetch(`/api/auth/subscription?venue_id=${venueId}`)
+        .then(r => r.json())
+        .then(({ subscription }) => {
+          setProfile((prev: any) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              plan:                subscription?.plan               ?? null,
+              subscription_status: subscription?.status            ?? null,
+              trial_end_date:      subscription?.trial_end_date    ?? null,
+            }
+          })
+        })
+        .catch(err => console.warn('[auth] Could not fetch venue subscription:', err))
+    }
   }
 
   const loadForUser = async (u: any) => {
