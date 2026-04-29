@@ -130,7 +130,7 @@ function formatDateEs(ds: string): string {
 
 export default function CalendarioPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, activeVenue } = useAuth()
   const { isBlocked } = useRequireSubscription()
 
   const [entries,      setEntries]      = useState<Record<string, Entry>>({})
@@ -180,7 +180,7 @@ export default function CalendarioPage() {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
     load()
-  }, [user, authLoading, year, month])
+  }, [user, authLoading, year, month, activeVenue?.id])
 
   // Deep-link: reabrir modal de fecha al volver desde ?openDate=YYYY-MM-DD
   useEffect(() => {
@@ -193,6 +193,7 @@ export default function CalendarioPage() {
   }, [])
 
   const load = async () => {
+    if (!activeVenue) return
     setLoading(true)
     const supabase = createClient()
     const lastDay  = new Date(year, month + 1, 0).getDate()
@@ -200,9 +201,9 @@ export default function CalendarioPage() {
     const to       = dateStr(year, month, lastDay)
 
     const [entriesRes, leadsRes, modalitiesRes] = await Promise.all([
-      supabase.from('calendar_entries').select('*').eq('user_id', user!.id).gte('date', from).lte('date', to),
-      supabase.from('leads').select('id,name,email,phone,whatsapp,wedding_date,wedding_date_to,wedding_date_ranges,date_flexibility,wedding_year,wedding_month,guests,status,budget,ceremony_type,visit_date,visit_time,visit_duration,notes,budget_date,budget_date_to,budget_date_ranges,budget_date_flexibility').eq('user_id', user!.id).order('wedding_date', { ascending: true }),
-      supabase.from('venue_modalities').select('id,name,duration_type,packages:venue_modality_packages(id,day_from,day_to,label,sort_order)').eq('user_id', user!.id).order('sort_order'),
+      supabase.from('calendar_entries').select('*').eq('venue_id', activeVenue.id).gte('date', from).lte('date', to),
+      supabase.from('leads').select('id,name,email,phone,whatsapp,wedding_date,wedding_date_to,wedding_date_ranges,date_flexibility,wedding_year,wedding_month,guests,status,budget,ceremony_type,visit_date,visit_time,visit_duration,notes,budget_date,budget_date_to,budget_date_ranges,budget_date_flexibility').eq('venue_id', activeVenue.id).order('wedding_date', { ascending: true }),
+      supabase.from('venue_modalities').select('id,name,duration_type,packages:venue_modality_packages(id,day_from,day_to,label,sort_order)').eq('venue_id', activeVenue.id).order('sort_order'),
     ])
 
     const map: Record<string, Entry> = {}
@@ -327,7 +328,7 @@ export default function CalendarioPage() {
           result = data
         } else {
           const { data } = await supabase.from('calendar_entries')
-            .insert({ user_id: user!.id, date: e.date, status: statusToSave, note: e.note ?? null, lead_id: e.lead_id ?? null })
+            .insert({ user_id: user!.id, venue_id: activeVenue!.id, date: e.date, status: statusToSave, note: e.note ?? null, lead_id: e.lead_id ?? null })
             .select().single()
           result = data
         }
@@ -1045,12 +1046,12 @@ export default function CalendarioPage() {
             await supabase.from('leads').update({ status: 'lost', notes }).eq('id', lead.id)
             await supabase.from('calendar_entries')
               .update({ status: 'libre', lead_id: null, note: null })
-              .eq('user_id', user!.id).eq('lead_id', lead.id).eq('status', 'reservado')
+              .eq('venue_id', activeVenue!.id).eq('lead_id', lead.id).eq('status', 'reservado')
             setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'lost', notes } : l))
             setModalDate(null)
             await load()
           }}
-          userId={user!.id}
+          venueId={activeVenue!.id}
         />
       )}
 
@@ -1074,7 +1075,7 @@ function getSpanDates(startDate: string, spanDays: number): string[] {
 
 function DayModal({
   date, entry, entry2, leadsOnDate, visitsOnDate, allLeads, leadsById, saving, modalities,
-  onSave, onSave2, onDelete, onClose, onLeadCreated, onUpdateLead, onCancelWedding, userId
+  onSave, onSave2, onDelete, onClose, onLeadCreated, onUpdateLead, onCancelWedding, venueId
 }: {
   date: string
   entry: Entry | null
@@ -1092,7 +1093,7 @@ function DayModal({
   onLeadCreated: (l: Lead) => Promise<void>
   onUpdateLead: (leadId: string, fields: Partial<Lead>) => Promise<void>
   onCancelWedding: (lead: Lead, reason: string) => Promise<void>
-  userId: string
+  venueId: string
 }) {
   const [status,      setStatus]      = useState<Status>(entry?.status || 'libre')
   // Separate half-day state from free-text note.
@@ -1266,11 +1267,11 @@ function DayModal({
       for (const spanDate of spanDates) {
         if (spanDate === date) continue
         const { data: existingSpan } = await supabaseExtra.from('calendar_entries')
-          .select('id').eq('user_id', userId).eq('date', spanDate).maybeSingle()
+          .select('id').eq('venue_id', venueId).eq('date', spanDate).maybeSingle()
         if (existingSpan?.id) {
           await supabaseExtra.from('calendar_entries').update({ status: calStatus, lead_id: leadId }).eq('id', existingSpan.id)
         } else {
-          await supabaseExtra.from('calendar_entries').insert({ user_id: userId, date: spanDate, status: calStatus, lead_id: leadId })
+          await supabaseExtra.from('calendar_entries').insert({ venue_id: venueId, date: spanDate, status: calStatus, lead_id: leadId })
         }
       }
       await onUpdateLead(leadId, {
@@ -1316,13 +1317,13 @@ function DayModal({
     // Remove calendar entry on this date linked to this lead
     await supabase.from('calendar_entries')
       .update({ lead_id: null })
-      .eq('user_id', userId)
+      .eq('venue_id', venueId)
       .eq('lead_id', leadToRemove.id)
       .eq('date', date)
     // Check if lead has other calendar entries linked to it
     const { data: otherEntries } = await supabase.from('calendar_entries')
       .select('id')
-      .eq('user_id', userId)
+      .eq('venue_id', venueId)
       .eq('lead_id', leadToRemove.id)
       .limit(1)
     // Clear all lead date fields
@@ -1365,7 +1366,7 @@ function DayModal({
           {showCreate ? (
             <QuickCreateLead
               defaultDate={date}
-              userId={userId}
+              venueId={venueId}
               onCreated={async (lead) => { await onLeadCreated(lead); setLeadId(lead.id); setShowCreate(false) }}
               onCancel={() => setShowCreate(false)}
             />
@@ -2034,13 +2035,14 @@ function DayModal({
 // ── Quick Create Lead ──────────────────────────────────────────────────────────
 
 function QuickCreateLead({
-  defaultDate, userId, onCreated, onCancel
+  defaultDate, venueId, onCreated, onCancel
 }: {
   defaultDate: string
-  userId: string
+  venueId: string
   onCreated: (lead: Lead) => Promise<void>
   onCancel: () => void
 }) {
+  const { user } = useAuth()
   const [form, setForm] = useState({
     name: '', email: '', phone: '', guests: '', wedding_date: defaultDate, ceremony_type: 'sin_definir', budget: 'sin_definir'
   })
@@ -2053,7 +2055,8 @@ function QuickCreateLead({
     setSaving(true); setError('')
     const supabase = createClient()
     const { data, error: err } = await supabase.from('leads').insert({
-      user_id: userId,
+      user_id: user!.id,
+      venue_id: venueId,
       name: form.name.trim(),
       email: form.email.trim() || null,
       phone: form.phone.trim() || null,
