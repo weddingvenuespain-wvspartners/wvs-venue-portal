@@ -52,13 +52,13 @@ export async function POST(req: NextRequest) {
     const cardBrand   = params.Ds_Card_Brand      // 1=VISA, 2=MC, etc.
 
     // Parse merchant data (userId, planId, cycleId, intervalMonths)
-    let merchantData: { userId?: string; planId?: string; cycleId?: string; intervalMonths?: number } = {}
+    let merchantData: { userId?: string; planId?: string; cycleId?: string; intervalMonths?: number; venueId?: string | null } = {}
     try {
       const raw = params.Ds_MerchantData
       if (raw) merchantData = JSON.parse(raw)
     } catch { /* ignore parse errors */ }
 
-    const { userId, planId, cycleId, intervalMonths } = merchantData
+    const { userId, planId, cycleId, intervalMonths, venueId } = merchantData
 
     console.log(`[redsys/notification] Order=${order} Response=${responseCode} Auth=${authCode} User=${userId}`)
 
@@ -88,12 +88,16 @@ export async function POST(req: NextRequest) {
 
     const svc = getServiceClient()
 
-    // Cancel any existing active/trial subscriptions for this user
-    await svc
+    // Cancel any existing active/trial subscriptions for this user+venue.
+    // For multi-venue accounts, scope to the specific venue so we don't
+    // cancel subscriptions belonging to the user's other venues.
+    let cancelQuery = svc
       .from('venue_subscriptions')
       .update({ status: 'cancelled' })
       .eq('user_id', userId)
       .in('status', ['active', 'trial'])
+    if (venueId) cancelQuery = (cancelQuery as any).eq('venue_id', venueId)
+    await cancelQuery
 
     // Create new active subscription
     const months = intervalMonths || 1
@@ -102,6 +106,7 @@ export async function POST(req: NextRequest) {
 
     const subscriptionData: Record<string, any> = {
       user_id: userId,
+      venue_id: venueId || null,
       plan_id: planId,
       status: 'active',
       billing_cycle: cycleId || 'monthly',
