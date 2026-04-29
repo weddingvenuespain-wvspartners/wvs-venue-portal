@@ -46,10 +46,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Venue not found', wp_venue_id }, { status: 404 })
     }
 
+    // Look up the user_venues row so we can store venue_id on the lead
+    const { data: venueRow } = await svc
+      .from('user_venues')
+      .select('id')
+      .eq('user_id', profile.user_id)
+      .eq('wp_venue_id', wp_venue_id)
+      .maybeSingle()
+
     const wedding_date = parseDate(date)
 
     const { data, error } = await svc.from('leads').insert({
       user_id:      profile.user_id,
+      venue_id:     venueRow?.id ?? null,
       status:       'new',
       source:       'web',
       name:         name  || '',
