@@ -2,8 +2,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
-import { usePlanFeatures, FEATURE_DEFS, type PlanFeatures } from '@/lib/use-plan-features'
-import { Check, X, Loader2, ArrowLeft, Shield, LogOut, Clock } from 'lucide-react'
+import { usePlanFeatures, type PlanFeatures } from '@/lib/use-plan-features'
+import { Check, X, Loader2, ArrowLeft, Shield, LogOut, Clock, PlusCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import type { BillingCycle } from '@/lib/billing-types'
 import { Suspense } from 'react'
@@ -19,26 +19,27 @@ type Plan = {
   visible_on_web: boolean
 }
 
-// Curated short feature list shown on pricing cards
-const PRICING_FEATURE_KEYS = [
-  'ficha', 'leads', 'calendario', 'estadisticas',
-  'pipeline', 'propuestas', 'comunicacion', 'estadisticas_avanzadas', 'soporte_prioritario',
-] as const
-const PRICING_FEATURE_LABELS: Record<string, string> = {
-  ficha:                  'Ficha en el directorio',
-  leads:                  'Gestión de leads',
-  calendario:             'Calendario de disponibilidad',
-  estadisticas:           'Estadísticas básicas',
-  pipeline:               'Pipeline de ventas',
-  propuestas:             'Propuestas digitales',
-  comunicacion:           'Tarifas y configuración',
-  estadisticas_avanzadas: 'Estadísticas avanzadas',
-  soporte_prioritario:    'Soporte prioritario',
-}
-const PRICING_FEATURES = PRICING_FEATURE_KEYS.map(key => ({
-  ...FEATURE_DEFS.find(f => f.key === key)!,
-  label: PRICING_FEATURE_LABELS[key],
-}))
+// Feature lists per plan tier — intentionally different lengths.
+// Basic card: shows what's included ✓ and what's missing ✗
+// Premium card: shorter punchy list — "everything in Basic +" premium items only
+const BASIC_FEATURES: { label: string; included: boolean }[] = [
+  { label: 'Ficha en el directorio',      included: true  },
+  { label: 'Gestión de leads',            included: true  },
+  { label: 'Calendario de disponibilidad',included: true  },
+  { label: 'Estadísticas básicas',        included: true  },
+  { label: 'Propuestas digitales',        included: false },
+  { label: 'Pipeline de ventas',          included: false },
+  { label: 'Estadísticas avanzadas',      included: false },
+  { label: 'Soporte prioritario',         included: false },
+]
+
+const PREMIUM_FEATURES: { label: string; included: boolean }[] = [
+  { label: 'Todo lo incluido en Básico',  included: true },
+  { label: 'Propuestas digitales',        included: true },
+  { label: 'Pipeline de ventas',          included: true },
+  { label: 'Estadísticas avanzadas',      included: true },
+  { label: 'Soporte prioritario',         included: true },
+]
 
 function PricingPageInner() {
   const router = useRouter()
@@ -46,6 +47,9 @@ function PricingPageInner() {
   const { user, profile, loading: authLoading, userVenues, activeVenue } = useAuth()
   const { hasPlan, planName, planTier, isTrial, isTrialExpired, trialDaysLeft } = usePlanFeatures()
   const isPendingVerification = profile?.status === 'pending'
+  // ?new_venue=1 — user is adding a new venue to their existing account.
+  // The subscription is created with venueId: null; admin assigns the venue later.
+  const newVenueMode = searchParams.get('new_venue') === '1'
   const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState<string | null>(null)
@@ -104,7 +108,9 @@ function PricingPageInner() {
     setSubmitting(`${planId}-${cycleId}`)
     setError('')
 
-    const venueId = selectedVenueId || activeVenue?.id || null
+    // In new-venue mode the subscription is created without a venue_id;
+    // admin will assign the venue via CRM after reviewing the registration.
+    const venueId = newVenueMode ? null : (selectedVenueId || activeVenue?.id || null)
     localStorage.setItem('wvs_pending_plan', JSON.stringify({ planId, cycleId, venueId }))
 
     try {
@@ -231,8 +237,21 @@ function PricingPageInner() {
             Potencia tu venue con las herramientas que necesitas para gestionar bodas de forma profesional.
           </p>
 
-          {/* Venue selector — only for multi-venue accounts */}
-          {isLoggedIn && userVenues.length > 1 && (
+          {/* New-venue mode banner */}
+          {isLoggedIn && newVenueMode && (
+            <div style={{
+              marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '8px 18px', borderRadius: 20,
+              background: 'rgba(196,151,90,0.1)', border: '1px solid rgba(196,151,90,0.25)',
+              fontSize: 13, color: 'var(--espresso)', fontWeight: 500,
+            }}>
+              <PlusCircle size={14} color="var(--gold)" />
+              Añadiendo un nuevo venue a tu cuenta
+            </div>
+          )}
+
+          {/* Venue selector — only for multi-venue accounts, not in new-venue mode */}
+          {isLoggedIn && !newVenueMode && userVenues.length > 1 && (
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontFamily: 'Manrope, sans-serif' }}>
                 Contratar para:
@@ -424,8 +443,7 @@ function PricingPageInner() {
         }}>
           {plans.map(plan => {
             const isPremium = plan.name.toLowerCase().includes('premium')
-            // Both tiers show all non-restriction features; basic shows premium ones as strikethrough
-            const featureDefs = PRICING_FEATURES
+            const featureDefs = isPremium ? PREMIUM_FEATURES : BASIC_FEATURES
             const isCurrentPlan = isLoggedIn && hasPlan && (
               (isPremium && planTier === 'premium') ||
               (!isPremium && planTier === 'basic')
@@ -491,24 +509,21 @@ function PricingPageInner() {
                   )}
                 </div>
 
-                {/* Feature list — basic shows premium features as strikethrough */}
+                {/* Feature list */}
                 <div style={{ marginTop: 20, marginBottom: 24, flex: 1 }}>
-                  {featureDefs.map(({ key, label, tier }) => {
-                    const isDisabled = !isPremium && tier === 'premium'
-                    return (
-                    <div key={key} style={{
+                  {featureDefs.map(({ label, included }) => (
+                    <div key={label} style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '5px 0', fontSize: 13,
-                      color: isDisabled ? '#ccc' : 'var(--charcoal)',
+                      color: included ? 'var(--charcoal)' : '#bbb',
                     }}>
-                      {isDisabled
-                        ? <X size={15} color="var(--ivory)" strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                        : <Check size={15} color="var(--gold)" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                      {included
+                        ? <Check size={15} color="var(--gold)" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                        : <X size={15} color="#ddd" strokeWidth={2.5} style={{ flexShrink: 0 }} />
                       }
                       {label}
                     </div>
-                    )
-                  })}
+                  ))}
                 </div>
 
                 {/* CTA button */}

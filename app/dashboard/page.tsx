@@ -6,7 +6,8 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Users, TrendingUp, CheckCircle, ExternalLink, AlertCircle, ClipboardList, Building2, CreditCard, Clock, UserPlus, BarChart2, Hourglass, UserRoundPlus, CalendarDays, Sparkles, PartyPopper, Bell } from 'lucide-react'
+import { usePlanFeatures } from '@/lib/use-plan-features'
+import { Users, TrendingUp, CheckCircle, ExternalLink, AlertCircle, ClipboardList, Building2, CreditCard, Clock, UserPlus, BarChart2, Hourglass, UserRoundPlus, CalendarDays, Sparkles, PartyPopper, Bell, PlusCircle } from 'lucide-react'
 
 function Skeleton({ w, h, radius = 4 }: { w?: string | number; h?: number; radius?: number }) {
   return (
@@ -226,6 +227,7 @@ function AdminDashboard() {
 function VenueDashboard() {
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
+  const { hasPlan, isTrial } = usePlanFeatures()
   const [venue, setVenue]         = useState<any>(null)
   const [venueLoading, setVenueLoading] = useState(false)
   const [leads, setLeads]         = useState<any[]>([])
@@ -438,27 +440,36 @@ function VenueDashboard() {
           </div>
 
           {/* Quick actions */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
-            {[
+          {(() => {
+            const actions = [
               { href: '/leads?new=1', icon: <UserPlus size={16} />,    label: 'Nuevo lead',   sub: 'Añadir manualmente'   },
               { href: '/calendario',  icon: <CalendarDays size={16} />, label: 'Calendario',   sub: 'Ver disponibilidad'   },
               { href: '/leads',       icon: <Users size={16} />,        label: 'Leads',        sub: 'Gestionar pipeline'   },
               { href: '/ficha',       icon: <TrendingUp size={16} />,   label: 'Editar ficha', sub: 'Info, fotos y precios'},
-            ].map((item, i) => (
-              <Link key={i} href={item.href}
-                style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px', background: '#fff', border: '1px solid var(--border)', borderRadius: 10, textDecoration: 'none', transition: 'box-shadow 0.15s, border-color 0.15s' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.07)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}>
-                <div style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>
-                  {item.icon}
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>{item.label}</div>
-                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>{item.sub}</div>
-                </div>
-              </Link>
-            ))}
-          </div>
+            ]
+            // Show "Añadir otro venue" only when user has an active paid plan (not trial)
+            if (hasPlan && !isTrial) {
+              actions.push({ href: '/pricing?new_venue=1', icon: <PlusCircle size={16} />, label: 'Añadir venue', sub: 'Contratar otro venue' })
+            }
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${actions.length}, 1fr)`, gap: 10, marginBottom: 20 }}>
+                {actions.map((item, i) => (
+                  <Link key={i} href={item.href}
+                    style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px', background: '#fff', border: '1px solid var(--border)', borderRadius: 10, textDecoration: 'none', transition: 'box-shadow 0.15s, border-color 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.07)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>
+                      {item.icon}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>{item.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>{item.sub}</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )
+          })()}
 
           <div className="two-col" style={{ marginBottom: 16 }}>
             <div className="card">
