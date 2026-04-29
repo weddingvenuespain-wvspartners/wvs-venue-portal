@@ -5,12 +5,12 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { usePlanFeatures, type PlanFeatures } from '@/lib/use-plan-features'
-import { Hourglass } from 'lucide-react'
+import { Hourglass, ChevronDown, Check } from 'lucide-react'
 
 export default function Sidebar() {
   const pathname = usePathname()
   const router   = useRouter()
-  const { user, profile, userVenues } = useAuth()
+  const { user, profile, userVenues, activeVenue, switchVenue } = useAuth()
 
   const features      = usePlanFeatures()
   const isAdmin       = profile?.role === 'admin'
@@ -22,6 +22,7 @@ export default function Sidebar() {
   const initials      = userEmail.slice(0, 2).toUpperCase()
 
   // Badge: new leads count (venue + catering users)
+  const [venueOpen, setVenueOpen] = useState(false)
   const [newLeadsCount, setNewLeadsCount] = useState(0)
   useEffect(() => {
     if (!user || isAdmin || isPlanner) return
@@ -56,10 +57,18 @@ export default function Sidebar() {
     return () => window.removeEventListener('wvs-pending-refresh', fetchPendingOnboarding)
   }, [user?.id, isAdmin]) // eslint-disable-line
 
+  // Close venue dropdown on outside click
+  useEffect(() => {
+    if (!venueOpen) return
+    const close = () => setVenueOpen(false)
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [venueOpen])
+
   const handleLogout = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.push('/login')
+    window.location.replace('/login')
   }
 
   const Icon = ({ d }: { d: string }) => (
@@ -162,12 +171,6 @@ export default function Sidebar() {
                 )}
               </Link>
             ))}
-            <div className="nav-section" style={{ marginTop: 8 }}>Ayuda</div>
-            {helpItems.map(item => (
-              <Link key={item.href} href={item.href} className={`nav-item ${isActive(item.href) ? 'active' : ''}`}>
-                <Icon d={item.icon} /> {item.label}
-              </Link>
-            ))}
           </>
         )}
 
@@ -237,6 +240,66 @@ export default function Sidebar() {
         {isVenueOwner && (
           <>
             <div className="nav-section" style={{ marginTop: 8 }}>Mi Venue</div>
+
+            {/* Venue switcher — only shown when user has 2+ venues */}
+            {userVenues.length > 1 && activeVenue && (
+              <div style={{ margin: '0 0 6px 0', position: 'relative' }}>
+                <button
+                  onClick={() => setVenueOpen(o => !o)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '7px 12px', borderRadius: 8, cursor: 'pointer',
+                    background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+                    color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: 600,
+                    fontFamily: 'Manrope, sans-serif', textAlign: 'left',
+                  }}
+                >
+                  <span style={{
+                    width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                    background: 'var(--gold)', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff',
+                  }}>
+                    {(activeVenue.name ?? `V${activeVenue.wp_venue_id}`).slice(0, 1).toUpperCase()}
+                  </span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {activeVenue.name ?? `Venue ${activeVenue.wp_venue_id}`}
+                  </span>
+                  <ChevronDown size={12} style={{
+                    flexShrink: 0, opacity: 0.6,
+                    transform: venueOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 150ms',
+                  }} />
+                </button>
+
+                {venueOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                    background: '#1e1a17', border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 8, overflow: 'hidden', zIndex: 50,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                  }}>
+                    {userVenues.map(v => (
+                      <button
+                        key={v.id}
+                        onClick={() => { switchVenue(v.id); setVenueOpen(false) }}
+                        style={{
+                          width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '8px 12px', background: 'none', border: 'none',
+                          color: v.id === activeVenue.id ? 'var(--gold)' : 'rgba(255,255,255,0.8)',
+                          fontSize: 12, fontWeight: v.id === activeVenue.id ? 600 : 400,
+                          cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left',
+                        }}
+                      >
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {v.name ?? `Venue ${v.wp_venue_id}`}
+                        </span>
+                        {v.id === activeVenue.id && <Check size={11} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {venueItems.map(item => {
               const locked = !features.loading && !features[item.feature]
               if (locked) return (
