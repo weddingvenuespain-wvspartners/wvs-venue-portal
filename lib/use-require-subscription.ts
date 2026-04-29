@@ -16,16 +16,19 @@ export function useRequireSubscription() {
   const isPending = profile?.status === 'pending'
   const onboardingComplete = !!profile?.display_name && !!profile?.first_name
 
-  // Only redirect when:
-  // 1. Auth is fully loaded (loading = false)
-  // 2. User exists
-  // 3. Profile is confirmed loaded (not null) — avoids false redirect if profile fetch is slow
-  // 4. User is confirmed NOT admin
-  // 5. User has no active plan or hasn't completed onboarding
-  const profileLoaded = !loading && profile !== null && profile !== undefined
+  // auth loading finished when loading = false, regardless of whether profile is null
+  const authDone = !loading && !!user
+  // profile row exists in DB (non-null after load)
+  const profileLoaded = authDone && profile !== null && profile !== undefined
 
   useEffect(() => {
-    if (!profileLoaded || !user || isAdmin) return
+    if (!authDone || isAdmin) return
+
+    // If profile is null after auth is done, the user has no profile row yet → onboarding
+    if (!profileLoaded) {
+      router.replace('/onboarding')
+      return
+    }
 
     // If onboarding is not complete, always send to /onboarding
     if (!onboardingComplete) {
@@ -37,7 +40,7 @@ export function useRequireSubscription() {
     if (isPending || !hasPlan) {
       router.replace('/pricing')
     }
-  }, [profileLoaded, user, isAdmin, hasPlan, isPending, onboardingComplete, router])
+  }, [authDone, profileLoaded, isAdmin, hasPlan, isPending, onboardingComplete, router])
 
   return {
     ready: profileLoaded && !!user && (isAdmin || (onboardingComplete && hasPlan && !isPending)),

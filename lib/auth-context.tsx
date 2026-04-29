@@ -134,8 +134,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    // Skip if we already loaded for this exact user
-    if (u.id === loadedUserIdRef.current) return
+    // Skip if we already loaded for this exact user.
+    // Still call setLoading(false) so the spinner is never left hanging
+    // if this branch is hit during React Strict Mode's double-invocation.
+    if (u.id === loadedUserIdRef.current) { setLoading(false); return }
     loadedUserIdRef.current = u.id
     setUser(u)
     const { profile: p, userVenues: v } = await fetchProfileAndVenues(u.id)
