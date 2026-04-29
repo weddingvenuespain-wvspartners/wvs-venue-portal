@@ -60,7 +60,7 @@ export async function getUserPlan(): Promise<ResolvedPlan | null> {
         .from('venue_subscriptions')
         .select(SELECT)
         .eq('user_id', session.user.id)
-        .eq('status', 'trial')
+        .in('status', ['trial', 'trial_expired'])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -72,7 +72,9 @@ export async function getUserPlan(): Promise<ResolvedPlan | null> {
 
   const isTrial = subscriptionStatus === 'trial'
   const trialEnd = (sub as any)?.trial_end_date as string | null
-  const trialExpired = isTrial && trialEnd != null && new Date(trialEnd).getTime() <= Date.now()
+  // trial_expired = already transitioned by subscription API; or trial with past end date
+  const trialExpired = subscriptionStatus === 'trial_expired' ||
+    (isTrial && trialEnd != null && new Date(trialEnd).getTime() <= Date.now())
   const hasPlan = !!plan && !trialExpired
 
   const planSlug = plan?.name ?? ''

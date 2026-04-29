@@ -5,7 +5,7 @@ import { ThemeProvider } from '@/lib/theme-context'
 import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
-  title: 'WVS Partners Portal',
+  title: 'Wedding Venues Spain',
   description: 'Portal de gestión para venues de Wedding Venues Spain',
 }
 

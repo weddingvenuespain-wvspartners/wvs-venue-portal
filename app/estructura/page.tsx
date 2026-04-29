@@ -331,7 +331,7 @@ export default function EstructuraPage() {
     .concat([5,6].map(day => ({ day, enabled: false, from: '10:00', to: '14:00' })))
   const [visitAvail, setVisitAvail]     = useState<VisitAvailability>({ slot_duration: 60, schedule: DEFAULT_SCHEDULE, block_booked_weddings: true, block_calendar_unavailable: false, blocked_dates: [] })
   const [savingVisit, setSavingVisit]   = useState(false)
-  const [visitAvailOpen, setVisitAvailOpen] = useState(false)
+  const [visitAvailOpen, setVisitAvailOpen] = useState(true)
   const [visitAvailDirty, setVisitAvailDirty] = useState(false)
   // Block calendar UI state
   const [blockCalYear,  setBlockCalYear]  = useState(() => new Date().getFullYear())
@@ -1291,21 +1291,15 @@ export default function EstructuraPage() {
             }
             return (
               <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, marginBottom: 16, maxWidth: 860, overflow: 'hidden' }}>
-                {/* Collapsible header */}
-                <button type="button" onClick={() => setVisitAvailOpen(o => !o)}
-                  style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}>
+                {/* Header */}
+                <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <CalendarDays size={14} style={{ color: '#059669', flexShrink: 0 }} />
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', flex: 1 }}>Disponibilidad para visitas</span>
-                  {visitAvailDirty && !visitAvailOpen && (
-                    <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706', background: '#fef3c7', borderRadius: 5, padding: '2px 7px' }}>Sin guardar</span>
-                  )}
-                  {visitAvailDirty && visitAvailOpen && (
+                  {visitAvailDirty && (
                     <span style={{ fontSize: 10, color: '#d97706' }}>Cambios pendientes</span>
                   )}
-                  {visitAvailOpen ? <ChevronUp size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} /> : <ChevronDown size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
-                </button>
+                </div>
 
-                {visitAvailOpen && (
                 <div style={{ padding: '0 20px 20px', borderTop: '1px solid var(--ivory)' }}>
                 <div style={{ height: 16 }} />
 
@@ -1739,7 +1733,6 @@ export default function EstructuraPage() {
                   </div>
                 </div>
                 </div>
-                )}
               </div>
             )
           })()}

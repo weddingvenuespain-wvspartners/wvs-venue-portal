@@ -100,22 +100,14 @@ const TRANSLATIONS = {
       cta: 'Start free',
     },
     featureLabels: [
-      // Basic
-      { key: 'ficha',                  label: 'Venue listing' },
+      { key: 'ficha',                  label: 'Venue listing on directory' },
       { key: 'leads',                  label: 'Lead management' },
-      { key: 'leads_date_filter',      label: 'Filter leads by date' },
       { key: 'calendario',             label: 'Availability calendar' },
       { key: 'estadisticas',           label: 'Basic analytics' },
-      // Premium
-      { key: 'leads_export',           label: 'Export leads to CSV' },
       { key: 'pipeline',               label: 'Sales pipeline' },
       { key: 'propuestas',             label: 'Digital proposals' },
-      { key: 'propuestas_web',         label: 'Public proposal page' },
-      { key: 'propuestas_pdf',         label: 'Proposal PDF download' },
-      { key: 'comunicacion',           label: 'Rates & pricing zones' },
+      { key: 'comunicacion',           label: 'Rates & pricing configuration' },
       { key: 'estadisticas_avanzadas', label: 'Advanced analytics' },
-      { key: 'recordatorios',          label: 'Automatic reminders' },
-      { key: 'multiusuario',           label: 'Multiple users' },
       { key: 'soporte_prioritario',    label: 'Priority support' },
     ] as { key: keyof PlanFeatures; label: string }[],
     faq: {
@@ -224,22 +216,14 @@ const TRANSLATIONS = {
       cta: 'Empieza gratis',
     },
     featureLabels: [
-      // Básico
-      { key: 'ficha',                  label: 'Ficha del venue' },
+      { key: 'ficha',                  label: 'Ficha en el directorio' },
       { key: 'leads',                  label: 'Gestión de leads' },
-      { key: 'leads_date_filter',      label: 'Filtrar leads por fecha' },
       { key: 'calendario',             label: 'Calendario de disponibilidad' },
       { key: 'estadisticas',           label: 'Estadísticas básicas' },
-      // Premium
-      { key: 'leads_export',           label: 'Exportar leads a CSV' },
       { key: 'pipeline',               label: 'Pipeline de ventas' },
       { key: 'propuestas',             label: 'Propuestas digitales' },
-      { key: 'propuestas_web',         label: 'Web pública de propuesta' },
-      { key: 'propuestas_pdf',         label: 'Descarga PDF de propuesta' },
-      { key: 'comunicacion',           label: 'Tarifas y zonas de precio' },
+      { key: 'comunicacion',           label: 'Tarifas y configuración' },
       { key: 'estadisticas_avanzadas', label: 'Estadísticas avanzadas' },
-      { key: 'recordatorios',          label: 'Recordatorios automáticos' },
-      { key: 'multiusuario',           label: 'Múltiples usuarios' },
       { key: 'soporte_prioritario',    label: 'Soporte prioritario' },
     ] as { key: keyof PlanFeatures; label: string }[],
     faq: {
@@ -273,7 +257,7 @@ const LOGO_URL  = 'https://weddingvenuesspain.com/wp-content/uploads/2024/10/log
 const HERO_IMG  = 'https://images.unsplash.com/photo-1519741497674-611481863552?w=1920&q=90&auto=format'
 const IMGS = {
   leads: '/screenshots/leads-panel.svg',
-  prop:  '/screenshots/proposals.svg',
+  prop:  'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=900&q=85&auto=format&fit=crop',
   cal:   '/screenshots/calendar.svg',
 } as const
 
@@ -554,6 +538,39 @@ export default function LandingPage() {
         )}
       </section>
 
+      {/* ─── FOR WHO ─── */}
+      <section style={{ background: C.darkDeep, borderBottom: '1px solid rgba(255,255,255,0.06)', padding: isMobile ? '20px 24px' : '0 60px' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 0 : 0 }}>
+          {[
+            { label: lang === 'es' ? 'Venues de bodas' : 'Wedding venues', active: true, soon: false },
+            { label: lang === 'es' ? 'Wedding Planners' : 'Wedding Planners', active: false, soon: true },
+            { label: lang === 'es' ? 'Catering' : 'Catering', active: false, soon: true },
+          ].map((item, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: isMobile ? '14px 0' : '18px 32px',
+              borderLeft: !isMobile && i > 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+              borderTop: isMobile && i > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              width: isMobile ? '100%' : 'auto',
+            }}>
+              <div style={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: item.active ? C.accent : 'rgba(255,255,255,0.18)',
+                flexShrink: 0,
+              }} />
+              <span style={{ fontFamily: SANS, fontSize: 13, fontWeight: item.active ? 600 : 400, color: item.active ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.35)' }}>
+                {item.label}
+              </span>
+              {item.soon && (
+                <span style={{ fontFamily: SANS, fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.accent, background: 'rgba(121,111,78,0.12)', border: '1px solid rgba(121,111,78,0.25)', borderRadius: 4, padding: '2px 7px' }}>
+                  {lang === 'es' ? 'Próximamente' : 'Coming soon'}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ─── PROBLEMS ─── */}
       <section style={{ background: C.dark, padding: isMobile ? '72px 24px' : '110px 60px' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
@@ -648,7 +665,7 @@ export default function LandingPage() {
                   ))}
                 </div>
               </div>
-              <div style={{ flex: 1, height: isMobile ? 220 : 380, borderRadius: isMobile ? 12 : 16, backgroundImage: `url(${IMGS[f.img as keyof typeof IMGS]})`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundColor: C.bg, boxShadow: isMobile ? '0 8px 32px rgba(69,61,35,0.12)' : '0 32px 80px rgba(69,61,35,0.18)', border: `1px solid ${C.border}` }} />
+              <div style={{ flex: 1, height: isMobile ? 220 : 380, borderRadius: isMobile ? 12 : 16, backgroundImage: `url(${IMGS[f.img as keyof typeof IMGS]})`, backgroundSize: f.img === 'prop' ? 'cover' : 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundColor: C.bg, boxShadow: isMobile ? '0 8px 32px rgba(69,61,35,0.12)' : '0 32px 80px rgba(69,61,35,0.18)', border: `1px solid ${C.border}` }} />
             </div>
           ))}
 
@@ -663,47 +680,6 @@ export default function LandingPage() {
                 <div style={{ fontFamily: SANS, fontSize: 13, color: C.muted, lineHeight: 1.65 }}>{x.d}</div>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── TESTIMONIALS ─── */}
-      <section style={{ background: C.bg, padding: isMobile ? '72px 24px' : '110px 60px', overflow: 'hidden' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-          <div style={{ fontFamily: SANS, fontSize: 11, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: C.accent, marginBottom: 16 }}>{t.testimonials.eyebrow}</div>
-          <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 36 : 50, fontWeight: 700, color: C.dark, margin: '0 0 56px', lineHeight: 1.1 }}>
-            {t.testimonials.title}<br /><em>{t.testimonials.titleItalic}</em>
-          </h2>
-
-          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 24 }}>
-            <div style={{ flex: isMobile ? undefined : '0 0 48%', background: C.dark, borderRadius: 16, padding: isMobile ? '36px 28px' : '48px 44px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 32 }}>
-              <div>
-                <div style={{ fontFamily: SERIF, fontSize: 72, color: C.accent, lineHeight: 0.7, marginBottom: 28, display: 'block' }}>&ldquo;</div>
-                <p style={{ fontFamily: SERIF, fontSize: isMobile ? 20 : 24, fontStyle: 'italic', color: C.white, lineHeight: 1.6, margin: 0 }}>{t.testimonials.items[0].q}</p>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontSize: 18, color: C.white, fontWeight: 700, flexShrink: 0 }}>{t.testimonials.items[0].letter}</div>
-                <div>
-                  <div style={{ fontFamily: SANS, fontSize: 14, fontWeight: 600, color: C.white }}>{t.testimonials.items[0].name}</div>
-                  <div style={{ fontFamily: SANS, fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{t.testimonials.items[0].role}</div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {t.testimonials.items.slice(1).map((item, i) => (
-                <div key={i} style={{ background: C.white, borderRadius: 14, padding: '28px 28px', border: `1px solid ${C.border}`, flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <p style={{ fontFamily: SANS, fontSize: 14, color: C.dark, lineHeight: 1.75, margin: 0, fontStyle: 'italic' }}>&ldquo;{item.q}&rdquo;</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 'auto' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: C.accentLight, border: `1px solid ${C.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontSize: 16, color: C.accent, fontWeight: 700, flexShrink: 0 }}>{item.letter}</div>
-                    <div>
-                      <div style={{ fontFamily: SANS, fontSize: 13, fontWeight: 600, color: C.dark }}>{item.name}</div>
-                      <div style={{ fontFamily: SANS, fontSize: 11, color: C.muted, marginTop: 1 }}>{item.role}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </section>
