@@ -2,27 +2,53 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 
-type UserVenue = { id: string; wp_venue_id: number }
+export type UserVenue = {
+  id:          string
+  wp_venue_id: number
+  name:        string | null
+  is_primary:  boolean
+}
 
 type AuthContextType = {
-  user: any
-  profile: any
-  userVenues: UserVenue[]
-  loading: boolean
+  user:           any
+  profile:        any
+  userVenues:     UserVenue[]
+  activeVenue:    UserVenue | null
+  switchVenue:    (venueId: string) => void
+  loading:        boolean
   refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null, profile: null, userVenues: [], loading: true,
+  user: null, profile: null, userVenues: [], activeVenue: null,
+  switchVenue: () => {}, loading: true,
   refreshProfile: async () => {},
 })
+
+const ACTIVE_VENUE_KEY = 'wvs_active_venue_id'
+
+function resolveActiveVenue(venues: UserVenue[]): UserVenue | null {
+  if (!venues.length) return null
+  // Try to restore from localStorage
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(ACTIVE_VENUE_KEY)
+    if (stored) {
+      const match = venues.find(v => v.id === stored)
+      if (match) return match
+    }
+  }
+  // Default: primary venue, or first
+  return venues.find(v => v.is_primary) ?? venues[0]
+}
 
 async function fetchProfileAndVenues(userId: string) {
   const supabase = createClient()
 
   // Fetch venues via browser client (RLS: user sees own venues)
   const venuesResult = await supabase
-    .from('user_venues').select('id, wp_venue_id').eq('user_id', userId)
+    .from('user_venues')
+    .select('id, wp_venue_id, name, is_primary')
+    .eq('user_id', userId)
 
   // Fetch profile via service-role API to bypass RLS.
   // This is required for admin users whose venue_profiles rows
@@ -46,8 +72,8 @@ async function fetchProfileAndVenues(userId: string) {
       const { subscription } = await subRes.json()
       if (subscription) {
         ;(profile as any).plan               = subscription.plan
-        ;(profile as any).subscription_status = subscription.status          // 'active' | 'trial'
-        ;(profile as any).trial_end_date      = subscription.trial_end_date  // string | null
+        ;(profile as any).subscription_status = subscription.status
+        ;(profile as any).trial_end_date      = subscription.trial_end_date
       }
     } catch (err) {
       console.warn('[auth] Could not fetch subscription:', err)
@@ -57,18 +83,28 @@ async function fetchProfileAndVenues(userId: string) {
 
   return {
     profile,
-    userVenues: venuesResult.data ?? [],
+    userVenues: (venuesResult.data ?? []) as UserVenue[],
   }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser]             = useState<any>(null)
-  const [profile, setProfile]       = useState<any>(null)
-  const [userVenues, setUserVenues] = useState<UserVenue[]>([])
-  const [loading, setLoading]       = useState(true)
+  const [user, setUser]               = useState<any>(null)
+  const [profile, setProfile]         = useState<any>(null)
+  const [userVenues, setUserVenues]   = useState<UserVenue[]>([])
+  const [activeVenue, setActiveVenue] = useState<UserVenue | null>(null)
+  const [loading, setLoading]         = useState(true)
 
   // Track which user ID we already loaded to prevent duplicate fetches
   const loadedUserIdRef = useRef<string | null>(null)
+
+  const switchVenue = (venueId: string) => {
+    const venue = userVenues.find(v => v.id === venueId)
+    if (!venue) return
+    setActiveVenue(venue)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(ACTIVE_VENUE_KEY, venueId)
+    }
+  }
 
   const loadForUser = async (u: any) => {
     // Check session duration preference — sign out if expired
@@ -88,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { profile: p, userVenues: v } = await fetchProfileAndVenues(u.id)
     setProfile(p)
     setUserVenues(v)
+    setActiveVenue(resolveActiveVenue(v))
     setLoading(false)
   }
 
@@ -97,6 +134,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { profile: p, userVenues: v } = await fetchProfileAndVenues(loadedUserIdRef.current)
     setProfile(p)
     setUserVenues(v)
+    setActiveVenue(prev => {
+      // Keep the same venue if still available, otherwise re-resolve
+      if (prev) {
+        const still = v.find(x => x.id === prev.id)
+        if (still) return still
+      }
+      return resolveActiveVenue(v)
+    })
   }
 
   useEffect(() => {
@@ -107,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         loadedUserIdRef.current = null
-        setUser(null); setProfile(null); setUserVenues([]); setLoading(false)
+        setUser(null); setProfile(null); setUserVenues([]); setActiveVenue(null); setLoading(false)
         return
       }
       if (session?.user && (
@@ -128,7 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []) // eslint-disable-line
 
   return (
-    <AuthContext.Provider value={{ user, profile, userVenues, loading, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, userVenues, activeVenue, switchVenue, loading, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )
