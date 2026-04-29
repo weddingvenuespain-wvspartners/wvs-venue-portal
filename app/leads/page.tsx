@@ -331,7 +331,7 @@ const emptyForm = {
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function LeadsPage() {
   const router   = useRouter()
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, activeVenue } = useAuth()
   const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
 
@@ -386,7 +386,7 @@ export default function LeadsPage() {
         window.history.replaceState({}, '', '/leads')
       }
     }
-  }, [user, authLoading])
+  }, [user, authLoading, activeVenue?.id])
 
   // Deep-link: open the visit-edit modal when arriving with ?openVisit=<leadId>
   useEffect(() => {
@@ -439,10 +439,11 @@ export default function LeadsPage() {
   }, [leads])
 
   const load = async () => {
+    if (!activeVenue) return
     setLoading(true)
     const supabase = createClient()
     const { data } = await supabase.from('leads').select('*')
-      .eq('user_id', user!.id).order('created_at', { ascending: false })
+      .eq('venue_id', activeVenue.id).order('created_at', { ascending: false })
     if (data) {
       // Auto-move leads whose visit_date has passed → post_visit (visit_scheduled y budget_sent con visita)
       const today = todayIso()
@@ -547,7 +548,7 @@ export default function LeadsPage() {
     if (status === 'lost' || cleanCalendar) {
       await supabase.from('calendar_entries')
         .update({ status: 'libre', lead_id: null, note: null })
-        .eq('user_id', user!.id)
+        .eq('venue_id', activeVenue!.id)
         .eq('lead_id', id)
     }
 
@@ -606,7 +607,7 @@ export default function LeadsPage() {
     // Free ALL calendar entries linked to this lead (reservado, negociacion, etc.)
     await supabase.from('calendar_entries')
       .update({ status: 'libre', lead_id: null, note: null })
-      .eq('user_id', user!.id)
+      .eq('venue_id', activeVenue!.id)
       .eq('lead_id', cancelWeddingLead.id)
 
     setLeads(prev => prev.map(l => l.id === cancelWeddingLead.id ? { ...l, status: 'lost', notes } : l))
@@ -641,7 +642,7 @@ export default function LeadsPage() {
         const { data: visitEntry } = await supabase
           .from('calendar_entries')
           .select('id, status')
-          .eq('user_id', user!.id)
+          .eq('venue_id', activeVenue!.id)
           .eq('date', lead.visit_date)
           .eq('lead_id', lead.id)
           .maybeSingle()
@@ -777,7 +778,7 @@ export default function LeadsPage() {
       const { data: oldEntries } = await supabase
         .from('calendar_entries')
         .select('id,date')
-        .eq('user_id', user!.id)
+        .eq('venue_id', activeVenue!.id)
         .eq('lead_id', dateConfirmLead.id)
         .in('status', ['negociacion', 'reservado'])
       if (oldEntries?.length) {
@@ -794,12 +795,12 @@ export default function LeadsPage() {
       const fullDayDates = calendarDates.filter(d => !halfDayMap?.[d])
       for (const d of fullDayDates) {
         const { data: existing } = await supabase.from('calendar_entries')
-          .select('id').eq('user_id', user!.id).eq('date', d).maybeSingle()
+          .select('id').eq('venue_id', activeVenue!.id).eq('date', d).maybeSingle()
         const entryPayload: any = { status: calendarStatus, lead_id: dateConfirmLead.id }
         if (existing?.id) {
           await supabase.from('calendar_entries').update(entryPayload).eq('id', existing.id)
         } else {
-          await supabase.from('calendar_entries').insert({ user_id: user!.id, date: d, ...entryPayload })
+          await supabase.from('calendar_entries').insert({ user_id: user!.id, venue_id: activeVenue!.id, date: d, ...entryPayload })
         }
       }
       // Save half-day entries — note encodes manana/tarde
@@ -807,12 +808,12 @@ export default function LeadsPage() {
         for (const [d, halfType] of Object.entries(halfDayMap)) {
           if (!calendarDates.includes(d)) continue
           const { data: existing } = await supabase.from('calendar_entries')
-            .select('id').eq('user_id', user!.id).eq('date', d).maybeSingle()
+            .select('id').eq('venue_id', activeVenue!.id).eq('date', d).maybeSingle()
           const entryPayload: any = { status: calendarStatus, lead_id: dateConfirmLead.id, note: halfType }
           if (existing?.id) {
             await supabase.from('calendar_entries').update(entryPayload).eq('id', existing.id)
           } else {
-            await supabase.from('calendar_entries').insert({ user_id: user!.id, date: d, ...entryPayload })
+            await supabase.from('calendar_entries').insert({ user_id: user!.id, venue_id: activeVenue!.id, date: d, ...entryPayload })
           }
         }
       }
@@ -820,14 +821,14 @@ export default function LeadsPage() {
       if (bufferDates?.length) {
         for (const { date: bd, note: bn } of bufferDates) {
           const { data: existing } = await supabase.from('calendar_entries')
-            .select('id,status').eq('user_id', user!.id).eq('date', bd).maybeSingle()
+            .select('id,status').eq('venue_id', activeVenue!.id).eq('date', bd).maybeSingle()
           // Don't overwrite reservado entries
           if (existing?.status === 'reservado') continue
           const bufPayload: any = { status: 'bloqueado', lead_id: dateConfirmLead.id, note: bn }
           if (existing?.id) {
             await supabase.from('calendar_entries').update(bufPayload).eq('id', existing.id)
           } else {
-            await supabase.from('calendar_entries').insert({ user_id: user!.id, date: bd, ...bufPayload })
+            await supabase.from('calendar_entries').insert({ user_id: user!.id, venue_id: activeVenue!.id, date: bd, ...bufPayload })
           }
         }
       }
@@ -877,7 +878,7 @@ export default function LeadsPage() {
       const { data: reservedEntry } = await supabase
         .from('calendar_entries')
         .select('id')
-        .eq('user_id', user!.id)
+        .eq('venue_id', activeVenue!.id)
         .eq('lead_id', deleteConfirmId)
         .eq('status', 'reservado')
         .maybeSingle()
@@ -1381,7 +1382,7 @@ export default function LeadsPage() {
 
       {showForm && (
         <LeadFormModal form={form} setForm={setForm} isEdit={!!editLead} editLead={editLead}
-          saving={saving} onSubmit={handleSubmit} userId={user!.id}
+          saving={saving} onSubmit={handleSubmit} userId={user!.id} venueId={activeVenue!.id}
           onClose={() => { setShowForm(false); setEditLead(null) }}
           onEditVisit={() => {
             if (!editLead) return
@@ -1400,7 +1401,7 @@ export default function LeadsPage() {
             if (clearErr) await supabase.from('leads').update({ visit_date: null }).eq('id', editLead.id)
             // Limpiar entrada de calendario si existe
             if (editLead.visit_date) {
-              const { data: visitEntry } = await supabase.from('calendar_entries').select('id,status').eq('user_id', user!.id).eq('date', editLead.visit_date).maybeSingle()
+              const { data: visitEntry } = await supabase.from('calendar_entries').select('id,status').eq('venue_id', activeVenue!.id).eq('date', editLead.visit_date).maybeSingle()
               if (visitEntry?.id) {
                 if (visitEntry.status === 'negociacion') await supabase.from('calendar_entries').delete().eq('id', visitEntry.id)
                 else await supabase.from('calendar_entries').update({ lead_id: null, note: null }).eq('id', visitEntry.id)
@@ -1437,7 +1438,7 @@ export default function LeadsPage() {
           key={dateConfirmKey}
           lead={dateConfirmLead}
           allLeads={leads}
-          userId={user!.id}
+          venueId={activeVenue!.id}
           onConfirm={handleDateConfirm}
           onClose={() => { setReturnToEditAfterVisit(false); setDateConfirmLead(null); setDateConfirmStatus(null) }}
           onBack={returnToEditAfterVisit ? (() => {
@@ -1456,6 +1457,7 @@ export default function LeadsPage() {
           lead={dateConfirmLead}
           targetStatus={dateConfirmStatus}
           userId={user!.id}
+          venueId={activeVenue!.id}
           allLeads={leads}
           onConfirm={handleDateConfirm}
           onClose={() => {
@@ -1480,6 +1482,7 @@ export default function LeadsPage() {
           lead={pdfDigitalLead}
           targetStatus={pdfDigitalLead.status === 'new' ? 'contacted' : pdfDigitalLead.status}
           userId={user!.id}
+          venueId={activeVenue!.id}
           allLeads={leads}
           onConfirm={handlePdfDigitalDates}
           onClose={() => setPdfDigitalLead(null)}
@@ -1658,11 +1661,12 @@ export default function LeadsPage() {
 
 // ── Date Confirm Modal ─────────────────────────────────────────────────────────
 function DateConfirmModal({
-  lead, targetStatus, userId, allLeads, onConfirm, onClose, onBack, isPdfDigital = false,
+  lead, targetStatus, userId, venueId, allLeads, onConfirm, onClose, onBack, isPdfDigital = false,
 }: {
   lead: any
   targetStatus: DbStatus
   userId: string
+  venueId: string
   allLeads: any[]
   onConfirm: (leadUpdates: any, calendarDates: string[], calendarStatus: 'negociacion' | 'reservado', isVisit: boolean, halfDayMap?: Record<string, 'medio_dia_manana' | 'medio_dia_tarde'>, visitTime?: string, visitDuration?: number, bufferDates?: { date: string; note: string }[]) => Promise<void>
   onClose: () => void
@@ -1870,7 +1874,7 @@ function DateConfirmModal({
         const [y, m] = ym.split('-').map(Number)
         const lastDay = new Date(y, m, 0).getDate()
         const { data } = await supabase.from('calendar_entries')
-          .select('*').eq('user_id', userId)
+          .select('*').eq('venue_id', venueId)
           .gte('date', `${ym}-01`).lte('date', `${ym}-${pad(lastDay)}`)
         if (data) {
           // Group entries by date (a date can have 2 entries for double half-day)
@@ -4564,10 +4568,10 @@ function FilterDateRangePicker({ from, to, onChange }: {
 
 // ── Mini Calendar Picker ───────────────────────────────────────────────────────
 function MiniCalendarPicker({
-  userId, value, onChange, rangeFrom, rangeTo,
+  venueId, value, onChange, rangeFrom, rangeTo,
   highlights, readOnly = false,
 }: {
-  userId: string
+  venueId: string
   value?: string
   onChange?: (date: string) => void
   rangeFrom?: string
@@ -4590,10 +4594,10 @@ function MiniCalendarPicker({
     const to   = new Date(year, month + 1, 0).toISOString().slice(0, 10)
     Promise.all([
       supabase.from('calendar_entries').select('date,status,note,lead_id')
-        .eq('user_id', userId).gte('date', from).lte('date', to),
+        .eq('venue_id', venueId).gte('date', from).lte('date', to),
       supabase.from('leads').select('id,wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility')
-        .eq('user_id', userId).neq('status', 'lost').neq('status', 'won'),
-      supabase.from('leads').select('id').eq('user_id', userId).eq('status', 'won'),
+        .eq('venue_id', venueId).neq('status', 'lost').neq('status', 'won'),
+      supabase.from('leads').select('id').eq('venue_id', venueId).eq('status', 'won'),
     ]).then(([entriesRes, leadsRes, wonRes]) => {
       if (entriesRes.data) {
         const wonIds    = new Set((wonRes.data   || []).map((l: any) => l.id))
@@ -4643,7 +4647,7 @@ function MiniCalendarPicker({
         setLeadCounts(counts)
       }
     })
-  }, [year, month, userId])
+  }, [year, month, venueId])
 
   const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
   const DAYS_ES   = ['L','M','X','J','V','S','D']
@@ -4792,9 +4796,9 @@ function MiniCalendarPicker({
 // Un solo calendario: 1er click = desde, 2º click = hasta
 // Hover preview del rango mientras se selecciona el hasta
 function RangeCalendarPicker({
-  userId, from, to, onChange,
+  venueId, from, to, onChange,
 }: {
-  userId: string
+  venueId: string
   from: string
   to: string
   onChange: (from: string, to: string) => void
@@ -4815,9 +4819,9 @@ function RangeCalendarPicker({
     const mFrom = `${year}-${String(month + 1).padStart(2, '0')}-01`
     const mTo   = new Date(year, month + 1, 0).toISOString().slice(0, 10)
     Promise.all([
-      supabase.from('calendar_entries').select('date,status,note,lead_id').eq('user_id', userId).gte('date', mFrom).lte('date', mTo),
-      supabase.from('leads').select('id,wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility').eq('user_id', userId).neq('status', 'lost').neq('status', 'won'),
-      supabase.from('leads').select('id').eq('user_id', userId).eq('status', 'won'),
+      supabase.from('calendar_entries').select('date,status,note,lead_id').eq('venue_id', venueId).gte('date', mFrom).lte('date', mTo),
+      supabase.from('leads').select('id,wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility').eq('venue_id', venueId).neq('status', 'lost').neq('status', 'won'),
+      supabase.from('leads').select('id').eq('venue_id', venueId).eq('status', 'won'),
     ]).then(([eRes, lRes, wonRes]) => {
       if (eRes.data) {
         const wonIds    = new Set((wonRes.data || []).map((l: any) => l.id))
@@ -4853,7 +4857,7 @@ function RangeCalendarPicker({
         setLeadCounts(counts)
       }
     })
-  }, [year, month, userId])
+  }, [year, month, venueId])
 
   const handleClick = (d: string) => {
     if (d < today) return
@@ -5024,9 +5028,9 @@ function RangeCalendarPicker({
 // Un solo calendario para seleccionar varios rangos.
 // 1er click = fecha inicio del rango en curso · 2º click = fecha fin → rango completado
 function MultiRangeCalendarPicker({
-  userId, ranges, onChange,
+  venueId, ranges, onChange,
 }: {
-  userId: string
+  venueId: string
   ranges: { from: string; to: string }[]
   onChange: (ranges: { from: string; to: string }[]) => void
 }) {
@@ -5055,9 +5059,9 @@ function MultiRangeCalendarPicker({
     const mFrom = `${year}-${String(month + 1).padStart(2, '0')}-01`
     const mTo   = new Date(year, month + 1, 0).toISOString().slice(0, 10)
     Promise.all([
-      supabase.from('calendar_entries').select('date,status,note,lead_id').eq('user_id', userId).gte('date', mFrom).lte('date', mTo),
-      supabase.from('leads').select('id,wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility').eq('user_id', userId).neq('status', 'lost').neq('status', 'won'),
-      supabase.from('leads').select('id').eq('user_id', userId).eq('status', 'won'),
+      supabase.from('calendar_entries').select('date,status,note,lead_id').eq('venue_id', venueId).gte('date', mFrom).lte('date', mTo),
+      supabase.from('leads').select('id,wedding_date,wedding_date_to,wedding_date_ranges,wedding_year,wedding_month,date_flexibility').eq('venue_id', venueId).neq('status', 'lost').neq('status', 'won'),
+      supabase.from('leads').select('id').eq('venue_id', venueId).eq('status', 'won'),
     ]).then(([eRes, lRes, wonRes]) => {
       if (eRes.data) {
         const wonIds    = new Set((wonRes.data || []).map((l: any) => l.id))
@@ -5093,7 +5097,7 @@ function MultiRangeCalendarPicker({
         setLeadCounts(counts)
       }
     })
-  }, [year, month, userId])
+  }, [year, month, venueId])
 
   // Qué rango (índice) contiene esta fecha (para color)
   const getRangeIdx = (d: string): number => {
@@ -5564,9 +5568,9 @@ function LanguagePicker({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 // ── Form Modal ─────────────────────────────────────────────────────────────────
-function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onClose, userId, onEditVisit, onDeleteVisit, onChangeDates, onChangeBudgetDates }: {
+function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onClose, userId, venueId, onEditVisit, onDeleteVisit, onChangeDates, onChangeBudgetDates }: {
   form: any; setForm: (f: any) => void; isEdit: boolean; editLead?: any | null
-  saving: boolean; onSubmit: () => void; onClose: () => void; userId: string
+  saving: boolean; onSubmit: () => void; onClose: () => void; userId: string; venueId: string
   onEditVisit?: () => void
   onDeleteVisit?: () => void
   onChangeDates?: () => void
@@ -5950,7 +5954,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   {/* EXACT DATE */}
                   {form.date_flexibility === 'exact' && (
                     <div>
-                      <MiniCalendarPicker userId={userId} value={form.wedding_date} onChange={d => set('wedding_date', d)} />
+                      <MiniCalendarPicker venueId={venueId} value={form.wedding_date} onChange={d => set('wedding_date', d)} />
                       {form.wedding_date && (() => {
                         const dt = new Date(form.wedding_date + 'T12:00:00')
                         const wd = dt.toLocaleDateString('es-ES', { weekday: 'long' })
@@ -5970,7 +5974,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     const curDur = Math.min(parseInt(form.wedding_duration_days || '1'), maxDur)
                     return (
                       <div>
-                        <RangeCalendarPicker userId={userId} from={form.wedding_date} to={form.wedding_date_to} onChange={(f, t) => { set('wedding_date', f); set('wedding_date_to', t) }} />
+                        <RangeCalendarPicker venueId={venueId} from={form.wedding_date} to={form.wedding_date_to} onChange={(f, t) => { set('wedding_date', f); set('wedding_date_to', t) }} />
                         {form.wedding_date && form.wedding_date_to && (
                           <DateSummaryCard
                             miniLabel="Rango disponible"
@@ -6001,7 +6005,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     const totalDays = rs.reduce((sum: number, r: any) => { if (!r.from) return sum; const a = new Date(r.from + 'T12:00:00'); const b = new Date((r.to || r.from) + 'T12:00:00'); return sum + Math.round((b.getTime() - a.getTime()) / 86400000) + 1 }, 0)
                     return (
                       <div>
-                        <MultiRangeCalendarPicker userId={userId} ranges={rs} onChange={r => set('wedding_date_ranges', r)} />
+                        <MultiRangeCalendarPicker venueId={venueId} ranges={rs} onChange={r => set('wedding_date_ranges', r)} />
                         {rs.length > 0 && <DateSummaryCard miniLabel="Opciones de fecha" title={`${rs.length} ${rs.length === 1 ? 'rango propuesto' : 'rangos propuestos'}`} subtitle={`${totalDays} ${totalDays === 1 ? 'día candidato' : 'días candidatos'} en total`} />}
                       </div>
                     )
@@ -6025,7 +6029,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                             </Select>
                           </div>
                         </div>
-                        <MiniCalendarPicker userId={userId} readOnly value={undefined} highlights={Array.from({ length: days }, (_, i) => `${y}-${String(mo).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`)} />
+                        <MiniCalendarPicker venueId={venueId} readOnly value={undefined} highlights={Array.from({ length: days }, (_, i) => `${y}-${String(mo).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`)} />
                         <DateSummaryCard miniLabel="Mes deseado" title={`${MONTHS[mo - 1]} de ${y}`} subtitle={`Cualquier día del mes (${days} días disponibles)`} />
                       </div>
                     )
@@ -6126,9 +6130,9 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                             }}>{opt.label}</button>
                           ))}
                         </div>
-                        {form.original_date_flexibility === 'exact' && <MiniCalendarPicker userId={userId} value={form.original_wedding_date} onChange={d => setOrig('wedding_date', d)} />}
-                        {form.original_date_flexibility === 'range' && <RangeCalendarPicker userId={userId} from={form.original_wedding_date} to={form.original_wedding_date_to} onChange={(f, t) => { setOrig('wedding_date', f); setOrig('wedding_date_to', t) }} />}
-                        {form.original_date_flexibility === 'multi_range' && <MultiRangeCalendarPicker userId={userId} ranges={form.original_wedding_date_ranges || []} onChange={r => setOrig('wedding_date_ranges', r)} />}
+                        {form.original_date_flexibility === 'exact' && <MiniCalendarPicker venueId={venueId} value={form.original_wedding_date} onChange={d => setOrig('wedding_date', d)} />}
+                        {form.original_date_flexibility === 'range' && <RangeCalendarPicker venueId={venueId} from={form.original_wedding_date} to={form.original_wedding_date_to} onChange={(f, t) => { setOrig('wedding_date', f); setOrig('wedding_date_to', t) }} />}
+                        {form.original_date_flexibility === 'multi_range' && <MultiRangeCalendarPicker venueId={venueId} ranges={form.original_wedding_date_ranges || []} onChange={r => setOrig('wedding_date_ranges', r)} />}
                         {form.original_date_flexibility === 'month' && (
                           <div style={{ display: 'flex', gap: 8 }}>
                             <Select value={String(form.original_wedding_month)} onValueChange={(v) => setOrig('wedding_month', v)}>
@@ -6343,13 +6347,13 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     ))}
                   </div>
                   {form.original_date_flexibility === 'exact' && (
-                    <MiniCalendarPicker userId={userId} value={form.original_wedding_date} onChange={d => setOrig('wedding_date', d)} />
+                    <MiniCalendarPicker venueId={venueId} value={form.original_wedding_date} onChange={d => setOrig('wedding_date', d)} />
                   )}
                   {form.original_date_flexibility === 'range' && (
-                    <RangeCalendarPicker userId={userId} from={form.original_wedding_date} to={form.original_wedding_date_to} onChange={(f, t) => { setOrig('wedding_date', f); setOrig('wedding_date_to', t) }} />
+                    <RangeCalendarPicker venueId={venueId} from={form.original_wedding_date} to={form.original_wedding_date_to} onChange={(f, t) => { setOrig('wedding_date', f); setOrig('wedding_date_to', t) }} />
                   )}
                   {form.original_date_flexibility === 'multi_range' && (
-                    <MultiRangeCalendarPicker userId={userId} ranges={form.original_wedding_date_ranges || []} onChange={r => setOrig('wedding_date_ranges', r)} />
+                    <MultiRangeCalendarPicker venueId={venueId} ranges={form.original_wedding_date_ranges || []} onChange={r => setOrig('wedding_date_ranges', r)} />
                   )}
                   {form.original_date_flexibility === 'month' && (
                     <div style={{ display: 'flex', gap: 8 }}>
@@ -6784,11 +6788,11 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
 
 // ── Visit Schedule Modal — clean, modern UI dedicated to scheduling a venue visit ──
 function VisitScheduleModal({
-  lead, allLeads = [], userId, onConfirm, onClose, onBack,
+  lead, allLeads = [], venueId, onConfirm, onClose, onBack,
 }: {
   lead: any
   allLeads?: any[]
-  userId: string
+  venueId: string
   onConfirm: (
     leadUpdates: any,
     calendarDates: string[],
@@ -6849,9 +6853,9 @@ function VisitScheduleModal({
     const ym = `${viewYear}-${pad(viewMonth + 1)}`
     const last = new Date(viewYear, viewMonth + 1, 0).getDate()
     Promise.all([
-      supabase.from('calendar_entries').select('date,status,note,lead_id').eq('user_id', userId)
+      supabase.from('calendar_entries').select('date,status,note,lead_id').eq('venue_id', venueId)
         .gte('date', `${ym}-01`).lte('date', `${ym}-${pad(last)}`),
-      supabase.from('leads').select('id').eq('user_id', userId).eq('status', 'won'),
+      supabase.from('leads').select('id').eq('venue_id', venueId).eq('status', 'won'),
     ]).then(([{ data }, { data: wonData }]) => {
       const wonIds = new Set((wonData || []).map((l: any) => l.id))
       const map: Record<string, any> = {}
@@ -6861,7 +6865,7 @@ function VisitScheduleModal({
       })
       setCalEntries(prev => ({ ...prev, ...map }))
     })
-  }, [viewYear, viewMonth, userId])
+  }, [viewYear, viewMonth, venueId])
 
   const isBlocked = (ds: string) => {
     const e = calEntries[ds]
