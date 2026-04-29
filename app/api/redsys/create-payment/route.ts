@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { planId, cycleId } = await req.json()
+    const { planId, cycleId, venueId } = await req.json()
     if (!planId || !cycleId) {
       return NextResponse.json({ error: 'planId y cycleId requeridos' }, { status: 400 })
     }
@@ -46,12 +46,13 @@ export async function POST(req: NextRequest) {
     const order = generateOrderNumber()
     const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || ''
 
-    // Merchant data: encode userId + plan + cycle so webhook can process it
+    // Merchant data: encode userId + plan + cycle + venue so webhook can process it
     const merchantData = JSON.stringify({
       userId: session.user.id,
       planId: plan.id,
       cycleId: cycle.id,
       intervalMonths: cycle.interval_months,
+      venueId: venueId || null,
     })
 
     const formData = buildRedirectFormData({
