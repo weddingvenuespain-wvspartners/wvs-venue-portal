@@ -43,7 +43,7 @@ const PRICING_FEATURES = PRICING_FEATURE_KEYS.map(key => ({
 function PricingPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, profile, loading: authLoading } = useAuth()
+  const { user, profile, loading: authLoading, userVenues, activeVenue } = useAuth()
   const { hasPlan, planName, planTier, isTrial, isTrialExpired, trialDaysLeft } = usePlanFeatures()
   const isPendingVerification = profile?.status === 'pending'
   const [plans, setPlans] = useState<Plan[]>([])
@@ -51,7 +51,15 @@ function PricingPageInner() {
   const [submitting, setSubmitting] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [billingAnnual, setBillingAnnual] = useState(true)
+  const [selectedVenueId, setSelectedVenueId] = useState<string>('')
   const formRef = useRef<HTMLFormElement>(null)
+
+  // Sync selectedVenueId when activeVenue loads (auth context is async)
+  useEffect(() => {
+    if (activeVenue && !selectedVenueId) {
+      setSelectedVenueId(activeVenue.id)
+    }
+  }, [activeVenue?.id]) // eslint-disable-line
 
   const isLoggedIn = !!user
 
@@ -96,13 +104,14 @@ function PricingPageInner() {
     setSubmitting(`${planId}-${cycleId}`)
     setError('')
 
-    localStorage.setItem('wvs_pending_plan', JSON.stringify({ planId, cycleId }))
+    const venueId = selectedVenueId || activeVenue?.id || null
+    localStorage.setItem('wvs_pending_plan', JSON.stringify({ planId, cycleId, venueId }))
 
     try {
       const res = await fetch('/api/redsys/create-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId, cycleId }),
+        body: JSON.stringify({ planId, cycleId, venueId }),
       })
 
       const data = await res.json()
@@ -221,6 +230,34 @@ function PricingPageInner() {
           <p style={{ color: 'var(--warm-gray)', fontSize: 14, maxWidth: 500, margin: '0 auto' }}>
             Potencia tu venue con las herramientas que necesitas para gestionar bodas de forma profesional.
           </p>
+
+          {/* Venue selector — only for multi-venue accounts */}
+          {isLoggedIn && userVenues.length > 1 && (
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontFamily: 'Manrope, sans-serif' }}>
+                Contratar para:
+              </span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {userVenues.map(v => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setSelectedVenueId(v.id)}
+                    style={{
+                      padding: '6px 16px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
+                      fontFamily: 'Manrope, sans-serif', fontWeight: 600,
+                      border: v.id === selectedVenueId ? '1.5px solid var(--gold)' : '1px solid rgba(0,0,0,0.15)',
+                      background: v.id === selectedVenueId ? 'rgba(196,151,90,0.12)' : 'transparent',
+                      color: v.id === selectedVenueId ? 'var(--espresso)' : 'var(--warm-gray)',
+                      transition: 'all 120ms',
+                    }}
+                  >
+                    {v.name ?? `Venue ${v.wp_venue_id}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 12 }}>
             {isLoggedIn && isTrial && !isTrialExpired && (
