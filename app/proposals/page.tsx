@@ -61,7 +61,7 @@ const S_LABEL: Record<string, string> = {
 function PropuestasPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, activeVenue } = useAuth()
   const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
 
@@ -88,7 +88,7 @@ function PropuestasPageContent() {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
     load()
-  }, [user, authLoading])
+  }, [user, authLoading, activeVenue?.id])
 
   // Legacy entry: /proposals?lead_id=xxx&create=1 → redirect to /proposals/new
   useEffect(() => {
@@ -100,10 +100,11 @@ function PropuestasPageContent() {
   }, [searchParams, router])
 
   const load = async () => {
+    if (!activeVenue) return
     const supabase = createClient()
     const [{ data: props }, { data: leadsData }, { data: venueRow }] = await Promise.all([
-      supabase.from('proposals').select('*, branding:proposal_branding(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('leads').select('id, name, email').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('*, branding:proposal_branding(*)').eq('venue_id', activeVenue.id).order('created_at', { ascending: false }),
+      supabase.from('leads').select('id, name, email').eq('venue_id', activeVenue.id).order('created_at', { ascending: false }),
       supabase.from('venue_onboarding').select('smtp_from_email').eq('user_id', user.id).maybeSingle(),
     ])
     cachedSmtpConfigured = !!(venueRow as any)?.smtp_from_email

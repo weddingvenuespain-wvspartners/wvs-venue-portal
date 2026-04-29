@@ -23,7 +23,7 @@ function generateSlug(name: string) {
 function NuevaPropuestaContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, activeVenue } = useAuth()
   const { isBlocked, ready } = useRequireSubscription()
   const features = usePlanFeatures()
   const [error, setError] = useState<string | null>(null)
@@ -118,6 +118,7 @@ function NuevaPropuestaContent() {
       const slug = generateSlug(coupleName)
       const payload: any = {
         user_id: user.id,
+        venue_id: activeVenue?.id ?? null,
         slug,
         couple_name: coupleName,
         couple_email: coupleEmail,
