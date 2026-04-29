@@ -52,6 +52,7 @@ type Plan = {
 type Subscription = {
   id: string
   user_id: string
+  venue_id: string | null
   plan_id: string
   billing_cycle: string          // matches a BillingCycle.id from the plan
   status: 'active' | 'trial' | 'trial_expired' | 'paused' | 'cancelled'
@@ -74,6 +75,7 @@ type UserVenue = {
   id: string
   user_id: string
   wp_venue_id: number
+  name: string | null
   subscription_id: string | null
 }
 
@@ -327,10 +329,14 @@ function UserPanel({
   onAssignVenue: (userId: string, wpId: number, planId: string, cycle: string) => Promise<void>
   trialConfig: TrialConfig
   onRemoveVenue: (uvId: string) => Promise<void>
-  onSaveSubscription: (sub: Partial<Subscription> & { user_id: string }) => Promise<void>
+  onSaveSubscription: (sub: Partial<Subscription> & { user_id: string }) => Promise<string | null>
   onRegisterPayment: (sub: Subscription, amount: string, ref: string) => Promise<void>
 }) {
   const [tab, setTab] = useState<'perfil' | 'venues' | 'suscripcion' | 'historial' | 'equipo'>(initialTab || 'perfil')
+  const [subFeedback, setSubFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [subVenueId, setSubVenueId] = useState<string>(
+    userVenues.find(v => v.user_id === profile.user_id)?.id ?? ''
+  )
   const [teamMembers, setTeamMembers] = useState<any[]>([])
   const [teamLoading, setTeamLoading] = useState(false)
   const [history, setHistory] = useState<PaymentEvent[]>([])
@@ -376,8 +382,12 @@ function UserPanel({
   const [newCycle,     setNewCycle]     = useState('')
 
   const STATUS_PRIO: Record<string, number> = { active: 0, trial: 1, paused: 2, cancelled: 3 }
+  const profileVenues = userVenues.filter(v => v.user_id === profile.user_id)
+  const effectiveVenueId = subVenueId || profileVenues[0]?.id
   const activeSub = subscriptions
-    .filter(s => s.user_id === profile.user_id)
+    .filter(s => s.user_id === profile.user_id && (
+      profileVenues.length <= 1 || s.venue_id === effectiveVenueId || s.venue_id == null
+    ))
     .sort((a, b) => (STATUS_PRIO[a.status] ?? 9) - (STATUS_PRIO[b.status] ?? 9))[0]
   const subPlan   = plans.find(p => p.id === activeSub?.plan_id)
   const daysLeft  = trialDaysLeft(activeSub?.trial_end_date || null)
@@ -936,6 +946,31 @@ function UserPanel({
           {tab === 'suscripcion' && (
             <div>
 
+              {/* Venue selector — only shown for multi-venue users */}
+              {profileVenues.length > 1 && (
+                <div style={{ marginBottom: 16 }}>
+                  <label className="form-label">Venue</label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {profileVenues.map(v => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => setSubVenueId(v.id)}
+                        style={{
+                          padding: '5px 14px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
+                          fontFamily: 'Manrope, sans-serif', fontWeight: 600,
+                          border: v.id === effectiveVenueId ? '1.5px solid var(--gold)' : '1px solid var(--ivory)',
+                          background: v.id === effectiveVenueId ? 'var(--gold-light)' : 'transparent',
+                          color: v.id === effectiveVenueId ? 'var(--espresso)' : 'var(--warm-gray)',
+                        }}
+                      >
+                        {v.name ?? `Venue ${v.wp_venue_id}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* ── Contextual verification banner ── */}
               {profile.status === 'pending' && !activeSub && (
                 <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '14px 16px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -1043,6 +1078,7 @@ function UserPanel({
                       onSaveSubscription({
                         ...(activeSub?.id ? { id: activeSub.id } : {}),
                         user_id:              profile.user_id,
+                        venue_id:             effectiveVenueId || null,
                         plan_id:              migratePlanId,
                         billing_cycle:        migrateCycle,
                         status:               'active',
@@ -1196,8 +1232,7 @@ function UserPanel({
                     </label>
                     <DatePicker
                       value={subForm.trial_end_date}
-                      disabled={subForm.status === 'trial_expired'}
-                      onChange={(v) => subForm.status === 'trial' && setSubForm(f => ({ ...f, trial_end_date: v }))}
+                      onChange={(v) => setSubForm(f => ({ ...f, trial_end_date: v }))}
                       placeholder="Fin del trial"
                     />
                     {subForm.trial_end_date && (() => {
@@ -1308,27 +1343,38 @@ function UserPanel({
                   onChange={e => setSubForm(f => ({ ...f, notes: e.target.value }))}
                   placeholder="Forma de pago, descuentos, observaciones..." />
               </div>
+              {subFeedback && (
+                <div className={`alert ${subFeedback.ok ? 'alert-success' : 'alert-error'}`} style={{ marginBottom: 12 }}>
+                  {subFeedback.msg}
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   className="btn btn-primary"
                   disabled={saving || !subForm.plan_id}
-                  onClick={() => onSaveSubscription({
-                    ...(activeSub?.id ? { id: activeSub.id } : {}),
-                    user_id:              profile.user_id,
-                    plan_id:              subForm.plan_id,
-                    billing_cycle:        subForm.billing_cycle,
-                    status:               subForm.status,
-                    start_date:           subForm.start_date           || null,
-                    trial_end_date:       subForm.status === 'trial' ? (subForm.trial_end_date || null) : null,
-                    renewal_date:         subForm.status === 'active' ? (subForm.renewal_date || null) : null,
-                    payment_reference:    subForm.payment_reference    || null,
-                    iban:                 subForm.iban                 || null,
-                    account_holder:       subForm.account_holder       || null,
-                    mandate_ref:          subForm.mandate_ref          || null,
-                    cancel_at_period_end: subForm.cancel_at_period_end,
-                    service_end_date:     subForm.service_end_date     || null,
-                    notes:                subForm.notes                || null,
-                  })}
+                  onClick={async () => {
+                    const err = await onSaveSubscription({
+                      ...(activeSub?.id ? { id: activeSub.id } : {}),
+                      user_id:              profile.user_id,
+                      venue_id:             effectiveVenueId || null,
+                      plan_id:              subForm.plan_id,
+                      billing_cycle:        subForm.billing_cycle,
+                      status:               subForm.status,
+                      start_date:           subForm.start_date           || null,
+                      trial_end_date:       subForm.status === 'trial' || subForm.status === 'trial_expired' ? (subForm.trial_end_date || null) : null,
+                      renewal_date:         subForm.status === 'active' ? (subForm.renewal_date || null) : null,
+                      payment_reference:    subForm.payment_reference    || null,
+                      iban:                 subForm.iban                 || null,
+                      account_holder:       subForm.account_holder       || null,
+                      mandate_ref:          subForm.mandate_ref          || null,
+                      cancel_at_period_end: subForm.cancel_at_period_end,
+                      service_end_date:     subForm.service_end_date     || null,
+                      notes:                subForm.notes                || null,
+                    })
+                    const fb = err ? { ok: false, msg: err } : { ok: true, msg: 'Suscripción guardada ✓' }
+                    setSubFeedback(fb)
+                    setTimeout(() => setSubFeedback(null), 4000)
+                  }}
                 >
                   <Check size={13} /> {saving ? 'Guardando...' : activeSub ? 'Actualizar suscripción' : 'Crear suscripción'}
                 </button>
@@ -1691,7 +1737,7 @@ export default function AdminPage() {
     } catch (e: any) { notify(e.message || 'Error', true) }
   }
 
-  const handleSaveSubscription = async (sub: Partial<Subscription> & { user_id: string }) => {
+  const handleSaveSubscription = async (sub: Partial<Subscription> & { user_id: string }): Promise<string | null> => {
     setSaving(true)
     try {
       const res = await fetch('/api/admin/subscriptions', {
@@ -1700,19 +1746,28 @@ export default function AdminPage() {
         body: JSON.stringify({ subscription: sub }),
       })
       const result = await res.json()
-      if (!res.ok) { notify(result.error || 'Error al guardar suscripción', true); setSaving(false); return }
+      if (!res.ok) { setSaving(false); return result.error || 'Error al guardar suscripción' }
 
       const saved = result.subscription
       if (saved) {
-        if (sub.id) {
-          setSubscriptions(p => p.map(x => x.id === saved.id ? saved : x))
-        } else {
-          setSubscriptions(p => [...p, saved])
-        }
+        setSubscriptions(p => {
+          const next = sub.id ? p.map(x => x.id === saved.id ? saved : x) : [...p, saved]
+          try {
+            const cached = sessionStorage.getItem('wvs_admin_crm')
+            if (cached) {
+              const c = JSON.parse(cached)
+              sessionStorage.setItem('wvs_admin_crm', JSON.stringify({ ...c, subscriptions: next }))
+            }
+          } catch {}
+          return next
+        })
       }
-      notify('Suscripción guardada ✓')
-    } catch (e: any) { notify(e?.message || 'Error al guardar suscripción', true) }
-    setSaving(false)
+      return null
+    } catch (e: any) {
+      return e?.message || 'Error al guardar suscripción'
+    } finally {
+      setSaving(false)
+    }
   }
 
   // Register payment: activates trial OR advances renewal for active subscription
