@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = session.user.id
-    const { planId, cycleId } = await req.json()
+    const { planId, cycleId, venueId } = await req.json()
 
     if (!planId || !cycleId) {
       return NextResponse.json({ error: 'planId y cycleId requeridos' }, { status: 400 })
@@ -22,14 +22,17 @@ export async function POST(req: NextRequest) {
 
     const svc = getServiceClient()
 
-    // Check if user already has an active subscription (webhook already fired)
-    const { data: existing } = await svc
+    // Check if this venue already has an active subscription (webhook already fired).
+    // For multi-venue accounts, scope to the specific venue so buying a plan for
+    // venue 2 doesn't get blocked by venue 1's existing subscription.
+    let existingQuery = svc
       .from('venue_subscriptions')
       .select('id')
       .eq('user_id', userId)
       .in('status', ['active', 'trial'])
       .limit(1)
-      .maybeSingle()
+    if (venueId) existingQuery = (existingQuery as any).eq('venue_id', venueId)
+    const { data: existing } = await existingQuery.maybeSingle()
 
     if (existing) {
       return NextResponse.json({ status: 'already_active' })
@@ -56,6 +59,7 @@ export async function POST(req: NextRequest) {
     // Create subscription
     const { error: subError } = await svc.from('venue_subscriptions').insert({
       user_id: userId,
+      venue_id: venueId || null,
       plan_id: planId,
       status: 'active',
       billing_cycle: cycleId,

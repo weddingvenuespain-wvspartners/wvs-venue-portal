@@ -35,11 +35,11 @@ export default function CheckoutSuccessPage() {
       }
 
       try {
-        const { planId, cycleId } = JSON.parse(stored)
+        const { planId, cycleId, venueId } = JSON.parse(stored)
         const res = await fetch('/api/redsys/activate-from-success', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ planId, cycleId }),
+          body: JSON.stringify({ planId, cycleId, venueId: venueId || null }),
         })
         const data = await res.json()
 
