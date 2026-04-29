@@ -299,11 +299,31 @@ export async function POST(req: NextRequest) {
         status: 'approved', wp_post_id: resolvedWpId, reviewed_at: new Date().toISOString()
       }).eq('user_id', target_user_id)
 
-      // Insert into user_venues so the CRM shows the assigned venue
-      await svc.from('user_venues').upsert(
-        { user_id: target_user_id, wp_venue_id: resolvedWpId },
-        { onConflict: 'user_id,wp_venue_id' }
-      )
+      // Insert into user_venues so the CRM shows the assigned venue.
+      // Count first to know if this is the user's first-ever venue (set is_primary).
+      const { count: venueCount } = await svc
+        .from('user_venues')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', target_user_id)
+      const isFirstVenue = (venueCount ?? 0) === 0
+
+      const { data: uvRow } = await svc
+        .from('user_venues')
+        .upsert(
+          { user_id: target_user_id, wp_venue_id: resolvedWpId, is_primary: isFirstVenue },
+          { onConflict: 'user_id,wp_venue_id' }
+        )
+        .select('id')
+        .single()
+
+      // Backfill venue_id on any null subscriptions for this user (e.g. onboarding trial)
+      if (isFirstVenue && uvRow?.id) {
+        await svc
+          .from('venue_subscriptions')
+          .update({ venue_id: uvRow.id })
+          .eq('user_id', target_user_id)
+          .is('venue_id', null)
+      }
     }
 
     return NextResponse.json({ success: true, wp_venue_id: resolvedWpId })

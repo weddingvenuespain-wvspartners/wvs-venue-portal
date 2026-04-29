@@ -40,7 +40,31 @@ export async function POST(req: NextRequest) {
 
     const svc = getServiceClient()
 
-    // 1. Create subscription if plan selected AND trial explicitly requested
+    // 1. Count existing venues BEFORE the upsert so we know if this is the first.
+    //    is_primary is set to true only for the very first venue on this account.
+    const { count: existingCount } = await svc
+      .from('user_venues')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user_id)
+    const isFirst = (existingCount ?? 0) === 0
+
+    // 2. Upsert user_venues (conflict on user_id + wp_venue_id), marking first as primary
+    const { data: uvRow, error: uvErr } = await svc
+      .from('user_venues')
+      .upsert(
+        { user_id, wp_venue_id, is_primary: isFirst },
+        { onConflict: 'user_id,wp_venue_id' }
+      )
+      .select('id')
+      .single()
+    if (uvErr || !uvRow) {
+      console.error('[assign-venue] user_venues upsert error', uvErr)
+      return NextResponse.json({ error: uvErr?.message || 'user_venues error' }, { status: 500 })
+    }
+    const newVenueId = uvRow.id
+
+    // 3. Create subscription if plan selected AND trial explicitly requested.
+    //    venue_id is now available from the upserted user_venues row.
     let subId: string | null = null
     if (plan_id && start_trial) {
       const cycle = billing_cycle || 'yearly'
@@ -60,7 +84,7 @@ export async function POST(req: NextRequest) {
       const { data: sub, error: subErr } = await svc
         .from('venue_subscriptions')
         .insert({
-          user_id, plan_id, billing_cycle: cycle,
+          user_id, venue_id: newVenueId, plan_id, billing_cycle: cycle,
           status: 'trial',
           start_date: start,
           trial_end_date: trialEnd.toISOString().slice(0, 10),
@@ -69,27 +93,25 @@ export async function POST(req: NextRequest) {
         .select().single()
       if (subErr) console.error('[assign-venue] subscription insert error', subErr)
       subId = sub?.id || null
+
+      // Link subscription back to the user_venues row
+      if (subId) {
+        await svc.from('user_venues').update({ subscription_id: subId }).eq('id', newVenueId)
+      }
     }
 
-    // 2. Upsert user_venues (conflict on user_id + wp_venue_id)
-    const { error: uvErr } = await svc
-      .from('user_venues')
-      .upsert({ user_id, wp_venue_id, subscription_id: subId }, { onConflict: 'user_id,wp_venue_id' })
-    if (uvErr) {
-      console.error('[assign-venue] user_venues upsert error', uvErr)
-      return NextResponse.json({ error: uvErr.message }, { status: 500 })
-    }
-
-    // 3. Count existing venues BEFORE this assignment to decide if it's the first
-    const { count } = await svc
-      .from('user_venues')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user_id)
-
-    const isFirst = (count ?? 0) <= 1   // just inserted, so <=1 means it's the first
-
+    // 4. Backfill venue_id on any null subscriptions for this user (e.g. onboarding trial
+    //    that was created before the user_venues row existed).
     if (isFirst) {
-      // Upsert venue_profiles (handles users who have no row yet)
+      await svc
+        .from('venue_subscriptions')
+        .update({ venue_id: newVenueId })
+        .eq('user_id', user_id)
+        .is('venue_id', null)
+    }
+
+    // 5. Update venue_profiles for first-ever venue
+    if (isFirst) {
       const { error: profErr } = await svc
         .from('venue_profiles')
         .upsert(
