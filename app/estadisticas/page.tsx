@@ -19,7 +19,7 @@ const LEAD_STATUS_MAP = [
 
 export default function EstadisticasPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
+  const { user, activeVenue, loading: authLoading } = useAuth()
   const { isBlocked } = useRequireSubscription()
   const [proposals,   setProposals]   = useState<any[]>([])
   const [leads,       setLeads]       = useState<any[]>([])
@@ -30,10 +30,12 @@ export default function EstadisticasPage() {
   useEffect(() => {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
+    if (!activeVenue) return
     load()
-  }, [user, authLoading])
+  }, [user, authLoading, activeVenue?.id]) // eslint-disable-line
 
   const load = async () => {
+    if (!activeVenue) return
     const supabase = createClient()
     const [
       { data: props },
@@ -41,8 +43,8 @@ export default function EstadisticasPage() {
       { data: ctas },
       { data: msgs },
     ] = await Promise.all([
-      supabase.from('proposals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('leads').select('status, created_at').eq('user_id', user.id),
+      supabase.from('proposals').select('*').eq('venue_id', activeVenue.id).order('created_at', { ascending: false }),
+      supabase.from('leads').select('status, created_at').eq('venue_id', activeVenue.id),
       supabase.from('proposal_cta_requests').select('type, created_at, proposal_id'),
       supabase.from('proposal_messages').select('created_at, proposal_id'),
     ])

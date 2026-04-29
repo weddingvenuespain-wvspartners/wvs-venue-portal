@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const body = await req.json()
-    const { ficha_data, status, changes_data, changes_status } = body
+    const { ficha_data, status, changes_data, changes_status, venue_id } = body
 
     const VALID_STATUS = ['draft', 'submitted']
     const VALID_CHANGES_STATUS = ['draft', 'submitted']
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Estado de cambios no válido' }, { status: 400 })
 
     const update: Record<string, any> = { user_id: user.id }
+    if (venue_id !== undefined)       update.venue_id      = venue_id
     if (ficha_data !== undefined)    update.ficha_data    = ficha_data
     if (status !== undefined)        update.status        = status
     if (changes_data !== undefined)  update.changes_data  = changes_data
@@ -35,9 +36,10 @@ export async function POST(req: NextRequest) {
     // Keep name in sync for admin display
     if (ficha_data?.H1_Venue) update.name = ficha_data.H1_Venue
 
+    const conflictCol = venue_id ? 'user_id,venue_id' : 'user_id'
     const { error } = await supabase
       .from('venue_onboarding')
-      .upsert(update, { onConflict: 'user_id' })
+      .upsert(update, { onConflict: conflictCol })
 
     if (error) { console.error('[save-draft] DB error:', error.message); return NextResponse.json({ error: 'Error al guardar' }, { status: 500 }) }
     return NextResponse.json({ success: true })

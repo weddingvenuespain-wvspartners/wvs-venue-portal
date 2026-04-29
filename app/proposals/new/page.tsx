@@ -34,6 +34,7 @@ function NuevaPropuestaContent() {
     if (isBlocked) return // useRequireSubscription already redirects to /pricing
     if (!ready) return    // wait until subscription state is resolved
     if (!features.propuestas) { router.replace('/proposals'); return }
+    if (!activeVenue) return
 
     const leadId = searchParams.get('lead_id')
     const starter = getStarterTemplate(searchParams.get('template'))
@@ -53,6 +54,7 @@ function NuevaPropuestaContent() {
           .from('proposals')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
+          .eq('venue_id', activeVenue.id)
           .eq('lead_id', leadId)
         if ((count ?? 0) >= MAX_PROPOSALS_PER_LEAD) {
           setError(`Este lead ya tiene ${count} propuestas (máximo ${MAX_PROPOSALS_PER_LEAD}).`)
@@ -63,6 +65,7 @@ function NuevaPropuestaContent() {
           .select('name, email, guests')
           .eq('id', leadId)
           .eq('user_id', user.id)
+          .eq('venue_id', activeVenue.id)
           .maybeSingle()
         if (lead) {
           // Lead data siempre prevalece sobre el starter
@@ -163,7 +166,7 @@ function NuevaPropuestaContent() {
     }
 
     createDraft()
-  }, [user, authLoading, isBlocked, ready, features.propuestas, searchParams, router])
+  }, [user, authLoading, isBlocked, ready, features.propuestas, searchParams, router, activeVenue?.id])
 
   if (error) {
     return (

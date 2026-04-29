@@ -303,7 +303,7 @@ function WeekDayPicker({ dayFrom, dayTo, onChange, accent = '#059669', hint, blo
 
 export default function EstructuraPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, activeVenue } = useAuth()
   const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
 
@@ -379,7 +379,7 @@ export default function EstructuraPage() {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
     load()
-  }, [user, authLoading]) // eslint-disable-line
+  }, [user, authLoading, activeVenue?.id]) // eslint-disable-line
 
   // Load calendar_entries for the visible range (month or week view)
   useEffect(() => {
@@ -396,19 +396,20 @@ export default function EstructuraPage() {
       const lastDay = new Date(blockCalYear, blockCalMonth + 1, 0).getDate()
       to = `${blockCalYear}-${p(blockCalMonth + 1)}-${p(lastDay)}`
     }
-    supabase.from('calendar_entries').select('date,status').eq('user_id', user.id).gte('date', from).lte('date', to)
+    supabase.from('calendar_entries').select('date,status').eq('user_id', user.id).eq('venue_id', activeVenue?.id ?? '').gte('date', from).lte('date', to)
       .then(({ data }) => {
         const map: Record<string, string> = {}
         data?.forEach(e => { map[e.date] = e.status })
         setBlockCalEntries(map)
       })
-  }, [blockCalYear, blockCalMonth, blockView, blockWeekStart, user]) // eslint-disable-line
+  }, [blockCalYear, blockCalMonth, blockView, blockWeekStart, user, activeVenue?.id]) // eslint-disable-line
 
   const load = async () => {
+    if (!activeVenue) return
     const supabase = createClient()
     const [res, { data: settingsRow }] = await Promise.all([
-      fetch('/api/estructura/modalities'),
-      supabase.from('venue_settings').select('commercial_config, zones, supplements, visit_availability').eq('user_id', user!.id).maybeSingle(),
+      fetch(`/api/estructura/modalities?venue_id=${activeVenue.id}`),
+      supabase.from('venue_settings').select('commercial_config, zones, supplements, visit_availability').eq('user_id', user!.id).eq('venue_id', activeVenue.id).maybeSingle(),
     ])
     const json = await res.json()
     if (!res.ok) { setError(json.error ?? 'Error al cargar'); setLoading(false); return }
@@ -440,7 +441,7 @@ export default function EstructuraPage() {
     const res = await fetch('/api/estructura/save-settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
+      body: JSON.stringify({ ...patch, venue_id: activeVenue?.id ?? null }),
     })
     if (!res.ok) {
       const json = await res.json().catch(() => ({}))
@@ -544,7 +545,7 @@ export default function EstructuraPage() {
     try {
       const url    = editing ? `/api/estructura/modalities/${editing.id}` : '/api/estructura/modalities'
       const method = editing ? 'PATCH' : 'POST'
-      const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...modalForm, sort_order: editing?.sort_order ?? modalities.length }) })
+      const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...modalForm, sort_order: editing?.sort_order ?? modalities.length, venue_id: activeVenue?.id ?? null }) })
       const json   = await res.json()
       if (!res.ok) { setModalError(json.error ?? 'Error al guardar'); setModalSaving(false); return }
       if (editing) {
@@ -586,7 +587,7 @@ export default function EstructuraPage() {
     try {
       const existingPkgs = modalities.find(m => m.id === addingPkg)?.packages ?? []
       const sortOrder    = existingPkgs.length
-      const res  = await fetch(`/api/estructura/modalities/${addingPkg}/packages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...pkgForm, sort_order: sortOrder }) })
+      const res  = await fetch(`/api/estructura/modalities/${addingPkg}/packages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...pkgForm, sort_order: sortOrder, venue_id: activeVenue?.id ?? null }) })
       const json = await res.json()
       if (!res.ok) { setPkgError(json.error ?? 'Error al guardar'); setPkgSaving(false); return }
       setModalities(prev => prev.map(m => m.id === addingPkg
@@ -647,7 +648,7 @@ export default function EstructuraPage() {
       const url = packageId
         ? `/api/estructura/packages/${packageId}/prices`
         : `/api/estructura/modalities/${modalityId}/prices`
-      const body = buildPricePayload(priceForm, commercialConfig)
+      const body = { ...buildPricePayload(priceForm, commercialConfig), venue_id: activeVenue?.id ?? null }
       const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const json = await res.json()
       if (!res.ok) { setPriceError(json.error ?? 'Error al guardar'); setPriceSaving(false); return }

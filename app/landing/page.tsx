@@ -98,6 +98,8 @@ const TRANSLATIONS = {
       perYear: '/year', perMonth: '/month', billedAnnually: '/month billed annually',
       recommended: 'Recommended',
       cta: 'Start free',
+      planNames: { basic: 'Basic', premium: 'Premium' },
+      planDescriptions: { basic: 'Entry plan for venues', premium: 'For professional venues' },
     },
     featureLabels: [
       { key: 'ficha',                  label: 'Venue listing on directory' },
@@ -214,6 +216,8 @@ const TRANSLATIONS = {
       perYear: '/año', perMonth: '/mes', billedAnnually: '/mes facturado anualmente',
       recommended: 'Recomendado',
       cta: 'Empieza gratis',
+      planNames: { basic: 'Básico', premium: 'Premium' },
+      planDescriptions: { basic: 'Plan de entrada para venues', premium: 'Para venues profesionales' },
     },
     featureLabels: [
       { key: 'ficha',                  label: 'Ficha en el directorio' },
@@ -723,8 +727,8 @@ export default function LandingPage() {
                 return (
                   <div key={plan.id} style={{ borderRadius: 16, padding: isMobile ? '28px 22px' : '36px 32px', border: isPremium ? `2px solid ${C.accent}` : `1px solid ${C.border}`, background: isPremium ? C.bg : C.white, position: 'relative', boxShadow: isPremium ? '0 12px 40px rgba(121,111,78,0.12)' : undefined }}>
                     {isPremium && <div style={{ position: 'absolute', top: -1, left: '50%', transform: 'translateX(-50%)', background: C.accent, color: C.white, fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '4px 16px', borderRadius: '0 0 8px 8px' }}>{t.pricing.recommended}</div>}
-                    <div style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 700, color: C.dark, marginTop: isPremium ? 10 : 0 }}>{plan.display_name || plan.name}</div>
-                    {plan.description && <div style={{ fontFamily: SANS, fontSize: 13, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>{plan.description}</div>}
+                    <div style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 700, color: C.dark, marginTop: isPremium ? 10 : 0 }}>{isPremium ? t.pricing.planNames.premium : t.pricing.planNames.basic}</div>
+                    <div style={{ fontFamily: SANS, fontSize: 13, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>{isPremium ? t.pricing.planDescriptions.premium : t.pricing.planDescriptions.basic}</div>
                     <div style={{ margin: '20px 0', paddingBottom: 20, borderBottom: `1px solid ${C.border}` }}>
                       <span style={{ fontFamily: SERIF, fontSize: 44, fontWeight: 700, color: C.dark, letterSpacing: '-0.02em' }}>{cycle?.price || 0}€</span>
                       <span style={{ fontFamily: SANS, fontSize: 14, color: C.muted, marginLeft: 4 }}>{billingAnnual ? t.pricing.perYear : t.pricing.perMonth}</span>

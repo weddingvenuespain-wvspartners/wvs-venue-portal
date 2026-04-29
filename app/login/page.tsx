@@ -107,7 +107,7 @@ function LoginPageInner() {
         <div className="login-logo" style={{ fontSize: 16, letterSpacing: '0.05em', whiteSpace: 'nowrap', marginTop: 8 }}>
           Wedding Venues Spain
         </div>
-        <div className="login-subtitle">Partner Portal</div>
+        <div className="login-subtitle">Portal</div>
 
         {error && <div className="login-error">{error}</div>}
         {success && (

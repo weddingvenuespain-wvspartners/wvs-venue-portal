@@ -316,7 +316,7 @@ export async function sendActivationEmail(to: string, venueName: string) {
         <tr>
           <td align="center" style="padding-top:24px;">
             <p style="margin:0;font-size:11px;color:#9A8F78;line-height:1.8;">
-              Wedding Venues Spain · Partner Portal<br>
+              Wedding Venues Spain · Venue Portal<br>
               <a href="mailto:info@weddingvenuesspain.com" style="color:#796F4E;text-decoration:none;">info@weddingvenuesspain.com</a>
             </p>
           </td>

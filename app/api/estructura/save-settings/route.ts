@@ -25,19 +25,23 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const patch = await req.json()
+    const { venue_id, ...patch } = await req.json()
 
     const svc = getServiceClient()
 
-    const { data: current } = await svc
+    let query = svc
       .from('venue_settings')
       .select('*')
       .eq('user_id', user.id)
-      .maybeSingle()
+    if (venue_id) query = query.eq('venue_id', venue_id)
+    const { data: current } = await query.maybeSingle()
+
+    const upsertPayload: Record<string, any> = { ...(current || {}), ...patch, user_id: user.id }
+    if (venue_id) upsertPayload.venue_id = venue_id
 
     const { error } = await svc
       .from('venue_settings')
-      .upsert({ ...(current || {}), ...patch, user_id: user.id }, { onConflict: 'user_id' })
+      .upsert(upsertPayload, { onConflict: venue_id ? 'venue_id' : 'user_id' })
 
     if (error) {
       console.error('[save-settings]', error)

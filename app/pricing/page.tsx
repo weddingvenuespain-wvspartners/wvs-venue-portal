@@ -223,7 +223,7 @@ function PricingPageInner() {
               <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, color: 'var(--gold)', letterSpacing: '0.06em', fontWeight: 500 }}>
                 Wedding Venues Spain
               </span>
-              <span style={{ fontSize: 11, color: 'var(--warm-gray)', marginLeft: 8 }}>Partner Portal</span>
+              <span style={{ fontSize: 11, color: 'var(--warm-gray)', marginLeft: 8 }}>Venue Portal</span>
             </div>
           )}
 
@@ -444,7 +444,8 @@ function PricingPageInner() {
           {plans.map(plan => {
             const isPremium = plan.name.toLowerCase().includes('premium')
             const featureDefs = isPremium ? PREMIUM_FEATURES : BASIC_FEATURES
-            const isCurrentPlan = isLoggedIn && hasPlan && (
+            // Only block re-purchase if the user has a real paid plan (not a trial)
+            const isCurrentPlan = isLoggedIn && hasPlan && !isTrial && (
               (isPremium && planTier === 'premium') ||
               (!isPremium && planTier === 'basic')
             )

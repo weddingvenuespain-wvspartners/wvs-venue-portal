@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     const authClient = await requireAdmin(req)
     if (!authClient) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
-    const { user_id, wp_venue_id, plan_id, billing_cycle, start_trial, trial_days } = await req.json()
+    const { user_id, wp_venue_id, venue_name, plan_id, billing_cycle, start_trial, trial_days } = await req.json()
     if (!user_id || !wp_venue_id)
       return NextResponse.json({ error: 'user_id y wp_venue_id son requeridos' }, { status: 400 })
 
@@ -48,11 +48,12 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user_id)
     const isFirst = (existingCount ?? 0) === 0
 
-    // 2. Upsert user_venues (conflict on user_id + wp_venue_id), marking first as primary
+    // 2. Upsert user_venues (conflict on user_id + wp_venue_id), marking first as primary.
+    //    venue_name comes from the admin UI (WP venue title) so the sidebar shows a real name.
     const { data: uvRow, error: uvErr } = await svc
       .from('user_venues')
       .upsert(
-        { user_id, wp_venue_id, is_primary: isFirst },
+        { user_id, wp_venue_id, is_primary: isFirst, ...(venue_name ? { name: venue_name } : {}) },
         { onConflict: 'user_id,wp_venue_id' }
       )
       .select('id')

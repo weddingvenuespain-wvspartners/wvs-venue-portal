@@ -1048,6 +1048,7 @@ export default function LeadsPage() {
       const insertPayload = {
         ...payload,
         user_id: user!.id,
+        venue_id: activeVenue?.id ?? null,
         status: 'new',
         original_date_flexibility:    payload.date_flexibility,
         original_wedding_date:        payload.wedding_date,
@@ -1791,7 +1792,7 @@ function DateConfirmModal({
   // Load date rules from venue settings
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('venue_settings').select('date_rules').eq('user_id', userId).maybeSingle()
+    supabase.from('venue_settings').select('date_rules').eq('user_id', userId).eq('venue_id', venueId).maybeSingle()
       .then(({ data }) => {
         if (data?.date_rules) {
           setDateRules(data.date_rules)

@@ -557,7 +557,7 @@ const DEFAULT_PROPOSAL_TPL: Omit<ProposalTemplate, 'id'> = {
 
 export default function ComunicacionPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, activeVenue } = useAuth()
   const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
 
@@ -571,16 +571,17 @@ export default function ComunicacionPage() {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
     load()
-  }, [user, authLoading])
+  }, [user, authLoading, activeVenue?.id])
 
 
   const load = async (silent = false) => {
+    if (!activeVenue) return
     if (!silent) setLoading(true)
     const supabase = createClient()
     const [msgRes, dosRes, leadsRes] = await Promise.all([
-      supabase.from('message_templates').select('*').eq('user_id', user!.id).order('created_at'),
-      supabase.from('dossiers').select('*').eq('user_id', user!.id).order('created_at', { ascending: false }),
-      supabase.from('leads').select('id,name,email,phone,wedding_date,guests').eq('user_id', user!.id).order('created_at', { ascending: false }).limit(100),
+      supabase.from('message_templates').select('*').eq('user_id', user!.id).eq('venue_id', activeVenue.id).order('created_at'),
+      supabase.from('dossiers').select('*').eq('user_id', user!.id).eq('venue_id', activeVenue.id).order('created_at', { ascending: false }),
+      supabase.from('leads').select('id,name,email,phone,wedding_date,guests').eq('user_id', user!.id).eq('venue_id', activeVenue.id).order('created_at', { ascending: false }).limit(100),
     ])
     setMsgTemplates(msgRes.data || [])
     setDossiers(dosRes.data || [])
@@ -648,6 +649,7 @@ export default function ComunicacionPage() {
               templates={msgTemplates}
               leads={leads}
               userId={user!.id}
+              venueId={activeVenue?.id ?? null}
               onRefresh={() => load(true)}
             />
           )}
@@ -656,6 +658,7 @@ export default function ComunicacionPage() {
               dossiers={dossiers}
               leads={leads}
               userId={user!.id}
+              venueId={activeVenue?.id ?? null}
               onRefresh={() => load(true)}
             />
           )}
@@ -667,10 +670,11 @@ export default function ComunicacionPage() {
 
 // ── Messages Tab ──────────────────────────────────────────────────────────────
 
-function MessagesTab({ templates, leads, userId, onRefresh }: {
+function MessagesTab({ templates, leads, userId, venueId, onRefresh }: {
   templates: MsgTemplate[]
   leads: Lead[]
   userId: string
+  venueId: string | null
   onRefresh: () => void
 }) {
   const [selected,   setSelected]   = useState<MsgTemplate | null>(null)
@@ -698,7 +702,7 @@ function MessagesTab({ templates, leads, userId, onRefresh }: {
   const handleSeed = async () => {
     const supabase = createClient()
     for (const t of DEFAULT_MSG_TEMPLATES) {
-      await supabase.from('message_templates').insert({ ...t, user_id: userId })
+      await supabase.from('message_templates').insert({ ...t, user_id: userId, venue_id: venueId ?? null })
     }
     onRefresh()
   }
@@ -707,7 +711,7 @@ function MessagesTab({ templates, leads, userId, onRefresh }: {
     if (!form.name.trim() || !form.body.trim()) return
     setSaving(true)
     const supabase = createClient()
-    const payload = { ...form, subject: form.subject || null, user_id: userId }
+    const payload = { ...form, subject: form.subject || null, user_id: userId, venue_id: venueId ?? null }
     if (isNew) {
       await supabase.from('message_templates').insert(payload)
     } else if (selected) {
@@ -1067,10 +1071,11 @@ function SendMsgModal({ template, leads, onClose }: {
 }
 // ── Dossier Tab ───────────────────────────────────────────────────────────────
 
-function DossierTab({ dossiers, leads, userId, onRefresh }: {
+function DossierTab({ dossiers, leads, userId, venueId, onRefresh }: {
   dossiers: Dossier[]
   leads: Lead[]
   userId: string
+  venueId: string | null
   onRefresh: () => void
 }) {
   const [sendModal, setSendModal]   = useState<Dossier | null>(null)
@@ -1098,6 +1103,7 @@ function DossierTab({ dossiers, leads, userId, onRefresh }: {
     const supabase = createClient()
     await supabase.from('dossiers').insert({
       user_id: userId,
+      venue_id: venueId ?? null,
       name: newForm.name.trim(),
       file_url: newForm.file_url.trim(),
       description: newForm.description.trim() || null,

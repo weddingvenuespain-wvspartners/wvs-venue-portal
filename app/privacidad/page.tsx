@@ -50,7 +50,7 @@ export default function PrivacidadPage() {
           <p>El responsable del tratamiento de tus datos personales es:</p>
           <div style={{ marginTop: 12, padding: '14px 18px', background: '#faf8f4', border: '1px solid #ede8df', borderRadius: 8 }}>
             <p><strong>WVS Partners SL</strong></p>
-            <p style={{ marginTop: 4 }}>Email de contacto: <a href="mailto:hola@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>hola@weddingvenuesspain.com</a></p>
+            <p style={{ marginTop: 4 }}>Email de contacto: <a href="mailto:info@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>info@weddingvenuesspain.com</a></p>
             <p style={{ marginTop: 4 }}>Actividad: Plataforma digital para la gestión de venues de bodas</p>
           </div>
         </div>
@@ -102,7 +102,7 @@ export default function PrivacidadPage() {
           </ul>
           <p style={{ marginTop: 12 }}>
             Para ejercer cualquiera de estos derechos, contacta con nosotros en{' '}
-            <a href="mailto:hola@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>hola@weddingvenuesspain.com</a>.
+            <a href="mailto:info@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>info@weddingvenuesspain.com</a>.
             Responderemos en un plazo máximo de 30 días. También puedes presentar una reclamación ante la{' '}
             <strong>Agencia Española de Protección de Datos (AEPD)</strong> en <a href="https://www.aepd.es" target="_blank" rel="noopener" style={{ color: '#c9a84c' }}>www.aepd.es</a>.
           </p>
@@ -155,7 +155,7 @@ export default function PrivacidadPage() {
           <div style={{ marginTop: 12, padding: '14px 18px', background: '#faf8f4', border: '1px solid #ede8df', borderRadius: 8 }}>
             <p><strong>WVS Partners SL</strong></p>
             <p style={{ marginTop: 4 }}>
-              <a href="mailto:hola@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>hola@weddingvenuesspain.com</a>
+              <a href="mailto:info@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>info@weddingvenuesspain.com</a>
             </p>
           </div>
         </div>
@@ -163,7 +163,7 @@ export default function PrivacidadPage() {
 
       {/* Footer */}
       <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid #ede8df', textAlign: 'center', fontSize: 12, color: '#b8a898' }}>
-        Wedding Venues Spain Partner Portal · © 2025 ·{' '}
+        Wedding Venues Spain Venue Portal · © 2025 ·{' '}
         <a href="/cookies" style={{ color: '#c9a84c' }}>Política de Cookies</a>
       </div>
     </div>

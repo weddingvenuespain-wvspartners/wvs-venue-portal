@@ -10,7 +10,7 @@ import { Hourglass, ChevronDown, Check } from 'lucide-react'
 export default function Sidebar() {
   const pathname = usePathname()
   const router   = useRouter()
-  const { user, profile, userVenues, activeVenue, switchVenue } = useAuth()
+  const { user, profile, userVenues, activeVenue, switchVenue, refreshProfile } = useAuth()
 
   const features      = usePlanFeatures()
   const isAdmin       = profile?.role === 'admin'
@@ -23,6 +23,16 @@ export default function Sidebar() {
 
   // Badge: new leads count (venue + catering users)
   const [venueOpen, setVenueOpen] = useState(false)
+
+  // Silently refresh venues once on mount so switcher always has the latest list
+  useEffect(() => {
+    if (!user || !isVenueOwner) return
+    refreshProfile()
+  }, [user?.id]) // eslint-disable-line
+
+  const handleVenueButtonClick = () => {
+    setVenueOpen(o => !o)
+  }
   const [newLeadsCount, setNewLeadsCount] = useState(0)
   useEffect(() => {
     if (!user || isAdmin || isPlanner) return
@@ -124,10 +134,10 @@ export default function Sidebar() {
     : isCatering ? 'Catering'
     : 'Venue Owner'
 
-  const portalLabel = isAdmin ? 'Panel de Control'
+  const portalLabel = isAdmin ? 'Admin Portal'
     : isPlanner ? 'Planner Portal'
     : isCatering ? 'Catering Portal'
-    : 'Partner Portal'
+    : 'Venue Portal'
 
   const dashboardHref = isPlanner ? '/wp' : isCatering ? '/catering' : '/dashboard'
 
@@ -136,6 +146,75 @@ export default function Sidebar() {
       <div className="sidebar-logo">
         <span className="brand">Wedding Venues Spain</span>
         <span className="venue-name">{portalLabel}</span>
+
+        {/* Venue switcher — only for venue owners with an active venue */}
+        {isVenueOwner && activeVenue && (
+          <div style={{ marginTop: 10, position: 'relative', borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 10 }}>
+            <button
+              onClick={handleVenueButtonClick}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 9,
+                cursor: 'pointer', background: 'none',
+                border: 'none', borderRadius: 8,
+                padding: '4px 2px',
+              }}
+            >
+              <span style={{
+                width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                background: 'var(--gold)', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff',
+                letterSpacing: '-0.01em',
+              }}>
+                {(activeVenue.name ?? 'V').slice(0, 1).toUpperCase()}
+              </span>
+              <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#fff', lineHeight: 1.2 }}>
+                  {activeVenue.name ?? `Venue ${activeVenue.wp_venue_id}`}
+                </div>
+                {userVenues.length > 1 && (
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Cambiar venue</div>
+                )}
+              </div>
+              <ChevronDown size={11} style={{
+                flexShrink: 0, color: 'rgba(255,255,255,0.3)',
+                transform: venueOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 150ms',
+              }} />
+            </button>
+
+            {venueOpen && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0,
+                background: '#1e1a17', border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 8, overflow: 'hidden', zIndex: 50,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+              }}>
+                {userVenues.map(v => (
+                  <button
+                    key={v.id}
+                    onMouseDown={(e) => {
+                      e.stopPropagation()
+                      switchVenue(v.id)
+                      setVenueOpen(false)
+                    }}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '9px 12px', background: 'none', border: 'none',
+                      color: v.id === activeVenue.id ? 'var(--gold)' : 'rgba(255,255,255,0.8)',
+                      fontSize: 12, fontWeight: v.id === activeVenue.id ? 600 : 400,
+                      cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {v.name ?? `Venue ${v.wp_venue_id}`}
+                    </span>
+                    {v.id === activeVenue.id && <Check size={11} />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <nav className="sidebar-nav">
@@ -241,65 +320,6 @@ export default function Sidebar() {
           <>
             <div className="nav-section" style={{ marginTop: 8 }}>Mi Venue</div>
 
-            {/* Venue switcher — only shown when user has 2+ venues */}
-            {userVenues.length > 1 && activeVenue && (
-              <div style={{ margin: '0 0 6px 0', position: 'relative' }}>
-                <button
-                  onClick={() => setVenueOpen(o => !o)}
-                  style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '7px 12px', borderRadius: 8, cursor: 'pointer',
-                    background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
-                    color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: 600,
-                    fontFamily: 'Manrope, sans-serif', textAlign: 'left',
-                  }}
-                >
-                  <span style={{
-                    width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                    background: 'var(--gold)', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff',
-                  }}>
-                    {(activeVenue.name ?? `V${activeVenue.wp_venue_id}`).slice(0, 1).toUpperCase()}
-                  </span>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {activeVenue.name ?? `Venue ${activeVenue.wp_venue_id}`}
-                  </span>
-                  <ChevronDown size={12} style={{
-                    flexShrink: 0, opacity: 0.6,
-                    transform: venueOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 150ms',
-                  }} />
-                </button>
-
-                {venueOpen && (
-                  <div style={{
-                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
-                    background: '#1e1a17', border: '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: 8, overflow: 'hidden', zIndex: 50,
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-                  }}>
-                    {userVenues.map(v => (
-                      <button
-                        key={v.id}
-                        onClick={() => { switchVenue(v.id); setVenueOpen(false) }}
-                        style={{
-                          width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '8px 12px', background: 'none', border: 'none',
-                          color: v.id === activeVenue.id ? 'var(--gold)' : 'rgba(255,255,255,0.8)',
-                          fontSize: 12, fontWeight: v.id === activeVenue.id ? 600 : 400,
-                          cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left',
-                        }}
-                      >
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {v.name ?? `Venue ${v.wp_venue_id}`}
-                        </span>
-                        {v.id === activeVenue.id && <Check size={11} />}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
             {venueItems.map(item => {
               const locked = !features.loading && !features[item.feature]
               if (locked) return (

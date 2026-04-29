@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const body = await req.json()
-    const { day_from, day_to, label, sort_order } = body
+    const { day_from, day_to, label, sort_order, venue_id } = body
 
     if (day_from === undefined || day_from === null) return NextResponse.json({ error: 'day_from es obligatorio' }, { status: 400 })
     if (day_to   === undefined || day_to   === null) return NextResponse.json({ error: 'day_to es obligatorio' },   { status: 400 })
@@ -58,6 +58,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .insert({
         modality_id: id,
         user_id:     session.user.id,
+        venue_id:    venue_id ?? null,
         day_from,
         day_to,
         label:       label?.trim() || null,

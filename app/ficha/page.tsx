@@ -49,7 +49,7 @@ const WC_COLORS = (count: number, limit: number) =>
 
 export default function FichaPage() {
   const router = useRouter()
-  const { user, profile, userVenues, loading: authLoading } = useAuth()
+  const { user, profile, userVenues, activeVenue, loading: authLoading } = useAuth()
   const { isBlocked } = useRequireSubscription()
   const hasLoaded   = useRef(false)
   const autoSaveRef = useRef<() => void>(() => {})
@@ -132,10 +132,11 @@ export default function FichaPage() {
   useEffect(() => {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
-    if (hasLoaded.current) return
-    hasLoaded.current = true
+    // Reset on venue switch so ficha reloads for the new venue
+    hasLoaded.current = false
+    setLoading(true)
     load()
-  }, [user, profile, authLoading]) // eslint-disable-line
+  }, [user?.id, authLoading, activeVenue?.id]) // eslint-disable-line
 
   // Auto-save when user switches browser tabs
   useEffect(() => {
@@ -174,25 +175,25 @@ export default function FichaPage() {
 
   const load = async () => {
     const supabase = createClient()
-    const [{ data: onb }, { data: uvData }] = await Promise.all([
-      supabase.from('venue_onboarding').select('*').eq('user_id', user!.id).single(),
-      supabase.from('user_venues').select('wp_venue_id').eq('user_id', user!.id).limit(1).maybeSingle(),
-    ])
+    // Each venue has its own onboarding row (filtered by venue_id when available)
+    const onbQuery = activeVenue
+      ? supabase.from('venue_onboarding').select('*').eq('user_id', user!.id).eq('venue_id', activeVenue.id).maybeSingle()
+      : supabase.from('venue_onboarding').select('*').eq('user_id', user!.id).maybeSingle()
+    const { data: onb } = await onbQuery
     if (onb) setOnboarding(onb)
-    // selectedVenueId (multi-venue) > profile.wp_venue_id > user_venues fallback (stale auth)
-    const wpVenueId = selectedVenueId || profile?.wp_venue_id || uvData?.wp_venue_id
-    console.log('[ficha:load]', {
-      selectedVenueId, profile_wp_venue_id: profile?.wp_venue_id,
-      uvData_wp_venue_id: uvData?.wp_venue_id, wpVenueId,
-      onb_changes_status: onb?.changes_status, has_changes_data: !!onb?.changes_data,
-      has_ficha_data: !!onb?.ficha_data,
-    })
+    else setOnboarding(null)
+    // Active venue's wp_venue_id drives the WP fetch
+    const wpVenueId = activeVenue?.wp_venue_id || profile?.wp_venue_id
     if (wpVenueId) {
       setResolvedVenueWpId(wpVenueId)
 
       const hasRealChanges = onb?.changes_data && typeof onb.changes_data === 'object' && Object.keys(onb.changes_data).length > 0
+      // Only trust ficha_data from Supabase when the row is properly linked to a WP post
+      // (wp_post_id set OR status approved). If status is rejected/draft with no wp_post_id,
+      // the ficha_data may be stale/garbage — fall through to WP fetch for authoritative data.
+      const isLinkedToWp = !!onb?.wp_post_id || onb?.status === 'approved'
       const hasSupabaseData = (hasRealChanges && ['draft', 'submitted', 'rejected'].includes(onb?.changes_status || ''))
-        || (onb?.ficha_data && typeof onb.ficha_data === 'object' && Object.keys(onb.ficha_data).length > 0)
+        || (isLinkedToWp && onb?.ficha_data && typeof onb.ficha_data === 'object' && Object.keys(onb.ficha_data).length > 0)
 
       if (hasSupabaseData) {
         // Fast path: populate from Supabase immediately, fetch WP metadata in background
@@ -483,8 +484,8 @@ export default function FichaPage() {
     console.log('[ficha:save]', { isApproved, resolvedVenueWpId, verticalPhotoId: fichaData.verticalPhotoId, heroImageId: fichaData.heroImageId, galleryCount: fichaData.gallery?.filter(Boolean).length })
     try {
       const body = isApproved
-        ? { changes_data: fichaData, changes_status: 'draft' }
-        : { ficha_data: fichaData, status: onboarding?.status === 'submitted' ? 'submitted' : 'draft' }
+        ? { changes_data: fichaData, changes_status: 'draft', venue_id: activeVenue?.id ?? null }
+        : { ficha_data: fichaData, status: onboarding?.status === 'submitted' ? 'submitted' : 'draft', venue_id: activeVenue?.id ?? null }
       const res = await fetch('/api/venues/save-draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await res.json()
       if (!res.ok) { notify(data.error || 'Error al guardar', true); return false }
@@ -500,8 +501,8 @@ export default function FichaPage() {
     const isApproved = !!resolvedVenueWpId
     try {
       const body = isApproved
-        ? { changes_data: fichaData, changes_status: 'submitted' }
-        : { ficha_data: fichaData, status: 'submitted' }
+        ? { changes_data: fichaData, changes_status: 'submitted', venue_id: activeVenue?.id ?? null }
+        : { ficha_data: fichaData, status: 'submitted', venue_id: activeVenue?.id ?? null }
       const res = await fetch('/api/venues/save-draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await res.json()
       if (!res.ok) { notify(data.error || 'Error al enviar', true); return }
@@ -522,8 +523,8 @@ export default function FichaPage() {
     const isApproved = !!resolvedVenueWpId
     const fichaData = collectAllFields()
     const body = isApproved
-      ? { changes_data: fichaData, changes_status: onboarding?.changes_status === 'submitted' ? 'submitted' : 'draft' }
-      : { ficha_data: fichaData, status: onboarding?.status ?? 'draft' }
+      ? { changes_data: fichaData, changes_status: onboarding?.changes_status === 'submitted' ? 'submitted' : 'draft', venue_id: activeVenue?.id ?? null }
+      : { ficha_data: fichaData, status: onboarding?.status ?? 'draft', venue_id: activeVenue?.id ?? null }
     fetch('/api/venues/save-draft', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -783,28 +784,6 @@ export default function FichaPage() {
             </div>
           </div>
 
-          {/* Multi-venue selector */}
-          {userVenues.length > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 10, marginBottom: 16 }}>
-              <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontWeight: 500, flexShrink: 0 }}>Venue activo:</span>
-              <select
-                className="form-input"
-                style={{ fontSize: 13, padding: '5px 12px', maxWidth: 300 }}
-                value={selectedVenueId ?? resolvedVenueWpId ?? ''}
-                onChange={e => {
-                  const id = parseInt(e.target.value)
-                  setSelectedVenueId(id)
-                  hasLoaded.current = false
-                  load()
-                }}
-              >
-                {userVenues.map(v => (
-                  <option key={v.wp_venue_id} value={v.wp_venue_id}>Venue #{v.wp_venue_id}</option>
-                ))}
-              </select>
-              <span style={{ fontSize: 11, color: 'var(--stone)' }}>Los cambios afectan al venue seleccionado.</span>
-            </div>
-          )}
 
           {/* Status banners */}
           {isLocked && <StatusBanner type="pending" title="Ficha en revisión" body="Nuestro equipo está revisando tu ficha. Te avisaremos por email cuando esté aprobada." />}
@@ -1496,7 +1475,7 @@ export default function FichaPage() {
                           const res = await fetch('/api/venues/save-config', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ leadsEmail }),
+                            body: JSON.stringify({ leadsEmail, venue_id: activeVenue?.id ?? null }),
                           })
                           const data = await res.json()
                           if (!res.ok) { setConfigMsg(data.error || 'Error al guardar'); return }

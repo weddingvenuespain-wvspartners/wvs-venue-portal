@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const { leadsEmail } = await req.json()
+    const { leadsEmail, venue_id } = await req.json()
 
     if (leadsEmail && leadsEmail.split(',').length > 2)
       return NextResponse.json({ error: 'Máximo 2 emails permitidos' }, { status: 400 })
@@ -33,11 +33,12 @@ export async function POST(req: NextRequest) {
     const svc = getServiceClient()
 
     // Load current ficha_data and merge leadsEmail
-    const { data: onb, error: onbErr } = await svc
+    let onbQuery = svc
       .from('venue_onboarding')
       .select('ficha_data, changes_data')
       .eq('user_id', user.id)
-      .single()
+    if (venue_id) onbQuery = onbQuery.eq('venue_id', venue_id)
+    const { data: onb, error: onbErr } = await onbQuery.single()
 
     if (onbErr || !onb) {
       return NextResponse.json({ error: 'No se encontró la ficha' }, { status: 404 })
@@ -52,10 +53,12 @@ export async function POST(req: NextRequest) {
     const updatePayload: any = { ficha_data: updatedFicha }
     if (updatedChanges) updatePayload.changes_data = updatedChanges
 
-    const { error: updateErr } = await svc
+    let updateQuery = svc
       .from('venue_onboarding')
       .update(updatePayload)
       .eq('user_id', user.id)
+    if (venue_id) updateQuery = updateQuery.eq('venue_id', venue_id)
+    const { error: updateErr } = await updateQuery
     if (updateErr) {
       console.error('[save-config] update error', updateErr)
       return NextResponse.json({ error: 'Error al guardar la configuración' }, { status: 500 })

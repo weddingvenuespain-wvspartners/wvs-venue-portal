@@ -326,7 +326,7 @@ function UserPanel({
   initialTab?: 'perfil' | 'venues' | 'suscripcion' | 'historial' | 'equipo'
   onClose: () => void
   onSaveProfile: (p: Profile) => Promise<void>
-  onAssignVenue: (userId: string, wpId: number, planId: string, cycle: string) => Promise<void>
+  onAssignVenue: (userId: string, wpId: number, planId: string, cycle: string, venueName: string | null) => Promise<void>
   trialConfig: TrialConfig
   onRemoveVenue: (uvId: string) => Promise<void>
   onSaveSubscription: (sub: Partial<Subscription> & { user_id: string }) => Promise<string | null>
@@ -931,9 +931,12 @@ function UserPanel({
                   <button
                     className="btn btn-primary btn-sm"
                     disabled={!newVenueId || saving}
-                    onClick={() => onAssignVenue(
-                      profile.user_id, parseInt(newVenueId), newPlanId, newCycle,
-                    ).then(() => { setNewVenueId('') })}
+                    onClick={() => {
+                      const wpV = wpVenues.find((v: any) => v.id === parseInt(newVenueId))
+                      const venueName = wpV?.acf?.H1_Venue || wpV?.title?.rendered || null
+                      onAssignVenue(profile.user_id, parseInt(newVenueId), newPlanId, newCycle, venueName)
+                        .then(() => { setNewVenueId('') })
+                    }}
                   >
                     <Plus size={12} /> Asignar venue
                   </button>
@@ -964,7 +967,7 @@ function UserPanel({
                           color: v.id === effectiveVenueId ? 'var(--espresso)' : 'var(--warm-gray)',
                         }}
                       >
-                        {v.name ?? `Venue ${v.wp_venue_id}`}
+                        {v.name ? `${v.name} · #${v.wp_venue_id}` : `WP #${v.wp_venue_id}`}
                       </button>
                     ))}
                   </div>
@@ -1696,7 +1699,7 @@ export default function AdminPage() {
   }
 
   const handleAssignVenue = async (
-    userId: string, wpId: number, planId: string, cycle: string,
+    userId: string, wpId: number, planId: string, cycle: string, venueName: string | null = null,
   ) => {
     setSaving(true)
     try {
@@ -1704,7 +1707,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: userId, wp_venue_id: wpId,
+          user_id: userId, wp_venue_id: wpId, venue_name: venueName,
           plan_id: planId || null, billing_cycle: cycle || null,
         }),
       })

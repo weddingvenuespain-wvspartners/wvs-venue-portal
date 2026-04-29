@@ -1403,13 +1403,13 @@ function PerfilPageContent() {
                       </div>
                       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
                         Para activar tu plan contacta con tu gestor o escríbenos a{' '}
-                        <a href="mailto:hola@weddingvenuesspain.com" style={{ color: '#93c5fd' }}>hola@weddingvenuesspain.com</a>
+                        <a href="mailto:info@weddingvenuesspain.com" style={{ color: '#93c5fd' }}>info@weddingvenuesspain.com</a>
                       </div>
                     </div>
                   )}
 
                   {/* A) Plan actual */}
-                  <Section title="Plan actual" description="Tu suscripción a Wedding Venues Spain Partner Portal.">
+                  <Section title="Plan actual" description="Tu suscripción a Wedding Venues Spain Venue Portal.">
                     {features.hasPlan ? (
                       <>
                         <div style={{
@@ -1470,14 +1470,14 @@ function PerfilPageContent() {
                             <div style={{ fontSize: 12, color: '#b45309', lineHeight: 1.6, marginBottom: 10 }}>
                               Desbloquea propuestas digitales, estadísticas avanzadas, exportar leads y comunicación de tarifas.
                             </div>
-                            <a href="mailto:hola@weddingvenuesspain.com?subject=Quiero%20pasar%20a%20Premium"
+                            <a href="mailto:info@weddingvenuesspain.com?subject=Quiero%20pasar%20a%20Premium"
                               className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex' }}>
                               Solicitar upgrade →
                             </a>
                           </div>
                         )}
 
-                        <a href="mailto:hola@weddingvenuesspain.com?subject=Gestión%20de%20suscripción"
+                        <a href="mailto:info@weddingvenuesspain.com?subject=Gestión%20de%20suscripción"
                           className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
                           Gestionar suscripción
                         </a>
@@ -1487,7 +1487,7 @@ function PerfilPageContent() {
                         <CreditCard size={28} style={{ margin: '0 auto 10px', opacity: 0.3 }} />
                         <div style={{ fontSize: 14, marginBottom: 6 }}>Sin suscripción activa</div>
                         <div style={{ fontSize: 12, marginBottom: 16 }}>Contacta con tu gestor para activar tu plan.</div>
-                        <a href="mailto:hola@weddingvenuesspain.com?subject=Activar%20plan"
+                        <a href="mailto:info@weddingvenuesspain.com?subject=Activar%20plan"
                           className="btn btn-primary btn-sm" style={{ textDecoration: 'none' }}>
                           Contactar →
                         </a>
@@ -1644,7 +1644,7 @@ function PerfilPageContent() {
                       Los pagos se gestionan mediante domiciliación bancaria (SEPA) o transferencia.
                       Para actualizar tu método de pago contacta con tu gestor.
                     </div>
-                    <a href="mailto:hola@weddingvenuesspain.com?subject=Actualizar%20método%20de%20pago"
+                    <a href="mailto:info@weddingvenuesspain.com?subject=Actualizar%20método%20de%20pago"
                       className="btn btn-ghost btn-sm" style={{ marginTop: 8, textDecoration: 'none' }}>
                       Contactar para actualizar →
                     </a>
@@ -1737,10 +1737,10 @@ function PerfilPageContent() {
                           </div>
                           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                             <Mail size={13} style={{ color: 'var(--gold)' }} />
-                            hola@weddingvenuesspain.com
+                            info@weddingvenuesspain.com
                           </div>
                           <a
-                            href="mailto:hola@weddingvenuesspain.com?subject=Consulta%20desde%20el%20Portal"
+                            href="mailto:info@weddingvenuesspain.com?subject=Consulta%20desde%20el%20Portal"
                             className="btn btn-primary btn-sm"
                             style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                           >
@@ -1826,7 +1826,7 @@ function PerfilPageContent() {
 
                   {/* D) Versión */}
                   <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--stone)', padding: '12px 0 4px' }}>
-                    Wedding Venues Spain Partner Portal v2.0 · © 2025
+                    Wedding Venues Spain Venue Portal v2.0 · © 2025
                   </div>
                 </>
               )}

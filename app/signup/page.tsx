@@ -146,7 +146,7 @@ function RegistroPageInner() {
         <div className="login-logo" style={{ fontSize: 16, letterSpacing: '0.05em', whiteSpace: 'nowrap', marginTop: 8 }}>
           Wedding Venues Spain
         </div>
-        <div className="login-subtitle" style={{ marginBottom: 18 }}>Partner Portal</div>
+        <div className="login-subtitle" style={{ marginBottom: 18 }}>Venue Portal</div>
 
         {!done ? (
           <>

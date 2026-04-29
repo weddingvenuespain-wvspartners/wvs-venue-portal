@@ -226,7 +226,7 @@ function AdminDashboard() {
 // ─── Venue Dashboard ──────────────────────────────────────────────────────────
 function VenueDashboard() {
   const router = useRouter()
-  const { user, profile, loading: authLoading } = useAuth()
+  const { user, profile, activeVenue, loading: authLoading } = useAuth()
   const { hasPlan, isTrial } = usePlanFeatures()
   const [venue, setVenue]         = useState<any>(null)
   const [venueLoading, setVenueLoading] = useState(false)
@@ -258,8 +258,10 @@ function VenueDashboard() {
       .eq('user_id', user.id).gte('created_at', monthStart)
       .then(({ count }) => { setLeadsMonthCount(count ?? 0) })
 
-    if (profile?.wp_venue_id) {
-      const cacheKey = `wvs_venue_${profile.wp_venue_id}`
+    // Use activeVenue's wp_venue_id so switching venues updates the dashboard
+    const wpVenueId = activeVenue?.wp_venue_id ?? profile?.wp_venue_id
+    if (wpVenueId) {
+      const cacheKey = `wvs_venue_${wpVenueId}`
       const cached = sessionStorage.getItem(cacheKey)
       if (cached) { try { setVenue(JSON.parse(cached)) } catch {} }
       else { setVenueLoading(true) }
@@ -267,7 +269,7 @@ function VenueDashboard() {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 6000)
       fetch(
-        `https://weddingvenuesspain.com/wp-json/wp/v2/venues/${profile.wp_venue_id}?acf_format=standard`,
+        `https://weddingvenuesspain.com/wp-json/wp/v2/venues/${wpVenueId}?acf_format=standard`,
         { cache: 'no-store', signal: controller.signal }
       )
         .then(r => r.ok ? r.json() : null)
@@ -278,7 +280,7 @@ function VenueDashboard() {
       supabase.from('venue_onboarding').select('*').eq('user_id', user.id).single()
         .then(({ data }) => { if (data) setOnboarding(data) })
     }
-  }, [authLoading]) // eslint-disable-line
+  }, [authLoading, activeVenue?.id]) // eslint-disable-line
 
   const venueName   = venue?.acf?.H1_Venue || venue?.title?.rendered || 'Mi Venue'
   const newLeads    = leads.filter(l => l.status === 'new').length
@@ -331,7 +333,7 @@ function VenueDashboard() {
           <div className="page-content" style={{ maxWidth: 600, margin: '0 auto', paddingTop: 48 }}>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
               <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 500, letterSpacing: '0.01em', color: 'var(--espresso)', marginBottom: 8 }}>Wedding Venues Spain</div>
-              <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Partner Portal</div>
+              <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Venue Portal</div>
             </div>
             {!onboarding || onbStatus === 'draft' ? (
               <div className="card">

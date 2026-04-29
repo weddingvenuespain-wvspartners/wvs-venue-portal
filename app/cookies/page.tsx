@@ -179,7 +179,7 @@ export default function CookiesPage() {
           <div style={{ marginTop: 12, padding: '14px 18px', background: '#faf8f4', border: '1px solid #ede8df', borderRadius: 8 }}>
             <p><strong>WVS Partners SL</strong></p>
             <p style={{ marginTop: 4 }}>
-              <a href="mailto:hola@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>hola@weddingvenuesspain.com</a>
+              <a href="mailto:info@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>info@weddingvenuesspain.com</a>
             </p>
           </div>
         </div>
@@ -187,7 +187,7 @@ export default function CookiesPage() {
 
       {/* Footer */}
       <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid #ede8df', textAlign: 'center', fontSize: 12, color: '#b8a898' }}>
-        Wedding Venues Spain Partner Portal · © 2025 ·{' '}
+        Wedding Venues Spain Venue Portal · © 2025 ·{' '}
         <a href="/privacidad" style={{ color: '#c9a84c' }}>Política de Privacidad</a>
       </div>
     </div>
