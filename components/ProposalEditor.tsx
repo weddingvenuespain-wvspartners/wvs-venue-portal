@@ -18,6 +18,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { Checkbox } from '@/components/ui/checkbox'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
+import { DEFAULT_TEMPLATES } from '@/lib/proposal-starter-templates'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -352,18 +353,80 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // ── Apply a content template to sections
+  // Listado combinado: muestras estáticas (DEFAULT_TEMPLATES) + plantillas del usuario.
+  // Las muestras llevan id 't1'..'t5'; las propias, UUIDs.
+  type SelectorTemplate = {
+    id: string
+    name: string
+    description: string | null
+    sections_data: SectionsData
+    is_default: boolean
+    isSample: boolean
+  }
+  const allTemplates: SelectorTemplate[] = useMemo(() => {
+    const samples: SelectorTemplate[] = DEFAULT_TEMPLATES.map(t => ({
+      id: t.id, name: t.name, description: t.description,
+      sections_data: t.sections_data, is_default: false, isSample: true,
+    }))
+    const own: SelectorTemplate[] = contentTemplates.map(t => ({
+      id: t.id, name: t.name, description: t.description,
+      sections_data: t.sections_data, is_default: t.is_default, isSample: false,
+    }))
+    return [...samples, ...own]
+  }, [contentTemplates])
+
+  // ── Apply a content template to sections (con confirm si sobrescribe overrides)
   const applyContentTemplate = (templateId: string) => {
-    const tpl = contentTemplates.find(t => t.id === templateId)
+    const tpl = allTemplates.find(t => t.id === templateId)
     if (!tpl) return
+    const sd = tpl.sections_data ?? {}
+
+    // Detectar override-keys que la plantilla define Y que el usuario ya tiene
+    // editados con contenido. Solo esas se sobrescribirán de forma destructiva.
+    const OVERRIDE_LABELS: Record<string, string> = {
+      zones_override:          'zonas',
+      space_groups:            'grupos de espacios',
+      menus_override:          'menús',
+      menu_extras_override:    'extras de menú',
+      appetizers_base_override:'aperitivos',
+      inclusions_override:     'qué incluye',
+      testimonials_override:   'testimonios',
+      collaborators_override:  'colaboradores',
+      extra_services_override: 'servicios adicionales',
+      faq_override:            'preguntas frecuentes',
+      packages_override:       'paquetes',
+      experience_override:     'la experiencia',
+      venue_rental:            'tarifas de alquiler',
+      single_space:            'tu espacio',
+      accommodation:           'alojamiento',
+    }
+    const conflicting = Object.entries(OVERRIDE_LABELS)
+      .filter(([key]) => {
+        const incoming = (sd as any)[key]
+        const current  = (sections as any)[key]
+        if (incoming == null) return false        // template doesn't define this → no conflict
+        if (current  == null) return false        // user has nothing → no conflict
+        if (Array.isArray(current) && current.length === 0) return false
+        if (typeof current === 'object' && Object.keys(current).length === 0) return false
+        return true
+      })
+      .map(([, label]) => label)
+
+    if (conflicting.length > 0) {
+      const list = conflicting.length > 4
+        ? conflicting.slice(0, 4).join(', ') + ` y ${conflicting.length - 4} más`
+        : conflicting.join(', ')
+      const ok = confirm(`Aplicar "${tpl.name}" sobrescribirá: ${list}.\n\nEl resto de tus cambios se mantienen. ¿Continuar?`)
+      if (!ok) return
+    }
+
     setApplyingTemplate(true)
     setSections(s => ({
       ...s,
-      ...(tpl.sections_data ?? {}),
+      ...sd,
       content_template_id: templateId,
     }))
     // Also apply visual branding from template if set
-    const sd = tpl.sections_data ?? {}
     if (sd.primary_color) setForm(f => ({ ...f, primary_color: sd.primary_color! }))
     if (sd.font_family)   setForm(f => ({ ...f, font_family: sd.font_family! }))
     if (sd.logo_url)      setForm(f => ({ ...f, logo_url: sd.logo_url! }))
@@ -561,11 +624,11 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 Mostrar disponibilidad
               </label>
 
-              {contentTemplates.length > 0 && (
+              {allTemplates.length > 0 && (
                 <div className="form-group" style={{ marginTop: 14 }}>
                   <label className="form-label">Plantilla de contenido</label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {contentTemplates.map(tpl => {
+                    {allTemplates.map(tpl => {
                       const isActive = (sections as any).content_template_id === tpl.id
                       return (
                         <button key={tpl.id} type="button"
@@ -580,9 +643,10 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                             <ChefHat size={13} style={{ color: isActive ? 'var(--gold)' : 'var(--warm-gray)' }} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: isActive ? 'var(--gold)' : 'var(--charcoal)', marginBottom: 1 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: isActive ? 'var(--gold)' : 'var(--charcoal)', marginBottom: 1, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                               {tpl.name}
-                              {tpl.is_default && <span style={{ fontSize: 9, background: isActive ? 'var(--gold)' : 'var(--warm-gray)', color: '#fff', padding: '1px 5px', borderRadius: 8, marginLeft: 6, fontWeight: 700 }}>DEF</span>}
+                              {tpl.isSample && <span style={{ fontSize: 9, background: 'rgba(0,0,0,.06)', color: 'var(--warm-gray)', padding: '1px 6px', borderRadius: 8, fontWeight: 700, letterSpacing: '.04em' }}>MUESTRA</span>}
+                              {tpl.is_default && <span style={{ fontSize: 9, background: isActive ? 'var(--gold)' : 'var(--warm-gray)', color: '#fff', padding: '1px 5px', borderRadius: 8, fontWeight: 700 }}>DEF</span>}
                             </div>
                             {tpl.description && <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{tpl.description}</div>}
                             {isActive && applyingTemplate && <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 2 }}>✓ Aplicando…</div>}
@@ -593,7 +657,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                     })}
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 6, lineHeight: 1.5 }}>
-                    Al aplicar una plantilla se carga su configuración de secciones y contenido.
+                    Al aplicar una plantilla se carga su configuración de secciones y contenido. Si tienes secciones editadas que la plantilla también define, te avisará antes de sobrescribirlas.
                   </div>
                 </div>
               )}
