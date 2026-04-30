@@ -1,24 +1,77 @@
-// /proposals/templates/[id]/preview — renders the template as a fake proposal
-// Used as the iframe src in TemplateEditor for live preview via postMessage.
+// /proposals/templates/[id]/preview — renders the template as a fake proposal.
+// Used as the iframe src in TemplateEditor for live preview via postMessage,
+// y también para los thumbnails del listado de plantillas.
+//
+// Dos modos:
+//   • id ∈ {t1..t5}: muestra estática. No requiere auth ni queries — datos
+//     vienen 100% del array DEFAULT_TEMPLATES + venue stub "Finca Son Vell".
+//   • id = UUID: plantilla del usuario. Requiere auth + lookup en BD y trae
+//     venue/branding/content de la cuenta para que el preview sea real.
 
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import ProposalLanding from '@/app/proposal/[slug]/ProposalLanding'
 import type { ProposalData, VenueContent } from '@/app/proposal/[slug]/page'
+import { getDefaultTemplate } from '@/lib/proposal-starter-templates'
 
-async function createAuthClient() {
-  const cookieStore = await cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get: (n: string) => cookieStore.get(n)?.value, set() {}, remove() {} } }
-  )
+const EMPTY_VENUE_CONTENT: VenueContent = {
+  packages: [], zones: [], season_prices: [], inclusions: [], exclusions: [],
+  faq: [], testimonials: [], collaborators: [], extra_services: [], menu_prices: [],
+  experience: null, techspecs: null, accommodation_info: null, map_info: null,
+  budget_simulator: null, countdown: null,
+}
+
+// Stub de venue para muestras (Finca Son Vell — coincide con experience_override
+// y testimonials_override del array DEFAULT_TEMPLATES).
+const SAMPLE_VENUE = {
+  name:           'Finca Son Vell',
+  city:           'Mallorca',
+  region:         'Islas Baleares',
+  contact_email:  'hola@fincasonvell.com',
+  contact_phone:  '+34 971 000 000',
+  website:        'https://fincasonvell.com',
+  photo_urls:     [] as string[],
 }
 
 export default async function TemplatePreviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createAuthClient()
+
+  // ── Sample preview: sin auth, sin BD ───────────────────────────────────────
+  const sample = getDefaultTemplate(id)
+  if (sample) {
+    const sd = sample.sections_data as any
+    const proposalData: ProposalData = {
+      id:                  `tpl-${id}`,
+      slug:                `tpl-${id}`,
+      couple_name:         sample.couple_name,
+      personal_message:    sample.personal_message,
+      guest_count:         sample.guest_count,
+      wedding_date:        null,
+      price_estimate:      sample.price_estimate,
+      show_availability:   sample.show_availability,
+      show_price_estimate: sample.show_price_estimate,
+      status:              'preview',
+      ctas:                [],
+      sections_data:       sample.sections_data,
+      venueContent:        EMPTY_VENUE_CONTENT,
+      venue:               SAMPLE_VENUE,
+      branding: {
+        logo_url:      null,
+        primary_color: sd.primary_color ?? sample.branding.primary_color,
+        font_family:   sd.font_family   ?? sample.branding.font_family,
+      },
+    }
+    return <ProposalLanding data={proposalData} preview={true} />
+  }
+
+  // ── Plantilla del usuario: auth + lookup ───────────────────────────────────
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (n: string) => cookieStore.get(n)?.value, set() {}, remove() {} } }
+  )
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')

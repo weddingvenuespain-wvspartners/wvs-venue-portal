@@ -380,7 +380,7 @@ table.data-table tr:hover td { background: #fafaf9; }
   align-items: center;
   gap: 14px;
   padding: 16px 18px;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid #d8d2c4;
   border-radius: 10px;
   background: var(--surface);
   cursor: pointer;

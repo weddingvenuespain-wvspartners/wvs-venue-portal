@@ -928,3 +928,317 @@ export function extractData(data: ProposalData) {
     dateSlots:      (so.date_slots ?? null) as import('@/lib/proposal-types').DateSlot[] | null,
   }
 }
+
+// ─── Welcome variant resolution ────────────────────────────────────────────────
+// Misma lógica que T1 — lee `sections.styles.welcome` (registry) y cae a flags
+// legacy (`sections_enabled.welcome_light/_split/_editorial`).
+import { getActiveStyle, isSectionGroupEnabled } from '@/lib/section-styles'
+
+export type WelcomeVariant = 'welcome' | 'welcome_light' | 'welcome_split' | 'welcome_editorial' | null
+
+export function pickWelcomeVariant(sec: any): WelcomeVariant {
+  const map: Record<string, Exclude<WelcomeVariant, null>> = {
+    default:   'welcome',
+    light:     'welcome_light',
+    split:     'welcome_split',
+    editorial: 'welcome_editorial',
+  }
+  if (!isSectionGroupEnabled(sec, 'welcome')) return null
+  return map[getActiveStyle(sec, 'welcome')] ?? 'welcome'
+}
+
+// ─── Welcome variant blocks (light / split / editorial) ────────────────────────
+// La variante "default" la mantiene cada template con su look propio.
+
+export function TplWelcomeLight({
+  message, venueName, imageUrl, primary, bg, fg, font,
+}: {
+  message: string
+  venueName?: string | null
+  imageUrl?: string
+  primary: string
+  bg: string
+  fg: string
+  font?: string
+}) {
+  return (
+    <section id="sec-welcome" style={{ position: 'relative', padding: '120px 32px', background: bg, overflow: 'hidden' }}>
+      {imageUrl && (
+        <img src={imageUrl} alt="" loading="lazy"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.18 }} />
+      )}
+      <FadeUp>
+        <div style={{ position: 'relative', maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ width: 1, height: 56, background: primary, margin: '0 auto 28px' }} />
+          <p style={{ fontFamily: font, fontSize: 'clamp(1.2rem,2.4vw,1.6rem)', fontWeight: 300, lineHeight: 1.7, color: fg, fontStyle: 'italic' }}>
+            {message}
+          </p>
+          {venueName && (
+            <div style={{ fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: `${fg}99`, marginTop: 24 }}>— {venueName}</div>
+          )}
+        </div>
+      </FadeUp>
+    </section>
+  )
+}
+
+export function TplWelcomeSplit({
+  message, venueName, imageUrl, imageSide, primary, bg, fg, font, eyebrow,
+}: {
+  message: string
+  venueName?: string | null
+  imageUrl?: string
+  imageSide?: 'left' | 'right'
+  primary: string
+  bg: string
+  fg: string
+  font?: string
+  eyebrow?: string
+}) {
+  const right = imageSide === 'right'
+  return (
+    <section id="sec-welcome" style={{ background: bg }}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: imageUrl ? '1fr 1fr' : '1fr',
+        minHeight: 480,
+      }}>
+        {imageUrl && !right && (
+          <div style={{ background: '#000' }}>
+            <img src={imageUrl} alt="" loading="lazy"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+        )}
+        <FadeUp>
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '64px 48px' }}>
+            <span style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: primary, fontWeight: 600, marginBottom: 20 }}>
+              {eyebrow ?? 'Un mensaje para vosotros'}
+            </span>
+            <p style={{ fontFamily: font, fontSize: 'clamp(1.15rem,2.2vw,1.5rem)', fontWeight: 300, lineHeight: 1.75, color: fg }}>
+              {message}
+            </p>
+            {venueName && (
+              <div style={{ fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: `${fg}99`, marginTop: 24 }}>— {venueName}</div>
+            )}
+          </div>
+        </FadeUp>
+        {imageUrl && right && (
+          <div style={{ background: '#000' }}>
+            <img src={imageUrl} alt="" loading="lazy"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+export function TplWelcomeEditorial({
+  message, venueName, eyebrow, primary, bg, fg, font,
+}: {
+  message: string
+  venueName?: string | null
+  eyebrow?: string
+  primary: string
+  bg: string
+  fg: string
+  font?: string
+}) {
+  return (
+    <section id="sec-welcome" style={{ padding: '140px 32px', background: bg }}>
+      <FadeUp>
+        <div style={{ maxWidth: 900, margin: '0 auto', textAlign: 'center' }}>
+          {eyebrow && (
+            <span style={{ fontSize: 11, letterSpacing: '.24em', textTransform: 'uppercase', color: primary, fontWeight: 600, marginBottom: 28, display: 'block' }}>
+              {eyebrow}
+            </span>
+          )}
+          <p style={{ fontFamily: font, fontSize: 'clamp(2rem,4.5vw,3.4rem)', fontWeight: 300, lineHeight: 1.25, color: fg, letterSpacing: '-.01em' }}>
+            {message}
+          </p>
+          {venueName && (
+            <div style={{ fontSize: 12, letterSpacing: '.2em', textTransform: 'uppercase', color: `${fg}80`, marginTop: 36 }}>— {venueName}</div>
+          )}
+        </div>
+      </FadeUp>
+    </section>
+  )
+}
+
+// ─── Reusable section blocks for T2–T5 ─────────────────────────────────────────
+// Cada bloque acepta tokens de tema (primary, fg, bg, font) para encajar en la
+// paleta de cada template. Importado por T2/T3/T4/T5 — T1 mantiene sus propias
+// implementaciones bespoke.
+
+export function TplStickyNav({
+  venueName, logoUrl, primary, bg, fg, fontSerif, links, ctaLabel, onCta,
+}: {
+  venueName?: string | null
+  logoUrl?: string | null
+  primary: string
+  bg: string                                  // background color del nav
+  fg: string                                  // text color del nav
+  fontSerif?: string
+  links: Array<{ label: string; anchor: string }>
+  ctaLabel?: string
+  onCta?: () => void
+}) {
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 80)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+  if (!links.length && !ctaLabel) return null
+  return (
+    <nav style={{
+      position: 'sticky', top: 0, zIndex: 50,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '12px 32px',
+      background: scrolled ? bg : 'transparent',
+      backdropFilter: scrolled ? 'blur(14px)' : 'none',
+      borderBottom: scrolled ? `1px solid ${fg}1A` : '1px solid transparent',
+      transition: 'background .25s, border-color .25s',
+      fontFamily: fontSerif,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {logoUrl
+          ? <img src={logoUrl} alt={venueName ?? ''} style={{ height: 26, objectFit: 'contain' }} />
+          : <span style={{ fontSize: 14, fontWeight: 500, color: fg, letterSpacing: '.04em' }}>{venueName}</span>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        {links.map(l => (
+          <button key={l.anchor} type="button"
+            onClick={() => document.getElementById(l.anchor)?.scrollIntoView({ behavior: 'smooth' })}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: '6px 12px', fontSize: 12, fontWeight: 500,
+              color: `${fg}B3`, letterSpacing: '.04em',
+              transition: 'color .15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = primary)}
+            onMouseLeave={e => (e.currentTarget.style.color = `${fg}B3`)}
+          >{l.label}</button>
+        ))}
+        {ctaLabel && onCta && (
+          <button type="button" onClick={onCta}
+            style={{
+              marginLeft: 12, padding: '8px 18px',
+              background: primary, color: '#fff', border: 'none',
+              fontSize: 11, fontWeight: 600, letterSpacing: '.1em', textTransform: 'uppercase',
+              cursor: 'pointer', borderRadius: 2,
+            }}>{ctaLabel}</button>
+        )}
+      </div>
+    </nav>
+  )
+}
+
+export function TplVenueSpecs({
+  specs, fallbackArea, primary, fg, font, label,
+}: {
+  specs: { founded_year?: string; area?: string; max_capacity?: string; extra_value?: string; extra_label?: string } | undefined
+  fallbackArea?: string | null
+  primary: string
+  fg: string
+  font?: string
+  label?: string
+}) {
+  const vs = specs ?? {}
+  const items = [
+    { n: vs.founded_year,                      l: 'Año de fundación' },
+    { n: vs.area ?? fallbackArea ?? undefined, l: 'Extensión' },
+    { n: vs.max_capacity,                      l: 'Capacidad máxima' },
+    { n: vs.extra_value,                       l: vs.extra_label ?? 'Detalle' },
+  ].filter(s => s.n != null && s.n !== '')
+  if (!items.length) return null
+  return (
+    <section style={{ padding: '60px 32px' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+        {label && (
+          <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: `${fg}99`, marginBottom: 28, textAlign: 'center' }}>{label}</div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: 24 }}>
+          {items.map((s, i) => (
+            <FadeIn key={i} delay={i * 0.08}>
+              <div style={{ textAlign: 'center', borderLeft: i > 0 ? `1px solid ${fg}1A` : 'none', padding: '0 12px' }}>
+                <div style={{ fontFamily: font, fontSize: 'clamp(2rem,4vw,3.2rem)', fontWeight: 300, color: primary, lineHeight: 1, marginBottom: 8 }}>{s.n}</div>
+                <div style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: `${fg}99` }}>{s.l}</div>
+              </div>
+            </FadeIn>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+export function TplSingleSpace({
+  data, fallbackImage, primary, bg, fg, font, label,
+}: {
+  data: { title?: string; description?: string; sqm?: string; max_guests?: string; features?: string[]; image_url?: string } | undefined | null
+  fallbackImage?: string | null
+  primary: string
+  bg: string
+  fg: string
+  font?: string
+  label?: string
+}) {
+  if (!data) return null
+  const features = (Array.isArray(data.features) ? data.features : []).filter(Boolean)
+  const img = data.image_url || fallbackImage || null
+  if (!data.title && !data.description && !img && features.length === 0) return null
+  return (
+    <section id="sec-single-space" style={{ padding: '80px 32px', background: bg }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: img ? '1fr 1fr' : '1fr', gap: 48, alignItems: 'center' }}>
+        {img && (
+          <FadeIn>
+            <img src={img} alt={data.title || 'Espacio'} loading="lazy"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+              style={{ width: '100%', height: 440, objectFit: 'cover', borderRadius: 4 }} />
+          </FadeIn>
+        )}
+        <FadeUp>
+          {label && (
+            <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: `${fg}99`, marginBottom: 16 }}>{label}</div>
+          )}
+          {data.title && (
+            <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,4vw,3rem)', fontWeight: 300, color: fg, lineHeight: 1.1, marginBottom: 18 }}>
+              {data.title}
+            </h2>
+          )}
+          {data.description && (
+            <p style={{ fontSize: 15, lineHeight: 1.8, color: `${fg}CC`, marginBottom: 24 }}>
+              {data.description}
+            </p>
+          )}
+          {(data.sqm || data.max_guests) && (
+            <div style={{ display: 'flex', gap: 36, padding: '20px 0', borderTop: `1px solid ${fg}14`, borderBottom: `1px solid ${fg}14`, marginBottom: 22 }}>
+              {data.sqm && (
+                <div>
+                  <div style={{ fontFamily: font, fontSize: '1.6rem', fontWeight: 300, color: fg, lineHeight: 1 }}>{data.sqm}<span style={{ fontSize: '.7em', color: `${fg}80` }}> m²</span></div>
+                  <div style={{ fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: `${fg}80`, marginTop: 4 }}>Superficie</div>
+                </div>
+              )}
+              {data.max_guests && (
+                <div>
+                  <div style={{ fontFamily: font, fontSize: '1.6rem', fontWeight: 300, color: fg, lineHeight: 1 }}>{data.max_guests}</div>
+                  <div style={{ fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: `${fg}80`, marginTop: 4 }}>Capacidad máx.</div>
+                </div>
+              )}
+            </div>
+          )}
+          {features.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {features.map((f, i) => (
+                <span key={i} style={{ fontSize: 12, padding: '5px 12px', border: `1px solid ${fg}24`, borderRadius: 999, color: `${fg}B3` }}>{f}</span>
+              ))}
+            </div>
+          )}
+        </FadeUp>
+      </div>
+    </section>
+  )
+}

@@ -130,7 +130,12 @@ export default function TemplateEditor({
     })()
   }, [user])
 
-  const iframeUrl = `/proposals/templates/${template.id}/preview`
+  // En modo borrador (id === 'new') el preview apunta a la muestra cuyo
+  // visual_template_id coincide con el del borrador, para que el iframe inicial
+  // tenga algo razonable que mostrar antes de que el postMessage live-updatee.
+  const iframeUrl = template.id === 'new'
+    ? `/proposals/templates/t${(sections.visual_template_id as number | undefined) ?? 1}/preview`
+    : `/proposals/templates/${template.id}/preview`
 
   // ── postMessage live preview ──────────────────────────────────────────────
   const buildPatch = useCallback(() => ({
@@ -237,15 +242,22 @@ export default function TemplateEditor({
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
+  // En modo borrador (id === 'new') hace POST y devuelve la fila creada via
+  // onSave; el padre se encarga de redirigir a /{nuevoId}. En modo edición,
+  // PATCH normal sobre la fila existente.
   const handleSave = async () => {
     if (!name.trim()) { setSaveError('El nombre es obligatorio'); return }
     setSaving(true); setSaveError(null)
     try {
-      const res = await fetch(`/api/proposal-templates/${template.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), description: description || null, sections_data: sections, is_default: isDefault }),
-      })
+      const isDraft = template.id === 'new'
+      const res = await fetch(
+        isDraft ? '/api/proposal-templates' : `/api/proposal-templates/${template.id}`,
+        {
+          method: isDraft ? 'POST' : 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim(), description: description || null, sections_data: sections, is_default: isDefault }),
+        }
+      )
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error al guardar') }
       const updated = await res.json()
       setSaved(true); setDirty(false)

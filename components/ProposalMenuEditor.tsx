@@ -295,22 +295,8 @@ export default function ProposalMenuEditor({
         {intro ?? <>Aquí configuráis los <strong>menús, extras y aperitivos</strong> que verán los invitados en el bloque interactivo al final de la propuesta. Lo que elijan se os enviará por email.</>}
       </div>
 
-      {/* ─── Importar desde PDF ─────────────────────────────────────────────── */}
-      <div style={{ background: 'var(--cream)', border: '1px dashed var(--gold)', borderRadius: 10, padding: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <Sparkles size={18} style={{ color: 'var(--gold)', flexShrink: 0 }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>Importar desde PDF</div>
-          <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
-            Si tu menú ya está en PDF (con texto seleccionable), lo leemos e intentamos estructurar los cursos. Podrás revisar antes de guardar.
-          </div>
-        </div>
-        <input ref={importInputRef} type="file" accept="application/pdf" style={{ display: 'none' }}
-          onChange={e => e.target.files?.[0] && handleImportPdf(e.target.files[0])} />
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => importInputRef.current?.click()}
-          disabled={parsing || uploadingPdf} style={{ flexShrink: 0 }}>
-          <Upload size={12} /> {parsing ? 'Leyendo…' : uploadingPdf ? 'Subiendo…' : 'Subir PDF'}
-        </button>
-      </div>
+      {/* "Importar desde PDF" oculto temporalmente — el parser no acierta con todos los menús.
+          Mantener el handler/refs para reactivarlo cuando mejore el parsing. */}
 
       {undoSnapshot && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, padding: '10px 12px', borderRadius: 8, marginBottom: 12, background: '#f0fdf4', border: '1px solid #86efac', color: '#15803d' }}>

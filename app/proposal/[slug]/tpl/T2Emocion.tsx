@@ -5,9 +5,10 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { buildSingleFontUrl } from '@/lib/fonts'
-import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, type ProposalData } from './shared'
+import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, TplStickyNav, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, type ProposalData } from './shared'
 import { WeddingProposal } from './WeddingProposal'
 import VisitBookingModal from '@/components/VisitBookingModal'
+import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 
 function EmptySec({ label }: { label: string }) {
   return (
@@ -24,7 +25,10 @@ function EmptySec({ label }: { label: string }) {
 
 export default function T2Emocion({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
-  const { sec, on, hasCatering, packagesShow, inclusionsShow, testsShow, extrasShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, collabsShow, accom } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, testsShow, extrasShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, collabsShow, accom, spaceGroups, techspecs } = extractData(data)
+  const [, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const displayMsg = data.personal_message || (sec as any).welcome_default || null
+  const welcomeVariant = pickWelcomeVariant(sec)
   const _preview = !!(data as any)._preview
 
   const primary = branding?.primary_color ?? '#6B4F3A'
@@ -99,9 +103,33 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
     #cta .inp:focus{border-bottom-color:rgba(255,255,255,.7)}
   `
 
+  const stickyLinks = ([
+    welcomeVariant && displayMsg ? { label: 'Bienvenida', anchor: 'sec-welcome' } : null,
+    on('experience') && (expShow as any)?.body ? { label: 'Historia', anchor: 'sec-experience' } : null,
+    on('gallery') && gallery.length > 0 ? { label: 'Galería', anchor: 'sec-gallery' } : null,
+    on('single_space') && (sec as any).single_space?.title ? { label: 'Espacio', anchor: 'sec-single-space' } : null,
+    on('zones') && zonesShow.length > 0 ? { label: 'Espacios', anchor: 'sec-zones' } : null,
+    hasCatering ? { label: 'Menús', anchor: 'menu' } : null,
+    on('schedule_visit') ? { label: 'Visita', anchor: 'sec-schedule' } : null,
+    contactOn ? { label: 'Contacto', anchor: 'cta' } : null,
+  ].filter(Boolean) as { label: string; anchor: string }[])
+
   return (
     <div className="tpl-root" style={{ fontFamily: font, background: CREAM, color: '#2c2418', minHeight: '100vh' }}>
       <style dangerouslySetInnerHTML={{ __html: css }} />
+
+      {/* ── STICKY NAV ── */}
+      {on('sticky_nav') && (
+        <TplStickyNav
+          venueName={venue?.name}
+          logoUrl={logo}
+          primary={primary}
+          bg={CREAM}
+          fg="#2c2418"
+          fontSerif={font}
+          links={stickyLinks}
+        />
+      )}
 
       {/* ══════════════════════════════════════════
           HERO — minimal, image is everything
@@ -158,7 +186,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           GALLERY — full-bleed, immediately
       ══════════════════════════════════════════ */}
       {on('gallery') && (gallery.length > 0 ? (
-        <section>
+        <section id="sec-gallery">
           <FadeIn>
             <Gallery photos={gallery} primary={primary} dark={false} />
           </FadeIn>
@@ -167,16 +195,16 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
 
 
       {/* ══════════════════════════════════════════
-          PERSONAL MESSAGE — editorial quote
+          PERSONAL MESSAGE — variantes (default / light / split / editorial)
       ══════════════════════════════════════════ */}
-      {on('welcome') && personal_message && (
-        <section style={{ background: '#fff', padding: '100px 0' }}>
+      {welcomeVariant === 'welcome' && displayMsg && (
+        <section id="sec-welcome" style={{ background: '#fff', padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
                 <div className="serif" style={{ fontSize: 120, fontWeight: 300, color: `rgba(${rgb},.1)`, lineHeight: 1, marginBottom: -28, fontStyle: 'italic' }}>"</div>
                 <p className="serif" style={{ fontSize: 'clamp(21px,3.2vw,28px)', fontWeight: 300, fontStyle: 'italic', color: '#3a2f28', lineHeight: 1.8, marginBottom: 36 }}>
-                  {personal_message}
+                  {displayMsg}
                 </p>
                 <div className="orn" style={{ maxWidth: 280 }}>
                   {venue?.name && <span className="sans" style={{ fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: `rgba(${rgb},.5)` }}>{venue.name}</span>}
@@ -186,13 +214,47 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           </div>
         </section>
       )}
+      {welcomeVariant === 'welcome_light' && displayMsg && (
+        <TplWelcomeLight
+          message={displayMsg}
+          venueName={venue?.name}
+          imageUrl={(sec as any).welcome_light?.image_url}
+          primary={primary}
+          bg={WARM}
+          fg="#2c2418"
+          font={font}
+        />
+      )}
+      {welcomeVariant === 'welcome_split' && displayMsg && (
+        <TplWelcomeSplit
+          message={displayMsg}
+          venueName={venue?.name}
+          imageUrl={(sec as any).welcome_split?.image_url}
+          imageSide={(sec as any).welcome_split?.image_side}
+          primary={primary}
+          bg={CREAM}
+          fg="#2c2418"
+          font={font}
+        />
+      )}
+      {welcomeVariant === 'welcome_editorial' && displayMsg && (
+        <TplWelcomeEditorial
+          message={displayMsg}
+          venueName={venue?.name}
+          eyebrow={(sec as any).welcome_editorial?.eyebrow}
+          primary={primary}
+          bg="#fff"
+          fg="#2c2418"
+          font={font}
+        />
+      )}
 
 
       {/* ══════════════════════════════════════════
           EXPERIENCE — full width editorial text
       ══════════════════════════════════════════ */}
       {on('experience') && expShow && (expShow as any).body && (
-        <section style={{ background: WARM, padding: '100px 0' }}>
+        <section id="sec-experience" style={{ background: WARM, padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 52 }}>
@@ -214,11 +276,36 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       )}
 
 
+      {/* ── VENUE SPECS ── */}
+      {on('venue_specs') && (
+        <TplVenueSpecs
+          specs={(sec as any).venue_specs}
+          fallbackArea={techspecs?.sqm?.split('·')[0]?.trim() ?? null}
+          primary={primary}
+          fg="#2c2418"
+          font={font}
+          label="Datos del venue"
+        />
+      )}
+
+      {/* ── SINGLE SPACE ── */}
+      {on('single_space') && (
+        <TplSingleSpace
+          data={(sec as any).single_space}
+          fallbackImage={hero}
+          primary={primary}
+          bg="#fff"
+          fg="#2c2418"
+          font={font}
+          label="Vuestro espacio"
+        />
+      )}
+
       {/* ══════════════════════════════════════════
           ZONES
       ══════════════════════════════════════════ */}
       {on('zones') && (zonesShow.length > 0 ? (
-        <section style={{ background: CREAM, padding: '100px 0' }}>
+        <section id="sec-zones" style={{ background: CREAM, padding: '100px 0' }}>
           <div className="w-full">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 56 }}>
@@ -266,6 +353,19 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           </div>
         </section>
       ) : _preview ? <EmptySec label="Espacios" /> : null)}
+
+      {/* ── SPACE GROUPS ── */}
+      {on('space_groups') && spaceGroups && spaceGroups.length > 0 && (
+        <SpaceGroupSelector
+          groups={spaceGroups}
+          primary={primary}
+          onPrimary={onPri}
+          dark={false}
+          font={font}
+          guestCount={guest_count ? Number(guest_count) : undefined}
+          onSelectionChange={setSelectedSpaces}
+        />
+      )}
 
       {/* ══════════════════════════════════════════
           VENUE RENTAL — grid temporada × día

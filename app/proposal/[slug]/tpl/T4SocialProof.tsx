@@ -12,10 +12,13 @@ import {
   IcoCalendar, IcoUsers, IcoBuilding, IcoChat,
   formatZoneCapacities, formatZoneFeatures, ivaLabel,
   InclusionIcon, StarRating, resolveContact, VenueRentalGrid,
+  TplVenueSpecs, TplSingleSpace,
+  TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant,
 } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import VisitBookingModal from '@/components/VisitBookingModal'
+import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const CREAM  = '#FFFAF4'
@@ -577,7 +580,10 @@ function EmptySec({ label }: { label: string }) {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function T4SocialProof({ data }: { data: ProposalData }) {
-  const { sec, on, hasCatering, packagesShow, zonesShow, inclusionsShow, faqShow, expShow, testsShow, menuShow, menusStructured, menuExtras, appetizersBase, seasonsShow, collabsShow, extrasShow, accom } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, zonesShow, inclusionsShow, faqShow, expShow, testsShow, menuShow, menusStructured, menuExtras, appetizersBase, seasonsShow, collabsShow, extrasShow, accom, spaceGroups, techspecs } = extractData(data)
+  const [, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const displayMsg = data.personal_message || (sec as any).welcome_default || null
+  const welcomeVariant = pickWelcomeVariant(sec)
 
   const _preview = !!(data as any)._preview
   const branding  = data.branding
@@ -631,16 +637,18 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
     <div className="t4 tpl-root">
       <style dangerouslySetInnerHTML={{ __html: buildCss(primary, priRgb, darkPri, font) }} />
 
-      {/* NAV */}
-      <nav className={`t4-nav ${scrolled ? 'scrolled' : ''}`}>
-        {branding?.logo_url
-          ? <img src={branding.logo_url} className="t4-logo" alt={venueName} />
-          : <span style={{ fontFamily: font, fontSize: '1.1rem', fontWeight: 600, color: scrolled ? INK : '#fff' }}>{venueName}</span>
-        }
-        <button className="t4-nav-cta" onClick={() => (document.getElementById(hasCatering ? 'menu' : 't4-cta') ?? document.getElementById('t4-cta'))?.scrollIntoView({ behavior: 'smooth' })}>
-          {hasCatering ? 'Ver menús' : 'Contactar'}
-        </button>
-      </nav>
+      {/* NAV — controlled by sticky_nav toggle */}
+      {on('sticky_nav') && (
+        <nav className={`t4-nav ${scrolled ? 'scrolled' : ''}`}>
+          {branding?.logo_url
+            ? <img src={branding.logo_url} className="t4-logo" alt={venueName} />
+            : <span style={{ fontFamily: font, fontSize: '1.1rem', fontWeight: 600, color: scrolled ? INK : '#fff' }}>{venueName}</span>
+          }
+          <button className="t4-nav-cta" onClick={() => (document.getElementById(hasCatering ? 'menu' : 't4-cta') ?? document.getElementById('t4-cta'))?.scrollIntoView({ behavior: 'smooth' })}>
+            {hasCatering ? 'Ver menús' : 'Contactar'}
+          </button>
+        </nav>
+      )}
 
       {/* FIRST SCREEN — hero + stats lock to 100vh */}
       <div className="t4-first-screen">
@@ -711,17 +719,51 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         </section>
       ) : _preview ? <EmptySec label="Galería" /> : null)}
 
-      {/* PERSONAL MESSAGE */}
-      {on('welcome') && data.personal_message && (
-        <section className="t4-msg-bg">
+      {/* PERSONAL MESSAGE — variantes */}
+      {welcomeVariant === 'welcome' && displayMsg && (
+        <section id="sec-welcome" className="t4-msg-bg">
           <FadeUp>
             <div className="t4-msg-wrap">
               <div className="t4-msg-icon">💌</div>
               <h2 className="t4-msg-title">Un mensaje para vosotros</h2>
-              <p className="t4-msg-text">{data.personal_message}</p>
+              <p className="t4-msg-text">{displayMsg}</p>
             </div>
           </FadeUp>
         </section>
+      )}
+      {welcomeVariant === 'welcome_light' && displayMsg && (
+        <TplWelcomeLight
+          message={displayMsg}
+          venueName={data.venue?.name}
+          imageUrl={(sec as any).welcome_light?.image_url}
+          primary={primary}
+          bg={WARM}
+          fg={INK}
+          font={font}
+        />
+      )}
+      {welcomeVariant === 'welcome_split' && displayMsg && (
+        <TplWelcomeSplit
+          message={displayMsg}
+          venueName={data.venue?.name}
+          imageUrl={(sec as any).welcome_split?.image_url}
+          imageSide={(sec as any).welcome_split?.image_side}
+          primary={primary}
+          bg={CREAM}
+          fg={INK}
+          font={font}
+        />
+      )}
+      {welcomeVariant === 'welcome_editorial' && displayMsg && (
+        <TplWelcomeEditorial
+          message={displayMsg}
+          venueName={data.venue?.name}
+          eyebrow={(sec as any).welcome_editorial?.eyebrow}
+          primary={primary}
+          bg={CREAM}
+          fg={INK}
+          font={font}
+        />
       )}
 
       {/* EXPERIENCE */}
@@ -812,6 +854,33 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         </section>
       ) : _preview ? <EmptySec label="Paquetes" /> : null)}
 
+      {/* VENUE SPECS */}
+      {on('venue_specs') && (
+        <section className="t4-section" style={{ background: CREAM }}>
+          <TplVenueSpecs
+            specs={(sec as any).venue_specs}
+            fallbackArea={techspecs?.sqm?.split('·')[0]?.trim() ?? null}
+            primary={primary}
+            fg={INK}
+            font={font}
+            label="Datos del venue"
+          />
+        </section>
+      )}
+
+      {/* SINGLE SPACE */}
+      {on('single_space') && (
+        <TplSingleSpace
+          data={(sec as any).single_space}
+          fallbackImage={heroPhoto}
+          primary={primary}
+          bg={WARM}
+          fg={INK}
+          font={font}
+          label="Vuestro espacio"
+        />
+      )}
+
       {/* ZONES */}
       {on('zones') && (zonesShow.length > 0 ? (
         <section className="t4-section" style={{ background: WARM }}>
@@ -863,6 +932,21 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           </div>
         </section>
       ) : _preview ? <EmptySec label="Espacios" /> : null)}
+
+      {/* SPACE GROUPS */}
+      {on('space_groups') && spaceGroups && spaceGroups.length > 0 && (
+        <section className="t4-section" style={{ background: CREAM }}>
+          <SpaceGroupSelector
+            groups={spaceGroups}
+            primary={primary}
+            onPrimary={darkPri ? '#fff' : '#111'}
+            dark={false}
+            font={font}
+            guestCount={data.guest_count ? Number(data.guest_count) : undefined}
+            onSelectionChange={setSelectedSpaces}
+          />
+        </section>
+      )}
 
       {/* VENUE RENTAL — grid temporada × día */}
       {on('venue_rental') && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (

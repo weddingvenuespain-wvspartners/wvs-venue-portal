@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import { Loader2, AlertCircle } from 'lucide-react'
-import { getStarterTemplate } from '@/lib/proposal-starter-templates'
+import { getDefaultTemplate } from '@/lib/proposal-starter-templates'
 
 const MAX_PROPOSALS_PER_LEAD = 6
 
@@ -37,7 +37,7 @@ function NuevaPropuestaContent() {
     if (!activeVenue) return
 
     const leadId = searchParams.get('lead_id')
-    const starter = getStarterTemplate(searchParams.get('template'))
+    const starter = getDefaultTemplate(searchParams.get('template'))
     const dsParam = searchParams.get('ds')
     const dateSlots = dsParam ? (() => { try { return JSON.parse(atob(dsParam)) } catch { return null } })() : null
 

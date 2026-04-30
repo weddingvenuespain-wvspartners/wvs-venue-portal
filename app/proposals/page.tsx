@@ -6,14 +6,17 @@ import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Lock, Loader2, FileText, Building2, UtensilsCrossed, LayoutTemplate, ChevronLeft, ChevronRight, Search, type LucideIcon } from 'lucide-react'
+import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Lock, Loader2, FileText, Zap, Sparkles, ClipboardList, MessageCircle, Target, LayoutTemplate, ChevronLeft, ChevronRight, Search, type LucideIcon } from 'lucide-react'
 import { usePlanFeatures } from '@/lib/use-plan-features'
-import { STARTER_TEMPLATES, type StarterTemplateId, type StarterTemplateIcon } from '@/lib/proposal-starter-templates'
+import { DEFAULT_TEMPLATES, type DefaultTemplateId, type DefaultTemplateIcon } from '@/lib/proposal-starter-templates'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
-const STARTER_ICON: Record<StarterTemplateIcon, LucideIcon> = {
-  'building-2': Building2,
-  'utensils-crossed': UtensilsCrossed,
+const TEMPLATE_ICON: Record<DefaultTemplateIcon, LucideIcon> = {
+  'zap': Zap,
+  'sparkles': Sparkles,
+  'clipboard-list': ClipboardList,
+  'message-circle': MessageCircle,
+  'target': Target,
 }
 
 const MAX_PROPOSALS_PER_LEAD = 6
@@ -124,7 +127,7 @@ function PropuestasPageContent() {
     setNewModalOpen(true)
   }
 
-  const createFromStarter = (tpl: StarterTemplateId | null) => {
+  const createFromStarter = (tpl: DefaultTemplateId | null) => {
     setNewModalOpen(false)
     router.push(tpl ? `/proposals/new?template=${tpl}` : '/proposals/new')
   }
@@ -586,41 +589,38 @@ function PropuestasPageContent() {
                 <X size={20} />
               </button>
             </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <button
                 type="button"
                 onClick={() => createFromStarter(null)}
                 className="starter-card"
+                style={{ flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}
               >
                 <div className="starter-card-icon">
                   <FileText size={20} strokeWidth={1.6} />
                 </div>
-                <div style={{ flex: 1 }}>
+                <div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>En blanco</div>
                   <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>Propuesta vacía para rellenar desde cero.</div>
                 </div>
-                <div className="starter-card-arrow" aria-hidden="true">→</div>
               </button>
-              {STARTER_TEMPLATES.map(tpl => {
-                const Icon = STARTER_ICON[tpl.icon]
+              {DEFAULT_TEMPLATES.map(tpl => {
+                const Icon = TEMPLATE_ICON[tpl.icon]
                 return (
                   <button
                     key={tpl.id}
                     type="button"
                     onClick={() => createFromStarter(tpl.id)}
                     className="starter-card"
+                    style={{ flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}
                   >
                     <div className="starter-card-icon">
                       <Icon size={20} strokeWidth={1.6} />
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        Plantilla · {tpl.label}
-                        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--gold)', background: 'rgba(196,151,90,.1)', padding: '2px 7px', borderRadius: 100 }}>Ejemplo</span>
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>{tpl.description} Incluye secciones, zonas, inclusiones, testimonios y más — todo editable.</div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>{tpl.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>{tpl.description}</div>
                     </div>
-                    <div className="starter-card-arrow" aria-hidden="true">→</div>
                   </button>
                 )
               })}

@@ -5,9 +5,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { buildSingleFontUrl } from '@/lib/fonts'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoChat, IcoBuilding, ivaLabel, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, type ProposalData } from './shared'
+import { formatDate, formatPrice, isDark, toRgb, FadeUp, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoChat, IcoBuilding, ivaLabel, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, type ProposalData } from './shared'
 import { WeddingProposal } from './WeddingProposal'
 import VisitBookingModal from '@/components/VisitBookingModal'
+import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 
 const SECTIONS_ALL = [
   { id: 'experience',    label: 'La experiencia' },
@@ -40,7 +41,10 @@ function EmptySec({ label }: { label: string }) {
 
 export default function T3TodoClaro({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
-  const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow, expShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, testsShow, seasonsShow, collabsShow, accom } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow, expShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, testsShow, seasonsShow, collabsShow, accom, spaceGroups, techspecs } = extractData(data)
+  const [, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const displayMsg = personal_message || (sec as any).welcome_default || null
+  const welcomeVariant = pickWelcomeVariant(sec)
 
   const primary = branding?.primary_color ?? '#1A3A5C'
   const rgb     = toRgb(primary)
@@ -232,15 +236,19 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
 
         {/* ── Sidebar navigation ────────────────── */}
         <aside className="sidebar">
-          <div className="side-h">Contenido</div>
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {SECTIONS_DEF.map(({ id, label, n }) => (
-              <button key={id} className={`nav-item${activeSection === id ? ' active' : ''}`} onClick={() => scrollTo(id)}>
-                <span className="side-n">{n}</span>
-                <span className="side-l">{label}</span>
-              </button>
-            ))}
-          </nav>
+          {on('sticky_nav') && (
+            <>
+              <div className="side-h">Contenido</div>
+              <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {SECTIONS_DEF.map(({ id, label, n }) => (
+                  <button key={id} className={`nav-item${activeSection === id ? ' active' : ''}`} onClick={() => scrollTo(id)}>
+                    <span className="side-n">{n}</span>
+                    <span className="side-l">{label}</span>
+                  </button>
+                ))}
+              </nav>
+            </>
+          )}
 
           {/* Key info box */}
           <div className="side-box">
@@ -287,10 +295,10 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 <h2 className="sec-h">{(expShow as any).title || 'Vuestro día especial'}</h2>
                 <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 15, color: '#64605C', lineHeight: 1.9, maxWidth: 560 }}>{(expShow as any).body}</p>
               </FadeUp>
-              {on('welcome') && personal_message && (
+              {welcomeVariant === 'welcome' && displayMsg && (
                 <FadeUp delay={.1}>
                   <div style={{ marginTop: 36, padding: '24px 28px', borderLeft: `3px solid ${primary}`, background: '#fff', borderRadius: '0 12px 12px 0' }}>
-                    <p style={{ fontFamily: font, fontSize: 18, fontStyle: 'italic', fontWeight: 300, color: '#3a3430', lineHeight: 1.75 }}>&ldquo;{personal_message}&rdquo;</p>
+                    <p style={{ fontFamily: font, fontSize: 18, fontStyle: 'italic', fontWeight: 300, color: '#3a3430', lineHeight: 1.75 }}>&ldquo;{displayMsg}&rdquo;</p>
                     {venue?.name && <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 11, color: '#C8C3BE', marginTop: 12, letterSpacing: '.1em', textTransform: 'uppercase' }}>— {venue.name}</div>}
                   </div>
                 </FadeUp>
@@ -298,10 +306,81 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
             </div>
           )}
 
+          {/* Welcome variants — light / split / editorial */}
+          {welcomeVariant === 'welcome_light' && displayMsg && (
+            <div className="sec">
+              <TplWelcomeLight
+                message={displayMsg}
+                venueName={venue?.name}
+                imageUrl={(sec as any).welcome_light?.image_url}
+                primary={primary}
+                bg="#F8F6F3"
+                fg="#1a1614"
+                font={font}
+              />
+            </div>
+          )}
+          {welcomeVariant === 'welcome_split' && displayMsg && (
+            <div className="sec">
+              <TplWelcomeSplit
+                message={displayMsg}
+                venueName={venue?.name}
+                imageUrl={(sec as any).welcome_split?.image_url}
+                imageSide={(sec as any).welcome_split?.image_side}
+                primary={primary}
+                bg="#fff"
+                fg="#1a1614"
+                font={font}
+              />
+            </div>
+          )}
+          {welcomeVariant === 'welcome_editorial' && displayMsg && (
+            <div className="sec">
+              <TplWelcomeEditorial
+                message={displayMsg}
+                venueName={venue?.name}
+                eyebrow={(sec as any).welcome_editorial?.eyebrow}
+                primary={primary}
+                bg="#fff"
+                fg="#1a1614"
+                font={font}
+              />
+            </div>
+          )}
+
           {/* Gallery strip in content */}
           {on('gallery') && (gallery.length > 0 ? (
             <Gallery photos={gallery} primary={primary} dark={false} />
           ) : _preview ? <EmptySec label="Galería" /> : null)}
+
+          {/* Venue specs */}
+          {on('venue_specs') && (
+            <div className="sec">
+              <TplVenueSpecs
+                specs={(sec as any).venue_specs}
+                fallbackArea={techspecs?.sqm?.split('·')[0]?.trim() ?? null}
+                primary={primary}
+                fg="#1a1614"
+                font={font}
+                label="Datos del venue"
+              />
+            </div>
+          )}
+
+          {/* Single space */}
+          {on('single_space') && (
+            <div className="sec">
+              <TplSingleSpace
+                data={(sec as any).single_space}
+                fallbackImage={hero}
+                primary={primary}
+                bg="#fff"
+                fg="#1a1614"
+                font={font}
+                label="Vuestro espacio"
+              />
+            </div>
+          )}
 
           {/* Zones */}
           {on('zones') && (zonesShow.length > 0 ? (
@@ -349,6 +428,21 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
               </div>
             </div>
           ) : _preview ? <EmptySec label="Espacios" /> : null)}
+
+          {/* Space groups */}
+          {on('space_groups') && spaceGroups && spaceGroups.length > 0 && (
+            <div className="sec">
+              <SpaceGroupSelector
+                groups={spaceGroups}
+                primary={primary}
+                onPrimary={onPri}
+                dark={false}
+                font={font}
+                guestCount={guest_count ? Number(guest_count) : undefined}
+                onSelectionChange={setSelectedSpaces}
+              />
+            </div>
+          )}
 
           {/* Inclusions */}
           {on('inclusions') && (inclusionsShow.length > 0 ? (

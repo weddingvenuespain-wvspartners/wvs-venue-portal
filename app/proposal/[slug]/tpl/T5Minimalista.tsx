@@ -12,10 +12,13 @@ import {
   IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating,
   resolveContact, VenueRentalGrid,
   formatZoneCapacities, formatZoneFeatures,
+  TplVenueSpecs, TplSingleSpace,
+  TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant,
 } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import VisitBookingModal from '@/components/VisitBookingModal'
+import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const WHITE = '#FFFFFF'
@@ -424,7 +427,10 @@ function EmptySec({ label }: { label: string }) {
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 export default function T5Minimalista({ data }: { data: ProposalData }) {
-  const { sec, on, hasCatering, packagesShow, inclusionsShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, testsShow, collabsShow, extrasShow, accom } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, testsShow, collabsShow, extrasShow, accom, spaceGroups, techspecs } = extractData(data)
+  const [, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const displayMsg = data.personal_message || (sec as any).welcome_default || null
+  const welcomeVariant = pickWelcomeVariant(sec)
 
   const _preview = !!(data as any)._preview
   const branding  = data.branding
@@ -480,28 +486,30 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       {/* SCROLL PROGRESS */}
       <div className="t5-progress" style={{ width: `${progress}%` }} />
 
-      {/* NAV */}
-      <nav className={`t5-nav ${scrolled ? 'scrolled' : ''}`}>
-        {branding?.logo_url
-          ? <img src={branding.logo_url} className="t5-logo" alt={venueName} />
-          : <span style={{ fontFamily: font, fontSize: '1.1rem' }}>{venueName}</span>
-        }
-        <div className="t5-nav-right">
-          {inclusionsShow.length > 0 && (
-            <button className="t5-nav-link" onClick={() => document.getElementById('t5-inc')?.scrollIntoView({ behavior: 'smooth' })}>
-              Qué incluye
+      {/* NAV — controlled by sticky_nav toggle */}
+      {on('sticky_nav') && (
+        <nav className={`t5-nav ${scrolled ? 'scrolled' : ''}`}>
+          {branding?.logo_url
+            ? <img src={branding.logo_url} className="t5-logo" alt={venueName} />
+            : <span style={{ fontFamily: font, fontSize: '1.1rem' }}>{venueName}</span>
+          }
+          <div className="t5-nav-right">
+            {inclusionsShow.length > 0 && (
+              <button className="t5-nav-link" onClick={() => document.getElementById('t5-inc')?.scrollIntoView({ behavior: 'smooth' })}>
+                Qué incluye
+              </button>
+            )}
+            {activePkgs.length > 0 && (
+              <button className="t5-nav-link" onClick={() => document.getElementById('t5-pkg')?.scrollIntoView({ behavior: 'smooth' })}>
+                Paquetes
+              </button>
+            )}
+            <button className="t5-nav-cta" onClick={() => (document.getElementById(hasCatering ? 'menu' : 't5-cta') ?? document.getElementById('t5-cta'))?.scrollIntoView({ behavior: 'smooth' })}>
+              {hasCatering ? 'Ver menús' : 'Contactar'}
             </button>
-          )}
-          {activePkgs.length > 0 && (
-            <button className="t5-nav-link" onClick={() => document.getElementById('t5-pkg')?.scrollIntoView({ behavior: 'smooth' })}>
-              Paquetes
-            </button>
-          )}
-          <button className="t5-nav-cta" onClick={() => (document.getElementById(hasCatering ? 'menu' : 't5-cta') ?? document.getElementById('t5-cta'))?.scrollIntoView({ behavior: 'smooth' })}>
-            {hasCatering ? 'Ver menús' : 'Contactar'}
-          </button>
-        </div>
-      </nav>
+          </div>
+        </nav>
+      )}
 
       {/* HERO — 2 columns */}
       <section className="t5-hero">
@@ -587,6 +595,55 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         </div>
       )}
 
+      {/* PERSONAL MESSAGE — variantes */}
+      {welcomeVariant === 'welcome' && displayMsg && (
+        <section id="sec-welcome" style={{ padding: '80px 32px', background: WHITE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
+          <FadeUp>
+            <div style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
+              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 18 }}>Un mensaje para vosotros</p>
+              <p style={{ fontFamily: font, fontSize: 'clamp(1.1rem,2vw,1.4rem)', fontWeight: 300, color: INK, lineHeight: 1.75 }}>{displayMsg}</p>
+              {data.venue?.name && (
+                <div style={{ fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: MUTED, marginTop: 22 }}>— {data.venue.name}</div>
+              )}
+            </div>
+          </FadeUp>
+        </section>
+      )}
+      {welcomeVariant === 'welcome_light' && displayMsg && (
+        <TplWelcomeLight
+          message={displayMsg}
+          venueName={data.venue?.name}
+          imageUrl={(sec as any).welcome_light?.image_url}
+          primary={primary}
+          bg="#fafafa"
+          fg={INK}
+          font={font}
+        />
+      )}
+      {welcomeVariant === 'welcome_split' && displayMsg && (
+        <TplWelcomeSplit
+          message={displayMsg}
+          venueName={data.venue?.name}
+          imageUrl={(sec as any).welcome_split?.image_url}
+          imageSide={(sec as any).welcome_split?.image_side}
+          primary={primary}
+          bg={WHITE}
+          fg={INK}
+          font={font}
+        />
+      )}
+      {welcomeVariant === 'welcome_editorial' && displayMsg && (
+        <TplWelcomeEditorial
+          message={displayMsg}
+          venueName={data.venue?.name}
+          eyebrow={(sec as any).welcome_editorial?.eyebrow}
+          primary={primary}
+          bg={WHITE}
+          fg={INK}
+          font={font}
+        />
+      )}
+
       {/* EXPERIENCE */}
       {on('experience') && expShow && (expShow as any).body && (
         <section style={{ padding: '80px 0', background: WHITE }}>
@@ -604,6 +661,33 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       {on('gallery') && (galleryPhotos.length > 0 ? (
         <Gallery photos={galleryPhotos} primary={primary} dark={false} />
       ) : _preview ? <EmptySec label="Galería" /> : null)}
+
+      {/* VENUE SPECS */}
+      {on('venue_specs') && (
+        <section style={{ background: '#fff', borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
+          <TplVenueSpecs
+            specs={(sec as any).venue_specs}
+            fallbackArea={techspecs?.sqm?.split('·')[0]?.trim() ?? null}
+            primary={primary}
+            fg={INK}
+            font={font}
+            label="Datos del venue"
+          />
+        </section>
+      )}
+
+      {/* SINGLE SPACE */}
+      {on('single_space') && (
+        <TplSingleSpace
+          data={(sec as any).single_space}
+          fallbackImage={heroPhoto}
+          primary={primary}
+          bg="#fafafa"
+          fg={INK}
+          font={font}
+          label="Vuestro espacio"
+        />
+      )}
 
       {/* ZONES */}
       {on('zones') && (zonesShow.length > 0 ? (
@@ -653,6 +737,21 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
           </div>
         </section>
       ) : _preview ? <EmptySec label="Espacios" /> : null)}
+
+      {/* SPACE GROUPS */}
+      {on('space_groups') && spaceGroups && spaceGroups.length > 0 && (
+        <section style={{ background: '#fff', padding: '40px 0' }}>
+          <SpaceGroupSelector
+            groups={spaceGroups}
+            primary={primary}
+            onPrimary={darkPri ? '#fff' : '#111'}
+            dark={false}
+            font={font}
+            guestCount={data.guest_count ? Number(data.guest_count) : undefined}
+            onSelectionChange={setSelectedSpaces}
+          />
+        </section>
+      )}
 
       {/* INCLUSIONS — bloque de color primario */}
       {on('inclusions') && (inclusionsShow.length > 0 ? (
