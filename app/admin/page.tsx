@@ -25,6 +25,7 @@ type Profile = {
   status: string
   wp_venue_id: number | null
   wp_username: string | null
+  display_name: string | null
   first_name: string | null
   last_name: string | null
   phone: string | null
@@ -32,6 +33,7 @@ type Profile = {
   address: string | null
   city: string | null
   website: string | null
+  venue_type: string | null
   admin_notes: string | null
   created_at: string
   // enriched from auth.users
@@ -424,7 +426,7 @@ function UserPanel({
 
   const myVenues    = userVenues.filter(v => v.user_id === profile.user_id)
   const displayName = [profile.first_name, profile.last_name].filter(Boolean).join(' ')
-    || profile.company || profile.wp_username || profile.email?.split('@')[0] || profile.user_id.slice(0, 8) + '...'
+    || profile.display_name || profile.company || profile.wp_username || profile.email?.split('@')[0] || profile.user_id.slice(0, 8) + '...'
 
 
   // Reset subscription form when the selected venue changes (multi-venue users)
@@ -741,6 +743,20 @@ function UserPanel({
                 </div>
               </div>
 
+              {/* ── Onboarding data summary ── */}
+              {(profile.display_name || profile.venue_type || profile.city) && (
+                <div style={{ background: 'rgba(196,151,90,0.07)', border: '1px solid rgba(196,151,90,0.18)', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>
+                    Datos del onboarding
+                  </div>
+                  <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', fontSize: 12, color: 'var(--espresso)' }}>
+                    {profile.display_name && <span><strong>Nombre venue:</strong> {profile.display_name}</span>}
+                    {profile.venue_type   && <span><strong>Tipo:</strong> {profile.venue_type}</span>}
+                    {profile.city         && <span><strong>Región:</strong> {profile.city}</span>}
+                  </div>
+                </div>
+              )}
+
               {/* ── Empresa ── */}
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <Building2 size={11} /> Empresa / Venue
@@ -1005,7 +1021,7 @@ function UserPanel({
                   </div>
                 </div>
               )}
-              {profile.status === 'pending' && activeSub && (
+              {profile.status === 'pending' && activeSub && activeSub.status !== 'trial' && (
                 <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '14px 16px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <span style={{ fontSize: 18, lineHeight: 1 }}>✅</span>
                   <div>
@@ -2103,11 +2119,11 @@ export default function AdminPage() {
                               fontSize: 12, fontWeight: 700, color: p.status === 'active' ? '#92400e' : '#9ca3af',
                               fontFamily: 'Manrope, sans-serif',
                             }}>
-                              {(p.first_name?.[0] || p.email?.[0] || '?').toUpperCase()}
+                              {(p.first_name?.[0] || p.display_name?.[0] || p.company?.[0] || p.email?.[0] || '?').toUpperCase()}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--espresso)', lineHeight: 1.2 }}>
-                                {[p.first_name, p.last_name].filter(Boolean).join(' ') || <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--warm-gray)' }}>{p.user_id.slice(0, 12)}…</span>}
+                                {[p.first_name, p.last_name].filter(Boolean).join(' ') || p.display_name || p.company || <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--warm-gray)' }}>{p.user_id.slice(0, 12)}…</span>}
                               </div>
                               {p.email && (
                                 <div style={{ fontSize: 11, color: '#0369a1', marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>

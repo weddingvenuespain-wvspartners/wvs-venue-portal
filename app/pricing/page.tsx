@@ -67,10 +67,10 @@ function PricingPageInner() {
 
   const isLoggedIn = !!user
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     const supabase = createClient()
+    await supabase.auth.signOut()
     window.location.replace('/login')
-    supabase.auth.signOut()
   }
 
   // Load plans
@@ -194,7 +194,7 @@ function PricingPageInner() {
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           {isLoggedIn ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              {hasPlan && !isTrialExpired ? (
+              {!isPendingVerification && hasPlan && !isTrialExpired ? (
                 <button
                   onClick={() => router.push('/dashboard')}
                   style={{
@@ -202,7 +202,6 @@ function PricingPageInner() {
                     borderRadius: 20, color: 'var(--espresso)', fontSize: 12, cursor: 'pointer',
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     fontFamily: 'Manrope, sans-serif', padding: '6px 14px', fontWeight: 500,
-                    transition: 'background 0.15s',
                   }}
                 >
                   <ArrowLeft size={13} /> Volver al portal
@@ -211,13 +210,14 @@ function PricingPageInner() {
               <button
                 onClick={handleLogout}
                 style={{
-                  background: 'none', border: '1px solid var(--ivory)', borderRadius: 20,
+                  background: 'rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 20,
                   color: 'var(--warm-gray)', fontSize: 12, cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontFamily: 'Manrope, sans-serif', padding: '6px 12px',
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  fontFamily: 'Manrope, sans-serif', padding: '6px 14px', fontWeight: 500,
+                  transition: 'background 0.15s',
                 }}
               >
-                <LogOut size={13} /> Cerrar sesión
+                <LogOut size={12} /> Cerrar sesión
               </button>
             </div>
           ) : (
@@ -235,9 +235,9 @@ function PricingPageInner() {
           }}>
             {isTrial ? 'Activa tu suscripción' : 'Elige tu plan'}
           </h1>
-          <p style={{ color: 'var(--warm-gray)', fontSize: 14, maxWidth: 480, margin: '0 auto' }}>
+          <p style={{ color: 'var(--warm-gray)', fontSize: 14, maxWidth: 520, margin: '0 auto' }}>
             {isTrial
-              ? 'Estás en período de prueba. Activa un plan ahora y continúa sin interrupciones cuando finalice.'
+              ? 'Estás en período de prueba. Si contratas ahora, tu suscripción se activa de inmediato — el período de prueba se sustituye por el plan elegido.'
               : isTrialExpired
                 ? 'Tu prueba ha finalizado. Elige un plan para seguir gestionando tu venue.'
                 : 'Herramientas profesionales para gestionar bodas, leads y propuestas desde un solo lugar.'}
@@ -553,8 +553,6 @@ function PricingPageInner() {
                     'Plan actual'
                   ) : !isLoggedIn ? (
                     'Empezar ahora'
-                  ) : isPendingVerification ? (
-                    'Contratar y esperar activación'
                   ) : (
                     'Contratar'
                   )}

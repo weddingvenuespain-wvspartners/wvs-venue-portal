@@ -366,8 +366,8 @@ export default function OnboardingPage() {
               <label style={labelStyle}>Teléfono de contacto</label>
               <div style={{ position: 'relative', marginBottom: 20 }}>
                 <Phone size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
-                <input type="tel" placeholder="+34 612 345 678"
-                  value={phone} onChange={e => setPhone(e.target.value)}
+                <input type="tel" placeholder="+34 612 345 678" inputMode="numeric"
+                  value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9+\s()\-]/g, ''))}
                   style={inputStyle} />
               </div>
 

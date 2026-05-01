@@ -67,6 +67,16 @@ export default function Sidebar() {
     return () => window.removeEventListener('wvs-pending-refresh', fetchPendingOnboarding)
   }, [user?.id, isAdmin]) // eslint-disable-line
 
+  // Badge: new pending users count (admin CRM)
+  const [pendingUsersCount, setPendingUsersCount] = useState(0)
+  useEffect(() => {
+    if (!user || !isAdmin) return
+    const supabase = createClient()
+    supabase.from('venue_profiles').select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => setPendingUsersCount(count ?? 0))
+  }, [user?.id, isAdmin]) // eslint-disable-line
+
   // Close venue dropdown on outside click
   useEffect(() => {
     if (!venueOpen) return
@@ -117,7 +127,7 @@ export default function Sidebar() {
   ]
 
   const adminItems: { href: string; label: string; icon: string; badge?: number }[] = [
-    { href: '/admin',            label: 'CRM',             icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4' },
+    { href: '/admin',            label: 'CRM',             icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', badge: pendingUsersCount },
     { href: '/admin/planes',     label: 'Planes',          icon: 'M1 4h14v8H1zM4 4V2M12 4V2M1 8h14' },
     { href: '/admin/onboarding', label: 'Solicitudes',     icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4M12 5v4M10 7h4', badge: pendingOnboardingCount },
   ]
