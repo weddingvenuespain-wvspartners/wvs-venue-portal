@@ -201,20 +201,26 @@ export async function POST(req: NextRequest) {
       .from('venue_profiles').select('role').eq('user_id', user.id).single()
     if (caller?.role !== 'admin') return NextResponse.json({ error: 'Solo admin' }, { status: 403 })
 
-    const { target_user_id, is_initial } = await req.json()
+    const { target_user_id, venue_id, is_initial } = await req.json()
 
     // Use service role for all Supabase reads/writes (bypasses RLS so admin can access any user's data)
     const svc = getServiceClient()
 
-    // Load onboarding via service role — anon client blocked by RLS for cross-user reads
-    const { data: onb, error: onbErr } = await svc
-      .from('venue_onboarding').select('*').eq('user_id', target_user_id).single()
+    // Load onboarding via service role — anon client blocked by RLS for cross-user reads.
+    // Use venue_id when provided (multi-venue users have one row per venue).
+    let onbQuery = svc.from('venue_onboarding').select('*').eq('user_id', target_user_id)
+    if (venue_id) onbQuery = onbQuery.eq('venue_id', venue_id)
+    const { data: onb, error: onbErr } = await onbQuery.single()
     if (!onb) {
       console.error('[apply-changes] onboarding not found', onbErr)
       return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
     }
 
-    const fichaData = is_initial ? onb.ficha_data : onb.changes_data
+    // For mis-routed submissions (not-yet-published venue that sent changes_data instead of ficha_data),
+    // treat changes_data as the initial ficha_data when is_initial=true
+    const fichaData = is_initial
+      ? (onb.ficha_data || onb.changes_data)
+      : onb.changes_data
     if (!fichaData) return NextResponse.json({ error: 'Sin datos de ficha' }, { status: 400 })
 
     const wpPayload = buildWpPayload(fichaData)
@@ -223,15 +229,32 @@ export async function POST(req: NextRequest) {
     let wpRes: Response
     let resolvedWpId: number | null = null
 
-    // Determine the existing WP post ID from venue_profiles OR onboarding wp_post_id as fallback
-    const { data: targetProfile } = await svc
-      .from('venue_profiles').select('wp_venue_id').eq('user_id', target_user_id).single()
-    const existingWpId: number | null =
-      targetProfile?.wp_venue_id || onb.wp_post_id || null
+    // Determine the existing WP post ID.
+    // Priority 1: venue_onboarding.wp_post_id (already set for approved venues)
+    // Priority 2: user_venues.wp_venue_id scoped to this specific venue_id (multi-venue)
+    // Priority 3: venue_profiles.wp_venue_id (legacy single-venue fallback)
+    let existingWpId: number | null = onb.wp_post_id || null
+    if (!existingWpId && venue_id) {
+      const { data: uvRow } = await svc
+        .from('user_venues').select('wp_venue_id').eq('user_id', target_user_id).eq('id', venue_id).maybeSingle()
+      existingWpId = uvRow?.wp_venue_id || null
+    }
+    if (!existingWpId) {
+      const { data: vp } = await svc
+        .from('venue_profiles').select('wp_venue_id').eq('user_id', target_user_id).single()
+      existingWpId = vp?.wp_venue_id || null
+    }
 
     // Store leads email in WP ACF field email_del_venue (set by venue in portal)
     const leadsEmail = fichaData?.leadsEmail || ''
     if (leadsEmail) (wpPayload.acf as any).email_del_venue = leadsEmail
+
+    // Build a scoped update query (always scope to venue_id when present)
+    const scopedUpdate = (payload: Record<string, any>) => {
+      let q = svc.from('venue_onboarding').update(payload).eq('user_id', target_user_id)
+      if (venue_id) q = q.eq('venue_id', venue_id)
+      return q
+    }
 
     if (existingWpId) {
       // WP post already exists — always UPDATE, never create a duplicate
@@ -252,18 +275,23 @@ export async function POST(req: NextRequest) {
       resolvedWpId = existingWpId
 
       if (is_initial) {
-        // Re-approving an already-published venue — update onboarding status
-        await svc.from('venue_onboarding').update({
-          status: 'approved', wp_post_id: existingWpId, reviewed_at: new Date().toISOString()
-        }).eq('user_id', target_user_id)
+        // Re-approving an already-published venue — update status and also write ficha_data
+        // so the next load reads from Supabase (fast path) with all current fields.
+        // fichaData was derived from ficha_data || changes_data earlier in this handler.
+        await scopedUpdate({
+          status: 'approved',
+          wp_post_id: existingWpId,
+          reviewed_at: new Date().toISOString(),
+          ficha_data: fichaData,
+        })
       } else {
         // Approving submitted changes — promote changes_data → ficha_data and clear pending
-        await svc.from('venue_onboarding').update({
+        await scopedUpdate({
           ficha_data: onb.changes_data,
           changes_data: null,
           changes_status: 'approved',
-          reviewed_at: new Date().toISOString()
-        }).eq('user_id', target_user_id)
+          reviewed_at: new Date().toISOString(),
+        })
       }
 
       // Ensure venue_profiles always has the correct wp_venue_id (upsert handles missing rows)
@@ -295,9 +323,7 @@ export async function POST(req: NextRequest) {
         { user_id: target_user_id, wp_venue_id: resolvedWpId, status: 'active' },
         { onConflict: 'user_id' }
       )
-      await svc.from('venue_onboarding').update({
-        status: 'approved', wp_post_id: resolvedWpId, reviewed_at: new Date().toISOString()
-      }).eq('user_id', target_user_id)
+      await scopedUpdate({ status: 'approved', wp_post_id: resolvedWpId, reviewed_at: new Date().toISOString(), ficha_data: fichaData })
 
       // Insert into user_venues so the CRM shows the assigned venue.
       // Count first to know if this is the user's first-ever venue (set is_primary).

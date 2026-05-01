@@ -3,12 +3,17 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { createClient } from '@/lib/supabase'
-import { Check, ArrowRight, Building2, MapPin, Globe, Phone, User, Loader2, CalendarHeart, UtensilsCrossed } from 'lucide-react'
+import { Check, ArrowRight, Building2, MapPin, Globe, Phone, User, Loader2, CalendarHeart, UtensilsCrossed, ChevronDown } from 'lucide-react'
 
 type AccountType = 'venue_owner' | 'wedding_planner' | 'catering'
 
 const VENUE_TYPES    = ['Finca', 'Hotel', 'Castillo / Palacio', 'Jardín / Exterior', 'Masía', 'Otro']
 const CATERING_TYPES = ['Cocina española', 'Cocina mediterránea', 'Cocina internacional', 'Alta cocina', 'Food truck', 'Otro']
+
+const REGIONS = [
+  'Mallorca', 'Ibiza', 'Barcelona', 'Madrid', 'Costa Brava',
+  'Alicante', 'Malaga', 'Marbella', 'Sevilla', 'Valencia',
+]
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px 12px 10px 34px', borderRadius: 8,
@@ -42,7 +47,7 @@ function dashboardForRole(role: AccountType) {
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const { user, profile, loading: authLoading } = useAuth()
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth()
   const [step, setStep]         = useState(1)
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState('')
@@ -51,7 +56,7 @@ export default function OnboardingPage() {
   // Step 1 fields
   const [companyName, setCompanyName] = useState('')
   const [typeSelection, setTypeSelection] = useState('')
-  const [city, setCity] = useState('')
+  const [region, setRegion] = useState('')
 
   // Step 2 fields
   const [firstName, setFirstName] = useState('')
@@ -75,19 +80,22 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (!authLoading && profile) {
-      // Also redirect by saved role (e.g. returning user already has profile)
+      // Redirect by saved role (returning user already has profile)
       if (profile.role === 'wedding_planner' || profile.role === 'catering') {
         router.replace(dashboardForRole(profile.role as AccountType))
         return
       }
+      // Both steps done → dashboard
       if (profile.display_name && profile.first_name) {
         router.replace(dashboardForRole(profile.role as AccountType))
+        return
       }
+      // Step 1 done, step 2 pending
       if (profile.display_name && !profile.first_name) {
         setStep(2)
       }
     }
-  }, [authLoading, profile, router])
+  }, [authLoading, profile]) // eslint-disable-line — router excluded to avoid re-runs during navigation
 
   const normalizeUrl = (url: string) => {
     const u = url.trim()
@@ -100,7 +108,7 @@ export default function OnboardingPage() {
     e.preventDefault()
     if (!companyName.trim()) { setError('Escribe el nombre'); return }
     if (!typeSelection)      { setError('Selecciona el tipo'); return }
-    if (!city.trim())        { setError('Escribe la ciudad'); return }
+    if (!region)             { setError('Selecciona una región'); return }
     setError('')
     setSaving(true)
     try {
@@ -111,7 +119,7 @@ export default function OnboardingPage() {
           display_name:      companyName.trim(),
           company:           companyName.trim(),
           venue_type:        typeSelection,
-          city:              city.trim(),
+          city:              region,
           role:              accountType,
           status:            'pending',
           timezone:          'Europe/Madrid',
@@ -163,6 +171,10 @@ export default function OnboardingPage() {
         }
       }
 
+      // Refresh auth-context profile so dashboard doesn't see stale first_name=null
+      // and redirect back to onboarding
+      await refreshProfile()
+
       router.replace(dashboardForRole(accountType))
     } catch (e: any) {
       setError(e?.message || 'Error al guardar. Inténtalo de nuevo.')
@@ -207,7 +219,7 @@ export default function OnboardingPage() {
 
   const websiteLabel = accountType === 'wedding_planner' ? 'Tu web profesional (opcional)'
     : accountType === 'catering' ? 'Web de tu empresa (opcional)'
-    : 'Web del venue'
+    : 'Web del venue (opcional)'
 
   const websitePlaceholder = accountType === 'venue_owner' ? 'www.tuvenue.com' : 'www.tuempresa.com'
 
@@ -288,12 +300,18 @@ export default function OnboardingPage() {
                 })}
               </div>
 
-              <label style={labelStyle}>Ciudad</label>
+              <label style={labelStyle}>Región / Zona</label>
               <div style={{ position: 'relative', marginBottom: 28 }}>
-                <MapPin size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
-                <input type="text" placeholder="Ej: Sevilla"
-                  value={city} onChange={e => setCity(e.target.value)}
-                  style={inputStyle} />
+                <MapPin size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', pointerEvents: 'none', zIndex: 1 }} />
+                <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', pointerEvents: 'none' }} />
+                <select
+                  value={region}
+                  onChange={e => setRegion(e.target.value)}
+                  style={{ ...inputStyle, paddingRight: 32, appearance: 'none', cursor: 'pointer' }}
+                >
+                  <option value="">Selecciona una región...</option>
+                  {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
               </div>
 
               <button type="submit" disabled={saving}
@@ -359,7 +377,6 @@ export default function OnboardingPage() {
                 <input type="text" placeholder={websitePlaceholder}
                   value={website} onChange={e => setWebsite(e.target.value)}
                   style={inputStyle}
-                  required={accountType === 'venue_owner'}
                 />
               </div>
 

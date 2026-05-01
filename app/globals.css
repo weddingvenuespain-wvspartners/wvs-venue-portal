@@ -78,6 +78,38 @@
 .card-title { font-size: 13px; font-weight: 500; color: var(--charcoal); }
 .card-body { padding: 18px 20px; }
 
+/* ── Rich Text Editor ──────────────────────────────────── */
+[data-rich-editor] h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--espresso);
+  margin-top: 14px;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+[data-rich-editor] p {
+  margin-bottom: 6px;
+}
+[data-rich-editor] ul,
+[data-rich-editor] ol {
+  padding-left: 20px;
+  margin-bottom: 6px;
+}
+[data-rich-editor] li {
+  margin-bottom: 2px;
+}
+[data-rich-editor] strong,
+[data-rich-editor] b {
+  font-weight: 700;
+}
+[data-rich-editor] em,
+[data-rich-editor] i {
+  font-style: italic;
+}
+[data-rich-editor] u {
+  text-decoration: underline;
+}
+
 /* ── Stats ─────────────────────────────────────────────── */
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
 .stat-card { background: #fff; border: 1px solid var(--ivory); border-radius: 8px; padding: 16px 18px; }

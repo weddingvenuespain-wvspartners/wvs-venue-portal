@@ -427,6 +427,25 @@ function UserPanel({
     || profile.company || profile.wp_username || profile.email?.split('@')[0] || profile.user_id.slice(0, 8) + '...'
 
 
+  // Reset subscription form when the selected venue changes (multi-venue users)
+  useEffect(() => {
+    setSubForm({
+      plan_id:              activeSub?.plan_id           || trialConfig.trial_plan_id || plans[0]?.id || '',
+      billing_cycle:        activeSub?.billing_cycle     || '',
+      status:               (activeSub?.status           || 'trial') as Subscription['status'],
+      start_date:           activeSub?.start_date        || new Date().toISOString().slice(0, 10),
+      trial_end_date:       activeSub?.trial_end_date    || '',
+      renewal_date:         activeSub?.renewal_date      || '',
+      payment_reference:    activeSub?.payment_reference || '',
+      iban:                 activeSub?.iban              || '',
+      account_holder:       activeSub?.account_holder    || '',
+      mandate_ref:          activeSub?.mandate_ref       || '',
+      cancel_at_period_end: activeSub?.cancel_at_period_end ?? false,
+      service_end_date:     activeSub?.service_end_date  || '',
+      notes:                activeSub?.notes             || '',
+    })
+  }, [effectiveVenueId, activeSub?.id]) // eslint-disable-line
+
   // Plan selected in venue assignment
   const selPlanNew = plans.find(p => p.id === newPlanId)
   useEffect(() => {
@@ -1148,6 +1167,7 @@ function UserPanel({
                 </div>
               ) : null}
 
+              {/* ── Sección 1: Plan y estado ── */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group">
                   <label className="form-label">Plan</label>
@@ -1164,18 +1184,16 @@ function UserPanel({
                     {plans.filter(p => p.is_active).map(p => (
                       <option key={p.id} value={p.id}>{planLabel(p)}</option>
                     ))}
-                    {plans.some(p => !p.is_active) && (
-                      <option disabled>── Planes inactivos ──</option>
-                    )}
+                    {plans.some(p => !p.is_active) && <option disabled>── Planes inactivos ──</option>}
                     {plans.filter(p => !p.is_active).map(p => (
                       <option key={p.id} value={p.id}>{planLabel(p)} (inactivo)</option>
                     ))}
                   </select>
                   {editPlan && (
-                    <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <div style={{ marginTop: 4 }}>
                       <span style={{
                         background: !editPlan.is_active ? '#fee2e2' : '#f0f9ff',
-                        color:      !editPlan.is_active ? '#c0392b' : '#0369a1',
+                        color: !editPlan.is_active ? '#c0392b' : '#0369a1',
                         padding: '1px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
                       }}>{planLabel(editPlan)}{!editPlan.is_active ? ' — INACTIVO' : ''}</span>
                     </div>
@@ -1192,32 +1210,11 @@ function UserPanel({
                     <option value="cancelled">Cancelado</option>
                   </select>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Ciclo de pago</label>
-                  <select className="form-input" value={subForm.billing_cycle}
-                    onChange={e => setSubForm(f => ({ ...f, billing_cycle: e.target.value }))}
-                    disabled={!editPlan}>
-                    {!editPlan && <option value="">Elige plan primero</option>}
-                    {(editPlan?.billing_cycles ?? []).map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.label} — {c.price}€
-                        {c.commitment_months > 0 ? ` (${c.commitment_months}m compromiso)` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {activeCycle && (
-                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 3 }}>
-                      {activeCycle.price}€ · aviso cancelación {activeCycle.cancel_notice_days}d antes
-                    </div>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Fecha inicio</label>
-                  <DatePicker value={subForm.start_date} onChange={(v) => setSubForm(f => ({ ...f, start_date: v }))} placeholder="Fecha inicio" />
-                </div>
+              </div>
 
-                {/* Trial end — si status=trial (editable) o trial_expired (solo lectura) */}
-                {(subForm.status === 'trial' || subForm.status === 'trial_expired') && (
+              {/* ── Sección 2: Trial ── solo cuando status=trial o trial_expired */}
+              {(subForm.status === 'trial' || subForm.status === 'trial_expired') && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
                   <div className="form-group" style={{
                     background: subForm.status === 'trial_expired' ? '#fff5f5' : '#fffbeb',
                     padding: '10px 12px', borderRadius: 8,
@@ -1247,97 +1244,123 @@ function UserPanel({
                       </div>
                     })()}
                   </div>
-                )}
-
-                {/* Renewal / end date — solo si active */}
-                {subForm.status === 'active' && (
                   <div className="form-group">
-                    <label className="form-label">
-                      {subForm.cancel_at_period_end ? <><Calendar size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Fecha de fin de servicio</> : 'Próxima renovación / cobro'}
-                    </label>
-                    <DatePicker value={subForm.renewal_date} onChange={(v) => setSubForm(f => ({ ...f, renewal_date: v }))} placeholder="Fecha de renovación" />
-                    {subForm.renewal_date && !subForm.cancel_at_period_end && activeCycle && (() => {
-                      const deadline = cancelDeadline(subForm.renewal_date, activeCycle.cancel_notice_days)
-                      return (
+                    <label className="form-label">Ref. pago <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>(TPV / mandato)</span></label>
+                    <input className="form-input" value={subForm.payment_reference}
+                      onChange={e => setSubForm(f => ({ ...f, payment_reference: e.target.value }))}
+                      placeholder="Ref. de la última transacción" />
+                  </div>
+                </div>
+              )}
+
+              {/* ── Sección 3: Pago activo ── solo cuando status=active (o paused/cancelled) */}
+              {subForm.status !== 'trial' && subForm.status !== 'trial_expired' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
+                    <div className="form-group">
+                      <label className="form-label">Ciclo de pago</label>
+                      <select className="form-input" value={subForm.billing_cycle}
+                        onChange={e => setSubForm(f => ({ ...f, billing_cycle: e.target.value }))}
+                        disabled={!editPlan}>
+                        {!editPlan && <option value="">Elige plan primero</option>}
+                        {(editPlan?.billing_cycles ?? []).map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.label} — {c.price}€{c.commitment_months > 0 ? ` (${c.commitment_months}m)` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {activeCycle && (
                         <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 3 }}>
-                          Plazo límite cancelación: <strong>{new Date(deadline).toLocaleDateString('es-ES')}</strong>
-                          {` (${activeCycle.cancel_notice_days}d antes)`}
+                          {activeCycle.price}€ · aviso cancelación {activeCycle.cancel_notice_days}d antes
                         </div>
-                      )
-                    })()}
-                    {subForm.cancel_at_period_end && subForm.renewal_date && (
-                      <div style={{ fontSize: 10, color: '#c0392b', marginTop: 3 }}>
-                        <OctagonAlert size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> El acceso se revocará el {new Date(subForm.renewal_date).toLocaleDateString('es-ES')} y no se renovará
+                      )}
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Fecha de activación</label>
+                      <DatePicker value={subForm.start_date} onChange={(v) => setSubForm(f => ({ ...f, start_date: v }))} placeholder="Fecha de activación" />
+                    </div>
+                    {subForm.status === 'active' && (
+                      <div className="form-group">
+                        <label className="form-label">
+                          {subForm.cancel_at_period_end
+                            ? <><Calendar size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Fecha fin de servicio</>
+                            : 'Próxima renovación / cobro'}
+                        </label>
+                        <DatePicker value={subForm.renewal_date} onChange={(v) => setSubForm(f => ({ ...f, renewal_date: v }))} placeholder="Fecha de renovación" />
+                        {subForm.renewal_date && !subForm.cancel_at_period_end && activeCycle && (() => {
+                          const deadline = cancelDeadline(subForm.renewal_date, activeCycle.cancel_notice_days)
+                          return (
+                            <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 3 }}>
+                              Plazo límite cancelación: <strong>{new Date(deadline).toLocaleDateString('es-ES')}</strong>
+                              {` (${activeCycle.cancel_notice_days}d antes)`}
+                            </div>
+                          )
+                        })()}
                       </div>
                     )}
+                    <div className="form-group">
+                      <label className="form-label">Ref. pago <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>(TPV / mandato)</span></label>
+                      <input className="form-input" value={subForm.payment_reference}
+                        onChange={e => setSubForm(f => ({ ...f, payment_reference: e.target.value }))}
+                        placeholder="Ref. de la última transacción" />
+                    </div>
                   </div>
-                )}
 
-                <div className="form-group">
-                  <label className="form-label">Ref. pago <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>(TPV / mandato)</span></label>
-                  <input className="form-input" value={subForm.payment_reference}
-                    onChange={e => setSubForm(f => ({ ...f, payment_reference: e.target.value }))}
-                    placeholder="Ref. de la última transacción" />
-                </div>
-              </div>
-
-              {/* ── SEPA Domiciliación ── */}
-              <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 14, marginTop: 4 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: 10 }}>
-                  Domiciliación SEPA
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="form-group">
-                    <label className="form-label">IBAN</label>
-                    <input className="form-input" value={subForm.iban}
-                      onChange={e => setSubForm(f => ({ ...f, iban: e.target.value }))}
-                      placeholder="ES00 0000 0000 00 0000000000" />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Titular cuenta</label>
-                    <input className="form-input" value={subForm.account_holder}
-                      onChange={e => setSubForm(f => ({ ...f, account_holder: e.target.value }))}
-                      placeholder="Nombre del titular" />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Ref. mandato SEPA</label>
-                    <input className="form-input" value={subForm.mandate_ref}
-                      onChange={e => setSubForm(f => ({ ...f, mandate_ref: e.target.value }))}
-                      placeholder="WVS-2024-XXXX" />
-                  </div>
-                </div>
-              </div>
-
-              {/* ── Fin de servicio / Cancelación ── */}
-              {(subForm.status === 'active' || subForm.status === 'trial') && (
-                <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 14, marginTop: 4 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: 10 }}>
-                    Renovación y cancelación
-                  </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 8, padding: '10px 12px', borderRadius: 8, background: subForm.cancel_at_period_end ? '#fff5f5' : '#f9fafb', border: `1px solid ${subForm.cancel_at_period_end ? '#fecaca' : 'var(--ivory)'}` }}>
-                    <Checkbox checked={subForm.cancel_at_period_end} onCheckedChange={(v) => setSubForm(f => ({ ...f, cancel_at_period_end: v === true }))} />
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: subForm.cancel_at_period_end ? '#c0392b' : 'var(--charcoal)' }}>
-                        Sin renovación automática
+                  {/* SEPA — solo en planes activos */}
+                  <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 14, marginTop: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: 10 }}>
+                      Domiciliación SEPA
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div className="form-group">
+                        <label className="form-label">IBAN</label>
+                        <input className="form-input" value={subForm.iban}
+                          onChange={e => setSubForm(f => ({ ...f, iban: e.target.value }))}
+                          placeholder="ES00 0000 0000 00 0000000000" />
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
-                        {subForm.cancel_at_period_end
-                          ? 'El servicio finalizará en la fecha indicada arriba y no se renovará'
-                          : 'Se domiciliará el cobro automáticamente en la fecha de renovación'}
+                      <div className="form-group">
+                        <label className="form-label">Titular cuenta</label>
+                        <input className="form-input" value={subForm.account_holder}
+                          onChange={e => setSubForm(f => ({ ...f, account_holder: e.target.value }))}
+                          placeholder="Nombre del titular" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Ref. mandato SEPA</label>
+                        <input className="form-input" value={subForm.mandate_ref}
+                          onChange={e => setSubForm(f => ({ ...f, mandate_ref: e.target.value }))}
+                          placeholder="WVS-2024-XXXX" />
                       </div>
                     </div>
-                  </label>
-                  {subForm.cancel_at_period_end && subForm.renewal_date && activeCycle && (
-                    <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#c0392b', marginTop: 8 }}>
-                      <OctagonAlert size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Fin de servicio: <strong>{new Date(subForm.renewal_date).toLocaleDateString('es-ES')}</strong>
-                      {activeSub?.renewal_date && (
-                        <> · Aviso cancelación: <strong>
-                          {new Date(cancelDeadline(subForm.renewal_date, activeCycle.cancel_notice_days)).toLocaleDateString('es-ES')}
-                        </strong></>
+                  </div>
+
+                  {/* Cancelación — solo en activo */}
+                  {subForm.status === 'active' && (
+                    <div style={{ borderTop: '1px solid var(--ivory)', paddingTop: 14, marginTop: 4 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: 10 }}>
+                        Renovación y cancelación
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 8, padding: '10px 12px', borderRadius: 8, background: subForm.cancel_at_period_end ? '#fff5f5' : '#f9fafb', border: `1px solid ${subForm.cancel_at_period_end ? '#fecaca' : 'var(--ivory)'}` }}>
+                        <Checkbox checked={subForm.cancel_at_period_end} onCheckedChange={(v) => setSubForm(f => ({ ...f, cancel_at_period_end: v === true }))} />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: subForm.cancel_at_period_end ? '#c0392b' : 'var(--charcoal)' }}>Sin renovación automática</div>
+                          <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                            {subForm.cancel_at_period_end
+                              ? 'El servicio finalizará en la fecha indicada y no se renovará'
+                              : 'Se domiciliará el cobro automáticamente en la fecha de renovación'}
+                          </div>
+                        </div>
+                      </label>
+                      {subForm.cancel_at_period_end && subForm.renewal_date && activeCycle && (
+                        <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#c0392b', marginTop: 8 }}>
+                          <OctagonAlert size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Fin de servicio: <strong>{new Date(subForm.renewal_date).toLocaleDateString('es-ES')}</strong>
+                          {activeSub?.renewal_date && (
+                            <> · Aviso cancelación: <strong>{new Date(cancelDeadline(subForm.renewal_date, activeCycle.cancel_notice_days)).toLocaleDateString('es-ES')}</strong></>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
-                </div>
+                </>
               )}
 
               <div className="form-group" style={{ marginTop: 14 }}>

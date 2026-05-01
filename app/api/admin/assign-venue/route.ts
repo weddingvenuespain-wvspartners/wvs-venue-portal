@@ -149,11 +149,24 @@ export async function DELETE(req: NextRequest) {
     const { data: uvRow } = await svc.from('user_venues').select('user_id, wp_venue_id').eq('id', uv_id).single()
     if (!uvRow) return NextResponse.json({ error: 'Venue no encontrado' }, { status: 404 })
 
-    // 2. Delete the row
+    // 2. Null out venue_id on all tables with NO ACTION FK (must be done before delete)
+    //    Tables with SET NULL handle themselves; these need manual clearing.
+    await Promise.all([
+      svc.from('venue_onboarding').update({ venue_id: null }).eq('venue_id', uv_id),
+      svc.from('dossiers').update({ venue_id: null }).eq('venue_id', uv_id),
+      svc.from('message_templates').update({ venue_id: null }).eq('venue_id', uv_id),
+      svc.from('venue_content').update({ venue_id: null }).eq('venue_id', uv_id),
+      svc.from('venue_modality_packages').update({ venue_id: null }).eq('venue_id', uv_id),
+      svc.from('venue_modality_prices').update({ venue_id: null }).eq('venue_id', uv_id),
+      svc.from('venue_settings').update({ venue_id: null }).eq('venue_id', uv_id),
+    ])
+
+    // 3. Delete the row (SET NULL tables — leads, proposals, calendar_entries,
+    //    venue_modalities, venue_subscriptions — are handled automatically by Postgres)
     const { error: delErr } = await svc.from('user_venues').delete().eq('id', uv_id)
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
 
-    // 3. Check remaining venues for this user
+    // 4. Check remaining venues for this user
     const { data: remaining } = await svc.from('user_venues').select('wp_venue_id').eq('user_id', uvRow.user_id)
 
     let updatedProfile = null

@@ -8,7 +8,7 @@ import { ImageUploader } from '@/components/ImageUploader'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Info, FileText, Tag, MapPin, Image as ImageIcon, Star, Settings, ExternalLink, Mail, Lightbulb, Globe } from 'lucide-react'
+import { X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Info, FileText, Tag, MapPin, Image as ImageIcon, Star, Settings, ExternalLink, Mail, Lightbulb, Globe, RotateCcw } from 'lucide-react'
 import DOMPurify from 'dompurify'
 
 type Tab = 'info' | 'descripcion' | 'precios' | 'ubicacion' | 'fotos' | 'resenas' | 'config'
@@ -60,6 +60,8 @@ export default function FichaPage() {
   const [saving, setSaving]         = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [confirmSubmit, setConfirmSubmit]         = useState(false)
+  const [confirmRevert, setConfirmRevert]         = useState(false)
+  const [reverting,     setReverting]             = useState(false)
   const [validationErrors, setValidationErrors]   = useState<{ field: string; tab: Tab; msg: string }[]>([])
   const [isDirty, setIsDirty]       = useState(false)
   const [dirtyTabs, setDirtyTabs]   = useState<Set<Tab>>(new Set())
@@ -111,7 +113,9 @@ export default function FichaPage() {
   const [placesNearby1,    setPlacesNearby1]    = useState('')
   const [placesNearby2,    setPlacesNearby2]    = useState('')
   const [placesNearby3,    setPlacesNearby3]    = useState('')
-  const [closestAirport,   setClosestAirport]   = useState('')
+  const [airportName,   setAirportName]   = useState('')
+  const [airportKm,     setAirportKm]     = useState('')
+  const [airportMins,   setAirportMins]   = useState('')
 
   // ── Fotos ───────────────────────────────────────────────────────────────────
   const [verticalPhoto,     setVerticalPhoto]     = useState<{ id: number; url: string } | null>(null)
@@ -182,8 +186,11 @@ export default function FichaPage() {
     const { data: onb } = await onbQuery
     if (onb) setOnboarding(onb)
     else setOnboarding(null)
-    // Active venue's wp_venue_id drives the WP fetch
-    const wpVenueId = activeVenue?.wp_venue_id || profile?.wp_venue_id
+    // Active venue's wp_venue_id drives the WP fetch.
+    // IMPORTANT: only fall back to profile?.wp_venue_id when there is NO active venue context
+    // (single-venue legacy flow). With multi-venue, activeVenue is always set — if its
+    // wp_venue_id is null the venue is not yet published and must NOT inherit another venue's WP ID.
+    const wpVenueId = activeVenue ? activeVenue.wp_venue_id : profile?.wp_venue_id
     if (wpVenueId) {
       setResolvedVenueWpId(wpVenueId)
 
@@ -325,8 +332,9 @@ export default function FichaPage() {
       setVenuePriceMode(raw === 'included' ? 'included' : (!raw || raw === '-') ? 'none' : 'auto')
     }
     setMiniDesc(acf['h2-Venue_and_mini_description'] || '')
-    setMiniParagraph(acf.mini_paragraph || '')
-    setPostContent(acf.start_of_post_content || stripHtml(data.content?.rendered || ''))
+    // start_of_post_content → Mini párrafo; main post content → Descripción completa (keep HTML for RichTextEditor)
+    setMiniParagraph(acf.start_of_post_content || acf.mini_paragraph || '')
+    setPostContent(data.content?.rendered || '')
     // starting_price_breakdown1 es solo para WordPress (label "Venue") — el venue nunca lo ve
     setVenueFeeValue(''); setVenueFeeNights(0); setVenueFeeIncluded(false)
     setBreakdown1text(acf.starting_price_breakdown_text_area_1 || '')
@@ -339,8 +347,15 @@ export default function FichaPage() {
     setAccomNights(acf.accom_nights || '')
     setWvsAccomHelp(acf.wvs_accommodation_help === 'yes')
     setSpecificLocation(acf.Specific_Location || '')
-    setPlacesNearby1(acf.Places_Nearby || '')
-    setClosestAirport(acf.Closest_Airport_to_Venue || '')
+    // Places_Nearby in WP: "Ibiza Town 25 mins - Es Canar 15 mins - Cala Jondal 20 mins"
+    const wpPlaces = (acf.Places_Nearby || '').split(' - ').map((s: string) => s.trim())
+    setPlacesNearby1(wpPlaces[0] || '')
+    setPlacesNearby2(wpPlaces[1] || '')
+    setPlacesNearby3(wpPlaces[2] || '')
+    const airportParts = (acf.Closest_Airport_to_Venue || '').split(' - ').map((s: string) => s.trim())
+    setAirportName(airportParts[0] || '')
+    setAirportKm(airportParts[1] || '')
+    setAirportMins(airportParts[2] || '')
     const hFields = ['h2_gallery','h2_gallery_copy','h2_gallery_copy2','h2_gallery_copy3',
                      'h2_gallery_copy4','h2_gallery_copy5','h2_gallery_copy6','h2_gallery_copy7']
     setHGallery(hFields.map(f => resolveImage(acf[f])))
@@ -366,7 +381,7 @@ export default function FichaPage() {
     setShortDesc(d.shortDesc || '')
     setCapacity(d.capacity || '')
     setMenuPriceValue(d.menuPriceValue || '')
-    setMenuPriceUnit('person')
+    setMenuPriceUnit(d.menuPriceUnit || 'person')
     const heroUrl = d.heroImageUrl || ''
     if (heroUrl && !heroUrl.startsWith('blob:')) setHeroImage({ id: d.heroImageId || 0, url: heroUrl })
     const vertUrl = d.verticalPhotoUrl || ''
@@ -390,11 +405,14 @@ export default function FichaPage() {
     setAccomNights(d.accomNights || '')
     setWvsAccomHelp(!!d.wvsAccomHelp)
     setSpecificLocation(d.specificLocation || '')
-    const parts = (d.placesNearby || '').split('·').map((s: string) => s.trim())
+    const parts = (d.placesNearby || '').split(' - ').map((s: string) => s.trim())
     setPlacesNearby1(parts[0] || '')
     setPlacesNearby2(parts[1] || '')
     setPlacesNearby3(parts[2] || '')
-    setClosestAirport(d.closestAirport || '')
+    const ap = (d.closestAirport || '').split(' - ').map((s: string) => s.trim())
+    setAirportName(ap[0] || '')
+    setAirportKm(ap[1] || '')
+    setAirportMins(ap[2] || '')
     setLeadsEmail(d.leadsEmail || '')
     setLeadsEmailSaved(d.leadsEmail || '')
     if (Array.isArray(d.gallery)) {
@@ -464,12 +482,27 @@ export default function FichaPage() {
       breakdown3: buildCateringFee(), breakdown3text,
       accommodation, accomGuests, accomNights, wvsAccomHelp,
       specificLocation,
-      placesNearby: [placesNearby1, placesNearby2, placesNearby3].filter(Boolean).join(' · '),
-      closestAirport,
+      placesNearby: [placesNearby1, placesNearby2, placesNearby3].filter(Boolean).join(' - '),
+      closestAirport: [airportName, airportKm, airportMins].filter(Boolean).join(' - '),
       leadsEmail,
       gallery: hGallery.map(p => p ? { id: p.id, url: p.url } : null),
       reviewsEnabled, reviews,
     }
+  }
+
+  // When saving changes for an already-published venue, fill any blank string fields with
+  // their published value. This prevents accidentally wiping a field that failed to load
+  // (e.g. legacy venuePrice stored as symbol without numeric input).
+  function mergeWithPublished(raw: ReturnType<typeof collectAllFields>): ReturnType<typeof collectAllFields> {
+    const published = onboarding?.ficha_data
+    if (!resolvedVenueWpId || !published) return raw
+    const merged: Record<string, any> = { ...raw }
+    for (const [k, v] of Object.entries(raw)) {
+      if (typeof v === 'string' && v === '' && published[k] !== undefined && published[k] !== null && published[k] !== '') {
+        merged[k] = published[k]
+      }
+    }
+    return merged as ReturnType<typeof collectAllFields>
   }
 
   const notify = (msg: string, isErr = false) => {
@@ -479,7 +512,7 @@ export default function FichaPage() {
 
   const saveDraft = async () => {
     setSaving(true)
-    const fichaData = collectAllFields()
+    const fichaData = mergeWithPublished(collectAllFields())
     const isApproved = !!resolvedVenueWpId
     console.log('[ficha:save]', { isApproved, resolvedVenueWpId, verticalPhotoId: fichaData.verticalPhotoId, heroImageId: fichaData.heroImageId, galleryCount: fichaData.gallery?.filter(Boolean).length })
     try {
@@ -490,6 +523,12 @@ export default function FichaPage() {
       const data = await res.json()
       if (!res.ok) { notify(data.error || 'Error al guardar', true); return false }
       setIsDirty(false); setDirtyTabs(new Set())
+      // Update onboarding state so "Volver al original" and submit button reflect the new draft
+      if (isApproved) {
+        setOnboarding((prev: any) => ({ ...prev, changes_data: fichaData, changes_status: 'draft' }))
+      } else {
+        setOnboarding((prev: any) => ({ ...prev, ficha_data: fichaData, status: body.status ?? 'draft' }))
+      }
       notify('Borrador guardado ✓'); return true
     } catch { notify('Error de conexión', true); return false }
     finally { setSaving(false) }
@@ -497,7 +536,7 @@ export default function FichaPage() {
 
   const submitForReview = async () => {
     setSubmitting(true)
-    const fichaData = collectAllFields()
+    const fichaData = mergeWithPublished(collectAllFields())
     const isApproved = !!resolvedVenueWpId
     try {
       const body = isApproved
@@ -515,13 +554,50 @@ export default function FichaPage() {
     finally { setSubmitting(false) }
   }
 
+  const revertToOriginal = async () => {
+    setReverting(true)
+    try {
+      const supabase = createClient()
+      let q = supabase
+        .from('venue_onboarding')
+        .update({ changes_data: null, changes_status: null })
+        .eq('user_id', user!.id)
+      if (activeVenue) q = (q as any).eq('venue_id', activeVenue.id)
+      const { error: dbErr } = await q
+      if (dbErr) { notify('Error al revertir los cambios', true); return }
+      setOnboarding((prev: any) => ({ ...prev, changes_data: null, changes_status: null }))
+
+      if (onboarding?.ficha_data) {
+        // Approved Supabase version exists — restore from it
+        populateFromFichaData(onboarding.ficha_data)
+      } else if (resolvedVenueWpId) {
+        // No Supabase ficha_data yet — restore from WordPress (the true original)
+        setLoading(true)
+        const res = await fetch(`/api/venues/wp-venue?id=${resolvedVenueWpId}`)
+        if (res.ok) {
+          const data = await res.json()
+          setVenue(data)
+          populateFromWp(data)
+        } else {
+          notify('No se pudo cargar la versión original desde WordPress', true)
+        }
+        setLoading(false)
+      }
+
+      setIsDirty(false)
+      setDirtyTabs(new Set())
+      notify('Revertido al original ✓')
+    } catch { notify('Error de conexión', true) }
+    finally { setReverting(false) }
+  }
+
   // ── Auto-save (silent, on visibility change / internal tab switch) ──────────
 
   // Keep autoSaveRef always pointing to the latest closure
   autoSaveRef.current = () => {
     if (loading) return
     const isApproved = !!resolvedVenueWpId
-    const fichaData = collectAllFields()
+    const fichaData = mergeWithPublished(collectAllFields())
     const body = isApproved
       ? { changes_data: fichaData, changes_status: onboarding?.changes_status === 'submitted' ? 'submitted' : 'draft', venue_id: activeVenue?.id ?? null }
       : { ficha_data: fichaData, status: onboarding?.status ?? 'draft', venue_id: activeVenue?.id ?? null }
@@ -545,7 +621,8 @@ export default function FichaPage() {
     else if (wordCount(shortDesc) > 30)  errs.push({ field: 'Descripción corta',        tab: 'info',        msg: 'Máximo 30 palabras' })
     if (!capacity.trim())                errs.push({ field: 'Nº de invitados',          tab: 'info',        msg: 'Obligatorio' })
     if (!heroImage)                       errs.push({ field: 'Imagen hero',             tab: 'info',        msg: 'Sube la foto principal' })
-    if (venuePriceMode === 'auto' && !venuePriceInput.trim())
+    // Allow empty venuePriceInput when a legacy symbol ($$) is already saved — the symbol is preserved on submit
+    if (venuePriceMode === 'auto' && !venuePriceInput.trim() && !venuePriceSaved.trim())
       errs.push({ field: 'Precio del venue', tab: 'info', msg: 'Introduce el precio o selecciona otra opción' })
     if (!menuPriceValue.trim())
       errs.push({ field: 'Starting price del menú', tab: 'info', msg: 'Obligatorio' })
@@ -569,8 +646,8 @@ export default function FichaPage() {
       errs.push({ field: 'Ubicación específica', tab: 'ubicacion', msg: 'Obligatorio' })
     if (!placesNearby1.trim() || !placesNearby2.trim() || !placesNearby3.trim())
       errs.push({ field: '3 lugares cercanos', tab: 'ubicacion', msg: 'Rellena los 3 lugares cercanos' })
-    if (!closestAirport.trim())
-      errs.push({ field: 'Aeropuerto más cercano', tab: 'ubicacion', msg: 'Obligatorio' })
+    if (!airportName.trim())
+      errs.push({ field: 'Aeropuerto más cercano', tab: 'ubicacion', msg: 'Indica el nombre del aeropuerto' })
 
     // Fotos
     if (!verticalPhoto)
@@ -590,7 +667,10 @@ export default function FichaPage() {
     return errs
   }
 
-  const handleSubmitClick = () => {
+  const handleSubmitClick = async () => {
+    // Auto-save current state first so no work is lost (even if validation fails or WP call errors)
+    if (isDirty) await saveDraft()
+
     const errs = validateForSubmit()
     if (errs.length > 0) {
       setValidationErrors(errs)
@@ -686,7 +766,9 @@ export default function FichaPage() {
     </div>
   )
 
-  const isApproved     = !!profile?.wp_venue_id
+  // Use resolvedVenueWpId (set per active venue in load()) rather than profile.wp_venue_id
+  // (which is always the primary venue and would be wrong for secondary venues)
+  const isApproved     = !!resolvedVenueWpId
   const mainStatus      = onboarding?.status || 'draft'
   const changesStatus   = onboarding?.changes_status || 'draft'
   const isLocked        = !isApproved && mainStatus === 'submitted'
@@ -819,6 +901,45 @@ export default function FichaPage() {
               >✕</button>
             </div>
           )}
+
+          {/* ── Historial de revisión ──────────────────────────────────── */}
+          {(() => {
+            const fmt = (d: string) => new Date(d).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+
+            // Determine the relevant dates and state
+            const submittedAt = onboarding?.submitted_at
+            const reviewedAt  = onboarding?.reviewed_at
+
+            // Case A: published venue, no pending changes → show last accepted date
+            if (isApproved && !changesPending && !changesRejected) {
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, padding: '7px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8 }}>
+                  <span style={{ fontSize: 15, lineHeight: 1 }}>✓</span>
+                  <span style={{ fontSize: 12, color: '#15803d', fontWeight: 500 }}>
+                    Publicado en WeddingVenuesSpain.com
+                    {reviewedAt && <span style={{ fontWeight: 400, opacity: 0.8 }}> · Última revisión aceptada: {fmt(reviewedAt)}</span>}
+                  </span>
+                </div>
+              )
+            }
+
+            // Case B: changes pending → shown inline in the status banner already, skip
+            if (changesPending) return null
+
+            // Case C: initial submission pending
+            if (!isApproved && mainStatus === 'submitted' && submittedAt) {
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, padding: '7px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8 }}>
+                  <span style={{ fontSize: 13, lineHeight: 1 }}>📋</span>
+                  <span style={{ fontSize: 12, color: '#1d4ed8', fontWeight: 500 }}>
+                    En revisión · <span style={{ fontWeight: 400 }}>Enviado el {fmt(submittedAt)}</span>
+                  </span>
+                </div>
+              )
+            }
+
+            return null
+          })()}
 
           {/* ── INFO PRINCIPAL ──────────────────────────────────────────── */}
           {activeTab === 'info' && (
@@ -1245,13 +1366,32 @@ export default function FichaPage() {
 
                 <div className="form-group">
                   <label className="form-label">Aeropuerto internacional más cercano</label>
-                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 6 }}>
-                    Ej: <em>Palma de Mallorca Airport (PMI) – 14 km – 15 min</em>
+                  <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Nombre de aeropuerto</div>
+                      <input className="form-input" value={airportName}
+                        onChange={e => setAirportName(e.target.value)}
+                        placeholder="Ej. Aeropuerto de Palma"
+                        disabled={isLocked}
+                        style={{ width: '100%', borderColor: hasError('Aeropuerto más cercano') ? ERR : undefined }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Kilómetros desde venue</div>
+                      <input className="form-input" value={airportKm}
+                        onChange={e => setAirportKm(e.target.value)}
+                        placeholder="Ej. 45 km"
+                        disabled={isLocked}
+                        style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Tiempo desde venue</div>
+                      <input className="form-input" value={airportMins}
+                        onChange={e => setAirportMins(e.target.value)}
+                        placeholder="Ej. 40 mins"
+                        disabled={isLocked}
+                        style={{ width: '100%' }} />
+                    </div>
                   </div>
-                  <input className="form-input" style={{ borderColor: hasError('Aeropuerto más cercano') ? ERR : undefined }} value={closestAirport}
-                    onChange={e => setClosestAirport(e.target.value)}
-                    placeholder="Nombre del aeropuerto – XX km – XX min"
-                    disabled={isLocked} />
                 </div>
 
               </div>
@@ -1430,7 +1570,7 @@ export default function FichaPage() {
                   </div>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>Emails de contacto</div>
-                    <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 1 }}>Dónde recibirás las consultas de parejas desde weddingvenuesspain.com</div>
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 1 }}>Recibirás las consultas de parejas por email y también aparecerán en tu sección de <strong>Leads</strong></div>
                   </div>
                 </div>
 
@@ -1504,6 +1644,19 @@ export default function FichaPage() {
 
           {activeTab !== 'config' && (
             <div style={{ position: 'fixed', bottom: 0, left: 'var(--sidebar-w)', right: 0, display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 28px', borderTop: '1px solid var(--ivory)', background: '#fff', zIndex: 40, alignItems: 'center' }}>
+
+              {/* Volver al original — solo cuando hay changes_data guardados */}
+              {isApproved && onboarding?.changes_data && Object.keys(onboarding.changes_data).length > 0 && (
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setConfirmRevert(true)}
+                  disabled={reverting}
+                  style={{ marginRight: 'auto', color: 'var(--warm-gray)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}
+                >
+                  <RotateCcw size={13} /> Volver al original
+                </button>
+              )}
+
               {/* Indicadores de estado (solo cuando no hay cambios sin guardar) */}
               {!isDirty && changesPending && (
                 <span style={{ fontSize: 11, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -1519,9 +1672,11 @@ export default function FichaPage() {
                 {saving ? 'Guardando...' : 'Guardar borrador'}
               </button>
               {(() => {
-                // El botón solo se activa cuando el usuario ha editado algo (isDirty).
-                // Así permanece apagado al abrir la ficha y se ilumina al primer cambio.
-                const canSubmit = isDirty
+                // Activo si hay cambios sin guardar (isDirty) O si hay un borrador guardado pendiente de enviar
+                const hasSavedDraft = isApproved
+                  ? (changesStatus === 'draft' && !!onboarding?.changes_data)
+                  : (mainStatus === 'draft' && !!onboarding?.ficha_data)
+                const canSubmit = isDirty || hasSavedDraft
                 const isResend  = changesPending || (!isApproved && mainStatus === 'submitted')
                 const btnLabel  = submitting
                   ? 'Enviando...'
@@ -1600,6 +1755,43 @@ export default function FichaPage() {
           maxPx={cropState.maxPx}
           quality={cropState.quality}
         />
+      )}
+
+      {/* Revert confirm modal */}
+      {confirmRevert && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={() => setConfirmRevert(false)}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 32, maxWidth: 420, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <span style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(220,38,38,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <RotateCcw size={16} color="#dc2626" />
+              </span>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)' }}>
+                ¿Volver a la versión original?
+              </div>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.8, marginBottom: 24 }}>
+              Se descartarán todos los cambios que has guardado como borrador y se restaurará la versión que está actualmente publicada. <strong>Esta acción no se puede deshacer.</strong>
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setConfirmRevert(false)}>Cancelar</button>
+              <button
+                disabled={reverting}
+                onClick={() => { setConfirmRevert(false); revertToOriginal() }}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '8px 16px', borderRadius: 7, border: 'none',
+                  background: '#dc2626', color: '#fff',
+                  fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                  fontFamily: 'Manrope, sans-serif',
+                }}
+              >
+                <RotateCcw size={13} /> {reverting ? 'Revirtiendo...' : 'Sí, volver al original'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Confirm modal */}
@@ -1876,6 +2068,7 @@ function RichTextEditor({ value, onChange, disabled, style, minHeight = 300, com
       <div ref={ref}
         contentEditable={!disabled}
         suppressContentEditableWarning
+        data-rich-editor
         onInput={() => onChange(ref.current?.innerHTML || '')}
         style={{ padding: '12px 14px', minHeight, outline: 'none', fontSize: 13, lineHeight: 1.9, color: 'var(--charcoal)', overflowY: 'auto' }}
       />

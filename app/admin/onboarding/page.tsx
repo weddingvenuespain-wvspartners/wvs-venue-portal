@@ -9,6 +9,7 @@ import { ArrowLeft, Check, X, ExternalLink, ImageIcon } from 'lucide-react'
 type Onboarding = {
   id: string
   user_id: string
+  venue_id: string | null
   name: string | null
   status: string
   changes_status: string | null
@@ -53,7 +54,10 @@ function VenueModal({
       ? onb.changes_data
       : onb.ficha_data
 
-  const isInitial  = onb.status === 'submitted'
+  // A row is an "initial" submission if status=submitted, OR if the venue has no wp_post_id
+  // and changes_status=submitted (mis-routed submission from a not-yet-published venue)
+  const isInitial  = onb.status === 'submitted' ||
+    (!onb.wp_post_id && onb.changes_status === 'submitted' && onb.status !== 'approved')
   const isChanges  = onb.status === 'approved' && onb.changes_status === 'submitted'
   const isApproved = onb.status === 'approved' && (!onb.changes_status || ['approved','draft'].includes(onb.changes_status))
 
@@ -113,7 +117,7 @@ function VenueModal({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
             <div style={{ fontSize: 20, fontFamily: 'Manrope, sans-serif', fontWeight: 600, color: 'var(--espresso)' }}>
-              {data?.H1_Venue || onb.name || 'Sin nombre'}
+              {data?.H1_Venue || onb.changes_data?.H1_Venue || onb.name || 'Sin nombre'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 3 }}>
               {data?.location || onb.region || onb.city || '—'}
@@ -439,7 +443,7 @@ export default function AdminOnboardingPage() {
       const res = await fetch('/api/venues/apply-changes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target_user_id: onb.user_id, is_initial: true }),
+        body: JSON.stringify({ target_user_id: onb.user_id, venue_id: onb.venue_id, is_initial: true }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -458,9 +462,10 @@ export default function AdminOnboardingPage() {
     if (!adminNotes.trim()) { notify('Añade una nota explicando el motivo del rechazo', true); return }
     setSaving(onb.id + '-reject')
     const supabase = createClient()
-    await supabase.from('venue_onboarding').update({
-      status: 'rejected', admin_notes: adminNotes, reviewed_at: new Date().toISOString(),
-    }).eq('id', onb.id)
+    // For mis-routed submissions (changes_status=submitted but not approved), also clear changes_status
+    const rejectPayload: any = { status: 'rejected', admin_notes: adminNotes, reviewed_at: new Date().toISOString() }
+    if (!onb.wp_post_id && onb.changes_status === 'submitted') rejectPayload.changes_status = null
+    await supabase.from('venue_onboarding').update(rejectPayload).eq('id', onb.id)
     setOnboardings(prev => prev.map(o => o.id === onb.id ? { ...o, status: 'rejected', admin_notes: adminNotes } : o))
     notify('Solicitud rechazada')
     setSelected(null); setAdminNotes('')
@@ -474,7 +479,7 @@ export default function AdminOnboardingPage() {
       const res = await fetch('/api/venues/apply-changes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target_user_id: onb.user_id, is_initial: false }),
+        body: JSON.stringify({ target_user_id: onb.user_id, venue_id: onb.venue_id, is_initial: false }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -503,7 +508,11 @@ export default function AdminOnboardingPage() {
     window.dispatchEvent(new CustomEvent('wvs-pending-refresh'))
   }
 
-  const pendingInitial = onboardings.filter(o => o.status === 'submitted')
+  const pendingInitial = onboardings.filter(o =>
+    o.status === 'submitted' ||
+    // Mis-routed: not-yet-published venue that used the changes path by mistake
+    (!o.wp_post_id && o.changes_status === 'submitted' && o.status !== 'approved')
+  )
   const pendingChanges = onboardings.filter(o => o.status === 'approved' && o.changes_status === 'submitted')
   const allPending     = [...pendingInitial, ...pendingChanges]
   const drafts         = onboardings.filter(o => o.status === 'draft' || !o.status)
@@ -522,6 +531,8 @@ export default function AdminOnboardingPage() {
     if (onb.status === 'approved' && onb.changes_status === 'submitted') return { cls: 'badge-pending', label: 'Cambios pendientes' }
     if (onb.status === 'approved') return { cls: 'badge-active', label: 'Aprobado' }
     if (onb.status === 'rejected') return { cls: 'badge-inactive', label: 'Rechazado' }
+    // Mis-routed: venue without a WP post that sent via the changes path
+    if (!onb.wp_post_id && onb.changes_status === 'submitted') return { cls: 'badge-pending', label: 'Nueva solicitud' }
     return { cls: 'badge-inactive', label: 'Borrador' }
   }
 
@@ -616,8 +627,8 @@ export default function AdminOnboardingPage() {
                     )}
                     {filtered.map(onb => {
                       const badge  = getRowBadge(onb)
-                      const name   = onb.ficha_data?.H1_Venue || onb.name || '—'
-                      const region = onb.ficha_data?.location || onb.region || onb.city || '—'
+                      const name   = onb.ficha_data?.H1_Venue || onb.changes_data?.H1_Venue || onb.name || '—'
+                      const region = onb.ficha_data?.location || onb.changes_data?.location || onb.region || onb.city || '—'
                       return (
                         <tr key={onb.id} style={{ cursor: 'pointer' }} onClick={() => openVenue(onb)}>
                           <td>

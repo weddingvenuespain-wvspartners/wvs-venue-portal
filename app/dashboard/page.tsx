@@ -239,8 +239,13 @@ function VenueDashboard() {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
 
+    // New user (Google OAuth or email): no profile row yet → go to onboarding
+    if (profile === null) {
+      router.replace('/onboarding')
+      return
+    }
     // First login: profile exists but display_name is not set → go to onboarding
-    if (profile !== undefined && profile !== null && !profile.display_name) {
+    if (!profile.display_name) {
       router.replace('/onboarding')
       return
     }
