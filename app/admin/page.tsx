@@ -32,7 +32,7 @@ type Profile = {
   company: string | null
   address: string | null
   city: string | null
-  website: string | null
+  venue_website: string | null
   venue_type: string | null
   admin_notes: string | null
   created_at: string
@@ -103,7 +103,7 @@ type TrialConfig = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_LABEL: Record<string, string> = {
-  active: 'Activo', pending: 'Pendiente', inactive: 'Inactivo',
+  active: 'Activo', pending: 'Pendiente', inactive: 'Inactivo', rejected: 'Denegado',
   trial: 'Trial', trial_expired: 'Fin de trial', paused: 'Pausado', cancelled: 'Cancelado',
 }
 const SUB_BADGE: Record<string, string> = {
@@ -111,7 +111,7 @@ const SUB_BADGE: Record<string, string> = {
   paused: 'badge-inactive', cancelled: 'badge-inactive',
 }
 const PROFILE_BADGE: Record<string, string> = {
-  active: 'badge-active', pending: 'badge-pending', inactive: 'badge-inactive',
+  active: 'badge-active', pending: 'badge-pending', inactive: 'badge-inactive', rejected: 'badge-inactive',
 }
 
 function planLabel(p: Plan) { return p.display_name || p.name }
@@ -345,15 +345,16 @@ function UserPanel({
   const [historyLoading, setHistoryLoading] = useState(false)
 
   const [pForm, setPForm] = useState({
-    first_name:  profile.first_name  || '',
-    last_name:   profile.last_name   || '',
-    phone:       profile.phone       || '',
-    company:     profile.company     || '',
-    address:     profile.address     || '',
-    city:        profile.city        || '',
-    website:     profile.website     || '',
-    admin_notes: profile.admin_notes || '',
-    status:      profile.status      || 'pending',
+    first_name:    profile.first_name    || '',
+    last_name:     profile.last_name     || '',
+    phone:         profile.phone         || '',
+    company:       profile.company       || profile.display_name || '',
+    address:       profile.address       || '',
+    city:          profile.city          || '',
+    venue_website: profile.venue_website || '',
+    venue_type:    profile.venue_type    || '',
+    admin_notes:   profile.admin_notes   || '',
+    status:        profile.status        || 'pending',
   })
 
   // Feature overrides — null = use plan default, true = force on, false = force off
@@ -739,23 +740,10 @@ function UserPanel({
                     <option value="pending">⏳ Pendiente verificación</option>
                     <option value="active">✅ Activo</option>
                     <option value="inactive">Inactivo</option>
+                    <option value="rejected">🚫 Denegado</option>
                   </select>
                 </div>
               </div>
-
-              {/* ── Onboarding data summary ── */}
-              {(profile.display_name || profile.venue_type || profile.city) && (
-                <div style={{ background: 'rgba(196,151,90,0.07)', border: '1px solid rgba(196,151,90,0.18)', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>
-                    Datos del onboarding
-                  </div>
-                  <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', fontSize: 12, color: 'var(--espresso)' }}>
-                    {profile.display_name && <span><strong>Nombre venue:</strong> {profile.display_name}</span>}
-                    {profile.venue_type   && <span><strong>Tipo:</strong> {profile.venue_type}</span>}
-                    {profile.city         && <span><strong>Región:</strong> {profile.city}</span>}
-                  </div>
-                </div>
-              )}
 
               {/* ── Empresa ── */}
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -769,8 +757,8 @@ function UserPanel({
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label"><Globe size={10} style={{ display: 'inline', marginRight: 4 }} />Web</label>
-                  <input className="form-input" value={pForm.website}
-                    onChange={e => setPForm(f => ({ ...f, website: e.target.value }))} placeholder="https://..." />
+                  <input className="form-input" value={pForm.venue_website}
+                    onChange={e => setPForm(f => ({ ...f, venue_website: e.target.value }))} placeholder="https://..." />
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label"><MapPin size={10} style={{ display: 'inline', marginRight: 4 }} />Dirección</label>
@@ -778,9 +766,14 @@ function UserPanel({
                     onChange={e => setPForm(f => ({ ...f, address: e.target.value }))} placeholder="Calle Mayor 1" />
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Ciudad / Provincia</label>
+                  <label className="form-label">Ciudad / Región</label>
                   <input className="form-input" value={pForm.city}
-                    onChange={e => setPForm(f => ({ ...f, city: e.target.value }))} placeholder="Barcelona" />
+                    onChange={e => setPForm(f => ({ ...f, city: e.target.value }))} placeholder="Mallorca" />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Tipo de venue</label>
+                  <input className="form-input" value={pForm.venue_type}
+                    onChange={e => setPForm(f => ({ ...f, venue_type: e.target.value }))} placeholder="Finca, Hotel..." />
                 </div>
               </div>
 
@@ -849,11 +842,23 @@ function UserPanel({
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button className="btn btn-primary" disabled={saving}
-                  onClick={() => onSaveProfile({ ...profile, ...pForm, features_override: featOverrides })}>
-                  <Check size={13} /> {saving ? 'Guardando...' : 'Guardar perfil'}
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {profile.status === 'pending' && (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    disabled={saving}
+                    style={{ color: '#dc2626', borderColor: 'rgba(220,38,38,0.3)' }}
+                    onClick={() => onSaveProfile({ ...profile, ...pForm, status: 'rejected', features_override: featOverrides })}
+                  >
+                    🚫 Denegar acceso
+                  </button>
+                )}
+                <div style={{ marginLeft: 'auto' }}>
+                  <button className="btn btn-primary" disabled={saving}
+                    onClick={() => onSaveProfile({ ...profile, ...pForm, features_override: featOverrides })}>
+                    <Check size={13} /> {saving ? 'Guardando...' : 'Guardar perfil'}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1715,16 +1720,17 @@ export default function AdminPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id:     updated.user_id,
-          first_name:  updated.first_name,
-          last_name:   updated.last_name,
-          phone:       updated.phone,
-          company:     updated.company,
-          address:     updated.address,
-          city:        updated.city,
-          website:     updated.website,
-          admin_notes: updated.admin_notes,
-          status:      updated.status,
+          user_id:       updated.user_id,
+          first_name:    updated.first_name,
+          last_name:     updated.last_name,
+          phone:         updated.phone,
+          company:       updated.company,
+          address:       updated.address,
+          city:          updated.city,
+          venue_website: updated.venue_website,
+          venue_type:    updated.venue_type,
+          admin_notes:   updated.admin_notes,
+          status:        updated.status,
         }),
       })
       const result = await res.json()

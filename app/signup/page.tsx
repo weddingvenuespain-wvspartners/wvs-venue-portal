@@ -112,8 +112,16 @@ function RegistroPageInner() {
         data: { marketing_consent: acceptMarketing, account_type: accountType }
       }
     })
-    if (error) { setError(error.message); setLoading(false) }
-    else { setDone(true); setLoading(false) }
+    if (error) {
+      const msg = error.message?.toLowerCase() || ''
+      const isDuplicate = msg.includes('already registered') || msg.includes('already been registered') || msg.includes('user already exists')
+      if (isDuplicate) {
+        setError('__duplicate__')
+      } else {
+        setError(error.message)
+      }
+      setLoading(false)
+    } else { setDone(true); setLoading(false) }
   }
 
   const handleGoogle = async () => {
@@ -183,7 +191,16 @@ function RegistroPageInner() {
               </div>
             </div>
 
-            {error && <div className="login-error">{error}</div>}
+            {error && error !== '__duplicate__' && <div className="login-error">{error}</div>}
+            {error === '__duplicate__' && (
+              <div style={{ background: 'rgba(196,151,90,0.1)', border: '1px solid rgba(196,151,90,0.25)', borderRadius: 8, padding: '10px 14px', fontSize: 12, marginBottom: 16, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                Ya existe una cuenta con este email.{' '}
+                <button type="button" onClick={() => router.push(`/login?hint=${encodeURIComponent(email)}`)}
+                  style={{ background: 'none', border: 'none', color: '#C4975A', fontSize: 12, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textDecoration: 'underline', padding: 0 }}>
+                  Iniciar sesión →
+                </button>
+              </div>
+            )}
 
             <form onSubmit={handleSignup}>
               <input

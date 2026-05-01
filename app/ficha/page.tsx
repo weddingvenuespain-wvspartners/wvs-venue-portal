@@ -86,7 +86,7 @@ export default function FichaPage() {
   const [menuPriceUnit,  setMenuPriceUnit]  = useState<'person' | 'day' | ''>('person')
   const [heroImage, setHeroImage]   = useState<{ id: number; url: string } | null>(null)
   const [uploadingHero, setUploadingHero] = useState(false)
-  const [venuePriceMode, setVenuePriceMode]   = useState<VenuePriceMode>('none')
+  const [venuePriceMode, setVenuePriceMode]   = useState<VenuePriceMode>('auto')
   const [venuePriceInput, setVenuePriceInput] = useState('')
   const [venuePriceSaved, setVenuePriceSaved] = useState('')
 
@@ -329,7 +329,7 @@ export default function FichaPage() {
     } else {
       const raw = legacyToSymbol(rawMin)
       setVenuePriceSaved(raw)
-      setVenuePriceMode(raw === 'included' ? 'included' : (!raw || raw === '-') ? 'none' : 'auto')
+      setVenuePriceMode(raw === 'included' ? 'included' : 'auto')
     }
     setMiniDesc(acf['h2-Venue_and_mini_description'] || '')
     // start_of_post_content → Mini párrafo; main post content → Descripción completa (keep HTML for RichTextEditor)
@@ -388,7 +388,7 @@ export default function FichaPage() {
     if (vertUrl && !vertUrl.startsWith('blob:')) setVerticalPhoto({ id: d.verticalPhotoId || 0, url: vertUrl })
     const raw = legacyToSymbol(d.venuePrice || '')
     setVenuePriceSaved(raw)
-    setVenuePriceMode(raw === 'included' ? 'included' : (!raw || raw === '-') ? 'none' : 'auto')
+    setVenuePriceMode(raw === 'included' ? 'included' : 'auto')
     setVenuePriceInput(d.venuePriceInput || '')
     setMiniDesc(d.miniDesc || '')
     setMiniParagraph(d.miniParagraph || '')
@@ -1031,35 +1031,14 @@ export default function FichaPage() {
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Precio del venue</label>
-                    {!isLocked && (
-                      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-                        {(['auto'] as VenuePriceMode[]).map(m => (
-                          <button key={m} type="button" onClick={() => setVenuePriceMode(m)} style={{
-                            padding: '7px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', border: '1px solid',
-                            borderColor: 'var(--charcoal)',
-                            background: 'var(--charcoal)',
-                            color: '#fff',
-                            fontWeight: 500,
-                          }}>
-                            Precio ($/$$/$$$ automático)
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {venuePriceMode === 'auto' && (
-                      <>
-                        <div style={{ position: 'relative' }}>
-                          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--warm-gray)', pointerEvents: 'none' }}>€</span>
-                          <input className="form-input" style={{ paddingLeft: 30, borderColor: hasError('Precio del venue') ? ERR : undefined }} type="number" min={0} value={venuePriceInput}
-                            onChange={e => setVenuePriceInput(e.target.value)} placeholder="4,500.00" disabled={isLocked} />
-                        </div>
-                        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.8 }}>
-                          <strong style={{ color: 'var(--gold)' }}>$</strong> hasta 4.000€ · <strong style={{ color: 'var(--gold)' }}>$$</strong> 4.000–8.000€ · <strong style={{ color: 'var(--gold)' }}>$$$</strong> más de 8.000€
-                        </div>
-                      </>
-                    )}
-                    {venuePriceMode === 'included' && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>Se mostrará como <strong>Included</strong>.</div>}
-                    {venuePriceMode === 'none' && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>No se mostrará ningún precio de venue.</div>}
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--warm-gray)', pointerEvents: 'none' }}>€</span>
+                      <input className="form-input" style={{ paddingLeft: 30, borderColor: hasError('Precio del venue') ? ERR : undefined }} type="number" min={0} value={venuePriceInput}
+                        onChange={e => setVenuePriceInput(e.target.value)} placeholder="4,500.00" disabled={isLocked} />
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.8 }}>
+                      <strong style={{ color: 'var(--gold)' }}>$</strong> hasta 4.000€ · <strong style={{ color: 'var(--gold)' }}>$$</strong> 4.000–8.000€ · <strong style={{ color: 'var(--gold)' }}>$$$</strong> más de 8.000€
+                    </div>
                   </div>
                 </div>
               </div>

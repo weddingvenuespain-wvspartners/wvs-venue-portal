@@ -62,6 +62,7 @@ export default function OnboardingPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName]   = useState('')
   const [phone, setPhone]         = useState('')
+  const [address, setAddress]     = useState('')
   const [website, setWebsite]     = useState('')
 
   useEffect(() => {
@@ -155,6 +156,7 @@ export default function OnboardingPage() {
           first_name:    firstName.trim(),
           last_name:     lastName.trim(),
           phone:         phone.trim(),
+          address:       address.trim(),
           venue_website: normalizeUrl(website),
           updated_at:    new Date().toISOString(),
         },
@@ -368,6 +370,14 @@ export default function OnboardingPage() {
                 <Phone size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
                 <input type="tel" placeholder="+34 612 345 678" inputMode="numeric"
                   value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9+\s()\-]/g, ''))}
+                  style={inputStyle} />
+              </div>
+
+              <label style={labelStyle}>Dirección <span style={{ opacity: 0.45, fontWeight: 400 }}>(opcional)</span></label>
+              <div style={{ position: 'relative', marginBottom: 20 }}>
+                <MapPin size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
+                <input type="text" placeholder="Calle Mayor 1, 07001 Palma"
+                  value={address} onChange={e => setAddress(e.target.value)}
                   style={inputStyle} />
               </div>
 
