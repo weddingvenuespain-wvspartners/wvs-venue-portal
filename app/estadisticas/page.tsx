@@ -30,7 +30,7 @@ export default function EstadisticasPage() {
   useEffect(() => {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
-    if (!activeVenue) return
+    if (!activeVenue) { setLoading(false); return }
     load()
   }, [user, authLoading, activeVenue?.id]) // eslint-disable-line
 

@@ -193,7 +193,7 @@ export default function CalendarioPage() {
   }, [])
 
   const load = async () => {
-    if (!activeVenue) return
+    if (!activeVenue) { setLoading(false); return }
     setLoading(true)
     const supabase = createClient()
     const lastDay  = new Date(year, month + 1, 0).getDate()

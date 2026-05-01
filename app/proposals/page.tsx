@@ -103,7 +103,7 @@ function PropuestasPageContent() {
   }, [searchParams, router])
 
   const load = async () => {
-    if (!activeVenue) return
+    if (!activeVenue) { setLoading(false); return }
     const supabase = createClient()
     const [{ data: props }, { data: leadsData }, { data: venueRow }] = await Promise.all([
       supabase.from('proposals').select('*, branding:proposal_branding(*)').eq('venue_id', activeVenue.id).order('created_at', { ascending: false }),

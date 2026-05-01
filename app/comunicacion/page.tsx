@@ -575,7 +575,7 @@ export default function ComunicacionPage() {
 
 
   const load = async (silent = false) => {
-    if (!activeVenue) return
+    if (!activeVenue) { if (!silent) setLoading(false); return }
     if (!silent) setLoading(true)
     const supabase = createClient()
     const [msgRes, dosRes, leadsRes] = await Promise.all([

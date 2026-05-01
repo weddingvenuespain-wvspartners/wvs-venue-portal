@@ -439,7 +439,7 @@ export default function LeadsPage() {
   }, [leads])
 
   const load = async () => {
-    if (!activeVenue) return
+    if (!activeVenue) { setLoading(false); return }
     setLoading(true)
     const supabase = createClient()
     const { data } = await supabase.from('leads').select('*')

@@ -405,7 +405,7 @@ export default function EstructuraPage() {
   }, [blockCalYear, blockCalMonth, blockView, blockWeekStart, user, activeVenue?.id]) // eslint-disable-line
 
   const load = async () => {
-    if (!activeVenue) return
+    if (!activeVenue) { setLoading(false); return }
     const supabase = createClient()
     const [res, { data: settingsRow }] = await Promise.all([
       fetch(`/api/estructura/modalities?venue_id=${activeVenue.id}`),
