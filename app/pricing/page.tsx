@@ -194,25 +194,27 @@ function PricingPageInner() {
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           {isLoggedIn ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              {hasPlan && !isTrialExpired && (
-              <button
-                onClick={() => router.push('/dashboard')}
-                style={{
-                  background: 'none', border: 'none', color: 'var(--warm-gray)',
-                  fontSize: 12, cursor: 'pointer', display: 'inline-flex',
-                  alignItems: 'center', gap: 4, fontFamily: 'Manrope, sans-serif',
-                }}
-              >
-                <ArrowLeft size={14} /> Volver al portal
-              </button>
-            )}
+              {hasPlan && !isTrialExpired ? (
+                <button
+                  onClick={() => router.push('/dashboard')}
+                  style={{
+                    background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.25)',
+                    borderRadius: 20, color: 'var(--espresso)', fontSize: 12, cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    fontFamily: 'Manrope, sans-serif', padding: '6px 14px', fontWeight: 500,
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  <ArrowLeft size={13} /> Volver al portal
+                </button>
+              ) : <div />}
               <button
                 onClick={handleLogout}
                 style={{
-                  background: 'none', border: '1px solid var(--ivory)', borderRadius: 6,
+                  background: 'none', border: '1px solid var(--ivory)', borderRadius: 20,
                   color: 'var(--warm-gray)', fontSize: 12, cursor: 'pointer',
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontFamily: 'Manrope, sans-serif', padding: '5px 10px',
+                  fontFamily: 'Manrope, sans-serif', padding: '6px 12px',
                 }}
               >
                 <LogOut size={13} /> Cerrar sesión
@@ -231,10 +233,14 @@ function PricingPageInner() {
             fontFamily: 'Manrope, sans-serif', fontSize: 28, fontWeight: 600,
             color: 'var(--charcoal)', marginBottom: 8,
           }}>
-            Elige tu plan
+            {isTrial ? 'Activa tu suscripción' : 'Elige tu plan'}
           </h1>
-          <p style={{ color: 'var(--warm-gray)', fontSize: 14, maxWidth: 500, margin: '0 auto' }}>
-            Potencia tu venue con las herramientas que necesitas para gestionar bodas de forma profesional.
+          <p style={{ color: 'var(--warm-gray)', fontSize: 14, maxWidth: 480, margin: '0 auto' }}>
+            {isTrial
+              ? 'Estás en período de prueba. Activa un plan ahora y continúa sin interrupciones cuando finalice.'
+              : isTrialExpired
+                ? 'Tu prueba ha finalizado. Elige un plan para seguir gestionando tu venue.'
+                : 'Herramientas profesionales para gestionar bodas, leads y propuestas desde un solo lugar.'}
           </p>
 
           {/* New-venue mode banner */}
@@ -372,7 +378,7 @@ function PricingPageInner() {
         </div>
 
         {/* Pending verification banner — two states */}
-        {isPendingVerification && !hasPlan && (
+        {isPendingVerification && (!hasPlan || isTrial) && (
           <div style={{
             background: 'rgba(121,111,78,0.08)',
             border: '1px solid rgba(121,111,78,0.25)',
@@ -397,7 +403,7 @@ function PricingPageInner() {
           </div>
         )}
 
-        {isPendingVerification && hasPlan && (
+        {isPendingVerification && hasPlan && !isTrial && (
           <div style={{
             background: 'rgba(22,163,74,0.06)',
             border: '1px solid rgba(22,163,74,0.25)',
@@ -415,7 +421,7 @@ function PricingPageInner() {
               <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', fontFamily: 'Manrope, sans-serif' }}>
                 Plan contratado — verificación en curso
               </p>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.6 }}>
+              <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>
                 Perfecto, ya tienes tu plan <strong>{planName}</strong> listo. En cuanto nuestro equipo verifique tu venue recibirás un email y podrás acceder al portal.
               </p>
             </div>
