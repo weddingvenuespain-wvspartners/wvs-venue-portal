@@ -3,13 +3,14 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Search, Plus, X, Check, Edit2, ExternalLink, RefreshCw,
-  AlertTriangle, CreditCard, UserPlus, Mail, Building2, History,
+  AlertTriangle, CreditCard, UserPlus, Mail, Building2, History, ChefHat, Sparkles,
   Phone, Globe, MapPin, User, Calendar, Clock, Shield, StickyNote,
   Copy, CheckCircle, Settings, Landmark, Lightbulb, ClipboardList,
   Ban, CircleCheckBig, ArrowLeftRight, RotateCcw, FileText, OctagonAlert,
@@ -1977,24 +1978,24 @@ export default function AdminPage() {
         </div>
 
         {/* CRM tabs */}
-        <div style={{ display: 'flex', gap: 2, padding: '0 24px', borderBottom: '1px solid var(--ivory)', background: '#fff' }}>
-          {([
-            { key: 'venue_owner',     label: 'Venues',   count: profiles.filter(p => p.role === 'venue_owner').length },
-            { key: 'wedding_planner', label: 'Planners', count: profiles.filter(p => p.role === 'wedding_planner').length },
-            { key: 'catering',        label: 'Catering', count: profiles.filter(p => p.role === 'catering').length },
-          ] as { key: 'venue_owner' | 'wedding_planner' | 'catering'; label: string; count: number }[]).map(tab => (
-            <button key={tab.key} onClick={() => { setCrmTab(tab.key); setSearch(''); setFilterStatus('all'); setFilterPlan('all') }}
-              style={{
-                padding: '10px 18px', fontSize: 13, fontWeight: crmTab === tab.key ? 600 : 400,
-                color: crmTab === tab.key ? 'var(--gold)' : 'var(--warm-gray)',
-                borderTop: 'none', borderLeft: 'none', borderRight: 'none',
-                borderBottom: crmTab === tab.key ? '2px solid var(--gold)' : '2px solid transparent',
-                background: 'none', cursor: 'pointer', fontFamily: 'Manrope, sans-serif', marginBottom: -1,
-              }}>
-              {tab.label} <span style={{ fontSize: 11, opacity: 0.7 }}>({tab.count})</span>
-            </button>
-          ))}
-        </div>
+        <Tabs
+          activeKey={crmTab}
+          onChange={(key) => { setCrmTab(key as typeof crmTab); setSearch(''); setFilterStatus('all'); setFilterPlan('all') }}
+          tabs={[
+            {
+              key: 'venue_owner', label: 'Venues', icon: Landmark,
+              badge: <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }}>({profiles.filter(p => p.role === 'venue_owner').length})</span>,
+            },
+            {
+              key: 'wedding_planner', label: 'Planners', icon: Sparkles,
+              badge: <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }}>({profiles.filter(p => p.role === 'wedding_planner').length})</span>,
+            },
+            {
+              key: 'catering', label: 'Catering', icon: ChefHat,
+              badge: <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }}>({profiles.filter(p => p.role === 'catering').length})</span>,
+            },
+          ]}
+        />
 
         <div className="page-content">
           {success && <div className="alert alert-success" style={{ marginBottom: 16 }}>{success}</div>}
