@@ -62,7 +62,12 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const contactOn = on('contact') && (contact.phone || contact.email)
   const waHref = contact.phone ? `https://wa.me/${contact.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, he visto la propuesta para ${couple_name} y me gustaría hablar con vosotros.`)}` : ''
   const mailHref = contact.email ? `mailto:${contact.email}?subject=${encodeURIComponent(`Propuesta ${couple_name}`)}` : ''
-  const scrollToContact = () => document.getElementById('t1-cta')?.scrollIntoView({ behavior: 'smooth' })
+  const inquiriesOn = on('inquiries')
+  const scrollToCta = () => {
+    const target = inquiriesOn ? 't1-inquiries' : 't1-cta'
+    document.getElementById(target)?.scrollIntoView({ behavior: 'smooth' })
+  }
+  const scrollToContact = scrollToCta
 
   const [scrolled, setScrolled]     = useState(false)
   const [ctaBar, setCtaBar]         = useState(false)
@@ -434,7 +439,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               on('zones') && zonesShow.length > 0 ? { label: 'Espacios', anchor: 'sec-zones' } : null,
               hasCatering && on('menu') ? { label: 'Menús', anchor: 'menu' } : null,
               on('schedule_visit') ? { label: 'Visita', anchor: 'sec-schedule' } : null,
-              contactOn ? { label: 'Contactar', anchor: 't1-cta' } : null,
+              inquiriesOn ? { label: 'Hablemos', anchor: 't1-inquiries' } : (contactOn ? { label: 'Contactar', anchor: 't1-cta' } : null),
             ].filter(Boolean) as { label: string; anchor: string }[]
             if (!navLinks.length) return null
             return (
