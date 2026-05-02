@@ -173,7 +173,12 @@ export default function CrmPage() {
           <div className="card">
             {filtered.length === 0 ? (
               <div style={{ padding: '40px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: '13px' }}>
-                {leads.length === 0 ? 'Aún no tienes contactos. Añade el primero.' : 'No hay contactos con este filtro.'}
+                <div style={{ marginBottom: leads.length === 0 ? 12 : 0 }}>
+                  {leads.length === 0 ? 'Aún no tienes contactos.' : 'No hay contactos con este filtro.'}
+                </div>
+                {leads.length === 0 && (
+                  <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Añadir primer contacto</button>
+                )}
               </div>
             ) : (
               <table className="table">

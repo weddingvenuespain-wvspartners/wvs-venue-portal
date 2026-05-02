@@ -108,6 +108,7 @@ export default function Sidebar() {
     { href: '/comunicacion', label: 'Comunicación',                                   icon: 'M14 2H2v9h5l1 3 1-3h5V2zM5 6h6M5 9h3',              feature: 'comunicacion' },
   ]
   const estadisticasItem = { href: '/estadisticas', label: 'Estadísticas', icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z', feature: 'estadisticas' as keyof PlanFeatures }
+  const facturasItem = { href: '/facturas', label: 'Facturas', icon: 'M3 1h10v14l-2-1-2 1-2-1-2 1-2-1V1zM5 5h6M5 8h6M5 11h4' }
 
   const plannerItems = [
     { href: '/wp',           label: 'Dashboard',        icon: 'M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z' },
@@ -381,6 +382,11 @@ export default function Sidebar() {
                 </Link>
               )
             })()}
+            <Link href={facturasItem.href}
+              className={`nav-item ${isActive(facturasItem.href) ? 'active' : ''}`}
+            >
+              <Icon d={facturasItem.icon} /> {facturasItem.label}
+            </Link>
 
             <div className="nav-section" style={{ marginTop: 8 }}>Ayuda</div>
             {helpItems.map(item => (

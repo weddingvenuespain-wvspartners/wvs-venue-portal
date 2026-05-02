@@ -206,10 +206,8 @@ export default function FichaPage() {
       if (hasSupabaseData) {
         // Fast path: populate from Supabase immediately, fetch WP metadata in background
         if (hasRealChanges && ['draft', 'submitted', 'rejected'].includes(onb?.changes_status || '')) {
-          console.log('[ficha:load] Fast path — using changes_data, status:', onb?.changes_status)
           populateFromFichaData(onb!.changes_data)
         } else {
-          console.log('[ficha:load] Fast path — using ficha_data from Supabase')
           populateFromFichaData(onb!.ficha_data)
         }
         setLoading(false)
@@ -225,12 +223,10 @@ export default function FichaPage() {
 
       // Slow path: no Supabase data yet — must wait for WP (first-time load)
       try {
-        console.log('[ficha:load] Slow path — fetching from WP')
         const res = await fetch(`/api/venues/wp-venue?id=${wpVenueId}`)
         if (res.ok) {
           const data = await res.json()
           setVenue(data)
-          console.log('[ficha:wp]', { _source: data._source, title: data.title?.rendered, acf_keys: Object.keys(data.acf || {}) })
           populateFromWp(data)
         } else {
           const err = await res.json().catch(() => ({}))
@@ -376,7 +372,6 @@ export default function FichaPage() {
 
   function populateFromFichaData(d: any) {
     if (!d) return
-    console.log('[ficha:populate]', { verticalPhotoId: d.verticalPhotoId, verticalPhotoUrl: d.verticalPhotoUrl, heroImageId: d.heroImageId, galleryCount: d.gallery?.filter(Boolean).length })
     setH1_Venue(d.H1_Venue || '')
     setLocation(d.location || '')
     setShortDesc(d.shortDesc || '')
@@ -515,7 +510,6 @@ export default function FichaPage() {
     setSaving(true)
     const fichaData = mergeWithPublished(collectAllFields())
     const isApproved = !!resolvedVenueWpId
-    console.log('[ficha:save]', { isApproved, resolvedVenueWpId, verticalPhotoId: fichaData.verticalPhotoId, heroImageId: fichaData.heroImageId, galleryCount: fichaData.gallery?.filter(Boolean).length })
     try {
       const body = isApproved
         ? { changes_data: fichaData, changes_status: 'draft', venue_id: activeVenue?.id ?? null }
