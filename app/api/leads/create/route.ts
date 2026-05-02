@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { wp_venue_id, name, email, phone, guests, date, notes } = body
+    const { wp_venue_id, name, email, phone, guests, date, budget, message, wants_wedding_planner, whatsapp_consent } = body
 
     if (!wp_venue_id) {
       return NextResponse.json({ error: 'Missing wp_venue_id' }, { status: 400 })
@@ -57,16 +57,19 @@ export async function POST(req: NextRequest) {
     const wedding_date = parseDate(date)
 
     const { data, error } = await svc.from('leads').insert({
-      user_id:      profile.user_id,
-      venue_id:     venueRow?.id ?? null,
-      status:       'new',
-      source:       'web',
-      name:         name  || '',
-      email:        email || '',
-      phone:        phone || '',
-      guests:       guests ? String(guests) : '',
-      wedding_date: wedding_date,
-      notes:        notes || '',
+      user_id:               profile.user_id,
+      venue_id:              venueRow?.id ?? null,
+      status:                'new',
+      source:                'web',
+      name:                  name    || '',
+      email:                 email   || '',
+      phone:                 phone   || '',
+      guests:                guests  ? String(guests) : '',
+      wedding_date:          wedding_date,
+      budget:                budget  || 'sin_definir',
+      initial_message:       message || null,
+      wants_wedding_planner: wants_wedding_planner === true || wants_wedding_planner === 'true' || false,
+      whatsapp_consent:      whatsapp_consent === true || whatsapp_consent === 'true' || false,
     }).select().single()
 
     if (error) {

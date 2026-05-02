@@ -631,7 +631,9 @@ export default function FichaPage() {
     if (!miniDesc.trim())                errs.push({ field: 'Mini título (H2)',          tab: 'descripcion', msg: 'Obligatorio' })
     else if (wordCount(miniDesc) > 6)    errs.push({ field: 'Mini título',              tab: 'descripcion', msg: 'Máximo 6 palabras' })
     if (!miniParagraph.trim())           errs.push({ field: 'Mini párrafo',             tab: 'descripcion', msg: 'Obligatorio' })
+    else if (wordCount(miniParagraph) > 60)  errs.push({ field: 'Mini párrafo',         tab: 'descripcion', msg: 'Máximo 60 palabras' })
     if (!postContent.trim())             errs.push({ field: 'Descripción completa',     tab: 'descripcion', msg: 'Obligatorio' })
+    else if (wordCount(postContent) > 280)   errs.push({ field: 'Descripción completa', tab: 'descripcion', msg: 'Máximo 280 palabras' })
 
     // Precios
     if (!accommodation)
@@ -640,6 +642,10 @@ export default function FichaPage() {
       errs.push({ field: 'Venue fee (precio)', tab: 'precios', msg: 'Indica el precio o activa "Included in menu"' })
     if (!cateringFeeValue.trim())
       errs.push({ field: 'Catering starting price', tab: 'precios', msg: 'Obligatorio' })
+    if (wordCount(breakdown1text) > 150)
+      errs.push({ field: 'Zonas del espacio e incluye', tab: 'precios', msg: 'Máximo 150 palabras' })
+    if (wordCount(breakdown3text) > 150)
+      errs.push({ field: 'Descripción del servicio', tab: 'precios', msg: 'Máximo 150 palabras' })
 
     // Ubicación
     if (!specificLocation.trim())
@@ -663,6 +669,10 @@ export default function FichaPage() {
           errs.push({ field: `Reseña ${i + 1}`, tab: 'resenas', msg: 'Nombre y texto son obligatorios, o desactiva las reseñas' })
       })
     }
+
+    // Configuración
+    if (!leadsEmail.trim())
+      errs.push({ field: 'Email de contacto', tab: 'config', msg: 'Añade al menos un email para recibir leads' })
 
     return errs
   }

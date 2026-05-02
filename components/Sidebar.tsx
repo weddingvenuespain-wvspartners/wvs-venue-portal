@@ -127,9 +127,10 @@ export default function Sidebar() {
   ]
 
   const adminItems: { href: string; label: string; icon: string; badge?: number }[] = [
-    { href: '/admin',            label: 'CRM',             icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', badge: pendingUsersCount },
-    { href: '/admin/planes',     label: 'Planes',          icon: 'M1 4h14v8H1zM4 4V2M12 4V2M1 8h14' },
-    { href: '/admin/onboarding', label: 'Solicitudes',     icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4M12 5v4M10 7h4', badge: pendingOnboardingCount },
+    { href: '/admin',                    label: 'CRM',             icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', badge: pendingUsersCount },
+    { href: '/admin/planes',             label: 'Planes',          icon: 'M1 4h14v8H1zM4 4V2M12 4V2M1 8h14' },
+    { href: '/admin/onboarding',         label: 'Solicitudes',     icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4M12 5v4M10 7h4', badge: pendingOnboardingCount },
+    { href: '/admin/wedding-planners',   label: 'Wedding Planners', icon: 'M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z' },
   ]
 
   const helpItems = [
