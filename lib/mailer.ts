@@ -376,3 +376,116 @@ export async function sendVisitRequestEmail({
 </body></html>`,
   })
 }
+
+// ─── New lead notification (para el venue cuando llega una petición nueva) ───
+
+const BUDGET_LABEL: Record<string, string> = {
+  'sin_definir': 'Sin definir',
+  'menos_10k':   '< 10.000 €',
+  '10k_20k':     '10.000 – 20.000 €',
+  '20k_35k':     '20.000 – 35.000 €',
+  '35k_50k':     '35.000 – 50.000 €',
+  '50k_75k':     '50.000 – 75.000 €',
+  'mas_75k':     '> 75.000 €',
+}
+
+export async function sendNewLeadEmail({
+  to,
+  venueName,
+  coupleName,
+  email,
+  phone,
+  guests,
+  weddingDate,
+  budget,
+  message,
+  wantsWeddingPlanner,
+  whatsappConsent,
+}: {
+  to: string | string[]
+  venueName: string
+  coupleName: string
+  email?: string | null
+  phone?: string | null
+  guests?: string | null
+  weddingDate?: string | null
+  budget?: string | null
+  message?: string | null
+  wantsWeddingPlanner?: boolean
+  whatsappConsent?: boolean
+}) {
+  const recipients = Array.isArray(to) ? to.join(', ') : to
+  const portalUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.weddingvenuesspain.com'
+
+  const fmtDate = (d: string | null | undefined) => {
+    if (!d) return '—'
+    return new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+  }
+
+  const budgetLabel = BUDGET_LABEL[budget || 'sin_definir'] || '—'
+
+  const rowHtml = (label: string, value: string) =>
+    `<tr>
+      <td style="padding:8px 0;font-size:12px;font-weight:700;color:#9A8F78;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;vertical-align:top;">${label}</td>
+      <td style="padding:8px 0 8px 16px;font-size:14px;color:#453D23;vertical-align:top;">${value}</td>
+    </tr>`
+
+  const badgesHtml = [
+    whatsappConsent ? `<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:#dcfce7;border:1px solid #86efac;font-size:11px;font-weight:700;color:#16a34a;margin-right:6px;">✓ WhatsApp</span>` : '',
+    wantsWeddingPlanner ? `<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:#fdf2f8;border:1px solid #f0abfc;font-size:11px;font-weight:700;color:#a21caf;">Wedding Planner</span>` : '',
+  ].filter(Boolean).join('')
+
+  await transporter.sendMail({
+    from: '"Wedding Venues Spain" <noreply@weddingvenuesspain.com>',
+    to: recipients,
+    subject: `Nueva petición de boda — ${coupleName || 'Nueva pareja'}`,
+    html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#F5F3ED;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F3ED;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+
+        <tr><td align="center" style="padding-bottom:24px;">
+          <span style="font-size:16px;font-weight:700;color:#453D23;letter-spacing:-0.3px;">${venueName}</span>
+        </td></tr>
+
+        <tr><td style="background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 2px 16px rgba(69,61,35,0.08);">
+
+          <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#C4975A;letter-spacing:.1em;text-transform:uppercase;">Nueva petición recibida</p>
+          <h1 style="margin:0 0 20px;font-size:22px;font-weight:700;color:#453D23;">${coupleName || 'Nueva pareja'}</h1>
+
+          ${badgesHtml ? `<div style="margin-bottom:20px;">${badgesHtml}</div>` : ''}
+
+          <table cellpadding="0" cellspacing="0" style="width:100%;border-top:1px solid #F0EDE6;">
+            ${rowHtml('Email', email ? `<a href="mailto:${email}" style="color:#796F4E;">${email}</a>` : '—')}
+            ${rowHtml('Teléfono', phone || '—')}
+            ${rowHtml('Fecha boda', fmtDate(weddingDate))}
+            ${rowHtml('Invitados', guests ? `${guests} personas` : '—')}
+            ${rowHtml('Presupuesto', budgetLabel)}
+          </table>
+
+          ${message ? `
+          <div style="margin-top:20px;background:#F9F7F2;border-radius:10px;padding:16px 20px;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#9A8F78;text-transform:uppercase;letter-spacing:.08em;">Mensaje</p>
+            <p style="margin:0;font-size:14px;color:#453D23;line-height:1.65;white-space:pre-wrap;">${message.replace(/</g, '&lt;')}</p>
+          </div>` : ''}
+
+          <div style="margin-top:28px;" align="center">
+            <a href="${portalUrl}/leads" style="display:inline-block;background:#453D23;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
+              Ver en el portal →
+            </a>
+          </div>
+
+        </td></tr>
+
+        <tr><td align="center" style="padding-top:20px;">
+          <p style="margin:0;font-size:11px;color:#9A8F78;">Wedding Venues Spain · <a href="mailto:info@weddingvenuesspain.com" style="color:#9A8F78;">info@weddingvenuesspain.com</a></p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body></html>`,
+  })
+}

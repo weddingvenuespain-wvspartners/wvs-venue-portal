@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { sendNewLeadEmail } from '@/lib/mailer'
 
 function getServiceClient() {
   return createClient(
@@ -75,6 +76,37 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.error('[leads/create]', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Send email notification to venue's configured leads emails
+    try {
+      const { data: onb } = await svc
+        .from('venue_onboarding')
+        .select('name, ficha_data')
+        .eq('user_id', profile.user_id)
+        .maybeSingle()
+
+      const rawEmails: string = onb?.ficha_data?.leadsEmail || ''
+      const emailList = rawEmails.split(',').map((e: string) => e.trim()).filter(Boolean)
+
+      if (emailList.length > 0) {
+        await sendNewLeadEmail({
+          to:                  emailList,
+          venueName:           onb?.name || 'Wedding Venues Spain',
+          coupleName:          name  || '',
+          email:               email || null,
+          phone:               phone || null,
+          guests:              guests ? String(guests) : null,
+          weddingDate:         wedding_date,
+          budget:              budget || 'sin_definir',
+          message:             message || null,
+          wantsWeddingPlanner: wants_wedding_planner === true || wants_wedding_planner === 'true',
+          whatsappConsent:     whatsapp_consent === true || whatsapp_consent === 'true',
+        })
+      }
+    } catch (mailErr: any) {
+      console.error('[leads/create] email error:', mailErr?.message)
+      // Non-fatal — lead was created successfully
     }
 
     return NextResponse.json({ success: true, lead_id: data.id })
