@@ -30,7 +30,7 @@ const MUTED  = '#9C7B6A'
 const INK    = '#2A1F1A'
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
-const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) => `
+const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, secRgb: string, font: string) => `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
@@ -136,7 +136,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) =
   .t4-section-label {
     display: block; text-align: center;
     font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-    color: ${TERRA}; margin-bottom: 12px;
+    color: ${sec}; margin-bottom: 12px;
   }
   .t4-section-title {
     font-family: ${font}; font-weight: 400;
@@ -161,7 +161,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) =
     background: #fff; border-radius: 4px;
     padding: 36px 32px 28px;
     position: relative; overflow: hidden;
-    box-shadow: 0 2px 20px rgba(${toRgb(TERRA)},.07);
+    box-shadow: 0 2px 20px rgba(${secRgb},.07);
     display: flex; flex-direction: column; gap: 20px;
     border-bottom: 3px solid ${pri};
   }
@@ -192,7 +192,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) =
   }
   .t4-test-avatar-ph {
     width: 44px; height: 44px; border-radius: 50%;
-    background: linear-gradient(135deg, ${pri}, ${TERRA});
+    background: linear-gradient(135deg, ${pri}, ${sec});
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
     font-family: ${font}; color: #fff;
@@ -362,7 +362,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) =
   .t4-zone-info { padding: 36px 32px; display: flex; flex-direction: column; gap: 10px }
   .t4-zone-name { font-family: ${font}; font-size: 1.4rem; color: ${INK} }
   .t4-zone-desc { font-size: .87rem; color: ${MUTED}; line-height: 1.7 }
-  .t4-zone-cap { font-size: .8rem; color: ${TERRA}; font-weight: 600 }
+  .t4-zone-cap { font-size: .8rem; color: ${sec}; font-weight: 600 }
   .t4-zone-price { font-size: .9rem; font-weight: 600; color: ${INK} }
 
   /* ── FAQ ── */
@@ -425,7 +425,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) =
   .t4-cta-av {
     width: 36px; height: 36px; border-radius: 50%;
     border: 2px solid rgba(255,255,255,.3);
-    background: linear-gradient(135deg, ${pri}, ${TERRA});
+    background: linear-gradient(135deg, ${pri}, ${sec});
     margin-left: -8px; display: flex; align-items: center; justify-content: center;
     font-size: .7rem; color: #fff; font-weight: 600;
     overflow: hidden;
@@ -590,6 +590,8 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
   const primary   = branding?.primary_color || TERRA
   const priRgb    = toRgb(primary)
   const darkPri   = isDark(primary)
+  const secondary = branding?.secondary_color || TERRA
+  const secRgb    = toRgb(secondary)
   const font      = (branding as any)?.font_family || "'Playfair Display', Georgia, serif"
   const venueName = data.venue?.name || ''
   const contact   = resolveContact(data)
@@ -635,7 +637,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
 
   return (
     <div className="t4 tpl-root">
-      <style dangerouslySetInnerHTML={{ __html: buildCss(primary, priRgb, darkPri, font) }} />
+      <style dangerouslySetInnerHTML={{ __html: buildCss(primary, priRgb, darkPri, secondary, secRgb, font) }} />
 
       {/* NAV — controlled by sticky_nav toggle */}
       {on('sticky_nav') && (
@@ -1061,7 +1063,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
                 ) : null}
                 {accom.nearby && (
                   <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${SAND}` }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: TERRA, marginBottom: 6 }}>Alojamientos cercanos</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: secondary, marginBottom: 6 }}>Alojamientos cercanos</div>
                     <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.7 }}>{accom.nearby}</p>
                   </div>
                 )}
@@ -1110,7 +1112,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
               {collabsShow.map((c: any, i: number) => (
                 <FadeUp key={i} delay={(i % 4) * .04}>
                   <div style={{ background: '#fff', borderRadius: 4, padding: '20px 22px', boxShadow: '0 1px 12px rgba(0,0,0,.04)', height: '100%' }}>
-                    <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: TERRA, marginBottom: 8 }}>{c.category}</div>
+                    <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: secondary, marginBottom: 8 }}>{c.category}</div>
                     <div style={{ fontFamily: font, fontSize: 18, color: INK, marginBottom: 4 }}>{c.name}</div>
                     {c.description && <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.55 }}>{c.description}</div>}
                   </div>

@@ -148,9 +148,10 @@ export default function TemplateEditor({
     show_price_estimate: false,
     sections_data:       sections,
     branding: {
-      logo_url:      sections.logo_url ?? null,
-      primary_color: sections.primary_color ?? '#2d4a7a',
-      font_family:   sections.font_family ?? 'Georgia, serif',
+      logo_url:        sections.logo_url ?? null,
+      primary_color:   sections.primary_color ?? '#2d4a7a',
+      secondary_color: sections.secondary_color ?? null,
+      font_family:     sections.font_family ?? 'Georgia, serif',
     },
   }), [sections])
 

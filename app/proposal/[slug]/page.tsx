@@ -59,6 +59,7 @@ export type ProposalData = {
   branding: {
     logo_url: string | null
     primary_color: string
+    secondary_color?: string | null
     font_family?: string | null
   } | null
 }
@@ -172,10 +173,12 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     countdown:          findOne('countdown'),
   }
 
+  const sectionsSecondary = (proposal as any)?.sections_data?.secondary_color as string | undefined
+  const baseBranding = brandingData ?? { logo_url: null, primary_color: '#2d4a7a' }
   const proposalData: ProposalData = {
     ...proposal,
     venue: venueData ?? null,
-    branding: brandingData ?? { logo_url: null, primary_color: '#2d4a7a' },
+    branding: { ...baseBranding, secondary_color: sectionsSecondary ?? null },
     venueContent,
   }
 

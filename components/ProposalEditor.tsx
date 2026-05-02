@@ -459,6 +459,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       branding: {
         logo_url: form.logo_url || null,
         primary_color: form.primary_color,
+        secondary_color: (sections as any).secondary_color ?? null,
         font_family: form.font_family,
       },
     }
