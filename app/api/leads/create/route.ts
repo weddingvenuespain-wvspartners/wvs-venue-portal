@@ -87,10 +87,11 @@ export async function POST(req: NextRequest) {
         .eq('user_id', profile.user_id)
         .maybeSingle()
 
+      const leadsEmailEnabled = onb?.ficha_data?.leadsEmailEnabled !== false
       const rawEmails: string = onb?.ficha_data?.leadsEmail || ''
       const emailList = rawEmails.split(',').map((e: string) => e.trim()).filter(Boolean)
 
-      if (emailList.length > 0) {
+      if (leadsEmailEnabled && emailList.length > 0) {
         await sendNewLeadEmail({
           to:                  emailList,
           venueName:           onb?.name || 'Wedding Venues Spain',
