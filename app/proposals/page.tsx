@@ -86,6 +86,7 @@ function PropuestasPageContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentTab, setCurrentTab] = useState<'proposals' | 'inquiries'>('proposals')
   const [inquiriesUnread, setInquiriesUnread] = useState(0)
+  const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({})
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'sent' | 'viewed' | 'expired'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'last_7d' | 'last_30d'>('all')
   const [sortBy, setSortBy] = useState<'recent' | 'views' | 'name'>('recent')
@@ -118,6 +119,15 @@ function PropuestasPageContent() {
     if (props) { cachedProposals = props as Proposal[]; setProposals(cachedProposals) }
     if (leadsData) { cachedLeads = leadsData; setLeads(leadsData) }
     setLoading(false)
+
+    // Section view counts (best-effort; venue scope handled by RPC SECURITY DEFINER)
+    supabase.rpc('get_proposal_section_counts').then(({ data }) => {
+      if (Array.isArray(data)) {
+        const map: Record<string, number> = {}
+        for (const row of data) map[(row as any).proposal_id] = Number((row as any).sections_seen) || 0
+        setSectionCounts(map)
+      }
+    })
   }
 
   const notify = (msg: string, isErr = false) => {
@@ -519,6 +529,11 @@ function PropuestasPageContent() {
                             <Eye size={11} style={{ color: 'var(--warm-gray)' }} />
                             <span style={{ fontSize: 12 }}>{p.open_count ?? p.views ?? 0}</span>
                           </div>
+                          {sectionCounts[p.id] > 0 && (
+                            <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 2, whiteSpace: 'nowrap' }}>
+                              {sectionCounts[p.id]} {sectionCounts[p.id] === 1 ? 'sección leída' : 'secciones leídas'}
+                            </div>
+                          )}
                         </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
