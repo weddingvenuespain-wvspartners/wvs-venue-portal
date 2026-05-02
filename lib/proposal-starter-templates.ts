@@ -48,6 +48,10 @@ const BASE_SECTIONS: SectionsData = {
     testimonials: true, collaborators: true, accommodation: true,
     extra_services: true, faq: true, map: true, contact: true,
   },
+  contact: {
+    phone: '+34 600 123 456',
+    email: 'hola@tuvenue.com',
+  },
   experience_override: {
     title: 'Finca Son Vell — Tradición mallorquina desde 1687',
     body: 'Finca centenaria a 20 minutos de Palma, rodeada de olivares y montañas de Tramuntana. Ofrecemos una experiencia gastronómica completa con producto local y bodega propia. Un equipo con más de 15 años creando bodas memorables.',

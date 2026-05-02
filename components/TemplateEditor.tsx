@@ -837,6 +837,9 @@ export default function TemplateEditor({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <input className="form-input" placeholder="Teléfono / WhatsApp" style={{ fontSize: 12 }} value={c.phone ?? ''} onChange={e => p({ phone: e.target.value })} />
           <input className="form-input" type="email" placeholder="Email de contacto" style={{ fontSize: 12 }} value={c.email ?? ''} onChange={e => p({ email: e.target.value })} />
+          <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.5, marginTop: 2 }}>
+            Sustituye los datos de la demo por los tuyos. Si lo dejas vacío, se usa el contacto del venue.
+          </div>
         </div>
       )
     }
