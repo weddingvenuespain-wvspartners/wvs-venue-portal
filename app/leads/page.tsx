@@ -10,6 +10,7 @@ import { usePlanFeatures } from '@/lib/use-plan-features'
 import { expandLeadDates, expandBudgetDates, pad } from '@/lib/lead-dates'
 import { LeadDatesSection } from '@/components/LeadDatesSection'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import {
   Plus, Search, X, Phone, Mail, MessageCircle,
   Calendar, Users, ChevronLeft, ChevronRight, RotateCcw, CheckCircle,
@@ -3910,9 +3911,9 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }} onClick={onClose}>
-      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 420, background: '#fff', boxShadow: '-8px 0 40px rgba(0,0,0,0.12)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
-        onClick={e => e.stopPropagation()}>
+    <Sheet open onOpenChange={(open) => { if (!open) onClose() }}>
+      <SheetContent side="right" showClose={false} className="w-[420px] sm:max-w-[420px] p-0 flex flex-col overflow-y-auto">
+        <SheetTitle className="sr-only">{lead.name}</SheetTitle>
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, fontWeight: 600, color: 'var(--espresso)' }}>{lead.name}</div>
@@ -4132,8 +4133,8 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   )
 }
 
