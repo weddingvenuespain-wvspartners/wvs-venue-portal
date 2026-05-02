@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Info, FileText, Tag, MapPin, Image as ImageIcon, Star, Settings, ExternalLink, Mail, Lightbulb, Globe, RotateCcw } from 'lucide-react'
 import DOMPurify from 'dompurify'
+import Spinner from '@/components/Spinner'
 
 type Tab = 'info' | 'descripcion' | 'precios' | 'ubicacion' | 'fotos' | 'resenas' | 'config'
 type VenuePriceMode = 'auto' | 'included' | 'none'
@@ -762,7 +763,7 @@ export default function FichaPage() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: 'var(--gold)' }}>Cargando...</div>
+      <Spinner />
     </div>
   )
 

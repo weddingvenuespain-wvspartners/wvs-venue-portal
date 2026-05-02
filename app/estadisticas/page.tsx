@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { Eye, MousePointerClick, MessageSquare, TrendingUp } from 'lucide-react'
+import Spinner from '@/components/Spinner'
 
 const LEAD_STATUS_MAP = [
   { status: 'new',              label: 'Nuevos',              color: 'var(--gold)'  },
@@ -67,7 +68,7 @@ export default function EstadisticasPage() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: 'var(--gold)' }}>Cargando...</div>
+      <Spinner />
     </div>
   )
 

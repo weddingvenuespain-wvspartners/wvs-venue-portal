@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
+import Spinner from '@/components/Spinner'
 import {
   ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
   FileText, Calendar, Search, AlertCircle, Trash2, Flower2, Edit2,
@@ -660,7 +661,7 @@ export default function CalendarioPage() {
               </div>
 
                 {loading ? (
-                  <div style={{ textAlign: 'center', padding: 60, color: 'var(--warm-gray)', fontSize: 13 }}>Cargando...</div>
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Spinner /></div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
                     {cells.map((day, i) => {

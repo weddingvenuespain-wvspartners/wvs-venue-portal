@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import { usePlanFeatures } from '@/lib/use-plan-features'
+import Spinner from '@/components/Spinner'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -602,7 +603,7 @@ export default function ComunicacionPage() {
       <div className="main-layout">
         <div className="topbar"><div className="topbar-title">Comunicación</div></div>
         <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-          <div style={{ color: 'var(--warm-gray)', fontSize: 13 }}>Cargando...</div>
+          <Spinner />
         </div>
       </div>
     </div>

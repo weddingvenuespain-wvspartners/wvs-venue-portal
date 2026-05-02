@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import Spinner from '@/components/Spinner'
 
 const STATUS_LABELS: Record<string, string> = {
   new: 'Nuevo', contacted: 'Contactado', visit: 'Visita',
@@ -80,7 +81,7 @@ export default function CrmPage() {
 
   if (isBlocked) return null
 
-  if (loading) return <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ color: 'var(--gold)' }}>Cargando...</div></div>
+  if (loading) return <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spinner /></div>
 
   return (
     <div style={{ display: 'flex' }}>

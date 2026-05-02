@@ -15,6 +15,7 @@ import {
   Ban, CircleCheckBig, ArrowLeftRight, RotateCcw, FileText, OctagonAlert,
 } from 'lucide-react'
 import { type BillingCycle, advanceDateByMonths, cancelDeadline, daysUntil } from '@/lib/billing-types'
+import Spinner from '@/components/Spinner'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1484,7 +1485,7 @@ function UserPanel({
                 Otros usuarios
               </div>
               {teamLoading ? (
-                <div style={{ textAlign: 'center', padding: 32, color: 'var(--warm-gray)', fontSize: 13 }}>Cargando...</div>
+                <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}><Spinner /></div>
               ) : teamMembers.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '28px 20px', background: 'var(--cream)', borderRadius: 10, color: 'var(--warm-gray)', fontSize: 13 }}>
                   <User size={24} style={{ marginBottom: 8, opacity: .3, display: 'block', margin: '0 auto 8px' }} />
