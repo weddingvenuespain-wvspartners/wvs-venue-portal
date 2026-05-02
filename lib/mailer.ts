@@ -376,3 +376,65 @@ export async function sendVisitRequestEmail({
 </body></html>`,
   })
 }
+
+const KIND_LABEL: Record<string, string> = {
+  visit: 'Solicitud de visita',
+  call:  'Solicitud de llamada',
+  video: 'Videollamada',
+  menu:  'Pregunta sobre menú',
+  other: 'Consulta general',
+}
+
+export async function sendInquiryEmail({
+  to, venueName, coupleName, kind, name, email, phone, preferredDates, message, proposalUrl, smtpConfig,
+}: {
+  to: string
+  venueName: string
+  coupleName: string
+  kind: 'visit' | 'call' | 'video' | 'menu' | 'other'
+  name: string
+  email?: string | null
+  phone?: string | null
+  preferredDates?: string[]
+  message?: string | null
+  proposalUrl: string
+  smtpConfig?: SmtpConfig | null
+}) {
+  const t = smtpConfig
+    ? nodemailer.createTransport({ host: smtpConfig.host, port: smtpConfig.port, secure: smtpConfig.port === 465, auth: { user: smtpConfig.user, pass: smtpConfig.pass } })
+    : transporter
+  const from = smtpConfig ? `"${venueName}" <${smtpConfig.fromEmail}>` : '"Wedding Venues Spain" <noreply@weddingvenuesspain.com>'
+  const kindLabel = KIND_LABEL[kind] ?? 'Consulta'
+  const datesHtml = preferredDates?.length
+    ? preferredDates.map(d => `<li>${new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</li>`).join('')
+    : null
+  const replyToBlock: any = email ? { replyTo: email } : {}
+  const safeMessage = message ? message.replace(/</g, '&lt;').replace(/>/g, '&gt;') : null
+
+  await t.sendMail({
+    from, to, ...replyToBlock,
+    subject: `${kindLabel} — ${coupleName}`,
+    html: `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#F5F3ED;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F3ED;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border-radius:12px;padding:36px;">
+        <tr><td style="padding-bottom:24px;border-bottom:1px solid #F0EDE6;">
+          <p style="margin:0;font-size:13px;font-weight:700;color:#C4975A;letter-spacing:.1em;text-transform:uppercase;">${kindLabel}</p>
+          <h1 style="margin:8px 0 0;font-size:22px;color:#2C2416;font-weight:600;">${coupleName}</h1>
+        </td></tr>
+        <tr><td style="padding:24px 0 16px;">
+          <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#9A8F78;text-transform:uppercase;letter-spacing:.08em;">Contacto</p>
+          <p style="margin:0;font-size:14px;color:#2C2416;">${name}${email ? ` · <a href="mailto:${email}" style="color:#C4975A;">${email}</a>` : ''}${phone ? ` · ${phone}` : ''}</p>
+        </td></tr>
+        ${datesHtml ? `<tr><td style="padding-bottom:16px;"><p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#9A8F78;text-transform:uppercase;letter-spacing:.08em;">Fechas preferidas</p><ul style="margin:0;padding-left:18px;font-size:14px;color:#2C2416;line-height:1.8;">${datesHtml}</ul></td></tr>` : ''}
+        ${safeMessage ? `<tr><td style="padding-bottom:16px;"><p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#9A8F78;text-transform:uppercase;letter-spacing:.08em;">Mensaje</p><p style="margin:0;font-size:14px;color:#453D23;font-style:italic;">"${safeMessage}"</p></td></tr>` : ''}
+        <tr><td style="padding-top:16px;border-top:1px solid #F0EDE6;" align="center">
+          <a href="${proposalUrl}" style="display:inline-block;background:#C4975A;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">Ver propuesta →</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`,
+  })
+}

@@ -6,7 +6,8 @@ import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Lock, Loader2, FileText, Zap, Sparkles, ClipboardList, MessageCircle, Target, LayoutTemplate, ChevronLeft, ChevronRight, Search, type LucideIcon } from 'lucide-react'
+import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Lock, Loader2, FileText, Zap, Sparkles, ClipboardList, MessageCircle, Target, LayoutTemplate, ChevronLeft, ChevronRight, Search, Inbox, type LucideIcon } from 'lucide-react'
+import InquiriesPanel from '@/components/InquiriesPanel'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import { DEFAULT_TEMPLATES, type DefaultTemplateId, type DefaultTemplateIcon } from '@/lib/proposal-starter-templates'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -83,6 +84,8 @@ function PropuestasPageContent() {
   const [newModalOpen, setNewModalOpen] = useState(false)
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentTab, setCurrentTab] = useState<'proposals' | 'inquiries'>('proposals')
+  const [inquiriesUnread, setInquiriesUnread] = useState(0)
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'sent' | 'viewed' | 'expired'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'last_7d' | 'last_30d'>('all')
   const [sortBy, setSortBy] = useState<'recent' | 'views' | 'name'>('recent')
@@ -323,14 +326,25 @@ function PropuestasPageContent() {
         )}
 
         <Tabs
-          activeKey="proposals"
+          activeKey={currentTab}
+          onChange={(key) => setCurrentTab(key as 'proposals' | 'inquiries')}
           tabs={[
             { key: 'proposals', label: 'Propuestas', icon: FileText },
+            {
+              key: 'inquiries', label: 'Consultas', icon: Inbox,
+              badge: inquiriesUnread > 0
+                ? <span style={{ marginLeft: 6, fontSize: 10, padding: '1px 6px', borderRadius: 99, background: 'var(--gold)', color: '#fff', fontWeight: 700 }}>{inquiriesUnread}</span>
+                : undefined,
+            },
             { key: 'templates', label: 'Plantillas', icon: LayoutTemplate, href: '/proposals/templates' },
           ]}
         />
 
         <div className="page-content">
+
+          {currentTab === 'inquiries' ? (
+            <InquiriesPanel onCountChange={setInquiriesUnread} />
+          ) : (<>
 
           {smtpConfigured === false && (
             <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -576,6 +590,7 @@ function PropuestasPageContent() {
           )}
           </>
           )}
+          </>)}
         </div>
       </div>
 

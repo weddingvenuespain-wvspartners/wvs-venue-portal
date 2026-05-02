@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, StarRating, resolveContact, type ProposalData } from './shared'
+import InquiryForm from '@/components/InquiryForm'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
@@ -1155,6 +1156,26 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           CONTACTO
       ════════════════════════════════════════════ */}
+      {/* ════════════════════════════════════════════
+          INQUIRY FORM — couple → venue
+      ════════════════════════════════════════════ */}
+      {on('inquiries') && (
+        <section className="t1-sec" id="t1-inquiries" style={{ background: lightMode ? pal.surfaceAlt : '#0a0a0a' }}>
+          <div className="w">
+            <FadeUp>
+              <span className="t1-label" style={{ display: 'block', textAlign: 'center' }}>Hablemos</span>
+              <h2 className="t1-h2" style={{ textAlign: 'center', marginBottom: 12 }}>¿Quedamos para conoceros?</h2>
+              <p style={{ textAlign: 'center', fontSize: '.95rem', color: fg(.55), maxWidth: 540, margin: '0 auto 40px', lineHeight: 1.7 }}>
+                Cuéntanos cómo prefieres que hablemos: visita en persona, llamada, videollamada o lo que necesites.
+              </p>
+            </FadeUp>
+            <FadeUp delay={.1}>
+              <InquiryForm slug={data.slug} primary={primary} onPrimary={onPri} dark={!lightMode} />
+            </FadeUp>
+          </div>
+        </section>
+      )}
+
       {contactOn && (
         <section className="t1-cta" id="t1-cta">
           <div className="w">
