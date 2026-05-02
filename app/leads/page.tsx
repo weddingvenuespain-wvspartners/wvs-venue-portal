@@ -77,8 +77,8 @@ const BUDGET_LABEL: Record<string, string> = {
 }
 const BUDGET_OPTS = [
   'sin_definir',
-  'menos_10k', '10k_15k', '15k_20k', '20k_25k', '25k_30k',
-  '30k_40k', '40k_50k', '50k_75k', '75k_100k', 'mas_100k',
+  'wvs_menos_20k', 'wvs_20k_35k', 'wvs_35k_40k',
+  'wvs_40k_51k', 'wvs_51k_60k', 'wvs_mas_60k',
 ]
 const CEREMONY_LABEL: Record<string, string> = {
   sin_definir: '—', civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica',

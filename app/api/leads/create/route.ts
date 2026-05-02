@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
       wedding_date:          wedding_date,
       budget:                budget  || 'sin_definir',
       initial_message:       message || null,
+      language:              null,
       wants_wedding_planner: wants_wedding_planner === true || wants_wedding_planner === 'true' || false,
       whatsapp_consent:      whatsapp_consent === true || whatsapp_consent === 'true' || false,
     }).select().single()
