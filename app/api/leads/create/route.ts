@@ -91,7 +91,10 @@ export async function POST(req: NextRequest) {
       const rawEmails: string = onb?.ficha_data?.leadsEmail || ''
       const emailList = rawEmails.split(',').map((e: string) => e.trim()).filter(Boolean)
 
+      console.log('[leads/create] email config:', { leadsEmailEnabled, rawEmails, emailList, smtpHost: process.env.SMTP_HOST, smtpUser: process.env.SMTP_USER, hasPass: !!process.env.SMTP_PASS })
+
       if (leadsEmailEnabled && emailList.length > 0) {
+        console.log('[leads/create] sending email to:', emailList)
         await sendNewLeadEmail({
           to:                  emailList,
           venueName:           onb?.name || 'Wedding Venues Spain',
@@ -105,9 +108,10 @@ export async function POST(req: NextRequest) {
           wantsWeddingPlanner: wants_wedding_planner === true || wants_wedding_planner === 'true',
           whatsappConsent:     whatsapp_consent === true || whatsapp_consent === 'true',
         })
+        console.log('[leads/create] email sent OK')
       }
     } catch (mailErr: any) {
-      console.error('[leads/create] email error:', mailErr?.message)
+      console.error('[leads/create] EMAIL ERROR:', mailErr?.message, mailErr?.code, mailErr?.responseCode)
       // Non-fatal — lead was created successfully
     }
 
