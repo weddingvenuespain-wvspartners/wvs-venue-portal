@@ -396,6 +396,24 @@ export default function LeadsPage() {
     }
   }, [user, authLoading, activeVenue?.id])
 
+  // Realtime: auto-refresh when a new lead arrives for this venue
+  useEffect(() => {
+    if (!activeVenue?.id) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`leads-${activeVenue.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'leads',
+        filter: `venue_id=eq.${activeVenue.id}`,
+      }, (payload) => {
+        setLeads(prev => [payload.new as any, ...prev])
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [activeVenue?.id])
+
   // Deep-link: open the visit-edit modal when arriving with ?openVisit=<leadId>
   useEffect(() => {
     if (typeof window === 'undefined') return

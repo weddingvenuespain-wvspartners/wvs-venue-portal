@@ -380,13 +380,19 @@ export async function sendVisitRequestEmail({
 // ─── New lead notification (para el venue cuando llega una petición nueva) ───
 
 const BUDGET_LABEL: Record<string, string> = {
-  'sin_definir': 'Sin definir',
-  'menos_10k':   '< 10.000 €',
-  '10k_20k':     '10.000 – 20.000 €',
-  '20k_35k':     '20.000 – 35.000 €',
-  '35k_50k':     '35.000 – 50.000 €',
-  '50k_75k':     '50.000 – 75.000 €',
-  'mas_75k':     '> 75.000 €',
+  'sin_definir':    'Sin definir',
+  'menos_10k':      '< 10.000 €',
+  '10k_20k':        '10.000 – 20.000 €',
+  '20k_35k':        '20.000 – 35.000 €',
+  '35k_50k':        '35.000 – 50.000 €',
+  '50k_75k':        '50.000 – 75.000 €',
+  'mas_75k':        '> 75.000 €',
+  'wvs_menos_20k':  '< 20.000 €',
+  'wvs_20k_35k':    '20.000 – 35.000 €',
+  'wvs_35k_40k':    '35.000 – 40.000 €',
+  'wvs_40k_51k':    '40.000 – 51.000 €',
+  'wvs_51k_60k':    '51.000 – 60.000 €',
+  'wvs_mas_60k':    '> 60.000 €',
 }
 
 export async function sendNewLeadEmail({

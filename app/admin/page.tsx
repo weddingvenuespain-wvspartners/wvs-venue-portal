@@ -1619,6 +1619,9 @@ export default function AdminPage() {
   const [selectedTab, setSelectedTab]     = useState<'perfil' | 'venues' | 'suscripcion' | 'historial'>('perfil')
   const [showCreateUser, setShowCreateUser] = useState(false)
   const [crmTab, setCrmTab]               = useState<'venue_owner' | 'wedding_planner' | 'catering'>('venue_owner')
+  const [venueView, setVenueView]         = useState<'users' | 'venues'>('users')
+  const [page, setPage]                   = useState(1)
+  const PAGE_SIZE = 20
 
   const notify = (msg: string, isErr = false) => {
     isErr ? setError(msg) : setSuccess(msg)
@@ -1982,7 +1985,7 @@ export default function AdminPage() {
             { key: 'wedding_planner', label: 'Planners', count: profiles.filter(p => p.role === 'wedding_planner').length },
             { key: 'catering',        label: 'Catering', count: profiles.filter(p => p.role === 'catering').length },
           ] as { key: 'venue_owner' | 'wedding_planner' | 'catering'; label: string; count: number }[]).map(tab => (
-            <button key={tab.key} onClick={() => { setCrmTab(tab.key); setSearch(''); setFilterStatus('all'); setFilterPlan('all') }}
+            <button key={tab.key} onClick={() => { setCrmTab(tab.key); setSearch(''); setFilterStatus('all'); setFilterPlan('all'); setPage(1) }}
               style={{
                 padding: '10px 18px', fontSize: 13, fontWeight: crmTab === tab.key ? 600 : 400,
                 color: crmTab === tab.key ? 'var(--gold)' : 'var(--warm-gray)',
@@ -2061,18 +2064,18 @@ export default function AdminPage() {
                 <Search size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
                 <input className="form-input" style={{ paddingLeft: 28, fontSize: 12, padding: '7px 12px 7px 28px' }}
                   placeholder="Buscar por nombre, empresa, username..."
-                  value={search} onChange={e => setSearch(e.target.value)} />
+                  value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
               </div>
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                {([['all','Todos'], ['pending','⏳ Por verificar'], ['pending','Pendientes'], ['active','Activos'], ['inactive','Inactivos']] as [string,string][]).map(([k, label]) => (
-                  <button key={k} onClick={() => setFilterStatus(k)}
+                {([['all','Todos'], ['pending','⏳ Pendientes'], ['active','Activos'], ['inactive','Inactivos']] as [string,string][]).map(([k, label]) => (
+                  <button key={k} onClick={() => { setFilterStatus(k); setPage(1) }}
                     className={`btn btn-sm ${filterStatus === k ? 'btn-primary' : 'btn-ghost'}`}>
                     {label}{k !== 'all' ? ` (${counts[k as keyof typeof counts] ?? 0})` : ` (${owners.length})`}
                   </button>
                 ))}
               </div>
               <select className="form-input" style={{ fontSize: 11, padding: '6px 10px', width: 'auto', minWidth: 170 }}
-                value={filterPlan} onChange={e => setFilterPlan(e.target.value)}>
+                value={filterPlan} onChange={e => { setFilterPlan(e.target.value); setPage(1) }}>
                 <option value="all">Todos los planes</option>
                 {plans.map(p => (
                   <option key={p.id} value={p.id}>
@@ -2087,6 +2090,120 @@ export default function AdminPage() {
               </select>
             </div>
 
+            {/* View toggle — only for venue_owner tab */}
+            {crmTab === 'venue_owner' && (
+              <div style={{ padding: '8px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 4 }}>
+                {([['users', 'Por usuarios'], ['venues', 'Por venues']] as ['users' | 'venues', string][]).map(([k, label]) => (
+                  <button key={k} onClick={() => setVenueView(k)}
+                    style={{
+                      padding: '5px 14px', fontSize: 11, fontWeight: venueView === k ? 600 : 400,
+                      border: venueView === k ? '1px solid var(--gold)' : '1px solid var(--ivory)',
+                      borderRadius: 6, cursor: 'pointer', fontFamily: 'Manrope, sans-serif',
+                      background: venueView === k ? 'rgba(196,151,90,0.08)' : '#fff',
+                      color: venueView === k ? 'var(--gold)' : 'var(--warm-gray)',
+                    }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Venues view */}
+            {crmTab === 'venue_owner' && venueView === 'venues' ? (
+              <div className="table-wrapper">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Venue</th>
+                      <th>Usuario</th>
+                      <th>Estado usuario</th>
+                      <th>Plan / Suscripción</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const venueRows = userVenues
+                        .map(v => {
+                          const prof = profiles.find(p => p.user_id === v.user_id)
+                          if (!prof || prof.role !== 'venue_owner') return null
+                          const info = getSubInfo(v.user_id)
+                          // Find venue-specific subscription
+                          const venueSub = subscriptions.find(s => s.venue_id === v.id && ['active', 'trial', 'trial_expired'].includes(s.status))
+                          const dLeft = venueSub?.status === 'trial' ? trialDaysLeft(venueSub.trial_end_date) : null
+                          const tBdg = trialBadge(dLeft)
+                          return { venue: v, profile: prof, info, venueSub, tBadge: tBdg }
+                        })
+                        .filter(Boolean) as any[]
+
+                      // Apply search filter
+                      const filteredVenues = venueRows.filter(r => {
+                        if (!search) return true
+                        const s = search.toLowerCase()
+                        return (r.venue.name || '').toLowerCase().includes(s)
+                          || (r.profile.email || '').toLowerCase().includes(s)
+                          || [r.profile.first_name, r.profile.last_name].filter(Boolean).join(' ').toLowerCase().includes(s)
+                          || (r.profile.company || '').toLowerCase().includes(s)
+                      })
+
+                      if (filteredVenues.length === 0) return (
+                        <tr><td colSpan={5} style={{ textAlign: 'center', padding: 40, color: 'var(--warm-gray)' }}>
+                          {search ? 'Sin resultados' : 'No hay venues asignados'}
+                        </td></tr>
+                      )
+
+                      return filteredVenues.map(r => (
+                        <tr key={r.venue.id} style={{ cursor: 'pointer' }} onClick={() => openPanel(r.profile, 'venues')}>
+                          <td>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--espresso)' }}>
+                              {r.venue.name || `WP #${r.venue.wp_venue_id}`}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>ID: {r.venue.wp_venue_id}</div>
+                          </td>
+                          <td>
+                            <div style={{ fontSize: 13, fontWeight: 500 }}>
+                              {[r.profile.first_name, r.profile.last_name].filter(Boolean).join(' ') || r.profile.email}
+                            </div>
+                            {r.profile.email && <div style={{ fontSize: 11, color: '#0369a1', display: 'flex', alignItems: 'center', gap: 3 }}><Mail size={9} /> {r.profile.email}</div>}
+                          </td>
+                          <td>
+                            <span className={`badge ${PROFILE_BADGE[r.profile.status] || ''}`}>
+                              {STATUS_LABEL[r.profile.status] || r.profile.status}
+                            </span>
+                          </td>
+                          <td>
+                            {r.info ? (
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 3 }}>{planLabel(r.info.plan)}</div>
+                                {r.venueSub ? (
+                                  <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                                    {r.venueSub.status === 'trial' && r.tBadge ? (
+                                      <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: r.tBadge.bg, color: r.tBadge.color }}>{r.tBadge.label}</span>
+                                    ) : (
+                                      <span className={`badge ${SUB_BADGE[r.venueSub.status] || 'badge-inactive'}`} style={{ fontSize: 10 }}>{STATUS_LABEL[r.venueSub.status]}</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className={`badge ${SUB_BADGE[r.info.sub.status] || 'badge-inactive'}`} style={{ fontSize: 10 }}>{STATUS_LABEL[r.info.sub.status]}</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Sin plan</span>
+                            )}
+                          </td>
+                          <td onClick={e => e.stopPropagation()}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => openPanel(r.profile, 'venues')}>
+                              <Edit2 size={11} /> Editar
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+            <>
             <div className="table-wrapper">
               <table className="data-table">
                 <thead>
@@ -2105,7 +2222,7 @@ export default function AdminPage() {
                       {search || filterStatus !== 'all' || filterPlan !== 'all' ? 'Sin resultados' : `No hay ${crmTab === 'venue_owner' ? 'venue owners' : crmTab === 'wedding_planner' ? 'planners' : 'caterings'} registrados todavía`}
                     </td></tr>
                   )}
-                  {filtered.map(p => {
+                  {filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(p => {
                     const info         = getSubInfo(p.user_id)
                     const myVenueCount = userVenues.filter(v => v.user_id === p.user_id).length
                     const primaryVenue = getVenueName(p.wp_venue_id)
@@ -2239,10 +2356,27 @@ export default function AdminPage() {
             </div>
 
             {filtered.length > 0 && (
-              <div style={{ padding: '10px 20px', borderTop: '1px solid var(--ivory)', fontSize: 11, color: 'var(--warm-gray)' }}>
-                {filtered.length} resultado{filtered.length !== 1 ? 's' : ''}
-                {(search || filterStatus !== 'all' || filterPlan !== 'all') && ` de ${owners.length} totales`}
+              <div style={{ padding: '10px 20px', borderTop: '1px solid var(--ivory)', fontSize: 11, color: 'var(--warm-gray)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>
+                  {filtered.length} resultado{filtered.length !== 1 ? 's' : ''}
+                  {(search || filterStatus !== 'all' || filterPlan !== 'all') && ` de ${owners.length} totales`}
+                </span>
+                {filtered.length > PAGE_SIZE && (
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <button className="btn btn-ghost btn-sm" disabled={page <= 1}
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      style={{ fontSize: 11, padding: '4px 8px' }}>← Anterior</button>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--charcoal)' }}>
+                      {page} / {Math.ceil(filtered.length / PAGE_SIZE)}
+                    </span>
+                    <button className="btn btn-ghost btn-sm" disabled={page >= Math.ceil(filtered.length / PAGE_SIZE)}
+                      onClick={() => setPage(p => p + 1)}
+                      style={{ fontSize: 11, padding: '4px 8px' }}>Siguiente →</button>
+                  </div>
+                )}
               </div>
+            )}
+            </>
             )}
           </div>
         </div>

@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     // Look up the user_venues row so we can store venue_id on the lead
     const { data: venueRow } = await svc
       .from('user_venues')
-      .select('id')
+      .select('id, name')
       .eq('user_id', profile.user_id)
       .eq('wp_venue_id', wp_venue_id)
       .maybeSingle()
@@ -108,13 +108,10 @@ export async function POST(req: NextRequest) {
       const rawEmails: string = onb?.ficha_data?.leadsEmail || ''
       const emailList = rawEmails.split(',').map((e: string) => e.trim()).filter(Boolean)
 
-      console.log('[leads/create] email config:', { leadsEmailEnabled, rawEmails, emailList, smtpHost: process.env.SMTP_HOST, smtpUser: process.env.SMTP_USER, hasPass: !!process.env.SMTP_PASS })
-
       if (leadsEmailEnabled && emailList.length > 0) {
-        console.log('[leads/create] sending email to:', emailList)
         await sendNewLeadEmail({
           to:                  emailList,
-          venueName:           onb?.name || 'Wedding Venues Spain',
+          venueName:           venueRow?.name || onb?.name || 'Wedding Venues Spain',
           coupleName:          name  || '',
           email:               email || null,
           phone:               phone || null,

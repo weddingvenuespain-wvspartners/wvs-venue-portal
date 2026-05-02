@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
-import { Heart, Phone, Mail, Users, Calendar, MessageSquare, ExternalLink, RefreshCw } from 'lucide-react'
+import { Heart, Phone, Mail, Users, Calendar, MessageSquare, MapPin, RefreshCw, ChevronDown } from 'lucide-react'
 
 type PlannerLead = {
   id: string
@@ -16,11 +16,12 @@ type PlannerLead = {
   budget: string | null
   initial_message: string | null
   whatsapp_consent: boolean
+  planner_status: string
   source: string | null
   created_at: string
   venue_id: string | null
-  // joined
   venue_name?: string | null
+  venue_location?: string | null
 }
 
 const BUDGET_LABEL: Record<string, string> = {
@@ -51,9 +52,28 @@ const BUDGET_LABEL: Record<string, string> = {
   'wvs_mas_60k':    '> 60.000 €',
 }
 
+const TABS = [
+  { key: 'new',        label: 'Nuevas',      color: '#C4975A' },
+  { key: 'contacted',  label: 'Contactadas', color: '#3b82f6' },
+  { key: 'accepted',   label: 'Aceptadas',   color: '#22c55e' },
+  { key: 'cancelled',  label: 'Canceladas',  color: '#6b7280' },
+] as const
+
+type TabKey = typeof TABS[number]['key']
+
+const STATUS_OPTIONS = [
+  { value: 'new',        label: 'Nueva',      color: '#C4975A' },
+  { value: 'contacted',  label: 'Contactada', color: '#3b82f6' },
+  { value: 'accepted',   label: 'Aceptada',   color: '#22c55e' },
+  { value: 'cancelled',  label: 'Cancelada',  color: '#6b7280' },
+]
+
 function fmtDate(d: string | null) {
   if (!d) return '—'
-  return new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+  // Handle both YYYY-MM-DD and full ISO timestamps
+  const date = d.length <= 10 ? new Date(d + 'T12:00:00') : new Date(d)
+  if (isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export default function WeddingPlannersPage() {
@@ -62,6 +82,16 @@ export default function WeddingPlannersPage() {
   const [leads, setLeads] = useState<PlannerLead[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<TabKey>('new')
+  const [statusMenuId, setStatusMenuId] = useState<string | null>(null)
+
+  // Close status dropdown on outside click
+  useEffect(() => {
+    if (!statusMenuId) return
+    const close = () => setStatusMenuId(null)
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [statusMenuId])
 
   useEffect(() => {
     if (authLoading) return
@@ -75,25 +105,60 @@ export default function WeddingPlannersPage() {
     const supabase = createClient()
     const { data, error } = await supabase
       .from('leads')
-      .select('id, name, email, phone, guests, wedding_date, budget, initial_message, whatsapp_consent, source, created_at, venue_id')
+      .select('id, name, email, phone, guests, wedding_date, budget, initial_message, whatsapp_consent, planner_status, source, created_at, venue_id')
       .eq('wants_wedding_planner', true)
       .order('created_at', { ascending: false })
     if (error) { console.error(error); setLoading(false); return }
 
-    // Enrich with venue names
+    // Enrich with venue names + locations
     const venueIds = [...new Set((data || []).map((l: any) => l.venue_id).filter(Boolean))]
-    let venueMap: Record<string, string> = {}
+    let venueMap: Record<string, { name: string; location: string | null }> = {}
     if (venueIds.length) {
       const { data: venues } = await supabase
         .from('user_venues')
         .select('id, name')
         .in('id', venueIds)
-      if (venues) venues.forEach((v: any) => { venueMap[v.id] = v.name })
+
+      // Get locations from venue_onboarding
+      const { data: onbs } = await supabase
+        .from('venue_onboarding')
+        .select('venue_id, ficha_data')
+        .in('venue_id', venueIds)
+
+      const locationMap: Record<string, string> = {}
+      if (onbs) onbs.forEach((o: any) => {
+        if (o.venue_id && o.ficha_data?.location) locationMap[o.venue_id] = o.ficha_data.location
+      })
+
+      if (venues) venues.forEach((v: any) => {
+        venueMap[v.id] = { name: v.name, location: locationMap[v.id] || null }
+      })
     }
 
-    setLeads((data || []).map((l: any) => ({ ...l, venue_name: l.venue_id ? venueMap[l.venue_id] || null : null })))
+    setLeads((data || []).map((l: any) => ({
+      ...l,
+      planner_status: l.planner_status || 'new',
+      venue_name: l.venue_id ? venueMap[l.venue_id]?.name || null : null,
+      venue_location: l.venue_id ? venueMap[l.venue_id]?.location || null : null,
+    })))
     setLoading(false)
   }
+
+  const updateStatus = async (leadId: string, newStatus: string) => {
+    const supabase = createClient()
+    await supabase.from('leads').update({ planner_status: newStatus }).eq('id', leadId)
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, planner_status: newStatus } : l))
+    setStatusMenuId(null)
+    // Notify sidebar to refresh WP badge count
+    window.dispatchEvent(new Event('wvs-wp-badge-refresh'))
+  }
+
+  const filtered = leads.filter(l => l.planner_status === activeTab)
+
+  const tabCounts = TABS.reduce((acc, t) => {
+    acc[t.key] = leads.filter(l => l.planner_status === t.key).length
+    return acc
+  }, {} as Record<TabKey, number>)
 
   if (loading || authLoading) return (
     <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -113,89 +178,164 @@ export default function WeddingPlannersPage() {
         </div>
         <div className="page-content">
 
-          <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ padding: '6px 14px', borderRadius: 20, background: '#fdf2f8', border: '1px solid #f0abfc', fontSize: 12, fontWeight: 600, color: '#a21caf' }}>
-              {leads.length} {leads.length === 1 ? 'petición' : 'peticiones'}
-            </div>
-            <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Parejas que marcaron "We'd like help planning and coordinating our wedding"</span>
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '2px solid var(--ivory)' }}>
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer',
+                  fontSize: 13, fontWeight: activeTab === tab.key ? 600 : 400,
+                  color: activeTab === tab.key ? tab.color : 'var(--warm-gray)',
+                  borderBottom: activeTab === tab.key ? `2px solid ${tab.color}` : '2px solid transparent',
+                  marginBottom: -2, transition: 'all 0.15s',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {tab.label}
+                {tabCounts[tab.key] > 0 && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10,
+                    background: activeTab === tab.key ? tab.color : 'var(--ivory)',
+                    color: activeTab === tab.key ? '#fff' : 'var(--warm-gray)',
+                  }}>
+                    {tabCounts[tab.key]}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
 
-          {leads.length === 0 ? (
+          {filtered.length === 0 ? (
             <div className="card" style={{ padding: '48px 32px', textAlign: 'center' }}>
               <Heart size={32} style={{ color: 'var(--ivory)', margin: '0 auto 12px' }} />
-              <div style={{ fontSize: 14, color: 'var(--warm-gray)' }}>No hay peticiones de wedding planner todavía</div>
+              <div style={{ fontSize: 14, color: 'var(--warm-gray)' }}>
+                No hay peticiones {TABS.find(t => t.key === activeTab)?.label.toLowerCase()}
+              </div>
             </div>
           ) : (
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="card" style={{ padding: 0, overflow: 'visible' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: 'var(--cream)', borderBottom: '1px solid var(--ivory)' }}>
-                    <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, color: 'var(--warm-gray)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pareja</th>
-                    <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, color: 'var(--warm-gray)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Contacto</th>
-                    <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, color: 'var(--warm-gray)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Venue</th>
-                    <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, color: 'var(--warm-gray)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Fecha / Invitados</th>
-                    <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, color: 'var(--warm-gray)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Presupuesto</th>
-                    <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, color: 'var(--warm-gray)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Recibida</th>
+                    {['Pareja', 'Contacto', 'Venue', 'Ubicación', 'Fecha / Invitados', 'Presupuesto', 'Estado', 'Recibida'].map(h => (
+                      <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--warm-gray)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {leads.map(lead => (
-                    <>
-                      <tr
-                        key={lead.id}
-                        onClick={() => setExpanded(expanded === lead.id ? null : lead.id)}
-                        style={{ borderBottom: '1px solid var(--ivory)', cursor: 'pointer', background: expanded === lead.id ? '#fdf8f4' : '#fff', transition: 'background 0.1s' }}
-                      >
-                        <td style={{ padding: '12px 16px' }}>
-                          <div style={{ fontWeight: 600, color: 'var(--espresso)' }}>{lead.name || '—'}</div>
+                  {filtered.map(lead => (<>
+                    <tr
+                      key={lead.id}
+                      onClick={() => lead.initial_message && setExpanded(expanded === lead.id ? null : lead.id)}
+                      style={{ borderBottom: expanded === lead.id ? 'none' : '1px solid var(--ivory)', cursor: lead.initial_message ? 'pointer' : 'default', background: expanded === lead.id ? '#fdf8f4' : '#fff', transition: 'background 0.1s' }}
+                    >
+                      {/* Pareja */}
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--espresso)' }}>{lead.name || '—'}</div>
+                        <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
                           {lead.whatsapp_consent && (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 3, padding: '2px 7px', borderRadius: 10, background: '#dcfce7', fontSize: 10, fontWeight: 600, color: '#16a34a' }}>
-                              <svg width="9" height="9" viewBox="0 0 24 24" fill="#16a34a"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.555 4.118 1.528 5.847L0 24l6.335-1.508A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.65-.502-5.18-1.378l-.37-.22-3.862.919.977-3.773-.243-.387A9.953 9.953 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-                              WhatsApp OK
-                            </div>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 10, background: '#dcfce7', fontSize: 9, fontWeight: 600, color: '#16a34a' }}>
+                              ✓ WhatsApp
+                            </span>
                           )}
-                        </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            {lead.email && <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--charcoal)' }}><Mail size={11} style={{ color: 'var(--warm-gray)' }} />{lead.email}</div>}
-                            {lead.phone && <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--charcoal)' }}><Phone size={11} style={{ color: 'var(--warm-gray)' }} />{lead.phone}</div>}
+                        </div>
+                      </td>
+                      {/* Contacto */}
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {lead.email && <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--charcoal)', fontSize: 12 }}><Mail size={10} style={{ color: 'var(--warm-gray)' }} />{lead.email}</div>}
+                          {lead.phone && <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--charcoal)', fontSize: 12 }}><Phone size={10} style={{ color: 'var(--warm-gray)' }} />{lead.phone}</div>}
+                        </div>
+                      </td>
+                      {/* Venue */}
+                      <td style={{ padding: '12px 14px', color: lead.venue_name ? 'var(--espresso)' : 'var(--warm-gray)', fontStyle: lead.venue_name ? 'normal' : 'italic', fontWeight: 500 }}>
+                        {lead.venue_name || '—'}
+                      </td>
+                      {/* Ubicación */}
+                      <td style={{ padding: '12px 14px' }}>
+                        {lead.venue_location ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--charcoal)', fontSize: 12 }}>
+                            <MapPin size={10} style={{ color: 'var(--warm-gray)' }} />{lead.venue_location}
                           </div>
-                        </td>
-                        <td style={{ padding: '12px 16px', color: lead.venue_name ? 'var(--espresso)' : 'var(--warm-gray)', fontStyle: lead.venue_name ? 'normal' : 'italic' }}>
-                          {lead.venue_name || 'Sin venue asignado'}
-                        </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--charcoal)' }}><Calendar size={11} style={{ color: 'var(--warm-gray)' }} />{fmtDate(lead.wedding_date)}</div>
-                            {lead.guests && <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--charcoal)' }}><Users size={11} style={{ color: 'var(--warm-gray)' }} />{lead.guests} invitados</div>}
+                        ) : <span style={{ color: 'var(--warm-gray)' }}>—</span>}
+                      </td>
+                      {/* Fecha / Invitados */}
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--charcoal)', fontSize: 12 }}><Calendar size={10} style={{ color: 'var(--warm-gray)' }} />{fmtDate(lead.wedding_date)}</div>
+                          {lead.guests && <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--charcoal)', fontSize: 12 }}><Users size={10} style={{ color: 'var(--warm-gray)' }} />{lead.guests}</div>}
+                        </div>
+                      </td>
+                      {/* Presupuesto */}
+                      <td style={{ padding: '12px 14px', color: 'var(--charcoal)', fontSize: 12 }}>
+                        {BUDGET_LABEL[lead.budget || 'sin_definir'] || '—'}
+                      </td>
+                      {/* Estado */}
+                      <td style={{ padding: '12px 14px', position: 'relative' }}>
+                        <button
+                          onMouseDown={(e) => { e.stopPropagation(); setStatusMenuId(statusMenuId === lead.id ? null : lead.id) }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 4,
+                            padding: '4px 10px', borderRadius: 8, border: '1px solid var(--ivory)',
+                            background: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                            color: STATUS_OPTIONS.find(s => s.value === lead.planner_status)?.color || 'var(--warm-gray)',
+                          }}
+                        >
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_OPTIONS.find(s => s.value === lead.planner_status)?.color }} />
+                          {STATUS_OPTIONS.find(s => s.value === lead.planner_status)?.label}
+                          <ChevronDown size={10} />
+                        </button>
+                        {statusMenuId === lead.id && (
+                          <div style={{
+                            position: 'absolute', top: '100%', left: 14, zIndex: 50,
+                            background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10,
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.1)', padding: 4, minWidth: 140,
+                          }}>
+                            {STATUS_OPTIONS.filter(s => s.value !== lead.planner_status).map(opt => (
+                              <button
+                                key={opt.value}
+                                onMouseDown={(e) => { e.stopPropagation(); updateStatus(lead.id, opt.value) }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+                                  padding: '7px 12px', border: 'none', background: 'none', cursor: 'pointer',
+                                  fontSize: 12, color: opt.color, fontWeight: 500, borderRadius: 6,
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.background = '#f9f7f2')}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                              >
+                                <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color }} />
+                                {opt.label}
+                              </button>
+                            ))}
                           </div>
-                        </td>
-                        <td style={{ padding: '12px 16px', color: 'var(--charcoal)' }}>
-                          {BUDGET_LABEL[lead.budget || 'sin_definir'] || '—'}
-                        </td>
-                        <td style={{ padding: '12px 16px', color: 'var(--warm-gray)', fontSize: 12 }}>
-                          {fmtDate(lead.created_at)}
+                        )}
+                      </td>
+                      {/* Recibida */}
+                      <td style={{ padding: '12px 14px', color: 'var(--warm-gray)', fontSize: 12 }}>
+                        {fmtDate(lead.created_at)}
+                      </td>
+                    </tr>
+                    {expanded === lead.id && lead.initial_message && (
+                      <tr key={`${lead.id}-msg`} style={{ background: '#fdf8f4', borderBottom: '1px solid var(--ivory)' }}>
+                        <td colSpan={8} style={{ padding: '0 14px 14px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <MessageSquare size={13} style={{ color: 'var(--gold)', flexShrink: 0, marginTop: 2 }} />
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Mensaje</div>
+                              <div style={{ fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{lead.initial_message}</div>
+                            </div>
+                          </div>
                         </td>
                       </tr>
-                      {expanded === lead.id && lead.initial_message && (
-                        <tr key={`${lead.id}-msg`} style={{ background: '#fdf8f4', borderBottom: '1px solid var(--ivory)' }}>
-                          <td colSpan={6} style={{ padding: '0 16px 14px 16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                              <MessageSquare size={13} style={{ color: 'var(--gold)', flexShrink: 0, marginTop: 2 }} />
-                              <div>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Mensaje</div>
-                                <div style={{ fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{lead.initial_message}</div>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                  ))}
+                    )}
+                  </>))}
                 </tbody>
               </table>
             </div>
           )}
+
         </div>
       </div>
     </div>

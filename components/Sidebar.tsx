@@ -34,12 +34,28 @@ export default function Sidebar() {
     setVenueOpen(o => !o)
   }
   const [newLeadsCount, setNewLeadsCount] = useState(0)
-  useEffect(() => {
+  const fetchNewLeads = () => {
     if (!user || isAdmin || isPlanner) return
     const supabase = createClient()
     supabase.from('leads').select('id', { count: 'exact', head: true })
       .eq('user_id', user.id).eq('status', 'new')
-      .then(({ count }) => { if (count) setNewLeadsCount(count) })
+      .then(({ count }) => setNewLeadsCount(count ?? 0))
+  }
+  useEffect(() => { fetchNewLeads() }, [user?.id]) // eslint-disable-line
+  // Realtime: update badge when new lead arrives
+  useEffect(() => {
+    if (!user || isAdmin || isPlanner) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel('sidebar-new-leads')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'leads', filter: `user_id=eq.${user.id}` }, () => {
+        fetchNewLeads()
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads', filter: `user_id=eq.${user.id}` }, () => {
+        fetchNewLeads()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [user?.id]) // eslint-disable-line
 
   // Badge: new clients count (planner)
@@ -75,6 +91,22 @@ export default function Sidebar() {
     supabase.from('venue_profiles').select('id', { count: 'exact', head: true })
       .eq('status', 'pending')
       .then(({ count }) => setPendingUsersCount(count ?? 0))
+  }, [user?.id, isAdmin]) // eslint-disable-line
+
+  // Badge: new wedding planner requests (admin)
+  const [wpNewCount, setWpNewCount] = useState(0)
+  const fetchWpCount = () => {
+    if (!user || !isAdmin) return
+    const supabase = createClient()
+    supabase.from('leads').select('id', { count: 'exact', head: true })
+      .eq('wants_wedding_planner', true)
+      .eq('planner_status', 'new')
+      .then(({ count }) => setWpNewCount(count ?? 0))
+  }
+  useEffect(() => { fetchWpCount() }, [user?.id, isAdmin]) // eslint-disable-line
+  useEffect(() => {
+    window.addEventListener('wvs-wp-badge-refresh', fetchWpCount)
+    return () => window.removeEventListener('wvs-wp-badge-refresh', fetchWpCount)
   }, [user?.id, isAdmin]) // eslint-disable-line
 
   // Close venue dropdown on outside click
@@ -130,7 +162,7 @@ export default function Sidebar() {
     { href: '/admin',                    label: 'CRM',             icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', badge: pendingUsersCount },
     { href: '/admin/planes',             label: 'Planes',          icon: 'M1 4h14v8H1zM4 4V2M12 4V2M1 8h14' },
     { href: '/admin/onboarding',         label: 'Solicitudes',     icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4M12 5v4M10 7h4', badge: pendingOnboardingCount },
-    { href: '/admin/wedding-planners',   label: 'Wedding Planners', icon: 'M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z' },
+    { href: '/admin/wedding-planners',   label: 'Peticiones WP', icon: 'M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z', badge: wpNewCount },
   ]
 
   const helpItems = [
@@ -397,42 +429,29 @@ export default function Sidebar() {
       <div className="sidebar-footer">
         {/* Trial / plan banners — solo venue owner */}
         {isVenueOwner && !features.loading && features.isTrialExpired && (
-          <div style={{ marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-              <Hourglass size={12} style={{ color: '#f87171', flexShrink: 0 }} />
-              <span style={{ fontSize: 10, fontWeight: 600, color: '#f87171', letterSpacing: '0.08em' }}>PERIODO DE PRUEBA EXPIRADO</span>
+          <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', textDecoration: 'none' }}>
+            <Hourglass size={11} style={{ color: '#f87171', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#f87171', letterSpacing: '0.04em' }}>TRIAL EXPIRADO</div>
+              <div style={{ fontSize: 10, color: 'var(--stone)' }}>Activa tu plan</div>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--stone)', marginBottom: 10, lineHeight: 1.5 }}>
-              Tu periodo de prueba ha terminado. Activa tu plan para seguir usando el portal.
-            </div>
-            <Link href="/pricing" style={{ display: 'block', padding: '8px 12px', borderRadius: 8, background: '#dc2626', color: '#fff', fontSize: 11, fontWeight: 600, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.02em' }}>
-              Activar plan ahora
-            </Link>
-          </div>
+            <span style={{ fontSize: 9, fontWeight: 600, color: '#f87171', whiteSpace: 'nowrap' }}>Activar →</span>
+          </Link>
         )}
 
         {isVenueOwner && !features.loading && features.isTrial && !features.isTrialExpired && (
-          <div style={{ marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-              <Hourglass size={12} style={{ color: 'var(--gold)', flexShrink: 0 }} />
-              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.08em' }}>PERIODO DE PRUEBA</span>
-            </div>
-            {features.trialDaysLeft !== null && (
-              <div style={{ marginBottom: 8 }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
-                  background: features.trialDaysLeft <= 3 ? 'rgba(220,38,38,0.15)' : 'rgba(196,151,90,0.12)',
-                  color: features.trialDaysLeft <= 3 ? '#fca5a5' : 'var(--gold)',
-                }}>
+          <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)', textDecoration: 'none' }}>
+            <Hourglass size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.04em' }}>TRIAL</div>
+              {features.trialDaysLeft !== null && (
+                <div style={{ fontSize: 10, color: features.trialDaysLeft <= 3 ? '#fca5a5' : 'var(--stone)' }}>
                   {features.trialDaysLeft} días restantes
-                </span>
-              </div>
-            )}
-            <div style={{ fontSize: 11, color: 'var(--stone)', marginBottom: 10, lineHeight: 1.5 }}>Activa tu plan para seguir usando el portal.</div>
-            <Link href="/pricing" style={{ display: 'block', padding: '8px 12px', borderRadius: 8, background: 'var(--gold)', color: '#fff', fontSize: 11, fontWeight: 600, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.02em' }}>
-              Activar plan
-            </Link>
-          </div>
+                </div>
+              )}
+            </div>
+            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--gold)', whiteSpace: 'nowrap' }}>Activar →</span>
+          </Link>
         )}
 
         {isVenueOwner && !features.loading && !features.isTrial && !features.isTrialExpired && features.hasPlan && features.planTier === 'basic' && (
@@ -443,13 +462,13 @@ export default function Sidebar() {
         )}
 
         {isVenueOwner && !features.loading && !features.isTrial && !features.isTrialExpired && !features.hasPlan && (
-          <div style={{ marginBottom: 10, padding: '9px 12px', borderRadius: 8, background: '#1e293b', border: '1px solid #334155' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#f87171', marginBottom: 2 }}>Sin suscripción activa</div>
-            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.4, marginBottom: 8 }}>Activa tu plan para acceder al portal.</div>
-            <Link href="/pricing" style={{ display: 'block', padding: '7px 12px', borderRadius: 7, background: '#dc2626', color: '#fff', fontSize: 11, fontWeight: 600, textAlign: 'center', textDecoration: 'none' }}>
-              Ver planes
-            </Link>
-          </div>
+          <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: '#1e293b', border: '1px solid #334155', textDecoration: 'none' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#f87171' }}>Sin suscripción</div>
+              <div style={{ fontSize: 10, color: '#94a3b8' }}>Activa tu plan</div>
+            </div>
+            <span style={{ fontSize: 9, fontWeight: 600, color: '#f87171', whiteSpace: 'nowrap' }}>Ver planes →</span>
+          </Link>
         )}
 
         <Link href="/perfil" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, textDecoration: 'none' }}>
