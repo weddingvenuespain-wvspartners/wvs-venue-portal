@@ -737,13 +737,15 @@ function UserPanel({
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Estado de cuenta</label>
-                  <select className="form-input" value={pForm.status}
-                    onChange={e => setPForm(f => ({ ...f, status: e.target.value }))}>
-                    <option value="pending">⏳ Pendiente verificación</option>
-                    <option value="active">✅ Activo</option>
-                    <option value="inactive">Inactivo</option>
-                    <option value="rejected">🚫 Denegado</option>
-                  </select>
+                  <Select value={pForm.status} onValueChange={(v) => setPForm(f => ({ ...f, status: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pendiente verificación</SelectItem>
+                      <SelectItem value="active">Activo</SelectItem>
+                      <SelectItem value="inactive">Inactivo</SelectItem>
+                      <SelectItem value="rejected">Denegado</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -931,12 +933,14 @@ function UserPanel({
                 </div>
                 <div className="form-group">
                   <label className="form-label">Venue (WordPress) *</label>
-                  <select className="form-input" value={newVenueId} onChange={e => setNewVenueId(e.target.value)}>
-                    <option value="">{wpVenues.length === 0 ? 'Cargando WP...' : 'Selecciona venue...'}</option>
-                    {wpVenues.map(v => (
-                      <option key={v.id} value={v.id}>{v.acf?.H1_Venue || v.title?.rendered} (#{v.id})</option>
-                    ))}
-                  </select>
+                  <Select value={newVenueId} onValueChange={setNewVenueId} disabled={wpVenues.length === 0}>
+                    <SelectTrigger><SelectValue placeholder={wpVenues.length === 0 ? 'Cargando WP...' : 'Selecciona venue...'} /></SelectTrigger>
+                    <SelectContent>
+                      {wpVenues.map(v => (
+                        <SelectItem key={v.id} value={String(v.id)}>{v.acf?.H1_Venue || v.title?.rendered} (#{v.id})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {wpVenues.length === 0 && (
                     <div style={{ fontSize: 11, color: '#b45309', marginTop: 4 }}>
                       <AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Si el venue aún no está en WordPress, aprueba primero el onboarding para que se publique.
@@ -948,24 +952,26 @@ function UserPanel({
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
                   <div className="form-group">
                     <label className="form-label">Plan</label>
-                    <select className="form-input" value={newPlanId} onChange={e => setNewPlanId(e.target.value)}>
-                      <option value="">Sin plan</option>
-                      {plans.filter(p => p.is_active).map(p => (
-                        <option key={p.id} value={p.id}>{planLabel(p)}</option>
-                      ))}
-                    </select>
+                    <Select value={newPlanId || 'none'} onValueChange={(v) => setNewPlanId(v === 'none' ? '' : v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin plan</SelectItem>
+                        {plans.filter(p => p.is_active).map(p => (
+                          <SelectItem key={p.id} value={p.id}>{planLabel(p)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Ciclo</label>
-                    <select className="form-input" value={newCycle} onChange={e => setNewCycle(e.target.value)}
-                      disabled={!newPlanId}>
-                      {!newPlanId && <option value="">Elige plan</option>}
-                      {(selPlanNew?.billing_cycles ?? []).map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.label} — {c.price}€
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={newCycle} onValueChange={setNewCycle} disabled={!newPlanId}>
+                      <SelectTrigger><SelectValue placeholder="Elige plan" /></SelectTrigger>
+                      <SelectContent>
+                        {(selPlanNew?.billing_cycles ?? []).map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.label} — {c.price}€</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -1083,28 +1089,29 @@ function UserPanel({
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 130px', gap: 10, marginBottom: 10 }}>
                     <div className="form-group" style={{ margin: 0 }}>
                       <label className="form-label" style={{ color: '#92400e' }}>Nuevo plan *</label>
-                      <select className="form-input" value={migratePlanId}
-                        onChange={e => {
-                          const p = plans.find(x => x.id === e.target.value)
-                          setMigratePlanId(e.target.value)
-                          setMigrateCycle(p?.billing_cycles?.[0]?.id || '')
-                        }}>
-                        <option value="">Selecciona plan activo...</option>
-                        {plans.filter(p => p.is_active).map(p => (
-                          <option key={p.id} value={p.id}>{planLabel(p)}</option>
-                        ))}
-                      </select>
+                      <Select value={migratePlanId} onValueChange={(v) => {
+                        const p = plans.find(x => x.id === v)
+                        setMigratePlanId(v)
+                        setMigrateCycle(p?.billing_cycles?.[0]?.id || '')
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="Selecciona plan activo..." /></SelectTrigger>
+                        <SelectContent>
+                          {plans.filter(p => p.is_active).map(p => (
+                            <SelectItem key={p.id} value={p.id}>{planLabel(p)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
                       <label className="form-label" style={{ color: '#92400e' }}>Ciclo de pago *</label>
-                      <select className="form-input" value={migrateCycle}
-                        onChange={e => setMigrateCycle(e.target.value)}
-                        disabled={!migratePlanId}>
-                        <option value="">—</option>
-                        {(migratePlan?.billing_cycles ?? []).map(c => (
-                          <option key={c.id} value={c.id}>{c.label} — {c.price}€</option>
-                        ))}
-                      </select>
+                      <Select value={migrateCycle} onValueChange={setMigrateCycle} disabled={!migratePlanId}>
+                        <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>
+                          {(migratePlan?.billing_cycles ?? []).map(c => (
+                            <SelectItem key={c.id} value={c.id}>{c.label} — {c.price}€</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
                       <label className="form-label" style={{ color: '#92400e' }}>Fecha inicio</label>
@@ -1194,24 +1201,26 @@ function UserPanel({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group">
                   <label className="form-label">Plan</label>
-                  <select className="form-input" value={subForm.plan_id}
-                    onChange={e => {
-                      const p = plans.find(x => x.id === e.target.value)
-                      setSubForm(f => ({
-                        ...f,
-                        plan_id: e.target.value,
-                        billing_cycle: p?.billing_cycles?.[0]?.id || f.billing_cycle,
-                      }))
-                    }}>
-                    <option value="">Sin plan</option>
-                    {plans.filter(p => p.is_active).map(p => (
-                      <option key={p.id} value={p.id}>{planLabel(p)}</option>
-                    ))}
-                    {plans.some(p => !p.is_active) && <option disabled>── Planes inactivos ──</option>}
-                    {plans.filter(p => !p.is_active).map(p => (
-                      <option key={p.id} value={p.id}>{planLabel(p)} (inactivo)</option>
-                    ))}
-                  </select>
+                  <Select value={subForm.plan_id || 'none'} onValueChange={(v) => {
+                    const planId = v === 'none' ? '' : v
+                    const p = plans.find(x => x.id === planId)
+                    setSubForm(f => ({
+                      ...f,
+                      plan_id: planId,
+                      billing_cycle: p?.billing_cycles?.[0]?.id || f.billing_cycle,
+                    }))
+                  }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin plan</SelectItem>
+                      {plans.filter(p => p.is_active).map(p => (
+                        <SelectItem key={p.id} value={p.id}>{planLabel(p)}</SelectItem>
+                      ))}
+                      {plans.filter(p => !p.is_active).map(p => (
+                        <SelectItem key={p.id} value={p.id}>{planLabel(p)} (inactivo)</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {editPlan && (
                     <div style={{ marginTop: 4 }}>
                       <span style={{
@@ -1224,14 +1233,16 @@ function UserPanel({
                 </div>
                 <div className="form-group">
                   <label className="form-label">Estado</label>
-                  <select className="form-input" value={subForm.status}
-                    onChange={e => setSubForm(f => ({ ...f, status: e.target.value as Subscription['status'] }))}>
-                    <option value="trial">Trial (pendiente de cobro)</option>
-                    <option value="trial_expired">Fin de trial — pendiente de cobro</option>
-                    <option value="active">Activo (pagado ✓)</option>
-                    <option value="paused">Pausado</option>
-                    <option value="cancelled">Cancelado</option>
-                  </select>
+                  <Select value={subForm.status} onValueChange={(v) => setSubForm(f => ({ ...f, status: v as Subscription['status'] }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="trial">Trial (pendiente de cobro)</SelectItem>
+                      <SelectItem value="trial_expired">Fin de trial — pendiente de cobro</SelectItem>
+                      <SelectItem value="active">Activo (pagado)</SelectItem>
+                      <SelectItem value="paused">Pausado</SelectItem>
+                      <SelectItem value="cancelled">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -1282,16 +1293,16 @@ function UserPanel({
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
                     <div className="form-group">
                       <label className="form-label">Ciclo de pago</label>
-                      <select className="form-input" value={subForm.billing_cycle}
-                        onChange={e => setSubForm(f => ({ ...f, billing_cycle: e.target.value }))}
-                        disabled={!editPlan}>
-                        {!editPlan && <option value="">Elige plan primero</option>}
-                        {(editPlan?.billing_cycles ?? []).map(c => (
-                          <option key={c.id} value={c.id}>
-                            {c.label} — {c.price}€{c.commitment_months > 0 ? ` (${c.commitment_months}m)` : ''}
-                          </option>
-                        ))}
-                      </select>
+                      <Select value={subForm.billing_cycle} onValueChange={(v) => setSubForm(f => ({ ...f, billing_cycle: v }))} disabled={!editPlan}>
+                        <SelectTrigger><SelectValue placeholder="Elige plan primero" /></SelectTrigger>
+                        <SelectContent>
+                          {(editPlan?.billing_cycles ?? []).map(c => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.label} — {c.price}€{c.commitment_months > 0 ? ` (${c.commitment_months}m)` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       {activeCycle && (
                         <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 3 }}>
                           {activeCycle.price}€ · aviso cancelación {activeCycle.cancel_notice_days}d antes
@@ -2073,20 +2084,24 @@ export default function AdminPage() {
                   </button>
                 ))}
               </div>
-              <select className="form-input" style={{ fontSize: 11, padding: '6px 10px', width: 'auto', minWidth: 170 }}
-                value={filterPlan} onChange={e => setFilterPlan(e.target.value)}>
-                <option value="all">Todos los planes</option>
-                {plans.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.display_name || p.name}{!p.is_active ? ' (inactivo)' : ''}
-                  </option>
-                ))}
-                <option value="trial">En trial</option>
-                <option value="trial_expired">Fin de trial {subCounts.trial_expired > 0 ? `(${subCounts.trial_expired})` : ''}</option>
-                <option value="expiring">Trial expirando {subCounts.expiring > 0 ? `(${subCounts.expiring})` : ''}</option>
-                <option value="paused">Pausados</option>
-                <option value="none">Sin plan</option>
-              </select>
+              <div style={{ minWidth: 170 }}>
+                <Select value={filterPlan} onValueChange={setFilterPlan}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los planes</SelectItem>
+                    {plans.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.display_name || p.name}{!p.is_active ? ' (inactivo)' : ''}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="trial">En trial</SelectItem>
+                    <SelectItem value="trial_expired">Fin de trial {subCounts.trial_expired > 0 ? `(${subCounts.trial_expired})` : ''}</SelectItem>
+                    <SelectItem value="expiring">Trial expirando {subCounts.expiring > 0 ? `(${subCounts.expiring})` : ''}</SelectItem>
+                    <SelectItem value="paused">Pausados</SelectItem>
+                    <SelectItem value="none">Sin plan</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="table-wrapper">
