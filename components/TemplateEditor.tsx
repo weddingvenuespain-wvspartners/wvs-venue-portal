@@ -921,12 +921,69 @@ export default function TemplateEditor({
     if (secId === 'schedule_visit') {
       const sv: any = (sections as any).schedule_visit ?? {}
       const p = (patch: any) => { setSections(s => ({ ...s, schedule_visit: { ...((s as any).schedule_visit ?? {}), ...patch } } as any)); markDirty() }
+      const defaultKinds: Array<{ id: string; label: string }> = [
+        { id: 'visit', label: 'Visitar el venue' },
+        { id: 'call',  label: 'Llamada telefónica' },
+        { id: 'video', label: 'Videollamada' },
+        { id: 'menu',  label: 'Pregunta sobre menú' },
+        { id: 'other', label: 'Otro' },
+      ]
+      const kinds: Array<{ id: string; label: string }> = Array.isArray(sv.kinds) && sv.kinds.length > 0 ? sv.kinds : defaultKinds
+      const updateKinds = (next: Array<{ id: string; label: string }>) => p({ kinds: next })
+      const updateKind = (i: number, label: string) => updateKinds(kinds.map((k, idx) => idx === i ? { ...k, label } : k))
+      const removeKind = (i: number) => updateKinds(kinds.filter((_, idx) => idx !== i))
+      const moveKind = (i: number, dir: -1 | 1) => {
+        const j = i + dir
+        if (j < 0 || j >= kinds.length) return
+        const next = [...kinds]
+        ;[next[i], next[j]] = [next[j], next[i]]
+        updateKinds(next)
+      }
+      const addKind = () => {
+        const newId = `custom_${Math.random().toString(36).slice(2, 8)}`
+        updateKinds([...kinds, { id: newId, label: 'Nueva opción' }])
+      }
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <input className="form-input" placeholder="Título (ej. Hablemos)" style={{ fontSize: 12 }} value={sv.title ?? ''} onChange={e => p({ title: e.target.value })} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input className="form-input" placeholder="Título (ej. Agendar visita)" style={{ fontSize: 12 }} value={sv.title ?? ''} onChange={e => p({ title: e.target.value })} />
           <textarea className="form-textarea" style={{ minHeight: 60, fontSize: 12 }} placeholder="Subtítulo / descripción breve…" value={sv.subtitle ?? ''} onChange={e => p({ subtitle: e.target.value })} />
-          <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5, marginTop: 2 }}>
-            La sección muestra el formulario de contacto unificado. Si la pareja elige "Visitar el venue" se abre el calendario con horarios disponibles.
+
+          <div style={{ marginTop: 6 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Opciones del formulario</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {kinds.map((k, i) => (
+                <div key={k.id} style={{ display: 'flex', alignItems: 'center', gap: 4, border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--surface)' }}>
+                  <button type="button" onClick={() => moveKind(i, -1)} disabled={i === 0}
+                    title="Subir"
+                    style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: 'var(--warm-gray)', padding: 2, opacity: i === 0 ? 0.3 : 1 }}>
+                    <ChevronDown size={11} style={{ transform: 'rotate(180deg)' }} />
+                  </button>
+                  <button type="button" onClick={() => moveKind(i, 1)} disabled={i === kinds.length - 1}
+                    title="Bajar"
+                    style={{ background: 'none', border: 'none', cursor: i === kinds.length - 1 ? 'default' : 'pointer', color: 'var(--warm-gray)', padding: 2, opacity: i === kinds.length - 1 ? 0.3 : 1 }}>
+                    <ChevronDown size={11} />
+                  </button>
+                  <input className="form-input" style={{ flex: 1, fontSize: 12, padding: '4px 8px', border: 'none', background: 'transparent' }}
+                    value={k.label}
+                    onChange={e => updateKind(i, e.target.value)}
+                    placeholder="Etiqueta de la opción" />
+                  {k.id === 'visit' ? (
+                    <span title="Esta opción abre el calendario para reservar visita"
+                      style={{ fontSize: 9, fontWeight: 700, color: 'var(--gold)', background: 'rgba(196,151,90,.12)', padding: '2px 6px', borderRadius: 99, letterSpacing: '.04em' }}>
+                      VISITA
+                    </span>
+                  ) : (
+                    <button type="button" style={removeBtn} onClick={() => removeKind(i)} title="Eliminar opción">
+                      <X size={11} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button type="button" style={{ ...addBtn, marginTop: 6 }} onClick={addKind}>+ Añadir opción</button>
+            <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4, lineHeight: 1.5 }}>
+              La opción <strong>Visitar el venue</strong> abre el calendario con horarios disponibles. El resto envían el formulario al inbox de Consultas.
+            </div>
           </div>
         </div>
       )

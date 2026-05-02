@@ -385,47 +385,6 @@ const KIND_LABEL: Record<string, string> = {
   other: 'Consulta general',
 }
 
-export async function sendShareWithPartnerEmail({
-  to, fromName, venueName, coupleName, proposalUrl, smtpConfig,
-}: {
-  to: string
-  fromName?: string | null
-  venueName: string
-  coupleName: string
-  proposalUrl: string
-  smtpConfig?: SmtpConfig | null
-}) {
-  const t = smtpConfig
-    ? nodemailer.createTransport({ host: smtpConfig.host, port: smtpConfig.port, secure: smtpConfig.port === 465, auth: { user: smtpConfig.user, pass: smtpConfig.pass } })
-    : transporter
-  const from = smtpConfig ? `"${venueName}" <${smtpConfig.fromEmail}>` : '"Wedding Venues Spain" <noreply@weddingvenuesspain.com>'
-  const senderText = fromName ? `${fromName} ` : ''
-
-  await t.sendMail({
-    from, to,
-    subject: `${senderText}quiere compartir contigo una propuesta de ${venueName}`,
-    html: `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#F5F3ED;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F3ED;padding:40px 20px;">
-    <tr><td align="center">
-      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border-radius:12px;padding:36px;">
-        <tr><td style="padding-bottom:20px;border-bottom:1px solid #F0EDE6;">
-          <p style="margin:0;font-size:13px;font-weight:700;color:#C4975A;letter-spacing:.1em;text-transform:uppercase;">Propuesta de boda</p>
-          <h1 style="margin:8px 0 0;font-size:22px;color:#2C2416;font-weight:600;">${venueName}</h1>
-        </td></tr>
-        <tr><td style="padding:20px 0 0;">
-          <p style="margin:0 0 16px;font-size:14px;color:#453D23;line-height:1.7;">${senderText ? `${senderText}quiere` : 'Quieren'} compartir contigo la propuesta de boda preparada para <strong>${coupleName}</strong>. Echa un vistazo cuando tengas un momento.</p>
-        </td></tr>
-        <tr><td style="padding-top:8px;" align="center">
-          <a href="${proposalUrl}" style="display:inline-block;background:#C4975A;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">Ver propuesta →</a>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`,
-  })
-}
-
 export async function sendFirstViewEmail({
   to, venueName, coupleName, proposalUrl, smtpConfig,
 }: {
@@ -466,12 +425,13 @@ export async function sendFirstViewEmail({
 }
 
 export async function sendInquiryEmail({
-  to, venueName, coupleName, kind, name, email, phone, preferredDates, message, proposalUrl, smtpConfig,
+  to, venueName, coupleName, kind, kindLabel: customKindLabel, name, email, phone, preferredDates, message, proposalUrl, smtpConfig,
 }: {
   to: string
   venueName: string
   coupleName: string
-  kind: 'visit' | 'call' | 'video' | 'menu' | 'other'
+  kind: string
+  kindLabel?: string | null
   name: string
   email?: string | null
   phone?: string | null
@@ -484,7 +444,7 @@ export async function sendInquiryEmail({
     ? nodemailer.createTransport({ host: smtpConfig.host, port: smtpConfig.port, secure: smtpConfig.port === 465, auth: { user: smtpConfig.user, pass: smtpConfig.pass } })
     : transporter
   const from = smtpConfig ? `"${venueName}" <${smtpConfig.fromEmail}>` : '"Wedding Venues Spain" <noreply@weddingvenuesspain.com>'
-  const kindLabel = KIND_LABEL[kind] ?? 'Consulta'
+  const kindLabel = customKindLabel || KIND_LABEL[kind] || 'Consulta'
   const datesHtml = preferredDates?.length
     ? preferredDates.map(d => `<li>${new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</li>`).join('')
     : null

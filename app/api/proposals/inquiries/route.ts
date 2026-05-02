@@ -7,8 +7,10 @@ import { sendInquiryEmail } from '@/lib/mailer'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-type InquiryKind = 'visit' | 'call' | 'video' | 'menu' | 'other'
-const KINDS: InquiryKind[] = ['visit', 'call', 'video', 'menu', 'other']
+// Kinds are now editor-configurable. We accept any non-empty string up to 64
+// chars. The 'visit' id is special: it never reaches this endpoint because
+// InquiryForm routes it to VisitBookingModal client-side.
+const KIND_MAX = 64
 
 function getServiceClient() {
   return createClient(
@@ -24,7 +26,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
     const slug: string | undefined = body.slug
-    const kind: string | undefined = body.kind
+    const kind: string | undefined = body.kind?.trim?.()
+    const kindLabel: string | undefined = body.kind_label?.trim?.() || null
     const name: string | undefined = body.name?.trim?.()
     const email: string | undefined = body.email?.trim?.() || null
     const phone: string | undefined = body.phone?.trim?.() || null
@@ -33,7 +36,7 @@ export async function POST(req: NextRequest) {
       ? body.preferred_dates.filter((d: any) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(0, 5)
       : []
 
-    if (!slug || !name || !KINDS.includes(kind as InquiryKind)) {
+    if (!slug || !name || !kind || kind.length > KIND_MAX) {
       return NextResponse.json({ ok: false, error: 'Datos incompletos' }, { status: 400 })
     }
     if (!email && !phone) {
@@ -59,6 +62,7 @@ export async function POST(req: NextRequest) {
         proposal_id: proposal.id,
         user_id: proposal.user_id,
         kind,
+        kind_label: kindLabel,
         name,
         email,
         phone,
@@ -99,7 +103,8 @@ export async function POST(req: NextRequest) {
           to: venueEmail,
           venueName: venueData.name || 'Wedding Venues Spain',
           coupleName: proposal.couple_name || name,
-          kind: kind as InquiryKind,
+          kind,
+          kindLabel,
           name,
           email,
           phone,
@@ -139,7 +144,7 @@ export async function GET(req: NextRequest) {
 
     let query = supabase
       .from('proposal_inquiries')
-      .select('id, proposal_id, kind, name, email, phone, preferred_dates, message, status, created_at, proposals!inner(id, slug, couple_name)')
+      .select('id, proposal_id, kind, kind_label, name, email, phone, preferred_dates, message, status, created_at, proposals!inner(id, slug, couple_name)')
       .order('created_at', { ascending: false })
       .limit(100)
     if (status) query = query.eq('status', status)

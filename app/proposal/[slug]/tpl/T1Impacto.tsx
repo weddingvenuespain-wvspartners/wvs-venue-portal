@@ -7,7 +7,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, StarRating, resolveContact, type ProposalData } from './shared'
 import InquiryForm from '@/components/InquiryForm'
-import SharePartner from '@/components/SharePartner'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
@@ -434,7 +433,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               on('single_space') && (sec as any).single_space?.title ? { label: 'Vuestro espacio', anchor: 'sec-single-space' } : null,
               on('zones') && zonesShow.length > 0 ? { label: 'Espacios', anchor: 'sec-zones' } : null,
               hasCatering && on('menu') ? { label: 'Menús', anchor: 'menu' } : null,
-              on('schedule_visit') ? { label: 'Hablemos', anchor: 'sec-schedule' } : null,
+              on('schedule_visit') ? { label: 'Agendar visita', anchor: 'sec-schedule' } : null,
               !on('schedule_visit') && contactOn ? { label: 'Contactar', anchor: 't1-cta' } : null,
             ].filter(Boolean) as { label: string; anchor: string }[]
             if (!navLinks.length) return null
@@ -1084,23 +1083,20 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       ════════════════════════════════════════════ */}
       {on('schedule_visit') && (() => {
         const sv = (sec as any).schedule_visit ?? {}
-        const svTitle = sv.title || 'Hablemos'
-        const svSub = sv.subtitle || 'Cuéntanos cómo prefieres que hablemos: visita en persona, llamada, videollamada o lo que necesites.'
+        const svTitle = sv.title || 'Agendar visita'
+        const svSub = sv.subtitle || 'Selecciona qué prefieres y rellena tus datos. Si quieres venir a visitarnos, podrás elegir directamente fecha y hora disponibles.'
+        const svKinds = Array.isArray(sv.kinds) && sv.kinds.length > 0 ? sv.kinds : undefined
         return (
           <section id="sec-schedule" className="t1-sec" style={{ background: lightMode ? pal.surfaceAlt : '#0a0a0a' }}>
             <div className="w">
               <FadeUp>
                 <span className="t1-label" style={{ display: 'block', textAlign: 'center' }}>{svTitle}</span>
-                <h2 className="t1-h2" style={{ textAlign: 'center', marginBottom: 12 }}>¿Quedamos para conoceros?</h2>
                 <p style={{ textAlign: 'center', fontSize: '.95rem', color: fg(.55), maxWidth: 540, margin: '0 auto 40px', lineHeight: 1.7 }}>
                   {svSub}
                 </p>
               </FadeUp>
               <FadeUp delay={.1}>
-                <InquiryForm slug={data.slug} proposalId={data.id} coupleName={couple_name} primary={primary} onPrimary={onPri} dark={!lightMode} />
-              </FadeUp>
-              <FadeUp delay={.2}>
-                <SharePartner slug={data.slug} primary={primary} onPrimary={onPri} dark={!lightMode} />
+                <InquiryForm slug={data.slug} proposalId={data.id} coupleName={couple_name} kinds={svKinds} primary={primary} onPrimary={onPri} dark={!lightMode} />
               </FadeUp>
             </div>
           </section>

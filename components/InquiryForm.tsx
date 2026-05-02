@@ -5,20 +5,29 @@ import { Calendar, Phone, Video, UtensilsCrossed, MessageCircle, Check, type Luc
 import Spinner from '@/components/Spinner'
 import VisitBookingModal from '@/components/VisitBookingModal'
 
-type Kind = 'visit' | 'call' | 'video' | 'menu' | 'other'
+export type InquiryKindOption = { id: string; label: string }
 
-const KINDS: Array<{ id: Kind; label: string; icon: LucideIcon }> = [
-  { id: 'visit', label: 'Visitar el venue',      icon: Calendar },
-  { id: 'call',  label: 'Llamada telefónica',    icon: Phone },
-  { id: 'video', label: 'Videollamada',          icon: Video },
-  { id: 'menu',  label: 'Pregunta sobre menú',   icon: UtensilsCrossed },
-  { id: 'other', label: 'Otro',                  icon: MessageCircle },
+const ICON_BY_ID: Record<string, LucideIcon> = {
+  visit: Calendar,
+  call:  Phone,
+  video: Video,
+  menu:  UtensilsCrossed,
+  other: MessageCircle,
+}
+
+export const DEFAULT_INQUIRY_KINDS: InquiryKindOption[] = [
+  { id: 'visit', label: 'Visitar el venue' },
+  { id: 'call',  label: 'Llamada telefónica' },
+  { id: 'video', label: 'Videollamada' },
+  { id: 'menu',  label: 'Pregunta sobre menú' },
+  { id: 'other', label: 'Otro' },
 ]
 
 export default function InquiryForm({
   slug,
   proposalId,
   coupleName,
+  kinds,
   primary = '#C4975A',
   onPrimary = '#fff',
   dark = false,
@@ -26,11 +35,15 @@ export default function InquiryForm({
   slug: string
   proposalId?: string
   coupleName?: string
+  kinds?: InquiryKindOption[]
   primary?: string
   onPrimary?: string
   dark?: boolean
 }) {
-  const [kind, setKind] = useState<Kind>('call')
+  const visibleKinds: InquiryKindOption[] = (kinds && kinds.length > 0) ? kinds : DEFAULT_INQUIRY_KINDS
+  const [kind, setKind] = useState<string>(() =>
+    visibleKinds.find(k => k.id !== 'visit')?.id ?? visibleKinds[0]?.id ?? 'other'
+  )
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone, setVisitDone] = useState(false)
   const [name, setName] = useState('')
@@ -63,11 +76,13 @@ export default function InquiryForm({
 
     setError(null); setLoading(true)
     try {
+      const selectedLabel = visibleKinds.find(k => k.id === kind)?.label
       const res = await fetch('/api/proposals/inquiries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug, kind,
+          kind_label: selectedLabel,
           name: name.trim(),
           email: email.trim() || null,
           phone: phone.trim() || null,
@@ -133,9 +148,9 @@ export default function InquiryForm({
         <div>
           <label style={labelStyle}>¿Qué prefieres?</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-            {KINDS.map(k => {
+            {visibleKinds.map(k => {
               const sel = kind === k.id
-              const Icon = k.icon
+              const Icon = ICON_BY_ID[k.id] ?? MessageCircle
               return (
                 <button key={k.id} type="button" onClick={() => { setKind(k.id); setError(null) }}
                   style={{

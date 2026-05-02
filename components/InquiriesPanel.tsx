@@ -5,13 +5,13 @@ import Link from 'next/link'
 import { Calendar, Phone, Video, UtensilsCrossed, MessageCircle, Mail, ExternalLink, Inbox, CheckCircle2, Archive, Trash2, RotateCcw, type LucideIcon } from 'lucide-react'
 import Spinner from '@/components/Spinner'
 
-type Kind = 'visit' | 'call' | 'video' | 'menu' | 'other'
 type Status = 'new' | 'replied' | 'closed'
 
 type Inquiry = {
   id: string
   proposal_id: string
-  kind: Kind
+  kind: string
+  kind_label: string | null
   name: string
   email: string | null
   phone: string | null
@@ -22,14 +22,14 @@ type Inquiry = {
   proposals?: { id: string; slug: string; couple_name: string | null } | null
 }
 
-const KIND_LABEL: Record<Kind, string> = {
+const FALLBACK_LABEL: Record<string, string> = {
   visit: 'Visita',
   call:  'Llamada',
   video: 'Videollamada',
   menu:  'Menú',
   other: 'Consulta',
 }
-const KIND_ICON: Record<Kind, LucideIcon> = {
+const ICON_BY_KIND: Record<string, LucideIcon> = {
   visit: Calendar,
   call:  Phone,
   video: Video,
@@ -142,7 +142,8 @@ export default function InquiriesPanel({ onCountChange }: InquiriesPanelProps) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {filtered.map(inq => {
-          const Icon = KIND_ICON[inq.kind]
+          const Icon = ICON_BY_KIND[inq.kind] ?? MessageCircle
+          const kindLabel = inq.kind_label || FALLBACK_LABEL[inq.kind] || inq.kind
           const date = new Date(inq.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
           const time = new Date(inq.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
           const dates = (inq.preferred_dates ?? []).map(d => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' }))
@@ -155,7 +156,7 @@ export default function InquiriesPanel({ onCountChange }: InquiriesPanelProps) {
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--gold)', padding: '3px 8px', background: 'rgba(196,151,90,0.12)', borderRadius: 99 }}>
-                    <Icon size={11} strokeWidth={2} /> {KIND_LABEL[inq.kind]}
+                    <Icon size={11} strokeWidth={2} /> {kindLabel}
                   </span>
                   <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)' }}>{inq.name}</span>
                   {inq.proposals?.couple_name && inq.proposals.couple_name !== inq.name && (
