@@ -11,6 +11,7 @@ import { expandLeadDates, expandBudgetDates, pad } from '@/lib/lead-dates'
 import { LeadDatesSection } from '@/components/LeadDatesSection'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import {
   Plus, Search, X, Phone, Mail, MessageCircle,
   Calendar, Users, ChevronLeft, ChevronRight, RotateCcw, CheckCircle,
@@ -2449,10 +2450,9 @@ function DateConfirmModal({
   const canConfirm = !saving && !budgetUploading && (!isVisitMode || selectedDates.length > 0 || isPdfDigital)
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(17,15,12,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 16 }}
-      onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.3)' }}
-        onClick={e => e.stopPropagation()}>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent showClose={false} className="bg-white rounded-[20px] sm:rounded-[20px] w-full max-w-[560px] max-h-[92vh] overflow-y-auto p-0 gap-0 border-0 shadow-2xl">
+        <DialogTitle className="sr-only">{modeConfig.label}</DialogTitle>
 
         {/* Header — compact single row */}
         <div style={{ position: 'relative', padding: '14px 20px 12px', background: modeConfig.gradient, borderTopLeftRadius: 20, borderTopRightRadius: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -3465,8 +3465,8 @@ function DateConfirmModal({
               : '✓ Pasar a seguimiento'}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
