@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, LayoutTemplate, Trash2, Star, Loader2, Pencil, FileText, X, Zap, Sparkles, ClipboardList, MessageCircle, Target, type LucideIcon } from 'lucide-react'
+import { Plus, LayoutTemplate, Trash2, Star, Loader2, Pencil, FileText, X, Zap, Sparkles, ClipboardList, MessageCircle, Target, Inbox, type LucideIcon } from 'lucide-react'
 import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
@@ -100,6 +100,7 @@ export default function TemplatesPage() {
           activeKey="templates"
           tabs={[
             { key: 'proposals', label: 'Propuestas', icon: FileText, href: '/proposals' },
+            { key: 'inquiries', label: 'Consultas',  icon: Inbox,    href: '/proposals?tab=inquiries' },
             { key: 'templates', label: 'Plantillas', icon: LayoutTemplate },
           ]}
         />

@@ -84,7 +84,9 @@ function PropuestasPageContent() {
   const [newModalOpen, setNewModalOpen] = useState(false)
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
-  const [currentTab, setCurrentTab] = useState<'proposals' | 'inquiries'>('proposals')
+  const [currentTab, setCurrentTab] = useState<'proposals' | 'inquiries'>(
+    searchParams.get('tab') === 'inquiries' ? 'inquiries' : 'proposals'
+  )
   const [inquiriesUnread, setInquiriesUnread] = useState(0)
   const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({})
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'sent' | 'viewed' | 'expired'>('all')
