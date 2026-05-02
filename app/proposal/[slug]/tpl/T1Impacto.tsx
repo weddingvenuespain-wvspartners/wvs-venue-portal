@@ -12,7 +12,6 @@ import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 import DateSelector from './DateSelector'
-import VisitBookingModal from '@/components/VisitBookingModal'
 import { getActiveStyle, isSectionGroupEnabled } from '@/lib/section-styles'
 
 function EmptySec({ label }: { label: string }) {
@@ -63,18 +62,14 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const contactOn = on('contact') && (contact.phone || contact.email)
   const waHref = contact.phone ? `https://wa.me/${contact.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, he visto la propuesta para ${couple_name} y me gustaría hablar con vosotros.`)}` : ''
   const mailHref = contact.email ? `mailto:${contact.email}?subject=${encodeURIComponent(`Propuesta ${couple_name}`)}` : ''
-  const inquiriesOn = on('inquiries')
-  const scrollToCta = () => {
-    const target = inquiriesOn ? 't1-inquiries' : 't1-cta'
+  const scrollToContact = () => {
+    const target = on('schedule_visit') ? 'sec-schedule' : 't1-cta'
     document.getElementById(target)?.scrollIntoView({ behavior: 'smooth' })
   }
-  const scrollToContact = scrollToCta
 
   const [scrolled, setScrolled]     = useState(false)
   const [ctaBar, setCtaBar]         = useState(false)
   const [openFaq, setOpenFaq]       = useState<number | null>(null)
-  const [visitModalOpen, setVisitModalOpen] = useState(false)
-  const [visitDone, setVisitDone]           = useState(false)
   const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
   const heroRef                     = useRef<HTMLImageElement>(null)
 
@@ -439,8 +434,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               on('single_space') && (sec as any).single_space?.title ? { label: 'Vuestro espacio', anchor: 'sec-single-space' } : null,
               on('zones') && zonesShow.length > 0 ? { label: 'Espacios', anchor: 'sec-zones' } : null,
               hasCatering && on('menu') ? { label: 'Menús', anchor: 'menu' } : null,
-              on('schedule_visit') ? { label: 'Visita', anchor: 'sec-schedule' } : null,
-              inquiriesOn ? { label: 'Hablemos', anchor: 't1-inquiries' } : (contactOn ? { label: 'Contactar', anchor: 't1-cta' } : null),
+              on('schedule_visit') ? { label: 'Hablemos', anchor: 'sec-schedule' } : null,
+              !on('schedule_visit') && contactOn ? { label: 'Contactar', anchor: 't1-cta' } : null,
             ].filter(Boolean) as { label: string; anchor: string }[]
             if (!navLinks.length) return null
             return (
@@ -1085,55 +1080,32 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       })() : _preview ? <EmptySec label="FAQ" /> : null)}
 
       {/* ════════════════════════════════════════════
-          AGENDAR VISITA
+          AGENDAR VISITA / HABLEMOS — formulario unificado
       ════════════════════════════════════════════ */}
       {on('schedule_visit') && (() => {
         const sv = (sec as any).schedule_visit ?? {}
-        const svUrl = sv.url
-        const svTitle = sv.title || 'Visitadnos en persona'
-        const svSub = sv.subtitle || 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
-        const svCta = sv.cta_label || 'Reservar visita gratuita →'
+        const svTitle = sv.title || 'Hablemos'
+        const svSub = sv.subtitle || 'Cuéntanos cómo prefieres que hablemos: visita en persona, llamada, videollamada o lo que necesites.'
         return (
-          <section id="sec-schedule" className="t1-sv">
-            <FadeUp>
-              <div className="t1-sv-inner">
-                <div className="t1-sv-icon">
-                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                  </svg>
-                </div>
-                <h2 className="t1-sv-title">{svTitle}</h2>
-                <p className="t1-sv-sub">{svSub}</p>
-
-                {visitDone ? (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}22`, border: `1px solid ${primary}55`, borderRadius: 10, padding: '14px 24px', fontSize: '.88rem', color: primary, fontWeight: 600 }}>
-                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    ¡Solicitud enviada! Os confirmaremos la visita pronto.
-                  </div>
-                ) : svUrl ? (
-                  <a className="t1-sv-btn" href={svUrl} target="_blank" rel="noopener">{svCta}</a>
-                ) : (
-                  <button className="t1-sv-btn" onClick={() => setVisitModalOpen(true)}>
-                    {svCta}
-                  </button>
-                )}
-                {sv.note && <div className="t1-sv-note">{sv.note}</div>}
-              </div>
-            </FadeUp>
+          <section id="sec-schedule" className="t1-sec" style={{ background: lightMode ? pal.surfaceAlt : '#0a0a0a' }}>
+            <div className="w">
+              <FadeUp>
+                <span className="t1-label" style={{ display: 'block', textAlign: 'center' }}>{svTitle}</span>
+                <h2 className="t1-h2" style={{ textAlign: 'center', marginBottom: 12 }}>¿Quedamos para conoceros?</h2>
+                <p style={{ textAlign: 'center', fontSize: '.95rem', color: fg(.55), maxWidth: 540, margin: '0 auto 40px', lineHeight: 1.7 }}>
+                  {svSub}
+                </p>
+              </FadeUp>
+              <FadeUp delay={.1}>
+                <InquiryForm slug={data.slug} proposalId={data.id} coupleName={couple_name} primary={primary} onPrimary={onPri} dark={!lightMode} />
+              </FadeUp>
+              <FadeUp delay={.2}>
+                <SharePartner slug={data.slug} primary={primary} onPrimary={onPri} dark={!lightMode} />
+              </FadeUp>
+            </div>
           </section>
         )
       })()}
-
-      {visitModalOpen && (
-        <VisitBookingModal
-          proposalId={data.id}
-          coupleName={couple_name}
-          primaryColor={primary}
-          selectedSpaces={selectedSpaces}
-          onClose={() => setVisitModalOpen(false)}
-          onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
-        />
-      )}
 
       {/* ════════════════════════════════════════════
           MAPA
@@ -1162,31 +1134,6 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           CONTACTO
       ════════════════════════════════════════════ */}
-      {/* ════════════════════════════════════════════
-          INQUIRY FORM — couple → venue
-      ════════════════════════════════════════════ */}
-      {on('inquiries') && (
-        <section className="t1-sec" id="t1-inquiries" style={{ background: lightMode ? pal.surfaceAlt : '#0a0a0a' }}>
-          <div className="w">
-            <FadeUp>
-              <span className="t1-label" style={{ display: 'block', textAlign: 'center' }}>Hablemos</span>
-              <h2 className="t1-h2" style={{ textAlign: 'center', marginBottom: 12 }}>¿Quedamos para conoceros?</h2>
-              <p style={{ textAlign: 'center', fontSize: '.95rem', color: fg(.55), maxWidth: 540, margin: '0 auto 40px', lineHeight: 1.7 }}>
-                Cuéntanos cómo prefieres que hablemos: visita en persona, llamada, videollamada o lo que necesites.
-              </p>
-            </FadeUp>
-            <FadeUp delay={.1}>
-              <InquiryForm slug={data.slug} proposalId={data.id} coupleName={couple_name} primary={primary} onPrimary={onPri} dark={!lightMode} />
-            </FadeUp>
-            {on('share') && (
-              <FadeUp delay={.2}>
-                <SharePartner slug={data.slug} primary={primary} onPrimary={onPri} dark={!lightMode} />
-              </FadeUp>
-            )}
-          </div>
-        </section>
-      )}
-
       {contactOn && (
         <section className="t1-cta" id="t1-cta">
           <div className="w">

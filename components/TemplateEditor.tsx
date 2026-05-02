@@ -36,7 +36,7 @@ export const ALL_SECTION_IDS = [
   'single_space', 'zones', 'space_groups', 'venue_rental', 'inclusions', 'testimonials',
   'collaborators', 'accommodation', 'extra_services',
   'pricing',
-  'faq', 'schedule_visit', 'map', 'inquiries', 'share', 'contact',
+  'faq', 'schedule_visit', 'map', 'contact',
 ] as const
 
 type SectionId = typeof ALL_SECTION_IDS[number]
@@ -63,10 +63,8 @@ const SECTION_LABELS: Record<SectionId, string> = {
   extra_services:    'Servicios adicionales',
   pricing:           'Paquetes y precios',
   faq:               'Preguntas frecuentes',
-  schedule_visit:    'Agendar visita',
+  schedule_visit:    'Agendar visita / Hablemos',
   map:               'Mapa y ubicación',
-  inquiries:         'Formulario de consulta',
-  share:             'Compartir con mi pareja',
   contact:           'Datos de contacto',
 }
 
@@ -925,11 +923,11 @@ export default function TemplateEditor({
       const p = (patch: any) => { setSections(s => ({ ...s, schedule_visit: { ...((s as any).schedule_visit ?? {}), ...patch } } as any)); markDirty() }
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <input className="form-input" placeholder="Título (ej. Visitadnos en persona)" style={{ fontSize: 12 }} value={sv.title ?? ''} onChange={e => p({ title: e.target.value })} />
+          <input className="form-input" placeholder="Título (ej. Hablemos)" style={{ fontSize: 12 }} value={sv.title ?? ''} onChange={e => p({ title: e.target.value })} />
           <textarea className="form-textarea" style={{ minHeight: 60, fontSize: 12 }} placeholder="Subtítulo / descripción breve…" value={sv.subtitle ?? ''} onChange={e => p({ subtitle: e.target.value })} />
-          <input className="form-input" placeholder="URL Calendly / Cal.com (opcional)" style={{ fontSize: 12 }} value={sv.url ?? ''} onChange={e => p({ url: e.target.value })} />
-          <input className="form-input" placeholder="Texto del botón (ej. Reservar visita →)" style={{ fontSize: 12 }} value={sv.cta_label ?? ''} onChange={e => p({ cta_label: e.target.value })} />
-          <input className="form-input" placeholder="Nota pequeña (horarios, duración…)" style={{ fontSize: 12 }} value={sv.note ?? ''} onChange={e => p({ note: e.target.value })} />
+          <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5, marginTop: 2 }}>
+            La sección muestra el formulario de contacto unificado. Si la pareja elige "Visitar el venue" se abre el calendario con horarios disponibles.
+          </div>
         </div>
       )
     }

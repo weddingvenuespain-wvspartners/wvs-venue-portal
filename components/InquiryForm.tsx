@@ -154,53 +154,47 @@ export default function InquiryForm({
           </div>
         </div>
 
-        {isVisit ? (
-          <p style={{ fontSize: 13, color: sub, lineHeight: 1.6, margin: 0 }}>
-            En el siguiente paso elegirás una fecha y hora disponible en nuestro calendario.
-          </p>
-        ) : (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-              <div>
-                <label style={labelStyle}>Nombre *</label>
-                <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Tu nombre y el de tu pareja" />
-              </div>
-              <div>
-                <label style={labelStyle}>Email</label>
-                <input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="vosotros@email.com" />
-              </div>
-            </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+          <div>
+            <label style={labelStyle}>Nombre *</label>
+            <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Tu nombre y el de tu pareja" />
+          </div>
+          <div>
+            <label style={labelStyle}>Email</label>
+            <input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="vosotros@email.com" />
+          </div>
+        </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-              <div>
-                <label style={labelStyle}>Teléfono</label>
-                <input style={inputStyle} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+34 600 000 000" />
-              </div>
-              <div>
-                <label style={labelStyle}>Fecha preferida</label>
-                <input type="date" style={inputStyle} value={date1} onChange={e => setDate1(e.target.value)} />
-              </div>
-            </div>
-
-            {date1 && (
-              <div>
-                <label style={labelStyle}>Segunda opción (opcional)</label>
-                <input type="date" style={inputStyle} value={date2} onChange={e => setDate2(e.target.value)} />
-              </div>
-            )}
-
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+          <div>
+            <label style={labelStyle}>Teléfono</label>
+            <input style={inputStyle} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+34 600 000 000" />
+          </div>
+          {!isVisit && (
             <div>
-              <label style={labelStyle}>Mensaje (opcional)</label>
-              <textarea
-                style={{ ...inputStyle, minHeight: 90, resize: 'vertical', fontFamily: 'inherit' }}
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-                maxLength={2000}
-                placeholder="Cuéntanos lo que necesitas o preguntas que tengas…"
-              />
+              <label style={labelStyle}>Fecha preferida</label>
+              <input type="date" style={inputStyle} value={date1} onChange={e => setDate1(e.target.value)} />
             </div>
-          </>
+          )}
+        </div>
+
+        {!isVisit && date1 && (
+          <div>
+            <label style={labelStyle}>Segunda opción (opcional)</label>
+            <input type="date" style={inputStyle} value={date2} onChange={e => setDate2(e.target.value)} />
+          </div>
         )}
+
+        <div>
+          <label style={labelStyle}>Mensaje (opcional)</label>
+          <textarea
+            style={{ ...inputStyle, minHeight: 90, resize: 'vertical', fontFamily: 'inherit' }}
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            maxLength={2000}
+            placeholder={isVisit ? 'Cualquier cosa que quieras decirnos antes de la visita…' : 'Cuéntanos lo que necesitas o preguntas que tengas…'}
+          />
+        </div>
 
         {error && (
           <div style={{ fontSize: 12, color: '#dc2626', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6 }}>
