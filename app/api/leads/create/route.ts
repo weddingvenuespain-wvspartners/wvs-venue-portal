@@ -81,11 +81,28 @@ export async function POST(req: NextRequest) {
 
     // Send email notification to venue's configured leads emails
     try {
-      const { data: onb } = await svc
-        .from('venue_onboarding')
-        .select('name, ficha_data')
-        .eq('user_id', profile.user_id)
-        .maybeSingle()
+      // Try venue-specific onboarding first, fall back to user-level
+      let onb: any = null
+      if (venueRow?.id) {
+        const { data: venueOnb } = await svc
+          .from('venue_onboarding')
+          .select('name, ficha_data')
+          .eq('user_id', profile.user_id)
+          .eq('venue_id', venueRow.id)
+          .maybeSingle()
+        if (venueOnb?.ficha_data?.leadsEmail) onb = venueOnb
+      }
+      if (!onb) {
+        const { data: fallbackOnb } = await svc
+          .from('venue_onboarding')
+          .select('name, ficha_data')
+          .eq('user_id', profile.user_id)
+          .not('ficha_data->>leadsEmail', 'eq', '')
+          .not('ficha_data->>leadsEmail', 'is', null)
+          .limit(1)
+          .maybeSingle()
+        onb = fallbackOnb
+      }
 
       const leadsEmailEnabled = onb?.ficha_data?.leadsEmailEnabled !== false
       const rawEmails: string = onb?.ficha_data?.leadsEmail || ''
