@@ -36,7 +36,7 @@ export const ALL_SECTION_IDS = [
   'single_space', 'zones', 'space_groups', 'venue_rental', 'inclusions', 'testimonials',
   'collaborators', 'accommodation', 'extra_services',
   'pricing',
-  'faq', 'schedule_visit', 'map', 'inquiries', 'contact',
+  'faq', 'schedule_visit', 'map', 'inquiries', 'share', 'contact',
 ] as const
 
 type SectionId = typeof ALL_SECTION_IDS[number]
@@ -66,6 +66,7 @@ const SECTION_LABELS: Record<SectionId, string> = {
   schedule_visit:    'Agendar visita',
   map:               'Mapa y ubicación',
   inquiries:         'Formulario de consulta',
+  share:             'Compartir con mi pareja',
   contact:           'Datos de contacto',
 }
 

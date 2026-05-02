@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, StarRating, resolveContact, type ProposalData } from './shared'
 import InquiryForm from '@/components/InquiryForm'
+import SharePartner from '@/components/SharePartner'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
@@ -1177,6 +1178,11 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
             <FadeUp delay={.1}>
               <InquiryForm slug={data.slug} primary={primary} onPrimary={onPri} dark={!lightMode} />
             </FadeUp>
+            {on('share') && (
+              <FadeUp delay={.2}>
+                <SharePartner slug={data.slug} primary={primary} onPrimary={onPri} dark={!lightMode} />
+              </FadeUp>
+            )}
           </div>
         </section>
       )}

@@ -12,6 +12,7 @@ const PUBLIC_ROUTES = [
   '/api/proposals/unlock',      // password gate for private proposals — anonymous by design
   '/api/proposals/inquiries',   // public POST: couple submits inquiry from proposal landing
   '/api/proposals/track-section', // public POST: section-level view tracking
+  '/api/proposals/share',       // public POST: share proposal URL with partner via email
 ]
 
 export async function middleware(req: NextRequest) {
