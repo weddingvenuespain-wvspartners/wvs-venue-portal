@@ -5,7 +5,7 @@
 //            → Qué incluye → Testimoniales → Colaboradores → Extras → FAQ → CTA
 
 import { useEffect, useRef, useState } from 'react'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, FaqAccordion, FaqCards, FaqNumbered, StarRating, resolveContact, type ProposalData } from './shared'
+import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, StarRating, resolveContact, type ProposalData } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
@@ -798,52 +798,39 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           PAQUETES
       ════════════════════════════════════════════ */}
-      {on('packages') && (pkgs.length > 0 ? (
-        <section className="t1-sec" style={{ background: lightMode ? pal.bg : '#050505' }}>
-          <div className="w">
-            <FadeUp>
-              <span className="t1-label">Paquetes y precios</span>
-              <h2 className="t1-h2">Elige tu propuesta</h2>
-            </FadeUp>
-            <div className="t1-pkgs">
-              {pkgs.map((pkg: any, i: number) => (
-                <FadeUp key={i} delay={i * .08}>
-                  <div className={`t1-pkg${pkg.is_recommended ? ' rec' : ''}`}>
-                    {pkg.is_recommended && <div className="t1-pkg-badge">Más elegido</div>}
-                    <div className="t1-pkg-name">{pkg.name}</div>
-                    {pkg.subtitle && <div className="t1-pkg-sub">{pkg.subtitle}</div>}
-                    {pkg.price && (
-                      <div className="t1-pkg-price">
-                        {pkg.price} <small>/ persona</small>
-                      </div>
-                    )}
-                    {pkg.includes?.length > 0 && (
-                      <ul className="t1-pkg-includes">
-                        {pkg.includes.filter(Boolean).map((inc: string, j: number) => (
-                          <li key={j}>{inc}</li>
-                        ))}
-                      </ul>
-                    )}
-                    {(pkg.min_guests || pkg.max_guests) && (
-                      <div className="t1-pkg-guests">
-                        {pkg.min_guests && `Mín. ${pkg.min_guests}`}{pkg.min_guests && pkg.max_guests ? ' · ' : ''}{pkg.max_guests && `Máx. ${pkg.max_guests}`} invitados
-                      </div>
-                    )}
-                  </div>
-                </FadeUp>
-              ))}
-            </div>
-            {(hasCatering || contactOn) && (
-              <FadeUp delay={.2} style={{ marginTop: 48, textAlign: 'center' }}>
-                <button style={{ background: primary, color: onPri, border: 'none', padding: '15px 44px', fontSize: '.78rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}
-                  onClick={() => hasCatering ? document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' }) : scrollToContact()}>
-                  {hasCatering ? 'Ver menús' : 'Solicitar información'} →
-                </button>
+      {on('pricing') && on('packages') && (() => {
+        const pricingStyle = getActiveStyle(sec, 'pricing')
+        const hasRentalRows = (sec.venue_rental?.rows?.length ?? 0) > 0 && (sec.venue_rental?.day_tiers?.length ?? 0) > 0
+        const hasContent = pkgs.length > 0 || (pricingStyle === 'rental_grid' && hasRentalRows)
+        if (!hasContent) return _preview ? <EmptySec label="Paquetes" /> : null
+        return (
+          <section className="t1-sec" style={{ background: lightMode ? pal.bg : '#050505' }}>
+            <div className="w">
+              <FadeUp>
+                <span className="t1-label">Paquetes y precios</span>
+                <h2 className="t1-h2">Elige tu propuesta</h2>
               </FadeUp>
-            )}
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="Paquetes" /> : null)}
+              <FadeUp delay={.1}>
+                {pricingStyle === 'table' ? (
+                  <PricingTable packages={pkgs} primary={primary} dark={!lightMode} font={FONT} />
+                ) : pricingStyle === 'rental_grid' && hasRentalRows ? (
+                  <VenueRentalGrid data={sec.venue_rental} primary={primary} dark={!lightMode} />
+                ) : (
+                  <PricingCards packages={pkgs} primary={primary} dark={!lightMode} font={FONT} />
+                )}
+              </FadeUp>
+              {(hasCatering || contactOn) && (
+                <FadeUp delay={.2} style={{ marginTop: 48, textAlign: 'center' }}>
+                  <button style={{ background: primary, color: onPri, border: 'none', padding: '15px 44px', fontSize: '.78rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}
+                    onClick={() => hasCatering ? document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' }) : scrollToContact()}>
+                    {hasCatering ? 'Ver menús' : 'Solicitar información'} →
+                  </button>
+                </FadeUp>
+              )}
+            </div>
+          </section>
+        )
+      })()}
 
       {/* ════════════════════════════════════════════
           TARIFAS DE ALQUILER (grid temporada × día)

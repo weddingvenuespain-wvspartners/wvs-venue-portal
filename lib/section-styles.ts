@@ -87,6 +87,15 @@ export const SECTION_STYLES: Record<string, SectionStyleConfig> = {
       { id: 'numbered',  label: 'Numerada',  description: 'Lista numerada con respuestas siempre visibles' },
     ],
   },
+  pricing: {
+    sectionId: 'pricing',
+    defaultVariant: 'cards',
+    variants: [
+      { id: 'cards',       label: 'Tarjetas', description: 'Paquetes apilados con precio destacado' },
+      { id: 'table',       label: 'Tabla',    description: 'Listado tabular compacto, fácil de comparar' },
+      { id: 'rental_grid', label: 'Grid de alquiler', description: 'Tarifas por horario × temporada (requiere venue_rental)' },
+    ],
+  },
 }
 
 export function getSectionStyle(sectionId: string): SectionStyleConfig | undefined {

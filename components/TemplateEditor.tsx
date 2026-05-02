@@ -35,6 +35,7 @@ export const ALL_SECTION_IDS = [
   'experience', 'gallery',
   'single_space', 'zones', 'space_groups', 'venue_rental', 'inclusions', 'testimonials',
   'collaborators', 'accommodation', 'extra_services',
+  'pricing',
   'faq', 'schedule_visit', 'map', 'contact',
 ] as const
 
@@ -60,6 +61,7 @@ const SECTION_LABELS: Record<SectionId, string> = {
   collaborators:     'Colaboradores',
   accommodation:     'Alojamiento',
   extra_services:    'Servicios adicionales',
+  pricing:           'Paquetes y precios',
   faq:               'Preguntas frecuentes',
   schedule_visit:    'Agendar visita',
   map:               'Mapa y ubicación',
@@ -700,6 +702,54 @@ export default function TemplateEditor({
         <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { name: '', price: '', description: '' })}>+ Añadir servicio</button>
       </div>
     )
+
+    if (secId === 'pricing') {
+      const pricingStyleConfig = SECTION_STYLES.pricing
+      const activePricingVariantId = getActiveStyle(sections, 'pricing')
+      const selectPricingVariant = (variantId: string) => {
+        setSections(s => setActiveStyle(s, 'pricing', variantId) as SectionsData)
+        markDirty()
+      }
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Estilo visual</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {pricingStyleConfig.variants.map(v => {
+                const sel = activePricingVariantId === v.id
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => selectPricingVariant(v.id)}
+                    style={{
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      border: `1.5px solid ${sel ? 'var(--gold)' : 'var(--border)'}`,
+                      borderRadius: 8,
+                      background: sel ? 'rgba(196,151,90,0.08)' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: sel ? 'var(--gold)' : 'var(--charcoal)' }}>{v.label}</span>
+                      {sel && <Check size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />}
+                    </div>
+                    {v.description && (
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{v.description}</div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5, padding: '10px 12px', background: 'var(--cream)', borderRadius: 7 }}>
+            Los paquetes se editan en <strong>Comunicación → Plantillas de propuesta</strong> o por propuesta concreta.
+          </div>
+        </div>
+      )
+    }
 
     if (secId === 'faq') {
       const faqStyleConfig = SECTION_STYLES.faq

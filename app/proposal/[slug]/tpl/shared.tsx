@@ -874,6 +874,125 @@ export function VenueRentalGrid({
   )
 }
 
+// ─── Pricing — packages renderers ─────────────────────────────────────────────
+// Three variants share the same package data:
+//   • PricingCards: cards apiladas (default), one per package
+//   • PricingTable: compact tabular comparison
+//   • VenueRentalGrid (above): alternate horario × temporada grid
+
+export type PackageItem = {
+  name?: string
+  subtitle?: string
+  price?: string
+  description?: string
+  includes?: string[]
+  is_recommended?: boolean
+  min_guests?: number
+  max_guests?: number
+}
+
+export function PricingCards({ packages, primary, dark = true, font }: { packages: PackageItem[]; primary: string; dark?: boolean; font?: string }) {
+  if (!packages.length) return null
+  const rgb = toRgb(primary)
+  const FONT = font || "'Cormorant Garamond', Georgia, serif"
+  const surface = dark ? 'rgba(255,255,255,.04)' : '#fff'
+  const border = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
+  const text = dark ? 'rgba(255,255,255,.88)' : '#181410'
+  const sub = dark ? 'rgba(255,255,255,.45)' : '#6a6560'
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+      {packages.map((p, i) => (
+        <div key={i} style={{
+          background: surface, padding: '36px 28px',
+          display: 'flex', flexDirection: 'column',
+          borderRadius: 8, border: `1px solid ${border}`,
+          ...(p.is_recommended ? { borderTop: `2px solid ${primary}` } : {}),
+        }}>
+          {p.is_recommended && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '.58rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, background: `rgba(${rgb},.12)`, padding: '4px 10px', borderRadius: 100, marginBottom: 14, alignSelf: 'flex-start' }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: primary }} />
+              Más elegido
+            </div>
+          )}
+          <div style={{ fontFamily: FONT, fontSize: '1.7rem', fontWeight: 300, color: text, marginBottom: 4 }}>{p.name}</div>
+          {p.subtitle && <div style={{ fontSize: '.78rem', color: sub, marginBottom: 20 }}>{p.subtitle}</div>}
+          {p.price && (
+            <div style={{ fontFamily: FONT, fontSize: 'clamp(2.2rem,4vw,3.2rem)', fontWeight: 300, color: primary, lineHeight: 1, margin: '8px 0 24px' }}>
+              {p.price} <span style={{ fontSize: '1rem', color: sub, fontFamily: 'Inter, sans-serif' }}>/ persona</span>
+            </div>
+          )}
+          {(p.includes?.length ?? 0) > 0 && (
+            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 9, flex: 1, padding: 0, margin: 0 }}>
+              {p.includes!.filter(Boolean).map((inc, j) => (
+                <li key={j} style={{ fontSize: '.82rem', color: sub, display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: primary, flexShrink: 0, marginTop: 7 }} />
+                  {inc}
+                </li>
+              ))}
+            </ul>
+          )}
+          {(p.min_guests || p.max_guests) && (
+            <div style={{ marginTop: 20, paddingTop: 18, borderTop: `1px solid ${border}`, fontSize: '.75rem', color: sub }}>
+              {p.min_guests && `Mín. ${p.min_guests}`}{p.min_guests && p.max_guests ? ' · ' : ''}{p.max_guests && `Máx. ${p.max_guests}`} invitados
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function PricingTable({ packages, primary, dark = true, font }: { packages: PackageItem[]; primary: string; dark?: boolean; font?: string }) {
+  if (!packages.length) return null
+  const rgb = toRgb(primary)
+  const FONT = font || "'Cormorant Garamond', Georgia, serif"
+  const border = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
+  const text = dark ? 'rgba(255,255,255,.88)' : '#181410'
+  const sub = dark ? 'rgba(255,255,255,.45)' : '#6a6560'
+  const headerBg = dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)'
+  const cellPad = '18px 20px'
+  return (
+    <div style={{ overflowX: 'auto', border: `1px solid ${border}`, borderRadius: 10 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.88rem' }}>
+        <thead>
+          <tr style={{ background: headerBg }}>
+            <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: '.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: sub, borderBottom: `1px solid ${border}` }}>Paquete</th>
+            <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: '.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: sub, borderBottom: `1px solid ${border}` }}>Invitados</th>
+            <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: sub, borderBottom: `1px solid ${border}` }}>Precio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {packages.map((p, i) => {
+            const guestsRange = (p.min_guests || p.max_guests)
+              ? `${p.min_guests ?? ''}${p.min_guests && p.max_guests ? '–' : ''}${p.max_guests ?? ''} inv.`
+              : '—'
+            return (
+              <tr key={i} style={{ borderBottom: i < packages.length - 1 ? `1px solid ${border}` : 'none' }}>
+                <td style={{ padding: cellPad, verticalAlign: 'top' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: p.subtitle ? 4 : 0 }}>
+                    <span style={{ fontFamily: FONT, fontSize: '1.2rem', fontWeight: 400, color: text }}>{p.name}</span>
+                    {p.is_recommended && (
+                      <span style={{ fontSize: '.62rem', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: primary, padding: '2px 8px', borderRadius: 99, background: `rgba(${rgb},.12)` }}>Recomendado</span>
+                    )}
+                  </div>
+                  {p.subtitle && <div style={{ fontSize: '.78rem', color: sub }}>{p.subtitle}</div>}
+                </td>
+                <td style={{ padding: cellPad, verticalAlign: 'top', fontSize: '.85rem', color: sub, fontVariantNumeric: 'tabular-nums' }}>
+                  {guestsRange}
+                </td>
+                <td style={{ padding: cellPad, verticalAlign: 'top', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontFamily: FONT, fontSize: '1.4rem', fontWeight: 300, color: primary }}>{p.price || '—'}</span>
+                  {p.price && <span style={{ fontSize: '.7rem', color: sub, marginLeft: 4 }}>/ pers.</span>}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 // ─── Availability Banner ───────────────────────────────────────────────────────
 export function AvailabilityBanner({ message, primary, onPrimary }: {
   message: string; primary: string; onPrimary: string
