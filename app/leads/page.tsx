@@ -16,7 +16,7 @@ import {
   ExternalLink, Edit2, Trash2, Clock, Filter, FileText, Download,
   AlertTriangle, PartyPopper, Snowflake, Sparkles, Eye, Landmark, XCircle,
   Sprout, Sun, Leaf, Zap, LockKeyhole, OctagonAlert, Flower2, Info,
-  List, LayoutGrid, Receipt, ChevronDown, ChevronUp, Paperclip, Upload, CheckCircle2, CalendarDays,
+  List, LayoutGrid, Receipt, ChevronDown, ChevronUp, Paperclip, Upload, CheckCircle2, CalendarDays, Package,
 } from 'lucide-react'
 
 // ── Types & config ─────────────────────────────────────────────────────────────
@@ -2489,7 +2489,7 @@ function DateConfirmModal({
           {/* Existing visit notice — shown when re-scheduling a visit that wasn't cancelled */}
           {isVisitMode && lead.visit_date && (
             <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 10, background: '#fffbeb', border: '1.5px solid #fde68a', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0, marginTop: 1 }}>📅</span>
+              <CalendarDays size={18} color="#92400e" style={{ flexShrink: 0, marginTop: 1 }} />
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 2 }}>Visita ya agendada</div>
                 <div style={{ fontSize: 13, color: '#78350f', fontWeight: 500 }}>
@@ -2642,7 +2642,7 @@ function DateConfirmModal({
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 14 }}>📦</span>
+                    <Package size={14} color="var(--charcoal)" />
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)' }}>Venue con paquetes</span>
                   </div>
                   {/* Calendar legend for package mode */}
@@ -3540,8 +3540,8 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
               </div>
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                 {lead.source === 'wedding_planner' ? (
-                  <span style={{ fontSize: 10, background: 'rgba(139,92,246,0.1)', color: '#7c3aed', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
-                    🎯 Planner
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, background: 'rgba(139,92,246,0.1)', color: '#7c3aed', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
+                    <Sparkles size={11} /> Planner
                   </span>
                 ) : lead.source && (
                   <span style={{ fontSize: 10, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '1px 7px', borderRadius: 10 }}>

@@ -8,7 +8,7 @@ import { ImageUploader } from '@/components/ImageUploader'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { X, Send, Clock, CheckCircle, AlertCircle, ToggleLeft, ToggleRight, Info, FileText, Tag, MapPin, Image as ImageIcon, Star, Settings, ExternalLink, Mail, Lightbulb, Globe, RotateCcw } from 'lucide-react'
+import { X, Send, Clock, CheckCircle, CheckCircle2, AlertCircle, ToggleLeft, ToggleRight, Info, FileText, Tag, MapPin, Image as ImageIcon, Star, Settings, ExternalLink, Mail, Lightbulb, Globe, RotateCcw, ClipboardList } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import Spinner from '@/components/Spinner'
 
@@ -880,7 +880,7 @@ export default function FichaPage() {
               border: '1px solid #6ee7b7', borderRadius: 10, padding: '14px 16px', marginBottom: 16,
             }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 20, lineHeight: 1 }}>🎉</span>
+                <CheckCircle2 size={20} color="#059669" style={{ flexShrink: 0, marginTop: 1 }} />
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#065f46', marginBottom: 3 }}>
                     ¡Cambios publicados!
@@ -931,7 +931,7 @@ export default function FichaPage() {
             if (!isApproved && mainStatus === 'submitted' && submittedAt) {
               return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, padding: '7px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8 }}>
-                  <span style={{ fontSize: 13, lineHeight: 1 }}>📋</span>
+                  <ClipboardList size={14} color="#1d4ed8" style={{ flexShrink: 0 }} />
                   <span style={{ fontSize: 12, color: '#1d4ed8', fontWeight: 500 }}>
                     En revisión · <span style={{ fontWeight: 400 }}>Enviado el {fmt(submittedAt)}</span>
                   </span>

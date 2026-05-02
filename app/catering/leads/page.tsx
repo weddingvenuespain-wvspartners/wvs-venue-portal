@@ -174,7 +174,7 @@ export default function CateringLeadsPage() {
                 ['Fecha boda', selected.wedding_date ? new Date(selected.wedding_date).toLocaleDateString('es-ES') : '—'],
                 ['Invitados', selected.guests || '—'],
                 ['Presupuesto', BUDGET_LABEL[selected.budget] || '—'],
-                ['Origen', selected.source === 'wedding_planner' ? '🎯 Wedding Planner' : selected.source || '—'],
+                ['Origen', selected.source === 'wedding_planner' ? 'Wedding Planner' : selected.source || '—'],
               ].map(([k, v]) => (
                 <div key={k}>
                   <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '0.06em', marginBottom: 2 }}>{k}</div>

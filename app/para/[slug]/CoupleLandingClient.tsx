@@ -391,7 +391,7 @@ export default function CoupleLandingClient({ client, venues, caterings }: { cli
 
       {/* Hero */}
       <div style={{ background: 'linear-gradient(160deg, #2c2420 0%, #4a3828 50%, #3d3530 100%)', padding: '52px 24px 44px', textAlign: 'center', color: '#fff' }}>
-        <div style={{ fontSize: 36, marginBottom: 14 }}>💍</div>
+        <div style={{ marginBottom: 14, color: '#fff' }}><Heart size={36} strokeWidth={1.5} /></div>
         <h1 style={{ fontSize: 30, fontWeight: 300, letterSpacing: '0.06em', marginBottom: 10, lineHeight: 1.2 }}>
           Propuesta para <strong style={{ fontWeight: 800 }}>{client.name}</strong>
         </h1>

@@ -241,7 +241,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, se
   .t4-msg-wrap {
     max-width: 720px; margin: 0 auto; text-align: center; padding: 80px 48px;
   }
-  .t4-msg-icon { font-size: 2rem; margin-bottom: 20px }
+  .t4-msg-icon { color: ${pri}; margin-bottom: 20px; display: inline-flex }
   .t4-msg-title {
     font-family: ${font}; font-size: 1.6rem;
     color: ${INK}; margin-bottom: 20px;
@@ -726,7 +726,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         <section id="sec-welcome" className="t4-msg-bg">
           <FadeUp>
             <div className="t4-msg-wrap">
-              <div className="t4-msg-icon">💌</div>
+              <div className="t4-msg-icon"><InclusionIcon name="mail" size={36} color={primary} strokeWidth={1.6} /></div>
               <h2 className="t4-msg-title">Un mensaje para vosotros</h2>
               <p className="t4-msg-text">{displayMsg}</p>
             </div>

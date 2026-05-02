@@ -10,7 +10,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import Spinner from '@/components/Spinner'
 import {
   ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
-  FileText, Calendar, Search, AlertCircle, Trash2, Flower2, Edit2,
+  FileText, Calendar, Search, AlertCircle, Trash2, Flower2, Edit2, Link2,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -1707,7 +1707,7 @@ function DayModal({
                     <div>
                       <div style={{ fontSize: 12, color: '#be185d', marginBottom: 10 }}>Vincula la pareja que reservó esta boda.</div>
                       {!showQuickLink ? (
-                        <button onClick={() => setShowQuickLink(true)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', background: 'transparent', cursor: 'pointer', fontWeight: 500 }}>🔗 Vincular lead</button>
+                        <button onClick={() => setShowQuickLink(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', background: 'transparent', cursor: 'pointer', fontWeight: 500 }}><Link2 size={13} /> Vincular lead</button>
                       ) : (
                         <div>
                           <div style={{ position: 'relative', marginBottom: 8 }}>
@@ -1829,8 +1829,8 @@ function DayModal({
                       {!showQuickLink ? (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 8, marginBottom: 12 }}>
                           <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Sin pareja vinculada</span>
-                          <button onClick={() => setShowQuickLink(true)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, cursor: 'pointer', border: '1px solid var(--gold)', background: 'transparent', color: 'var(--gold)', fontWeight: 600 }}>
-                            🔗 Vincular lead
+                          <button onClick={() => setShowQuickLink(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, padding: '3px 10px', borderRadius: 20, cursor: 'pointer', border: '1px solid var(--gold)', background: 'transparent', color: 'var(--gold)', fontWeight: 600 }}>
+                            <Link2 size={12} /> Vincular lead
                           </button>
                         </div>
                       ) : (

@@ -851,7 +851,7 @@ function UserPanel({
                     style={{ color: '#dc2626', borderColor: 'rgba(220,38,38,0.3)' }}
                     onClick={() => onSaveProfile({ ...profile, ...pForm, status: 'rejected', features_override: featOverrides })}
                   >
-                    🚫 Denegar acceso
+                    <Ban size={13} /> Denegar acceso
                   </button>
                 )}
                 <div style={{ marginLeft: 'auto' }}>
