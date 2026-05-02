@@ -1176,7 +1176,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               </p>
             </FadeUp>
             <FadeUp delay={.1}>
-              <InquiryForm slug={data.slug} primary={primary} onPrimary={onPri} dark={!lightMode} />
+              <InquiryForm slug={data.slug} proposalId={data.id} coupleName={couple_name} primary={primary} onPrimary={onPri} dark={!lightMode} />
             </FadeUp>
             {on('share') && (
               <FadeUp delay={.2}>

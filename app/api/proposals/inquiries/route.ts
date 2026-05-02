@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     if (iErr) {
       console.error('[inquiries] insert error', iErr)
-      return NextResponse.json({ ok: false, error: 'No se ha podido enviar' }, { status: 500 })
+      return NextResponse.json({ ok: false, error: iErr.message || 'No se ha podido enviar' }, { status: 500 })
     }
 
     // Send notification to venue (best-effort, don't fail the request)
