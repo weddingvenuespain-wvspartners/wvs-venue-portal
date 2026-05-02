@@ -55,6 +55,54 @@ export default function ProposalLanding({ data, preview }: { data: ProposalData;
       body: JSON.stringify({ slug: data.slug, session }),
       keepalive: true,
     }).catch(() => {})
+
+    // Section-level tracking: fire one POST per section the first time it
+    // stays in the viewport for ~1.5s. Server dedupes via UNIQUE constraint.
+    const sent = new Set<string>()
+    const dwellTimers = new Map<string, ReturnType<typeof setTimeout>>()
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = (entry.target as HTMLElement).id
+          if (!id || sent.has(id)) continue
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.4) {
+            if (!dwellTimers.has(id)) {
+              const t = setTimeout(() => {
+                sent.add(id)
+                dwellTimers.delete(id)
+                fetch('/api/proposals/track-section', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ slug: data.slug, session, section_id: id }),
+                  keepalive: true,
+                }).catch(() => {})
+                observer.unobserve(entry.target)
+              }, 1500)
+              dwellTimers.set(id, t)
+            }
+          } else {
+            const t = dwellTimers.get(id)
+            if (t) { clearTimeout(t); dwellTimers.delete(id) }
+          }
+        }
+      },
+      { threshold: [0, 0.4, 1] },
+    )
+
+    // Defer attaching the observer until the template has rendered the sections
+    const attach = () => {
+      const candidates = document.querySelectorAll<HTMLElement>(
+        '.tpl-root section[id], .tpl-root [id^="sec-"], .tpl-root [id^="t1-"], .tpl-root #menu, .tpl-root [id="t1-inquiries"]',
+      )
+      candidates.forEach(el => observer.observe(el))
+    }
+    const raf = requestAnimationFrame(() => setTimeout(attach, 200))
+
+    return () => {
+      cancelAnimationFrame(raf)
+      dwellTimers.forEach(t => clearTimeout(t))
+      observer.disconnect()
+    }
   }, [data.slug, preview])
 
   const effective = preview ? liveData : data

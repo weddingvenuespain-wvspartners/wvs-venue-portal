@@ -11,6 +11,7 @@ const PUBLIC_ROUTES = [
   '/api/proposals/track-view',  // anonymous couple opens a proposal — RPC handles dedupe + self-view
   '/api/proposals/unlock',      // password gate for private proposals — anonymous by design
   '/api/proposals/inquiries',   // public POST: couple submits inquiry from proposal landing
+  '/api/proposals/track-section', // public POST: section-level view tracking
 ]
 
 export async function middleware(req: NextRequest) {
