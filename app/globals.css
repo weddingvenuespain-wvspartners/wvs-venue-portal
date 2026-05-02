@@ -193,14 +193,6 @@ table.data-table tr:hover td { background: #fafaf9; }
 .photo-thumb { aspect-ratio: 4/3; border-radius: 6px; overflow: hidden; border: 1px solid var(--ivory); }
 .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
 
-/* ── Kanban ─────────────────────────────────────────────── */
-.kanban { display: flex; gap: 10px; overflow-x: auto; align-items: flex-start; padding-bottom: 12px; }
-.kanban-col { min-width: 220px; width: 220px; flex-shrink: 0; border-radius: 10px; min-height: 400px; display: flex; flex-direction: column; }
-.kanban-col-header { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 10px 12px; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: space-between; }
-.kanban-card { background: #fff; border: 1px solid var(--ivory); border-radius: 8px; padding: 10px 11px; margin-bottom: 6px; cursor: grab; transition: box-shadow 0.15s, opacity 0.15s; font-size: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-.kanban-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-.kanban-card.dragging { opacity: 0.4; cursor: grabbing; }
-
 /* ── Login ──────────────────────────────────────────────── */
 .login-page { min-height: 100vh; background: var(--espresso); display: flex; align-items: center; justify-content: center; padding: 20px; }
 .login-box { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 40px 36px; width: 100%; max-width: 400px; }
