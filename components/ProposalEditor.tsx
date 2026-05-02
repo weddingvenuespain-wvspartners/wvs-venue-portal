@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Check, X, AlertCircle, ChevronDown, ArrowLeft, Copy, ChefHat } from 'lucide-react'
+import { Check, X, AlertCircle, ChevronDown, ArrowLeft, Copy, ChefHat, Lock, RefreshCw, Eye, EyeOff } from 'lucide-react'
 import type { SectionsData, VenueSpaceGroup } from '@/lib/proposal-types'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes'
@@ -48,6 +48,7 @@ export type EditorProposal = {
   sections_data?: SectionsData | null
   template_id?: string | null
   branding?: { logo_url: string | null; primary_color: string; font_family?: string } | null
+  access_password?: string | null
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -151,6 +152,8 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     font_family: initial.branding?.font_family ?? 'Georgia, serif',
     template_id: initial.template_id ?? '',
     modality_id: initial.modality_id ?? '',
+    access_password: initial.access_password ?? '',
+    password_protected: !!initial.access_password,
   })
   const [sections, setSections] = useState<SectionsData>({ ...emptySections, ...(initial.sections_data ?? {}) })
   const [activeTab, setActiveTab] = useState<'datos' | 'visual' | 'secciones' | 'menus'>('datos')
@@ -247,6 +250,10 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
     const cleanSections: SectionsData = { ...sections }
 
+    const accessPassword = form.password_protected && form.access_password.trim()
+      ? form.access_password.trim()
+      : null
+
     const { couple_email: coupleEmailValue, ...corePayload } = {
       user_id: user.id,
       lead_id: form.lead_id || null,
@@ -261,6 +268,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       sections_data: cleanSections,
       template_id: form.template_id || null,
       modality_id: form.modality_id || null,
+      access_password: accessPassword,
     }
 
     const { error: updErr } = await supabase.from('proposals').update(corePayload).eq('id', proposal.id)
@@ -624,6 +632,8 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                 <Checkbox checked={form.show_availability} onCheckedChange={(v) => setForm(f => ({ ...f, show_availability: v === true }))} />
                 Mostrar disponibilidad
               </label>
+
+              <PasswordProtectionBlock form={form} setForm={setForm} />
 
               {allTemplates.length > 0 && (
                 <div className="form-group" style={{ marginTop: 14 }}>
@@ -1726,6 +1736,84 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
         }}>
           {toast.err ? <AlertCircle size={15} /> : <Check size={15} />}
           <span>{toast.msg}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Password protection sub-block ────────────────────────────────────────────
+// Optional gate for the public proposal URL. Plain text by design (soft-protect).
+
+function PasswordProtectionBlock({
+  form, setForm,
+}: {
+  form: { password_protected: boolean; access_password: string }
+  setForm: React.Dispatch<React.SetStateAction<any>>
+}) {
+  const [reveal, setReveal] = useState(false)
+
+  const generatePassword = () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+    let pwd = ''
+    const arr = new Uint8Array(10)
+    if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+      window.crypto.getRandomValues(arr)
+      for (let i = 0; i < arr.length; i++) pwd += alphabet[arr[i] % alphabet.length]
+    } else {
+      for (let i = 0; i < 10; i++) pwd += alphabet[Math.floor(Math.random() * alphabet.length)]
+    }
+    setForm((f: any) => ({ ...f, access_password: pwd, password_protected: true }))
+    setReveal(true)
+  }
+
+  return (
+    <div style={{ marginTop: 14, padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+        <Checkbox
+          checked={form.password_protected}
+          onCheckedChange={(v) => setForm((f: any) => ({ ...f, password_protected: v === true }))}
+        />
+        <Lock size={13} style={{ color: 'var(--warm-gray)' }} />
+        Proteger con contraseña
+      </label>
+      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4, marginLeft: 22, lineHeight: 1.5 }}>
+        La pareja necesitará introducirla antes de ver la propuesta.
+      </div>
+
+      {form.password_protected && (
+        <div style={{ marginTop: 10, marginLeft: 22, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <input
+                type={reveal ? 'text' : 'password'}
+                className="form-input"
+                placeholder="Contraseña"
+                value={form.access_password}
+                onChange={e => setForm((f: any) => ({ ...f, access_password: e.target.value }))}
+                style={{ fontSize: 12, paddingRight: 32 }}
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                onClick={() => setReveal(r => !r)}
+                aria-label={reveal ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4, display: 'inline-flex' }}
+              >
+                {reveal ? <EyeOff size={13} /> : <Eye size={13} />}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={generatePassword}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, padding: '0 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--cream)', color: 'var(--charcoal)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              <RefreshCw size={11} /> Generar
+            </button>
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+            Comparte la contraseña por un canal aparte (WhatsApp, email distinto al del enlace).
+          </div>
         </div>
       )}
     </div>

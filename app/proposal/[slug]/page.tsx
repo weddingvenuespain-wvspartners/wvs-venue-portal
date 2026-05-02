@@ -7,6 +7,7 @@ import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { Metadata } from 'next'
 import ProposalLanding from './ProposalLanding'
+import ProposalGate from '@/components/ProposalGate'
 import type { SectionsData } from '@/lib/proposal-types'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -122,12 +123,22 @@ export default async function ProposalPage({ params, searchParams }: { params: P
       id, slug, couple_name, personal_message,
       guest_count, wedding_date, price_estimate,
       show_availability, show_price_estimate, status, ctas,
-      sections_data, user_id
+      sections_data, user_id, access_password
     `)
     .eq('slug', slug)
     .single()
 
   if (error || !proposal) notFound()
+
+  // 1b. Password gate — render lock screen if access_password is set and cookie does not match.
+  // Preview mode (editor iframe) bypasses the gate so the venue can see their own proposal.
+  if (proposal.access_password && !preview) {
+    const cookieStore = await cookies()
+    const unlockCookie = cookieStore.get(`proposal_unlock_${proposal.id}`)?.value
+    if (unlockCookie !== proposal.access_password) {
+      return <ProposalGate slug={proposal.slug} coupleName={proposal.couple_name} />
+    }
+  }
 
   // 2. Obtener datos del venue (solo nombre, ciudad, contacto para el hero y CTA)
   const { data: venueData } = await supabase

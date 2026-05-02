@@ -9,6 +9,7 @@ const PUBLIC_ROUTES = [
   '/api/redsys/notification',   // Redsys webhook (server-to-server, no session)
   '/api/plans',                 // public plan listing for pricing page
   '/api/proposals/track-view',  // anonymous couple opens a proposal — RPC handles dedupe + self-view
+  '/api/proposals/unlock',      // password gate for private proposals — anonymous by design
 ]
 
 export async function middleware(req: NextRequest) {

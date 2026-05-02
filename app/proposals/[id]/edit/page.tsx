@@ -51,6 +51,7 @@ export default function ProposalEditarPage({ params }: { params: Promise<{ id: s
         sections_data: (data as any).sections_data ?? null,
         template_id: (data as any).template_id ?? null,
         branding: branding ?? null,
+        access_password: (data as any).access_password ?? null,
       })
     }
     load()
