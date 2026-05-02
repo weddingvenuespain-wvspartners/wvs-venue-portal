@@ -67,6 +67,13 @@ const BUDGET_LABEL: Record<string, string> = {
   mas_100k:    '> 100k€',
   // legacy values — keep for backwards compat
   menos_20k: '< 20k€', '20k_35k': '20–35k€', '35k_50k': '35–50k€', mas_50k: '> 50k€',
+  // WVS form ranges
+  'wvs_menos_20k': '< 20.000€',
+  'wvs_20k_35k':   '20.000–35.000€',
+  'wvs_35k_40k':   '35.000–40.000€',
+  'wvs_40k_51k':   '40.000–51.000€',
+  'wvs_51k_60k':   '51.000–60.000€',
+  'wvs_mas_60k':   '> 60.000€',
 }
 const BUDGET_OPTS = [
   'sin_definir',
@@ -922,7 +929,7 @@ export default function LeadsPage() {
       visit_date: lead.visit_date || '', guests: lead.guests?.toString() || '',
       source: lead.source || 'web', notes: lead.notes || '', initial_message: lead.initial_message || '',
       ceremony_type: lead.ceremony_type || 'sin_definir',
-      budget: lead.budget || 'sin_definir', language: lead.language || 'es',
+      budget: lead.budget || 'sin_definir', language: lead.language || '',
       style: lead.style || '',
       country: lead.country || '', guests_adults: lead.guests_adults?.toString() || '',
       guests_children: lead.guests_children?.toString() || '',

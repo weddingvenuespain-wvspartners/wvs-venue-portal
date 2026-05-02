@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       user_id:               profile.user_id,
       venue_id:              venueRow?.id ?? null,
       status:                'new',
-      source:                'web',
+      source:                'wedding_venues_spain',
       name:                  name    || '',
       email:                 email   || '',
       phone:                 phone   || '',
