@@ -7,6 +7,7 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
+import ImportLeadsModal from '@/components/ImportLeadsModal'
 import { expandLeadDates, expandBudgetDates, pad } from '@/lib/lead-dates'
 import { LeadDatesSection } from '@/components/LeadDatesSection'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -240,7 +241,7 @@ function formatLeadDate(lead: any): { line1: string; line2?: React.ReactNode; co
       if (!lead.wedding_date) return { line1: 'Sin fecha', color: 'var(--stone)' }
       const days = Math.ceil((new Date(lead.wedding_date + 'T12:00:00').getTime() - Date.now()) / 86400000)
       const color = days < 0 ? 'var(--warm-gray)' : days < 60 ? 'var(--rose)' : days < 120 ? 'var(--gold)' : 'var(--sage)'
-      return { line1: fmtShort(lead.wedding_date), line2: days > 0 ? <>{days < 60 ? <><Zap size={11} style={{ display: 'inline', verticalAlign: 'middle' }} />{' '}</> : ''}{days} días</> : undefined, color }
+      return { line1: fmtShort(lead.wedding_date), line2: days > 0 ? `${days}d` : undefined, color }
   }
 }
 
@@ -360,6 +361,7 @@ export default function LeadsPage() {
 
   // Modals
   const [showForm,   setShowForm]   = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [editLead,   setEditLead]   = useState<any|null>(null)
   const [detailLead, setDetailLead] = useState<any|null>(null)
   const [form,       setForm]       = useState(emptyForm)
@@ -543,20 +545,76 @@ export default function LeadsPage() {
     })
   }, [leads, activeTab, hidePast, filterSrc, filterBudget, filterDateFrom, filterDateTo, search, features.leads_new_only, features.leads_date_filter])
 
-  // CSV export
-  const exportCSV = () => {
-    const header = ['Nombre','Email','Teléfono','WhatsApp','Fecha boda','Invitados','Estado','Origen','Presupuesto','Notas']
-    const rows = visibleLeads.map(l => [
-      l.name, l.email, l.phone, l.whatsapp, l.wedding_date || '',
-      l.guests || '', SUB_STATUS_LABEL[l.status as DbStatus] || l.status,
-      SOURCE_LABEL[l.source] || l.source, BUDGET_LABEL[l.budget] || l.budget, l.notes || '',
-    ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`))
-    const csv = [header.join(','), ...rows.map(r => r.join(','))].join('\n')
-    const blob = new Blob(['\uFEFF' + csv, ''], { type: 'text/csv;charset=utf-8' })
+  // CSV export — all leads with related data
+  const [exporting, setExporting] = useState(false)
+  const exportCSV = async () => {
+    if (!activeVenue) return
+    setExporting(true)
+    const supabase = createClient()
+    // Fetch related data
+    const leadIds = leads.map(l => l.id)
+    const [{ data: proposals }, { data: dgBudgets }, { data: calEntries }] = await Promise.all([
+      supabase.from('proposals').select('id, lead_id, couple_name, status').eq('venue_id', activeVenue.id).in('lead_id', leadIds),
+      supabase.from('budgets').select('id, lead_id, status, total_amount, slug').eq('venue_id', activeVenue.id).in('lead_id', leadIds),
+      supabase.from('calendar_entries').select('date, lead_id, status').eq('venue_id', activeVenue.id).in('lead_id', leadIds),
+    ])
+    // Index by lead_id
+    const proposalsByLead: Record<string, any[]> = {}
+    ;(proposals || []).forEach(p => { (proposalsByLead[p.lead_id] ??= []).push(p) })
+    const budgetsByLead: Record<string, any[]> = {}
+    ;(dgBudgets || []).forEach(b => { (budgetsByLead[b.lead_id] ??= []).push(b) })
+    const datesByLead: Record<string, any[]> = {}
+    ;(calEntries || []).forEach(c => { (datesByLead[c.lead_id] ??= []).push(c) })
+
+    const fmtD = (d: string) => d ? new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+    const header = [
+      'Nombre','Email','Teléfono','WhatsApp','País',
+      'Fecha boda','Invitados','Adultos','Niños',
+      'Estado','Origen','Presupuesto estimado','Ceremonia','Idioma','Catering',
+      'Mensaje inicial','Notas internas',
+      'Visita','Hora visita',
+      'Fechas ofertadas',
+      'Dosieres digitales','Estado dosier',
+      'Presupuestos digitales','Estado presupuesto','Total presupuesto',
+      'Tags',
+      'Fecha creación','Última actualización',
+    ]
+    const rows = leads.map(l => {
+      const lProposals = proposalsByLead[l.id] || []
+      const lBudgets = budgetsByLead[l.id] || []
+      const lDates = datesByLead[l.id] || []
+      const offeredDates = lDates.map(d => fmtD(d.date) + ' (' + d.status + ')').join(' | ')
+      return [
+        l.name, l.email, l.phone, l.whatsapp, l.country || '',
+        l.wedding_date ? fmtD(l.wedding_date) : '', l.guests || '', l.guests_adults || '', l.guests_children || '',
+        SUB_STATUS_LABEL[l.status as DbStatus] || l.status,
+        SOURCE_LABEL[l.source] || l.source,
+        BUDGET_LABEL[l.budget] || l.budget,
+        CEREMONY_LABEL[l.ceremony_type] || l.ceremony_type || '',
+        l.language || '',
+        l.catering_needed === 'si' ? 'Sí' : l.catering_needed === 'no' ? 'No' : '',
+        l.initial_message || '',
+        l.notes || '',
+        l.visit_date ? fmtD(l.visit_date) : '', l.visit_time || '',
+        offeredDates,
+        lProposals.length > 0 ? lProposals.length + ' dosier(es)' : 'No',
+        lProposals.length > 0 ? lProposals.map(p => p.status).join(', ') : '',
+        lBudgets.length > 0 ? lBudgets.length + ' presupuesto(s)' : 'No',
+        lBudgets.length > 0 ? lBudgets.map(b => b.status).join(', ') : '',
+        lBudgets.length > 0 ? lBudgets.map(b => b.total_amount?.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' }) || '').join(', ') : '',
+        (l.tags || []).join(', '),
+        l.created_at ? new Date(l.created_at).toLocaleDateString('es-ES') : '',
+        l.updated_at ? new Date(l.updated_at).toLocaleDateString('es-ES') : '',
+      ].map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"')
+    })
+    const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
-    a.href = url; a.download = 'leads.csv'; a.click()
+    const today = new Date().toISOString().slice(0, 10)
+    a.href = url; a.download = 'leads-' + today + '.csv'; a.click()
     URL.revokeObjectURL(url)
+    setExporting(false)
   }
 
   const moveToStatus = async (id: string, status: DbStatus, cleanCalendar = false) => {
@@ -881,7 +939,7 @@ export default function LeadsPage() {
     }
   }
 
-  // PDF digital: takes the selected dates from the calendar modal and creates a proposal
+  // Dosier digital: takes the selected dates from the calendar modal and creates a proposal
   const handlePdfDigitalDates = async (_leadUpdates: any, calendarDates: string[], _calStatus: any, _isVisit: boolean) => {
     if (!pdfDigitalLead || !user) return
     const dateSlots = calendarDates.length > 0
@@ -926,6 +984,8 @@ export default function LeadsPage() {
     if (detailLead?.id === deleteConfirmId) setDetailLead(null)
     setDeleteConfirmId(null)
   }
+
+  const existingEmails = useMemo(() => new Set(leads.map(l => (l.email || '').toLowerCase()).filter(Boolean)), [leads])
 
   const openCreate = () => { setForm(emptyForm); setEditLead(null); setShowForm(true) }
   const openEdit   = (lead: any) => {
@@ -1136,9 +1196,12 @@ export default function LeadsPage() {
         <div className="topbar">
           <div className="topbar-title">Leads</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowImport(true)} title="Importar leads desde Excel">
+              <Upload size={13} /> Importar
+            </button>
             {features.leads_export && (
-              <button className="btn btn-ghost btn-sm" onClick={exportCSV} title="Exportar leads visibles a CSV">
-                <Download size={13} /> Exportar CSV
+              <button className="btn btn-ghost btn-sm" onClick={exportCSV} disabled={exporting} title="Exportar todos los leads a CSV" style={exporting ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
+                <Download size={13} /> {exporting ? 'Exportando…' : 'Exportar CSV'}
               </button>
             )}
             <button className="btn btn-primary btn-sm" onClick={openCreate}>
@@ -1409,6 +1472,15 @@ export default function LeadsPage() {
           onUpdateLead={(id, updates) => setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))} />
       )}
 
+      <ImportLeadsModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        userId={user!.id}
+        venueId={activeVenue!.id}
+        existingEmails={existingEmails}
+        onImported={load}
+      />
+
       {showForm && (
         <LeadFormModal form={form} setForm={setForm} isEdit={!!editLead} editLead={editLead}
           saving={saving} onSubmit={handleSubmit} userId={user!.id} venueId={activeVenue!.id}
@@ -1504,7 +1576,7 @@ export default function LeadsPage() {
         />
       )}
 
-      {/* PDF digital — date selection before creating proposal */}
+      {/* Dosier digital — date selection before creating proposal */}
       {pdfDigitalLead && (
         <DateConfirmModal
           key={pdfDigitalKey}
@@ -2465,7 +2537,7 @@ function DateConfirmModal({
   const nextMonth = () => { if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) } else setViewMonth(m => m + 1) }
 
   // Header config per mode
-  const modeConfig = isPdfDigital   ? { label: 'Selecciona las fechas para la propuesta digital', icon: <CalendarDays size={16} />, gradient: 'linear-gradient(135deg,#f0f4ff 0%,#f8f9ff 100%)', accent: '#4f6ef7', avatarBg: '#4f6ef7' }
+  const modeConfig = isPdfDigital   ? { label: 'Selecciona las fechas para el dosier digital', icon: <CalendarDays size={16} />, gradient: 'linear-gradient(135deg,#f0f4ff 0%,#f8f9ff 100%)', accent: '#4f6ef7', avatarBg: '#4f6ef7' }
     : isVisitMode    ? { label: 'Agendar visita',          icon: <Landmark    size={16} />, gradient: 'linear-gradient(135deg,#fef3c7 0%,#fdf6ee 100%)', accent: 'var(--gold)',      avatarBg: 'var(--gold)' }
     : isWonMode      ? { label: 'Confirmar boda',            icon: <PartyPopper size={16} />, gradient: 'linear-gradient(135deg,#f0fdf4 0%,#fafdf8 100%)', accent: '#16a34a',        avatarBg: 'var(--sage)' }
     : isBudgetMode   ? { label: 'Presupuesto',               icon: <Receipt     size={16} />, gradient: 'linear-gradient(135deg,#fef3c7 0%,#fdf6ee 100%)', accent: 'var(--gold)',      avatarBg: 'var(--gold)' }
@@ -3483,7 +3555,7 @@ function DateConfirmModal({
               opacity: !canConfirm ? 0.5 : 1,
             }}>
             {saving ? 'Guardando...'
-              : isPdfDigital    ? <><CalendarDays size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Continuar a propuesta →</>
+              : isPdfDigital    ? <><CalendarDays size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Continuar a dosier →</>
               : isVisitMode    ? <><Calendar     size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Confirmar visita</>
               : isWonMode      ? <><PartyPopper  size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Confirmar boda</>
               : isBudgetMode   ? <><Receipt      size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Pasar a presupuesto</>
@@ -3537,14 +3609,17 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
   onPdfDigital?: (lead: any) => void
 }) {
 
+  // Fresh lead highlight: < 2h old in the "new" tab
+  const isRecent = tab === 'new' && lead.created_at && (Date.now() - new Date(lead.created_at).getTime()) < 2 * 3600_000
+
   return (
-    <div className="card" style={{ padding: 0, overflow: 'visible' }}>
+    <div className="card" style={{ padding: 0, overflow: 'visible', ...(isRecent ? { boxShadow: '0 0 0 2px #16a34a44, 0 2px 12px rgba(22,163,106,0.10)' } : {}) }}>
       <div style={{ display: 'flex', alignItems: 'stretch', borderRadius: 10 }}>
         {/* Urgency stripe */}
         {(() => {
           const days = lead.date_flexibility === 'exact' || !lead.date_flexibility ? (lead.wedding_date ? Math.ceil((new Date(lead.wedding_date + 'T12:00:00').getTime() - Date.now()) / 86400000) : null) : null
           const color = days !== null && days > 0 ? urgencyColor(days) : 'var(--ivory)'
-          return <div style={{ width: 4, background: color, flexShrink: 0, borderRadius: '10px 0 0 10px' }} />
+          return <div style={{ width: 4, background: isRecent ? '#16a34a' : color, flexShrink: 0, borderRadius: '10px 0 0 10px' }} />
         })()}
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -3555,33 +3630,59 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
             {/* Name + badges */}
             <div style={{ minWidth: 160, maxWidth: 200, flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                {isRecent && (
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a', flexShrink: 0, animation: 'pulse-dot 2s ease-in-out infinite' }} />
+                )}
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.name}</div>
                 {tab === 'new' && lead.created_at && (() => {
                   const ta = timeAgo(lead.created_at)
                   return (
-                    <span style={{ fontSize: 10, fontWeight: 500, color: ta.urgent ? 'var(--rose)' : ta.warning ? 'var(--gold)' : 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap',
+                      padding: '2px 8px', borderRadius: 10,
+                      background: ta.urgent ? 'rgba(225,29,72,0.1)' : ta.warning ? 'rgba(217,119,6,0.1)' : isRecent ? 'rgba(22,163,74,0.1)' : 'var(--ivory)',
+                      color: ta.urgent ? 'var(--rose)' : ta.warning ? '#b45309' : isRecent ? '#16a34a' : 'var(--warm-gray)',
+                    }}>
                       {ta.text}
                     </span>
                   )
                 })()}
               </div>
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                {lead.source === 'wedding_planner' ? (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, background: 'rgba(139,92,246,0.1)', color: '#7c3aed', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
-                    <Sparkles size={11} /> Planner
-                  </span>
-                ) : lead.source && (
-                  <span style={{ fontSize: 10, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '1px 7px', borderRadius: 10 }}>
-                    {SOURCE_LABEL[lead.source] || lead.source}
-                  </span>
-                )}
-                {(tab === 'en_seguimiento' || tab === 'visit' || tab === 'budget') && (
-                  <span style={{ fontSize: 10, background: 'var(--gold-light)', color: 'var(--espresso)', padding: '1px 7px', borderRadius: 10, fontWeight: 500 }}>
+                {tab === 'new' && lead.source && (() => {
+                  const sc: Record<string, { bg: string; color: string }> = {
+                    wedding_venues_spain: { bg: 'rgba(201,150,58,0.12)', color: '#92400e' },
+                    wedding_planner:     { bg: 'rgba(139,92,246,0.1)',  color: '#7c3aed' },
+                    web:                 { bg: 'rgba(59,130,246,0.1)',  color: '#2563eb' },
+                    whatsapp:            { bg: 'rgba(22,163,74,0.1)',   color: '#16a34a' },
+                    instagram:           { bg: 'rgba(219,39,119,0.1)', color: '#db2777' },
+                    bodas_net:           { bg: 'rgba(236,72,153,0.1)', color: '#db2777' },
+                    referral:            { bg: 'rgba(14,165,233,0.1)', color: '#0284c7' },
+                    email:               { bg: 'rgba(99,102,241,0.1)', color: '#4f46e5' },
+                  }
+                  const s = sc[lead.source] || { bg: 'var(--ivory)', color: 'var(--charcoal)' }
+                  return (
+                    <span style={{ fontSize: 10, background: s.bg, color: s.color, padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+                      {SOURCE_LABEL[lead.source] || lead.source}
+                    </span>
+                  )
+                })()}
+                {(tab === 'en_seguimiento' || tab === 'budget') && (
+                  <span style={{ fontSize: 10, background: 'var(--gold-light)', color: 'var(--espresso)', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
                     {SUB_STATUS_LABEL[lead.status as DbStatus]}
                   </span>
                 )}
+                {tab === 'visit' && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                    background: lead.status === 'post_visit' ? 'rgba(99,102,241,0.1)' : 'rgba(22,163,74,0.1)',
+                    color: lead.status === 'post_visit' ? '#4f46e5' : '#16a34a',
+                  }}>
+                    {lead.status === 'post_visit' ? 'Post-visita' : 'Visita agendada'}
+                  </span>
+                )}
                 {lead.tags?.length > 0 && lead.tags.slice(0, 3).map((t: string) => (
-                  <span key={t} style={{ fontSize: 10, background: 'rgba(99,102,241,0.08)', color: '#4f46e5', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
+                  <span key={t} style={{ fontSize: 10, background: 'rgba(99,102,241,0.08)', color: '#4f46e5', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
                     {t}
                   </span>
                 ))}
@@ -3589,48 +3690,64 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
             </div>
 
             {/* Date */}
-            <div style={{ minWidth: 120, flexShrink: 0 }}>
+            <div style={{ minWidth: 130, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {(() => {
                 const { line1, line2, color } = formatLeadDate(lead)
                 return (
                   <>
-                    <div style={{ fontSize: 12, color: color || 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Calendar size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                      {line1}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Calendar size={12} style={{ color: color || 'var(--warm-gray)', flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, fontWeight: 500, color: color || 'var(--charcoal)' }}>{line1}</span>
                     </div>
-                    {line2 && <div style={{ fontSize: 11, color: color || 'var(--warm-gray)', fontWeight: 600, marginTop: 2 }}>{line2}</div>}
+                    {line2 && (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: color || 'var(--warm-gray)', padding: '2px 8px', borderRadius: 10, lineHeight: 1.2, alignSelf: 'flex-start', marginLeft: 17 }}>
+                        {line2}
+                      </span>
+                    )}
                   </>
                 )
               })()}
-              {tab === 'visit' && lead.visit_date && (
-                <div style={{ fontSize: 11, color: lead.status === 'post_visit' ? 'var(--warm-gray)' : 'var(--gold)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Landmark size={11} /> {lead.status === 'post_visit' ? 'Visita: ' : ''}{new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                </div>
-              )}
+              {(tab === 'visit' || tab === 'budget') && lead.visit_date && (() => {
+                const vDate = new Date(lead.visit_date + 'T12:00:00')
+                const isPast = lead.status === 'post_visit'
+                const daysUntil = Math.ceil((vDate.getTime() - Date.now()) / 86400000)
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Landmark size={12} style={{ color: isPast ? '#4f46e5' : '#16a34a', flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: isPast ? '#4f46e5' : '#16a34a' }}>
+                        {vDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                      </span>
+                    </div>
+                    {!isPast && daysUntil >= 0 && (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: daysUntil <= 2 ? 'var(--rose)' : '#16a34a', padding: '2px 8px', borderRadius: 10, lineHeight: 1.2 }}>
+                        {daysUntil === 0 ? 'Hoy' : daysUntil === 1 ? 'Mañana' : `${daysUntil}d`}
+                      </span>
+                    )}
+                  </div>
+                )
+              })()}
               {tab === 'confirmed' && lead.wedding_date && (
-                <div style={{ fontSize: 12, color: 'var(--sage)', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--sage)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <PartyPopper size={11} /> {new Date(lead.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </div>
               )}
               {tab === 'confirmed' && lead.visit_date && lead.visit_date >= todayIso() && (
-                <div style={{ fontSize: 11, color: 'var(--sage)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--sage)', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Landmark size={11} /> Visita: {new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
                 </div>
               )}
             </div>
 
-            {/* Guests + budget */}
-            <div style={{ minWidth: 80, flexShrink: 0 }}>
+            {/* Guests */}
+            <div style={{ minWidth: 70, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
               {lead.guests && (
-                <div style={{ fontSize: 12, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Users size={11} style={{ color: 'var(--warm-gray)' }} /> {lead.guests} inv.
+                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Users size={12} style={{ color: 'var(--gold)', flexShrink: 0 }} /> {lead.guests} inv.
                 </div>
               )}
-              {lead.budget && lead.budget !== 'sin_definir' && (
-                <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{BUDGET_LABEL[lead.budget]}</div>
-              )}
               {(lead.budget_files?.length > 0 || lead.budget_file_url) && (
-                <div style={{ fontSize: 10, color: '#16a34a', marginTop: 3, display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+                <div style={{ fontSize: 10, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
                   <Paperclip size={10} /> {lead.budget_files?.length > 1 ? `${lead.budget_files.length} docs` : 'PDF'}
                 </div>
               )}
@@ -3688,12 +3805,12 @@ function EnSeguimientoBtn({ lead, canProposal, onDateConfirm, onPdfDigital }: {
             ? <button className="qa qa-ghost"
                 style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
                 onClick={() => { onPdfDigital(lead); setOpen(false) }}>
-                <Zap size={11} /> PDF digital
+                <Zap size={11} /> Dosier digital
               </button>
             : <span className="qa qa-ghost qa-locked"
                 style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
-                title="Disponible en plan Premium — actualiza para crear propuestas digitales">
-                <Zap size={11} /> PDF digital <LockKeyhole size={10} />
+                title="Disponible en plan Premium — actualiza para crear dosieres digitales">
+                <Zap size={11} /> Dosier digital <LockKeyhole size={10} />
               </span>
           }
         </div>
@@ -3784,8 +3901,9 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm, onPd
   onDateConfirm: (lead: any, s: DbStatus) => void
   onPdfDigital?: (lead: any) => void
 }) {
-  const { propuestas: canProposal } = usePlanFeatures()
+  const { propuestas: canProposal, presupuestos: canBudget } = usePlanFeatures()
   const isPostVisit = lead.status === 'post_visit'
+  const goToBudget = () => { window.location.href = `/budgets/new?lead_id=${lead.id}` }
 
   // Edit button — always pinned to the right
   const EditBtn = () => (
@@ -3836,8 +3954,9 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm, onPd
         <button className="qa qa-success" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
         <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
         <MoreMenu items={[
+          { label: 'Presupuesto digital', icon: <Receipt size={11} />, locked: !canBudget, lockedHint: 'Disponible en plan Premium', onClick: goToBudget },
           { label: 'Enviar presupuesto', icon: <Receipt    size={11} />, onClick: () => onDateConfirm(lead, 'budget_sent') },
-          { label: 'PDF digital',        icon: <FileText   size={11} />, locked: !canProposal, lockedHint: 'Disponible en plan Premium', onClick: () => onPdfDigital ? onPdfDigital(lead) : undefined },
+          { label: 'Dosier digital',        icon: <FileText   size={11} />, locked: !canProposal, lockedHint: 'Disponible en plan Premium', onClick: () => onPdfDigital ? onPdfDigital(lead) : undefined },
           { label: 'Cambiar fechas',     icon: <Calendar   size={11} />, onClick: () => onDateConfirm(lead, lead.status) },
           { label: 'Volver a nuevos',    icon: <RotateCcw  size={11} />, onClick: () => onMove(lead.id, 'new') },
           { label: 'Perdido',            icon: <XCircle    size={11} />, danger: true, onClick: () => onMove(lead.id, 'lost') },
@@ -3861,6 +3980,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm, onPd
         <button className="qa qa-success" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
         <PresupuestoBtn lead={lead} canProposal={canProposal} onMove={onMove} onDateConfirm={onDateConfirm} />
         <MoreMenu items={[
+          { label: 'Presupuesto digital', icon: <Receipt size={11} />, locked: !canBudget, lockedHint: 'Disponible en plan Premium', onClick: goToBudget },
           { label: 'Reagendar visita', icon: <Calendar  size={11} />, onClick: () => onDateConfirm(lead, 'visit_scheduled') },
           { label: 'En seguimiento',   icon: <RotateCcw size={11} />, onClick: () => onMove(lead.id, 'contacted') },
           { label: 'Perdido',          icon: <XCircle   size={11} />, danger: true, onClick: () => onMove(lead.id, 'lost') },
@@ -3870,8 +3990,11 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm, onPd
 
       {tab === 'budget' && (<>
         <button className="qa qa-success" onClick={() => onDateConfirm(lead, 'won')}><PartyPopper size={11} /> Confirmar boda</button>
-        <button className="qa qa-ghost" onClick={() => onDateConfirm(lead, 'visit_scheduled')}><Calendar size={11} /> Agendar visita</button>
+        {canBudget
+          ? <button className="qa qa-ghost" onClick={goToBudget}><Receipt size={11} /> Presupuesto digital</button>
+          : <span className="qa qa-ghost qa-locked" title="Disponible en plan Premium"><Receipt size={11} /> Presupuesto digital <LockKeyhole size={11} /></span>}
         <MoreMenu items={[
+          { label: 'Agendar visita',  icon: <Calendar    size={11} />, onClick: () => onDateConfirm(lead, 'visit_scheduled') },
           { label: 'Post-visita',     icon: <CheckCircle size={11} />, onClick: () => onMove(lead.id, 'post_visit') },
           { label: 'En seguimiento',  icon: <RotateCcw   size={11} />, onClick: () => onMove(lead.id, 'contacted') },
           { label: 'Perdido',         icon: <XCircle     size={11} />, danger: true, onClick: () => onMove(lead.id, 'lost') },
@@ -3881,8 +4004,8 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm, onPd
 
       {tab === 'confirmed' && (<>
         {canProposal
-          ? <a href="/proposals" className="qa qa-ghost"><ExternalLink size={11} /> Propuesta</a>
-          : <span className="qa qa-ghost qa-locked" title="Disponible en plan Premium"><FileText size={11} /> Propuesta <LockKeyhole size={11} /></span>}
+          ? <a href="/proposals" className="qa qa-ghost"><ExternalLink size={11} /> Dosier</a>
+          : <span className="qa qa-ghost qa-locked" title="Disponible en plan Premium"><FileText size={11} /> Dosier <LockKeyhole size={11} /></span>}
         <MoreMenu items={[
           { label: 'Cancelar boda', icon: <XCircle size={11} />, danger: true, onClick: () => onMove(lead.id, 'lost') },
           { label: 'Eliminar',      icon: <Trash2  size={11} />, danger: true, onClick: () => onDelete(lead.id) },
@@ -4213,6 +4336,7 @@ function KanbanColumn({ col, leads, isOver, draggingId, onDragOver, onDragLeave,
       <div style={{ padding: 6, flex: 1, overflowY: 'auto', maxHeight: 'calc(50vh - 80px)' }}>
         {leads.map(lead => {
           const isDragging = draggingId === lead.id
+          const isRecent = col.key === 'new' && lead.created_at && (Date.now() - new Date(lead.created_at).getTime()) < 2 * 3600_000
           return (
             <div
               key={lead.id}
@@ -4221,20 +4345,21 @@ function KanbanColumn({ col, leads, isOver, draggingId, onDragOver, onDragLeave,
               onDragEnd={onDragEnd}
               onClick={() => onDetail(lead)}
               style={{
-                background: isDragging ? 'var(--cream)' : 'var(--cream)',
-                border: '1px solid var(--ivory)',
+                background: isDragging ? 'var(--cream)' : isRecent ? '#f0fdf4' : 'var(--cream)',
+                border: isRecent ? '1px solid #86efac' : '1px solid var(--ivory)',
                 borderRadius: 8,
                 padding: '9px 10px',
                 marginBottom: 5,
                 cursor: isDragging ? 'grabbing' : 'grab',
                 opacity: isDragging ? 0.35 : 1,
                 transition: 'box-shadow 0.15s, opacity 0.15s',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                boxShadow: isRecent ? '0 0 8px rgba(22,163,106,0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
               }}
-              onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = '0 3px 10px rgba(0,0,0,0.07)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)' }}
+              onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 12px rgba(22,163,106,0.2)' : '0 3px 10px rgba(0,0,0,0.07)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 8px rgba(22,163,106,0.12)' : '0 1px 2px rgba(0,0,0,0.03)' }}
             >
-              <div style={{ fontWeight: 600, color: 'var(--espresso)', fontSize: 12.5, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600, color: 'var(--espresso)', fontSize: 12.5, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {isRecent && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', flexShrink: 0, animation: 'pulse-dot 2s ease-in-out infinite' }} />}
                 {lead.name}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
@@ -4249,19 +4374,27 @@ function KanbanColumn({ col, leads, isOver, draggingId, onDragOver, onDragLeave,
                 </div>
               )}
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                {lead.source && (
-                  <span style={{ fontSize: 9, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '1px 6px', borderRadius: 8 }}>
-                    {SOURCE_LABEL[lead.source] || lead.source}
-                  </span>
-                )}
+                {lead.source && (() => {
+                  const sc: Record<string, { bg: string; color: string }> = {
+                    wedding_venues_spain: { bg: 'rgba(201,150,58,0.12)', color: '#92400e' },
+                    wedding_planner:     { bg: 'rgba(139,92,246,0.1)',  color: '#7c3aed' },
+                    web:                 { bg: 'rgba(59,130,246,0.1)',  color: '#2563eb' },
+                    whatsapp:            { bg: 'rgba(22,163,74,0.1)',   color: '#16a34a' },
+                    instagram:           { bg: 'rgba(219,39,119,0.1)', color: '#db2777' },
+                    bodas_net:           { bg: 'rgba(236,72,153,0.1)', color: '#db2777' },
+                    referral:            { bg: 'rgba(14,165,233,0.1)', color: '#0284c7' },
+                    email:               { bg: 'rgba(99,102,241,0.1)', color: '#4f46e5' },
+                  }
+                  const s = sc[lead.source] || { bg: 'var(--ivory)', color: 'var(--charcoal)' }
+                  return (
+                    <span style={{ fontSize: 9, background: s.bg, color: s.color, padding: '1px 6px', borderRadius: 8, fontWeight: 600 }}>
+                      {SOURCE_LABEL[lead.source] || lead.source}
+                    </span>
+                  )
+                })()}
                 {lead.guests && (
-                  <span style={{ fontSize: 9, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '1px 6px', borderRadius: 8 }}>
+                  <span style={{ fontSize: 9, background: 'rgba(201,150,58,0.1)', color: '#92400e', padding: '1px 6px', borderRadius: 8, fontWeight: 500 }}>
                     {lead.guests} inv.
-                  </span>
-                )}
-                {lead.budget && lead.budget !== 'sin_definir' && (
-                  <span style={{ fontSize: 9, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '1px 6px', borderRadius: 8 }}>
-                    {BUDGET_LABEL[lead.budget]}
                   </span>
                 )}
               </div>
@@ -6528,9 +6661,9 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
             {/* Divider */}
             <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
 
-            {/* Propuesta digital */}
+            {/* Dosier digital */}
             <div style={{ marginBottom: 4 }}>
-              <SectionTitle icon={<Sparkles size={14} />} title="Propuesta digital" hint="Propuesta visual e interactiva para la pareja" />
+              <SectionTitle icon={<Sparkles size={14} />} title="Dosier digital" hint="Propuesta visual e interactiva para la pareja" />
               {canPropuesta ? (
                 <a href="/proposals" style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -6538,13 +6671,13 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   background: 'var(--espresso)', color: '#fff',
                   fontSize: 12, fontWeight: 700, textDecoration: 'none',
                 }}>
-                  <ExternalLink size={12} /> Crear propuesta digital
+                  <ExternalLink size={12} /> Crear dosier digital
                 </a>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px solid var(--ivory)' }}>
                   <LockKeyhole size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Propuesta digital</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Dosier digital</div>
                     <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Disponible en plan Premium</div>
                   </div>
                 </div>
@@ -6686,9 +6819,9 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
             {/* Divider */}
             <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
 
-            {/* Propuesta digital (bloqueada para básico) */}
+            {/* Dosier digital (bloqueada para básico) */}
             <div style={{ marginBottom: 4 }}>
-              <SectionTitle icon={<Sparkles size={14} />} title="Propuesta digital" hint="Propuesta visual e interactiva para la pareja" />
+              <SectionTitle icon={<Sparkles size={14} />} title="Dosier digital" hint="Propuesta visual e interactiva para la pareja" />
               {canPropuesta ? (
                 <a href="/proposals" style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -6696,13 +6829,13 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   background: 'var(--espresso)', color: '#fff',
                   fontSize: 12, fontWeight: 700, textDecoration: 'none',
                 }}>
-                  <ExternalLink size={12} /> Crear propuesta digital
+                  <ExternalLink size={12} /> Crear dosier digital
                 </a>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px solid var(--ivory)' }}>
                   <LockKeyhole size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Propuesta digital</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Dosier digital</div>
                     <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Disponible en plan Premium</div>
                   </div>
                 </div>

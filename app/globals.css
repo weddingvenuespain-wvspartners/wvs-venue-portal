@@ -251,6 +251,7 @@ table.data-table tr:hover td { background: #fafaf9; }
 
 /* ── Spinner ─────────────────────────────────────────────────────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.7); } }
 
 /* ── Ficha tabs ───────────────────────────────────────────────────────────── */
 .ficha-tab { position: relative; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; border: none; transition: background 0.15s, color 0.15s; font-family: 'Manrope', sans-serif; display: inline-flex; align-items: center; gap: 5px; background: transparent; color: var(--warm-gray); font-weight: 500; }

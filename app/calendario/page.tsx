@@ -10,7 +10,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import Spinner from '@/components/Spinner'
 import {
   ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
-  FileText, Calendar, Search, AlertCircle, Trash2, Flower2, Edit2, Link2,
+  FileText, Calendar, Search, AlertCircle, Trash2, Flower2, Edit2, Link2, Download,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -308,6 +308,183 @@ export default function CalendarioPage() {
     return m
   }, [leads])
 
+  const [exporting, setExporting] = useState(false)
+
+  // ── Export CSV ──────────────────────────────────────────────────────────────
+  const exportCSV = async () => {
+    if (!activeVenue || exporting) return
+    setExporting(true)
+    try {
+      const supabase = createClient()
+      const { data: allEntries } = await supabase
+        .from('calendar_entries')
+        .select('*')
+        .eq('venue_id', activeVenue.id)
+        .neq('status', 'libre')
+        .order('date')
+
+      const header = ['Fecha', 'Tipo', 'Estado', 'Pareja', 'Email', 'Teléfono', 'Invitados', 'Notas', 'Medio día']
+
+      const rows: string[][] = []
+
+      // Calendar entries (negociacion, reservado, bloqueado)
+      ;(allEntries || []).forEach((e: any) => {
+        const lead = e.lead_id ? leadsById[e.lead_id] : null
+        const _HALF = ['medio_dia', 'medio_dia_manana', 'medio_dia_tarde']
+        const noteRaw = e.note || ''
+        const parts = noteRaw.split('|')
+        const isHalf = _HALF.includes(parts[0])
+        const halfLabel = parts[0] === 'medio_dia_manana' ? 'Mañana' : parts[0] === 'medio_dia_tarde' ? 'Tarde' : isHalf ? 'Sí' : ''
+        const freeNote = isHalf ? (parts[1] || '') : noteRaw
+
+        rows.push([
+          e.date,
+          e.status === 'reservado' ? 'Boda' : e.status === 'negociacion' ? 'Negociación' : 'Bloqueado',
+          STATUS_CFG[e.status as Status]?.label || e.status,
+          lead?.name || '',
+          lead?.email || '',
+          lead?.phone || lead?.whatsapp || '',
+          lead?.guests ? String(lead.guests) : '',
+          freeNote,
+          halfLabel,
+        ])
+      })
+
+      // Visits from leads
+      leads.forEach(l => {
+        if (!l.visit_date) return
+        rows.push([
+          l.visit_date,
+          'Visita',
+          l.visit_time ? `Visita ${l.visit_time}` : 'Visita programada',
+          l.name || '',
+          l.email || '',
+          l.phone || l.whatsapp || '',
+          l.guests ? String(l.guests) : '',
+          l.notes || '',
+          '',
+        ])
+      })
+
+      // Sort all rows by date
+      rows.sort((a, b) => a[0].localeCompare(b[0]))
+
+      const escaped = rows.map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"'))
+      const csv = [header.join(';'), ...escaped.map(r => r.join(';'))].join('\n')
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const today = new Date().toISOString().slice(0, 10)
+      a.href = url; a.download = `calendario-${today}.csv`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) { console.error('CSV export error:', err) }
+    setExporting(false)
+  }
+
+  // ── Export ICS ──────────────────────────────────────────────────────────────
+  const exportICS = async () => {
+    if (!activeVenue || exporting) return
+    setExporting(true)
+    try {
+      const supabase = createClient()
+      const { data: allEntries } = await supabase
+        .from('calendar_entries')
+        .select('*')
+        .eq('venue_id', activeVenue.id)
+        .neq('status', 'libre')
+        .order('date')
+
+      const venueName = activeVenue.name || 'Venue'
+      const lines: string[] = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//WVS//Calendario//ES',
+        `X-WR-CALNAME:${venueName} - Calendario`,
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+      ]
+
+      const uid = (i: number, prefix: string) => `${prefix}-${i}-${Date.now()}@wvs`
+      const icsDate = (d: string) => d.replace(/-/g, '')
+      const nextDay = (d: string) => {
+        const dt = new Date(d + 'T12:00:00')
+        dt.setDate(dt.getDate() + 1)
+        return `${dt.getFullYear()}${pad(dt.getMonth()+1)}${pad(dt.getDate())}`
+      }
+
+      // Calendar entries
+      ;(allEntries || []).forEach((e: any, i: number) => {
+        const lead = e.lead_id ? leadsById[e.lead_id] : null
+        const tipo = e.status === 'reservado' ? '🟢 Boda' : e.status === 'negociacion' ? '🟡 Negociación' : '⬛ Bloqueado'
+        const summary = lead ? `${tipo} — ${lead.name}` : tipo
+
+        const noteRaw = e.note || ''
+        const parts = noteRaw.split('|')
+        const _HALF = ['medio_dia', 'medio_dia_manana', 'medio_dia_tarde']
+        const freeNote = _HALF.includes(parts[0]) ? (parts[1] || '') : noteRaw
+
+        const desc: string[] = []
+        if (lead?.email) desc.push(`Email: ${lead.email}`)
+        if (lead?.phone) desc.push(`Tel: ${lead.phone}`)
+        if (lead?.guests) desc.push(`Invitados: ${lead.guests}`)
+        if (freeNote) desc.push(freeNote)
+
+        lines.push('BEGIN:VEVENT')
+        lines.push(`UID:${uid(i, 'cal')}`)
+        lines.push(`DTSTART;VALUE=DATE:${icsDate(e.date)}`)
+        lines.push(`DTEND;VALUE=DATE:${nextDay(e.date)}`)
+        lines.push(`SUMMARY:${summary}`)
+        if (desc.length) lines.push(`DESCRIPTION:${desc.join('\\n')}`)
+        lines.push(`STATUS:CONFIRMED`)
+        lines.push('END:VEVENT')
+      })
+
+      // Visits
+      leads.forEach((l, i) => {
+        if (!l.visit_date) return
+        const summary = `📍 Visita — ${l.name || 'Pareja'}`
+        const desc: string[] = []
+        if (l.email) desc.push(`Email: ${l.email}`)
+        if (l.phone) desc.push(`Tel: ${l.phone}`)
+        if (l.guests) desc.push(`Invitados: ${l.guests}`)
+        if (l.notes) desc.push(l.notes)
+
+        lines.push('BEGIN:VEVENT')
+        lines.push(`UID:${uid(i, 'visit')}`)
+
+        if (l.visit_time) {
+          // Timed event
+          const [hh, mm] = l.visit_time.split(':')
+          const dtStart = `${icsDate(l.visit_date)}T${hh}${mm}00`
+          const dur = l.visit_duration || 60
+          const endDate = new Date(`${l.visit_date}T${l.visit_time}:00`)
+          endDate.setMinutes(endDate.getMinutes() + dur)
+          const dtEnd = `${endDate.getFullYear()}${pad(endDate.getMonth()+1)}${pad(endDate.getDate())}T${pad(endDate.getHours())}${pad(endDate.getMinutes())}00`
+          lines.push(`DTSTART:${dtStart}`)
+          lines.push(`DTEND:${dtEnd}`)
+        } else {
+          // All-day
+          lines.push(`DTSTART;VALUE=DATE:${icsDate(l.visit_date)}`)
+          lines.push(`DTEND;VALUE=DATE:${nextDay(l.visit_date)}`)
+        }
+
+        lines.push(`SUMMARY:${summary}`)
+        if (desc.length) lines.push(`DESCRIPTION:${desc.join('\\n')}`)
+        lines.push('END:VEVENT')
+      })
+
+      lines.push('END:VCALENDAR')
+
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const today = new Date().toISOString().slice(0, 10)
+      a.href = url; a.download = `calendario-${venueName.replace(/\s+/g, '-')}-${today}.ics`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) { console.error('ICS export error:', err) }
+    setExporting(false)
+  }
+
   const saveEntry = async (entry: Partial<Entry> & { date: string }, extraBlocks?: { date: string; isHalf: boolean }[]) => {
     setSaving(true)
     const supabase = createClient()
@@ -557,6 +734,13 @@ export default function CalendarioPage() {
                 }}>Sin resultados</div>
               )}
             </div>
+
+            <button className="btn btn-ghost btn-sm" onClick={exportCSV} disabled={exporting} title="Exportar calendario a CSV" style={exporting ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
+              <Download size={13} /> {exporting ? 'Exportando…' : 'CSV'}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={exportICS} disabled={exporting} title="Descargar archivo .ics para Google Calendar" style={exporting ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
+              <Calendar size={13} /> {exporting ? 'Exportando…' : 'Google Cal'}
+            </button>
 
             {bulkMode ? (
               <>

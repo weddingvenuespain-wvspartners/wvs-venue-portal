@@ -26,22 +26,22 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const { venue_id, ...patch } = await req.json()
+    if (!venue_id) return NextResponse.json({ error: 'Missing venue_id' }, { status: 400 })
 
     const svc = getServiceClient()
 
-    let query = svc
+    const { data: current } = await svc
       .from('venue_settings')
       .select('*')
       .eq('user_id', user.id)
-    if (venue_id) query = query.eq('venue_id', venue_id)
-    const { data: current } = await query.maybeSingle()
+      .eq('venue_id', venue_id)
+      .maybeSingle()
 
-    const upsertPayload: Record<string, any> = { ...(current || {}), ...patch, user_id: user.id }
-    if (venue_id) upsertPayload.venue_id = venue_id
+    const upsertPayload: Record<string, any> = { ...(current || {}), ...patch, user_id: user.id, venue_id }
 
     const { error } = await svc
       .from('venue_settings')
-      .upsert(upsertPayload, { onConflict: venue_id ? 'venue_id' : 'user_id' })
+      .upsert(upsertPayload, { onConflict: 'user_id,venue_id' })
 
     if (error) {
       console.error('[save-settings]', error)

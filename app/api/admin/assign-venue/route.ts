@@ -158,7 +158,7 @@ export async function DELETE(req: NextRequest) {
       svc.from('venue_content').update({ venue_id: null }).eq('venue_id', uv_id),
       svc.from('venue_modality_packages').update({ venue_id: null }).eq('venue_id', uv_id),
       svc.from('venue_modality_prices').update({ venue_id: null }).eq('venue_id', uv_id),
-      svc.from('venue_settings').update({ venue_id: null }).eq('venue_id', uv_id),
+      svc.from('venue_settings').delete().eq('venue_id', uv_id),
     ])
 
     // 3. Delete the row (SET NULL tables — leads, proposals, calendar_entries,

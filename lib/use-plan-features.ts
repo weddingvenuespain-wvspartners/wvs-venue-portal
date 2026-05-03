@@ -26,6 +26,7 @@ export type PlanFeatures = {
   propuestas_web:         boolean  // Web pública de propuesta (enlace para parejas)
   propuestas_pdf:         boolean  // Descargar propuesta en PDF
   comunicacion:           boolean  // Tarifas, zonas y períodos de precio
+  presupuestos:           boolean  // Crear presupuestos digitales
   estadisticas_avanzadas: boolean  // Estadísticas avanzadas e informes
   recordatorios:          boolean  // Recordatorios automáticos a parejas
   multiusuario:           boolean  // Múltiples usuarios por cuenta
@@ -56,12 +57,13 @@ export const FEATURE_DEFS: FeatureDef[] = [
 
   // ── Premium ───────────────────────────────────────────────────────────────
   { key: 'estructura',              tier: 'premium',     label: 'Estructura comercial',           description: 'Define modalidades de alquiler y tarifas por período para tu venue' },
-  { key: 'leads_export',           tier: 'premium',     label: 'Exportar leads a CSV',           description: 'Descargar todos los leads en formato Excel/CSV' },
+  { key: 'leads_export',           tier: 'basic',       label: 'Exportar leads a CSV',           description: 'Descargar todos los leads en formato Excel/CSV' },
   { key: 'pipeline',               tier: 'premium',     label: 'Pipeline de ventas',             description: 'Vista kanban del embudo comercial con etapas personalizables' },
   { key: 'propuestas',             tier: 'premium',     label: 'Propuestas digitales',           description: 'Crear y enviar propuestas personalizadas a cada pareja' },
   { key: 'propuestas_web',         tier: 'premium',     label: 'Web pública de propuesta',       description: 'Enlace público con la propuesta, accesible desde cualquier dispositivo' },
   { key: 'propuestas_pdf',         tier: 'premium',     label: 'Descarga PDF de propuesta',      description: 'Exportar cualquier propuesta en formato PDF profesional' },
   { key: 'comunicacion',           tier: 'premium',     label: 'Tarifas y zonas de precio',      description: 'Configurar tarifas, zonas geográficas y períodos de precio' },
+  { key: 'presupuestos',           tier: 'premium',     label: 'Presupuestos digitales',         description: 'Crear y enviar presupuestos personalizados con desglose y plan de pagos' },
   { key: 'estadisticas_avanzadas', tier: 'premium',     label: 'Estadísticas avanzadas',         description: 'Informes detallados, tendencias y análisis de conversión por fuente' },
   { key: 'recordatorios',          tier: 'premium',     label: 'Recordatorios automáticos',      description: 'Enviar recordatorios automáticos a parejas según etapa del pipeline' },
   { key: 'multiusuario',           tier: 'premium',     label: 'Múltiples usuarios',             description: 'Añadir miembros del equipo con acceso a la cuenta del venue' },
@@ -79,14 +81,15 @@ export const BASIC_FALLBACK: PlanFeatures = {
   leads_date_filter:      true,
   calendario:             true,
   estadisticas:           true,
+  leads_export:           true,
   // premium → false
   estructura:             false,
-  leads_export:           false,
   pipeline:               false,
   propuestas:             false,
   propuestas_web:         false,
   propuestas_pdf:         false,
   comunicacion:           false,
+  presupuestos:           false,
   estadisticas_avanzadas: false,
   recordatorios:          false,
   multiusuario:           false,
@@ -108,6 +111,7 @@ export const PREMIUM_FALLBACK: PlanFeatures = {
   propuestas_web:         true,
   propuestas_pdf:         true,
   comunicacion:           true,
+  presupuestos:           true,
   estadisticas_avanzadas: true,
   recordatorios:          true,
   multiusuario:           true,

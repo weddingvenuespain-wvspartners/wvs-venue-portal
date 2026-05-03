@@ -862,7 +862,7 @@ export default function FichaPage() {
           })}
         />
 
-        <div className="page-content" style={{ paddingBottom: 80 }} onChange={() => { if (!loading) { setIsDirty(true); setDirtyTabs(prev => new Set(prev).add(activeTab)) } }}>
+        <div className="page-content" style={{ paddingBottom: 80 }} onChange={() => { if (!loading && activeTab !== 'config') { setIsDirty(true); setDirtyTabs(prev => new Set(prev).add(activeTab)) } }}>
 
           {/* English content notice */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, marginBottom: 18 }}>

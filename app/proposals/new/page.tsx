@@ -45,7 +45,7 @@ function NuevaPropuestaContent() {
       const supabase = createClient()
 
       // If a lead is linked, enforce max proposals per lead and pre-fill couple data
-      let coupleName = starter?.couple_name ?? 'Nueva propuesta'
+      let coupleName = starter?.couple_name ?? 'Nuevo dosier'
       let coupleEmail: string | null = null
       let guestCount: number | null = starter?.guest_count ?? null
 
@@ -57,7 +57,7 @@ function NuevaPropuestaContent() {
           .eq('venue_id', activeVenue.id)
           .eq('lead_id', leadId)
         if ((count ?? 0) >= MAX_PROPOSALS_PER_LEAD) {
-          setError(`Este lead ya tiene ${count} propuestas (máximo ${MAX_PROPOSALS_PER_LEAD}).`)
+          setError(`Este lead ya tiene ${count} dosieres (máximo ${MAX_PROPOSALS_PER_LEAD}).`)
           return
         }
         const { data: lead } = await supabase
@@ -146,7 +146,7 @@ function NuevaPropuestaContent() {
         data = r.data; insErr = r.error
       }
       if (insErr || !data) {
-        setError(`No se pudo crear la propuesta: ${insErr?.message ?? 'desconocido'}`)
+        setError(`No se pudo crear el dosier: ${insErr?.message ?? 'desconocido'}`)
         return
       }
 
@@ -175,14 +175,14 @@ function NuevaPropuestaContent() {
           <AlertCircle size={18} />
           <span>{error}</span>
         </div>
-        <button className="btn btn-ghost btn-sm" onClick={() => router.push('/proposals')}>← Volver a propuestas</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => router.push('/proposals')}>← Volver a dosieres</button>
       </div>
     )
   }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--cream)', color: 'var(--warm-gray)', gap: 8 }}>
-      <Loader2 size={16} className="animate-spin" /> Creando propuesta…
+      <Loader2 size={16} className="animate-spin" /> Creando dosier…
     </div>
   )
 }

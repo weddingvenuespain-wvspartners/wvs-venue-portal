@@ -43,11 +43,11 @@ const FAQS = [
   },
   {
     q: '¿Qué diferencia hay entre plan básico y premium?',
-    a: 'El plan básico incluye gestión de leads, calendario y ficha de venue. El plan premium añade propuestas digitales personalizadas, estadísticas avanzadas, comunicación automatizada y acceso prioritario a nuevas funciones.',
+    a: 'El plan básico incluye gestión de leads, calendario y ficha de venue. El plan premium añade dosieres digitales personalizados, estadísticas avanzadas, comunicación automatizada y acceso prioritario a nuevas funciones.',
   },
   {
-    q: '¿Cómo envío una propuesta digital?',
-    a: 'Disponible en plan Premium. Haz clic en "Presupuesto" de cualquier lead y selecciona "Presupuesto digital". Se abrirá el editor donde puedes elegir plantilla, personalizar el contenido y enviar el enlace al cliente.',
+    q: '¿Cómo envío un dosier digital?',
+    a: 'Disponible en plan Premium. Desde la sección Dosieres puedes crear un nuevo dosier digital, elegir plantilla, personalizar el contenido y enviar el enlace a la pareja.',
   },
   {
     q: '¿Cómo cancelo una reserva de boda?',
