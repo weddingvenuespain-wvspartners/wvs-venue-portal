@@ -37,11 +37,13 @@ export default function Sidebar() {
   const fetchNewLeads = () => {
     if (!user || isAdmin || isPlanner) return
     const supabase = createClient()
-    supabase.from('leads').select('id', { count: 'exact', head: true })
+    let q = supabase.from('leads').select('id', { count: 'exact', head: true })
       .eq('user_id', user.id).eq('status', 'new')
-      .then(({ count }) => setNewLeadsCount(count ?? 0))
+    // Multi-venue: only count leads for the active venue
+    if (activeVenue?.id) q = q.eq('venue_id', activeVenue.id)
+    q.then(({ count }) => setNewLeadsCount(count ?? 0))
   }
-  useEffect(() => { fetchNewLeads() }, [user?.id]) // eslint-disable-line
+  useEffect(() => { fetchNewLeads() }, [user?.id, activeVenue?.id]) // eslint-disable-line
   // Realtime: update badge when new lead arrives
   useEffect(() => {
     if (!user || isAdmin || isPlanner) return

@@ -36,14 +36,28 @@ export async function POST(req: NextRequest) {
 
     const svc = getServiceClient()
 
-    // Find the venue's user_id from venue_profiles
+    // Find the venue's user_id — try venue_profiles first, then user_venues (multi-venue)
+    let userId: string | null = null
     const { data: profile } = await svc
       .from('venue_profiles')
       .select('user_id')
       .eq('wp_venue_id', wp_venue_id)
-      .single()
+      .maybeSingle()
 
-    if (!profile?.user_id) {
+    if (profile?.user_id) {
+      userId = profile.user_id
+    } else {
+      // Multi-venue: wp_venue_id may only exist in user_venues, not venue_profiles
+      const { data: uv } = await svc
+        .from('user_venues')
+        .select('user_id')
+        .eq('wp_venue_id', wp_venue_id)
+        .limit(1)
+        .maybeSingle()
+      userId = uv?.user_id ?? null
+    }
+
+    if (!userId) {
       return NextResponse.json({ error: 'Venue not found', wp_venue_id }, { status: 404 })
     }
 
@@ -51,14 +65,14 @@ export async function POST(req: NextRequest) {
     const { data: venueRow } = await svc
       .from('user_venues')
       .select('id, name')
-      .eq('user_id', profile.user_id)
+      .eq('user_id', userId)
       .eq('wp_venue_id', wp_venue_id)
       .maybeSingle()
 
     const wedding_date = parseDate(date)
 
     const { data, error } = await svc.from('leads').insert({
-      user_id:               profile.user_id,
+      user_id:               userId,
       venue_id:              venueRow?.id ?? null,
       status:                'new',
       source:                'wedding_venues_spain',
@@ -87,7 +101,7 @@ export async function POST(req: NextRequest) {
         const { data: venueOnb } = await svc
           .from('venue_onboarding')
           .select('name, ficha_data')
-          .eq('user_id', profile.user_id)
+          .eq('user_id', userId)
           .eq('venue_id', venueRow.id)
           .maybeSingle()
         if (venueOnb?.ficha_data?.leadsEmail) onb = venueOnb
@@ -96,7 +110,7 @@ export async function POST(req: NextRequest) {
         const { data: fallbackOnb } = await svc
           .from('venue_onboarding')
           .select('name, ficha_data')
-          .eq('user_id', profile.user_id)
+          .eq('user_id', userId)
           .not('ficha_data->>leadsEmail', 'eq', '')
           .not('ficha_data->>leadsEmail', 'is', null)
           .limit(1)
