@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, StarRating, resolveContact, type ProposalData } from './shared'
 import InquiryForm from '@/components/InquiryForm'
+import VisitBookingModal from '@/components/VisitBookingModal'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
@@ -70,6 +71,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const [ctaBar, setCtaBar]         = useState(false)
   const [openFaq, setOpenFaq]       = useState<number | null>(null)
   const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const [visitModalOpen, setVisitModalOpen] = useState(false)
+  const [visitDone, setVisitDone]           = useState(false)
   const heroRef                     = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
@@ -1083,8 +1086,43 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       ════════════════════════════════════════════ */}
       {on('schedule_visit') && (() => {
         const sv = (sec as any).schedule_visit ?? {}
+        const variant = getActiveStyle(sec, 'schedule_visit')
         const svTitle = sv.title || 'Agendar visita'
-        const svSub = sv.subtitle || 'Selecciona qué prefieres y rellena tus datos. Si quieres venir a visitarnos, podrás elegir directamente fecha y hora disponibles.'
+        const svSub = sv.subtitle || (variant === 'cta'
+          ? 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
+          : 'Selecciona qué prefieres y rellena tus datos. Si quieres venir a visitarnos, podrás elegir directamente fecha y hora disponibles.')
+
+        if (variant === 'cta') {
+          const svUrl = sv.url
+          const svCta = sv.cta_label || 'Reservar visita gratuita →'
+          return (
+            <section id="sec-schedule" className="t1-sv">
+              <FadeUp>
+                <div className="t1-sv-inner">
+                  <div className="t1-sv-icon">
+                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                  </div>
+                  <h2 className="t1-sv-title">{svTitle}</h2>
+                  <p className="t1-sv-sub">{svSub}</p>
+                  {visitDone ? (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}22`, border: `1px solid ${primary}55`, borderRadius: 10, padding: '14px 24px', fontSize: '.88rem', color: primary, fontWeight: 600 }}>
+                      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      ¡Solicitud enviada! Os confirmaremos la visita pronto.
+                    </div>
+                  ) : svUrl ? (
+                    <a className="t1-sv-btn" href={svUrl} target="_blank" rel="noopener">{svCta}</a>
+                  ) : (
+                    <button className="t1-sv-btn" onClick={() => setVisitModalOpen(true)}>{svCta}</button>
+                  )}
+                  {sv.note && <div className="t1-sv-note">{sv.note}</div>}
+                </div>
+              </FadeUp>
+            </section>
+          )
+        }
+
         const svKinds = Array.isArray(sv.kinds) && sv.kinds.length > 0 ? sv.kinds : undefined
         return (
           <section id="sec-schedule" className="t1-sec" style={{ background: lightMode ? pal.surfaceAlt : '#0a0a0a' }}>
@@ -1102,6 +1140,17 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           </section>
         )
       })()}
+
+      {visitModalOpen && (
+        <VisitBookingModal
+          proposalId={data.id}
+          coupleName={couple_name}
+          primaryColor={primary}
+          selectedSpaces={selectedSpaces}
+          onClose={() => setVisitModalOpen(false)}
+          onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
+        />
+      )}
 
       {/* ════════════════════════════════════════════
           MAPA

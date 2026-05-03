@@ -9,6 +9,8 @@ import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsAp
 import { WeddingProposal } from './WeddingProposal'
 import VisitBookingModal from '@/components/VisitBookingModal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
+import InquiryForm from '@/components/InquiryForm'
+import { getActiveStyle } from '@/lib/section-styles'
 
 function EmptySec({ label }: { label: string }) {
   return (
@@ -701,39 +703,60 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       ══════════════════════════════════════════ */}
       {on('schedule_visit') && (() => {
         const sv = (sec as any).schedule_visit ?? {}
-        const svUrl   = sv.url
-        const svTitle = sv.title    || 'Visitadnos en persona'
-        const svSub   = sv.subtitle || 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
-        const svCta   = sv.cta_label || 'Reservar visita gratuita →'
-        return (
-          <section id="sec-schedule" style={{ padding: '100px 0', background: '#FAF7F2', textAlign: 'center' }}>
-            <FadeUp>
-              <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 24px' }}>
-                <div style={{ width: 48, height: 48, borderRadius: '50%', background: `${primary}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-                  <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                  </svg>
+        const variant = getActiveStyle(sec, 'schedule_visit')
+        const svTitle = sv.title || (variant === 'cta' ? 'Visitadnos en persona' : 'Agendar visita')
+        const svSub   = sv.subtitle || (variant === 'cta'
+          ? 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
+          : 'Selecciona qué prefieres y rellena tus datos. Si quieres venir a visitarnos, podrás elegir directamente fecha y hora disponibles.')
+
+        if (variant === 'cta') {
+          const svUrl = sv.url
+          const svCta = sv.cta_label || 'Reservar visita gratuita →'
+          return (
+            <section id="sec-schedule" style={{ padding: '100px 0', background: '#FAF7F2', textAlign: 'center' }}>
+              <FadeUp>
+                <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 24px' }}>
+                  <div style={{ width: 48, height: 48, borderRadius: '50%', background: `${primary}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                  </div>
+                  <h2 style={{ fontFamily: font, fontSize: 'clamp(1.8rem,3vw,2.6rem)', color: '#2A1F1A', marginBottom: 16, lineHeight: 1.2 }}>{svTitle}</h2>
+                  <p style={{ fontSize: '1rem', color: '#7A6A5A', lineHeight: 1.7, marginBottom: 36 }}>{svSub}</p>
+                  {visitDone ? (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}18`, border: `1px solid ${primary}44`, borderRadius: 10, padding: '14px 28px', fontSize: '.9rem', color: primary, fontWeight: 600 }}>
+                      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      ¡Solicitud enviada! Os confirmaremos la visita pronto.
+                    </div>
+                  ) : svUrl ? (
+                    <a href={svUrl} target="_blank" rel="noopener"
+                      style={{ display: 'inline-block', background: primary, color: onPri, padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 600, textDecoration: 'none', letterSpacing: '.04em' }}>
+                      {svCta}
+                    </a>
+                  ) : (
+                    <button onClick={() => setVisitModalOpen(true)}
+                      style={{ background: primary, color: onPri, padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 600, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
+                      {svCta}
+                    </button>
+                  )}
+                  {sv.note && <p style={{ fontSize: '.8rem', color: '#9A8A7A', marginTop: 16 }}>{sv.note}</p>}
                 </div>
+              </FadeUp>
+            </section>
+          )
+        }
+
+        const svKinds = Array.isArray(sv.kinds) && sv.kinds.length > 0 ? sv.kinds : undefined
+        return (
+          <section id="sec-schedule" style={{ padding: '100px 0', background: '#FAF7F2' }}>
+            <FadeUp>
+              <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px', textAlign: 'center' }}>
                 <h2 style={{ fontFamily: font, fontSize: 'clamp(1.8rem,3vw,2.6rem)', color: '#2A1F1A', marginBottom: 16, lineHeight: 1.2 }}>{svTitle}</h2>
                 <p style={{ fontSize: '1rem', color: '#7A6A5A', lineHeight: 1.7, marginBottom: 36 }}>{svSub}</p>
-                {visitDone ? (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}18`, border: `1px solid ${primary}44`, borderRadius: 10, padding: '14px 28px', fontSize: '.9rem', color: primary, fontWeight: 600 }}>
-                    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    ¡Solicitud enviada! Os confirmaremos la visita pronto.
-                  </div>
-                ) : svUrl ? (
-                  <a href={svUrl} target="_blank" rel="noopener"
-                    style={{ display: 'inline-block', background: primary, color: onPri, padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 600, textDecoration: 'none', letterSpacing: '.04em' }}>
-                    {svCta}
-                  </a>
-                ) : (
-                  <button onClick={() => setVisitModalOpen(true)}
-                    style={{ background: primary, color: onPri, padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 600, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
-                    {svCta}
-                  </button>
-                )}
-                {sv.note && <p style={{ fontSize: '.8rem', color: '#9A8A7A', marginTop: 16 }}>{sv.note}</p>}
               </div>
+            </FadeUp>
+            <FadeUp delay={.1}>
+              <InquiryForm slug={data.slug} proposalId={data.id} coupleName={couple_name} kinds={svKinds} primary={primary} onPrimary={onPri} dark={false} />
             </FadeUp>
           </section>
         )

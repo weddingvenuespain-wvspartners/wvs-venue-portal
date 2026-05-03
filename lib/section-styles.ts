@@ -96,6 +96,14 @@ export const SECTION_STYLES: Record<string, SectionStyleConfig> = {
       { id: 'rental_grid', label: 'Grid de alquiler', description: 'Tarifas por horario × temporada (requiere venue_rental)' },
     ],
   },
+  schedule_visit: {
+    sectionId: 'schedule_visit',
+    defaultVariant: 'form',
+    variants: [
+      { id: 'form', label: 'Formulario',  description: 'Visita + llamada + más opciones (configurables)' },
+      { id: 'cta',  label: 'CTA simple',  description: 'Solo botón "Reservar visita gratuita"' },
+    ],
+  },
 }
 
 export function getSectionStyle(sectionId: string): SectionStyleConfig | undefined {

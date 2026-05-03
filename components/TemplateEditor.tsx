@@ -921,6 +921,12 @@ export default function TemplateEditor({
     if (secId === 'schedule_visit') {
       const sv: any = (sections as any).schedule_visit ?? {}
       const p = (patch: any) => { setSections(s => ({ ...s, schedule_visit: { ...((s as any).schedule_visit ?? {}), ...patch } } as any)); markDirty() }
+      const visitStyleConfig = SECTION_STYLES.schedule_visit
+      const activeVariantId = getActiveStyle(sections, 'schedule_visit')
+      const selectVariant = (variantId: string) => {
+        setSections(s => setActiveStyle(s, 'schedule_visit', variantId) as SectionsData)
+        markDirty()
+      }
       const defaultKinds: Array<{ id: string; label: string }> = [
         { id: 'visit', label: 'Visitar el venue' },
         { id: 'call',  label: 'Llamada telefónica' },
@@ -944,47 +950,92 @@ export default function TemplateEditor({
         updateKinds([...kinds, { id: newId, label: 'Nueva opción' }])
       }
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Variant picker */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Tipo de sección</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+              {visitStyleConfig.variants.map(v => {
+                const sel = activeVariantId === v.id
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => selectVariant(v.id)}
+                    style={{
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      border: `1.5px solid ${sel ? 'var(--gold)' : 'var(--border)'}`,
+                      borderRadius: 8,
+                      background: sel ? 'rgba(196,151,90,0.08)' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: sel ? 'var(--gold)' : 'var(--charcoal)' }}>{v.label}</span>
+                      {sel && <Check size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />}
+                    </div>
+                    {v.description && (
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{v.description}</div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           <input className="form-input" placeholder="Título (ej. Agendar visita)" style={{ fontSize: 12 }} value={sv.title ?? ''} onChange={e => p({ title: e.target.value })} />
           <textarea className="form-textarea" style={{ minHeight: 60, fontSize: 12 }} placeholder="Subtítulo / descripción breve…" value={sv.subtitle ?? ''} onChange={e => p({ subtitle: e.target.value })} />
 
-          <div style={{ marginTop: 6 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Opciones del formulario</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {kinds.map((k, i) => (
-                <div key={k.id} style={{ display: 'flex', alignItems: 'center', gap: 4, border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--surface)' }}>
-                  <button type="button" onClick={() => moveKind(i, -1)} disabled={i === 0}
-                    title="Subir"
-                    style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: 'var(--warm-gray)', padding: 2, opacity: i === 0 ? 0.3 : 1 }}>
-                    <ChevronDown size={11} style={{ transform: 'rotate(180deg)' }} />
-                  </button>
-                  <button type="button" onClick={() => moveKind(i, 1)} disabled={i === kinds.length - 1}
-                    title="Bajar"
-                    style={{ background: 'none', border: 'none', cursor: i === kinds.length - 1 ? 'default' : 'pointer', color: 'var(--warm-gray)', padding: 2, opacity: i === kinds.length - 1 ? 0.3 : 1 }}>
-                    <ChevronDown size={11} />
-                  </button>
-                  <input className="form-input" style={{ flex: 1, fontSize: 12, padding: '4px 8px', border: 'none', background: 'transparent' }}
-                    value={k.label}
-                    onChange={e => updateKind(i, e.target.value)}
-                    placeholder="Etiqueta de la opción" />
-                  {k.id === 'visit' ? (
-                    <span title="Esta opción abre el calendario para reservar visita"
-                      style={{ fontSize: 9, fontWeight: 700, color: 'var(--gold)', background: 'rgba(196,151,90,.12)', padding: '2px 6px', borderRadius: 99, letterSpacing: '.04em' }}>
-                      VISITA
-                    </span>
-                  ) : (
-                    <button type="button" style={removeBtn} onClick={() => removeKind(i)} title="Eliminar opción">
-                      <X size={11} />
+          {activeVariantId === 'cta' ? (
+            <>
+              <input className="form-input" placeholder="URL Calendly / Cal.com (opcional)" style={{ fontSize: 12 }} value={sv.url ?? ''} onChange={e => p({ url: e.target.value })} />
+              <input className="form-input" placeholder="Texto del botón (ej. Reservar visita →)" style={{ fontSize: 12 }} value={sv.cta_label ?? ''} onChange={e => p({ cta_label: e.target.value })} />
+              <input className="form-input" placeholder="Nota pequeña (horarios, duración…)" style={{ fontSize: 12 }} value={sv.note ?? ''} onChange={e => p({ note: e.target.value })} />
+              <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.5, marginTop: 2 }}>
+                Si dejas la URL vacía, el botón abre el calendario con horarios disponibles configurados en el venue.
+              </div>
+            </>
+          ) : (
+            <div style={{ marginTop: 2 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Opciones del formulario</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {kinds.map((k, i) => (
+                  <div key={k.id} style={{ display: 'flex', alignItems: 'center', gap: 4, border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--surface)' }}>
+                    <button type="button" onClick={() => moveKind(i, -1)} disabled={i === 0}
+                      title="Subir"
+                      style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: 'var(--warm-gray)', padding: 2, opacity: i === 0 ? 0.3 : 1 }}>
+                      <ChevronDown size={11} style={{ transform: 'rotate(180deg)' }} />
                     </button>
-                  )}
-                </div>
-              ))}
+                    <button type="button" onClick={() => moveKind(i, 1)} disabled={i === kinds.length - 1}
+                      title="Bajar"
+                      style={{ background: 'none', border: 'none', cursor: i === kinds.length - 1 ? 'default' : 'pointer', color: 'var(--warm-gray)', padding: 2, opacity: i === kinds.length - 1 ? 0.3 : 1 }}>
+                      <ChevronDown size={11} />
+                    </button>
+                    <input className="form-input" style={{ flex: 1, fontSize: 12, padding: '4px 8px', border: 'none', background: 'transparent' }}
+                      value={k.label}
+                      onChange={e => updateKind(i, e.target.value)}
+                      placeholder="Etiqueta de la opción" />
+                    {k.id === 'visit' ? (
+                      <span title="Esta opción abre el calendario para reservar visita"
+                        style={{ fontSize: 9, fontWeight: 700, color: 'var(--gold)', background: 'rgba(196,151,90,.12)', padding: '2px 6px', borderRadius: 99, letterSpacing: '.04em' }}>
+                        VISITA
+                      </span>
+                    ) : (
+                      <button type="button" style={removeBtn} onClick={() => removeKind(i)} title="Eliminar opción">
+                        <X size={11} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button type="button" style={{ ...addBtn, marginTop: 6 }} onClick={addKind}>+ Añadir opción</button>
+              <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4, lineHeight: 1.5 }}>
+                La opción <strong>Visitar el venue</strong> abre el calendario con horarios disponibles. El resto envían el formulario al inbox de Consultas.
+              </div>
             </div>
-            <button type="button" style={{ ...addBtn, marginTop: 6 }} onClick={addKind}>+ Añadir opción</button>
-            <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4, lineHeight: 1.5 }}>
-              La opción <strong>Visitar el venue</strong> abre el calendario con horarios disponibles. El resto envían el formulario al inbox de Consultas.
-            </div>
-          </div>
+          )}
         </div>
       )
     }
