@@ -1170,7 +1170,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         return (
           <section style={{ padding: '96px 0', background: GRAY }}>
             <FadeUp>
-              <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 32px', textAlign: 'center', marginBottom: 28 }}>
+              <div style={{ maxWidth: 720, marginLeft: 'auto', marginRight: 'auto', marginBottom: 28, padding: '0 32px', textAlign: 'center' }}>
                 <p style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 12 }}>Visita</p>
                 <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 16 }}>{svTitle}</h2>
                 <p style={{ fontSize: '.95rem', color: MUTED, lineHeight: 1.7 }}>{svSub}</p>

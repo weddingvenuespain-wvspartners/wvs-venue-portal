@@ -1197,7 +1197,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           <section className="t4-section" style={{ background: WARM }}>
             <div className="t4-inner">
               <FadeUp>
-                <div style={{ maxWidth: 720, margin: '0 auto', textAlign: 'center', marginBottom: 28 }}>
+                <div style={{ maxWidth: 720, marginLeft: 'auto', marginRight: 'auto', marginBottom: 28, textAlign: 'center' }}>
                   <span className="t4-section-label">Visita</span>
                   <h2 className="t4-section-title" style={{ marginBottom: 16 }}>{svTitle}</h2>
                   <p style={{ fontSize: '.95rem', color: MUTED, lineHeight: 1.7 }}>{svSub}</p>

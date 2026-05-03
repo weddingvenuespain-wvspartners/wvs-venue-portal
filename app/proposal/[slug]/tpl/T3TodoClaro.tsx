@@ -763,7 +763,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
             return (
               <div className="sec">
                 <FadeUp>
-                  <div style={{ maxWidth: 720, margin: '0 auto', textAlign: 'center', marginBottom: 28 }}>
+                  <div style={{ maxWidth: 720, marginLeft: 'auto', marginRight: 'auto', marginBottom: 28, textAlign: 'center' }}>
                     <div className="sec-n">Visita</div>
                     <h2 className="sec-h" style={{ fontFamily: font }}>{svTitle}</h2>
                     <p style={{ fontSize: '.95rem', color: '#6A6A6A', lineHeight: 1.7 }}>{svSub}</p>
