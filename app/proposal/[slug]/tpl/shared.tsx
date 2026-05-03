@@ -295,6 +295,55 @@ export function FloatingWhatsApp({ phone, coupleName, primary, onPrimary }: {
   )
 }
 
+// ─── Mobile Slider — touch-swipeable horizontal carousel ─────────────────────
+function MobileSlider({ photos }: { photos: string[] }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [idx, setIdx] = useState(0)
+  const n = photos.length
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const onScroll = () => {
+      const w = el.clientWidth
+      if (w > 0) setIdx(Math.round(el.scrollLeft / w))
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div ref={ref} style={{
+        display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory',
+        WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+      }}>
+        <style>{`.mob-slider::-webkit-scrollbar{display:none}`}</style>
+        {photos.map((url, i) => (
+          <div key={i} className="mob-slider" style={{
+            flex: '0 0 85%', scrollSnapAlign: 'center', height: 220,
+            overflow: 'hidden', marginRight: 6, borderRadius: 6,
+          }}>
+            <img src={url} alt="" loading={i < 3 ? 'eager' : 'lazy'}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          </div>
+        ))}
+      </div>
+      {n > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 5, marginTop: 10 }}>
+          {photos.map((_, i) => (
+            <div key={i} style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: i === idx ? 'rgba(0,0,0,.6)' : 'rgba(0,0,0,.15)',
+              transition: 'background .2s',
+            }} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Gallery — 1-3 images: equal grid · 4+ images: auto-carousel ─────────────
 export function Gallery({
   photos, primary, dark = true,
@@ -328,16 +377,14 @@ export function Gallery({
 
   // 1–3 images → equal grid, colapsa a 1 columna en móvil
   if (n <= 3) {
-    const cols = isMobile ? 1 : n
-    const ratio = n === 1 ? '21/9' : (isMobile ? '3/2' : '4/2')
+    if (isMobile && n > 1) return <MobileSlider photos={photos} />
+    const ratio = n === 1 ? '21/9' : '4/2'
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 3 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${n}, 1fr)`, gap: 3 }}>
         {photos.map((url, i) => (
-          <div key={i} style={{ overflow: 'hidden', aspectRatio: ratio }}>
+          <div key={i} style={{ overflow: 'hidden', aspectRatio: isMobile ? '16/10' : ratio }}>
             <img src={url} alt="" loading="lazy"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .7s ease' }}
-              onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.04)')}
-              onMouseLeave={e => (e.currentTarget.style.transform = '')}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />
           </div>
         ))}
@@ -362,9 +409,7 @@ export function Gallery({
         {photos.map((url, i) => (
           <div key={i} style={{ flex: `0 0 ${isMobile ? '50%' : '25%'}`, height: isMobile ? 180 : 240, overflow: 'hidden', padding: '0 1.5px' }}>
             <img src={url} alt="" loading={i < 5 ? 'eager' : 'lazy'}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .7s ease' }}
-              onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.04)')}
-              onMouseLeave={e => (e.currentTarget.style.transform = '')}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />
           </div>
         ))}
@@ -394,18 +439,8 @@ export function GalleryMosaic({ photos }: { photos: string[]; primary?: string; 
 
   if (!photos.length) return null
 
-  // Mobile: grid uniforme 2 columnas
-  if (isMobile) {
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4 }}>
-        {photos.map((url, i) => (
-          <div key={i} style={{ overflow: 'hidden', aspectRatio: '4/3' }}>
-            <img src={url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          </div>
-        ))}
-      </div>
-    )
-  }
+  // Mobile: touch-swipeable slider
+  if (isMobile) return <MobileSlider photos={photos} />
 
   // Desktop: primera foto grande a la izquierda, resto en grid 2x2 a la derecha
   const [first, ...rest] = photos
@@ -418,18 +453,14 @@ export function GalleryMosaic({ photos }: { photos: string[]; primary?: string; 
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 4, aspectRatio: '21/9' }}>
         <div style={{ overflow: 'hidden' }}>
           <img src={first} alt="" loading="eager"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .7s ease' }}
-            onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.04)')}
-            onMouseLeave={e => (e.currentTarget.style.transform = '')} />
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
         </div>
         {side.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: side.length > 1 ? 'repeat(2, 1fr)' : '1fr', gridAutoRows: '1fr', gap: 4 }}>
             {side.map((url, i) => (
               <div key={i} style={{ overflow: 'hidden' }}>
                 <img src={url} alt="" loading="lazy"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .7s ease' }}
-                  onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.04)')}
-                  onMouseLeave={e => (e.currentTarget.style.transform = '')} />
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </div>
             ))}
           </div>
@@ -440,9 +471,7 @@ export function GalleryMosaic({ photos }: { photos: string[]; primary?: string; 
           {remainder.slice(0, 4).map((url, i) => (
             <div key={i} style={{ overflow: 'hidden', aspectRatio: '4/3' }}>
               <img src={url} alt="" loading="lazy"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .7s ease' }}
-                onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.04)')}
-                onMouseLeave={e => (e.currentTarget.style.transform = '')} />
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             </div>
           ))}
         </div>
@@ -462,16 +491,18 @@ export function GalleryGrid({ photos }: { photos: string[]; primary?: string; da
   }, [])
 
   if (!photos.length) return null
-  const cols = isMobile ? 2 : photos.length <= 4 ? photos.length : photos.length <= 9 ? 3 : 4
+
+  // Mobile: touch-swipeable slider
+  if (isMobile) return <MobileSlider photos={photos} />
+
+  const cols = photos.length <= 4 ? photos.length : photos.length <= 9 ? 3 : 4
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 4 }}>
       {photos.map((url, i) => (
         <div key={i} style={{ overflow: 'hidden', aspectRatio: '4/3' }}>
           <img src={url} alt="" loading={i < 6 ? 'eager' : 'lazy'}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .7s ease' }}
-            onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.04)')}
-            onMouseLeave={e => (e.currentTarget.style.transform = '')} />
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
         </div>
       ))}
     </div>

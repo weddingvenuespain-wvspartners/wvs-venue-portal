@@ -203,8 +203,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-story-text{padding:80px 64px;background:${pal.surfaceAlt}}
     .t1-story-body{font-size:.97rem;color:${fg(.55)};line-height:1.9;white-space:pre-wrap;margin-top:4px;overflow-wrap:break-word}
     .t1-story-img{overflow:hidden;min-height:500px;position:relative;background:linear-gradient(135deg,rgba(${rgb},.25),${pal.surface} 70%,${pal.bg})}
-    .t1-story-img img{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(${lightMode ? '.95' : '.8'});transition:transform .8s ease}
-    .t1-story-img:hover img{transform:scale(1.04)}
+    .t1-story-img img{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(${lightMode ? '.95' : '.8'})}
     @media(max-width:900px){.t1-story-text{padding:48px 28px}.t1-story-img{min-height:260px;aspect-ratio:16/10}}
 
     /* ── Gallery mosaic ── */
@@ -654,9 +653,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 <p className="t1-story-body">{expShow.body}</p>
               </div>
             </FadeUp>
-            {(sec.gallery_urls?.[0] ?? photos[1]) && (
+            {((sec as any).experience_override?.image_url ?? sec.gallery_urls?.[0] ?? photos[1]) && (
               <div className="t1-story-img">
-                <img src={sec.gallery_urls?.[0] ?? photos[1]} alt="El espacio" loading="lazy"
+                <img src={(sec as any).experience_override?.image_url ?? sec.gallery_urls?.[0] ?? photos[1]} alt="El espacio" loading="lazy"
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '40px 32px 28px', background: 'linear-gradient(to top, rgba(0,0,0,.8), transparent)' }}>
                   <div style={{ fontFamily: FONT, fontSize: '.85rem', fontStyle: 'italic', color: 'rgba(255,255,255,.6)' }}>{venue?.name} · {venue?.city}, {venue?.region}</div>

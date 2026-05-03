@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef, Fragment } from 'react'
 import {
   ChevronLeft, ChevronDown, Check, Loader2, ChefHat, LayoutTemplate,
   X, Monitor, Smartphone, RefreshCcw, ExternalLink,
-  PanelLeftOpen, PanelLeftClose, Info, Palette,
+  PanelLeftOpen, PanelLeftClose, Info, Palette, Image as ImageIcon,
 } from 'lucide-react'
 import type { SectionsData, VenueSpaceGroup } from '@/lib/proposal-types'
 import { createClient } from '@/lib/supabase'
@@ -340,13 +340,34 @@ export default function TemplateEditor({
     }
 
     if (secId === 'experience') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <input className="form-input" placeholder="Título (ej. Una finca del siglo XVII…)" style={{ fontSize: 12 }}
           value={(sections as any).experience_override?.title ?? ''}
           onChange={e => { setSections(s => ({ ...s, experience_override: { ...((s as any).experience_override ?? {}), title: e.target.value } } as any)); markDirty() }} />
         <textarea className="form-textarea" style={{ minHeight: 100, fontSize: 12 }} placeholder="Historia y descripción del venue…"
           value={(sections as any).experience_override?.body ?? ''}
           onChange={e => { setSections(s => ({ ...s, experience_override: { ...((s as any).experience_override ?? {}), body: e.target.value } } as any)); markDirty() }} />
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Foto de la experiencia</div>
+          <ImageUploader
+            compact
+            value={(sections as any).experience_override?.image_url ?? null}
+            aspectRatio={16 / 10}
+            alt="Foto experiencia"
+            label="Añadir foto"
+            onUpload={async (f) => {
+              const url = await uploadImage(f, 'experience')
+              if (url) {
+                setSections(s => ({ ...s, experience_override: { ...((s as any).experience_override ?? {}), image_url: url } } as any))
+                markDirty()
+              }
+            }}
+            onRemove={() => {
+              setSections(s => ({ ...s, experience_override: { ...((s as any).experience_override ?? {}), image_url: null } } as any))
+              markDirty()
+            }}
+          />
+        </div>
       </div>
     )
 
@@ -415,19 +436,38 @@ export default function TemplateEditor({
                   onRemove={() => { setSections(s => ({ ...s, gallery_urls: (s.gallery_urls ?? []).filter((_, j) => j !== i) })); markDirty() }}
                 />
               ))}
-              <ImageUploader
-                compact
-                value={null}
-                aspectRatio={4 / 3}
-                label="Añadir foto"
-                onUpload={async (f) => {
-                  const newUrl = await uploadImage(f, 'gallery')
-                  if (newUrl) {
-                    setSections(s => ({ ...s, gallery_urls: [...(s.gallery_urls ?? []), newUrl] }))
-                    markDirty()
+              {/* Multi-file add button */}
+              <div
+                onClick={() => {
+                  const inp = document.createElement('input')
+                  inp.type = 'file'
+                  inp.accept = 'image/jpeg,image/png,image/webp'
+                  inp.multiple = true
+                  inp.onchange = async () => {
+                    const files = Array.from(inp.files ?? [])
+                    for (const f of files) {
+                      const newUrl = await uploadImage(f, 'gallery')
+                      if (newUrl) {
+                        setSections(s => ({ ...s, gallery_urls: [...(s.gallery_urls ?? []), newUrl] }))
+                      }
+                    }
+                    if (files.length) markDirty()
                   }
+                  inp.click()
                 }}
-              />
+                style={{
+                  aspectRatio: '4/3', borderRadius: 8, border: '2px dashed var(--border)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', gap: 4, background: 'var(--cream)',
+                  transition: 'border-color .15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--gold)')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+              >
+                <ImageIcon size={16} style={{ color: 'var(--warm-gray)' }} />
+                <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--charcoal)' }}>Añadir fotos</span>
+                <span style={{ fontSize: 9, color: 'var(--warm-gray)' }}>Múltiples a la vez</span>
+              </div>
             </div>
           </div>
         </div>

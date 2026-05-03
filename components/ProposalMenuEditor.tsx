@@ -260,6 +260,20 @@ export default function ProposalMenuEditor({
           style={{ fontSize: 12 }}
           title="Mínimo de comensales para ofrecer este extra" />
       </div>
+      {e.category === 'open_bar' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4 }}>
+          <input className="form-input" type="number" min={0} placeholder="Horas incluidas (opc.)"
+            value={e.hours_included ?? ''}
+            onChange={ev => updateExtra(i, { hours_included: ev.target.value ? parseInt(ev.target.value) : undefined })}
+            style={{ fontSize: 12 }}
+            title="Horas de barra libre incluidas en el precio base" />
+          <input className="form-input" placeholder="Precio hora extra (ej. 8€)"
+            value={e.extra_hour_price ?? ''}
+            onChange={ev => updateExtra(i, { extra_hour_price: ev.target.value || undefined })}
+            style={{ fontSize: 12 }}
+            title="Precio por persona por hora extra de barra libre" />
+        </div>
+      )}
     </div>
   )
 

@@ -270,9 +270,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, se
   }
   .t4-exp-img {
     width: 100%; height: 100%; object-fit: cover;
-    transition: transform .7s ease;
   }
-  .t4-exp-img-wrap:hover .t4-exp-img { transform: scale(1.04) }
 
   /* ── Packages ── */
   .t4-packages-grid {

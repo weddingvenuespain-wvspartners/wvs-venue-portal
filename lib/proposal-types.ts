@@ -89,6 +89,8 @@ export type MenuExtra = {
   price_type: 'per_person' | 'flat'
   min_guests?: number
   photo_url?: string
+  hours_included?: number
+  extra_hour_price?: string
 }
 
 export type AppetizerGroup = {
