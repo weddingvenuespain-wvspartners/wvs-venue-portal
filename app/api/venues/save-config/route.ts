@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const { leadsEmail, venue_id } = await req.json()
+    const { leadsEmail, leadsEmailEnabled, venue_id } = await req.json()
 
     if (leadsEmail && leadsEmail.split(',').length > 2)
       return NextResponse.json({ error: 'Máximo 2 emails permitidos' }, { status: 400 })
@@ -44,10 +44,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No se encontró la ficha' }, { status: 404 })
     }
 
-    // Merge leadsEmail into ficha_data (and changes_data if exists)
-    const updatedFicha = { ...(onb.ficha_data || {}), leadsEmail }
+    // Merge leadsEmail + leadsEmailEnabled into ficha_data (and changes_data if exists)
+    const updatedFicha = { ...(onb.ficha_data || {}), leadsEmail, leadsEmailEnabled: leadsEmailEnabled !== false }
     const updatedChanges = onb.changes_data
-      ? { ...(onb.changes_data || {}), leadsEmail }
+      ? { ...(onb.changes_data || {}), leadsEmail, leadsEmailEnabled: leadsEmailEnabled !== false }
       : null
 
     const updatePayload: any = { ficha_data: updatedFicha }

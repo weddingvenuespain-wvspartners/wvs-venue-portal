@@ -7,7 +7,7 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
-import { Users, TrendingUp, CheckCircle, ExternalLink, AlertCircle, ClipboardList, Building2, CreditCard, Clock, UserPlus, BarChart2, Hourglass, UserRoundPlus, CalendarDays, Sparkles, PartyPopper, Bell, PlusCircle } from 'lucide-react'
+import { Users, TrendingUp, CheckCircle, ExternalLink, AlertCircle, ClipboardList, Building2, CreditCard, Clock, UserPlus, BarChart2, Hourglass, UserRoundPlus, CalendarDays, Sparkles, PartyPopper, Bell, PlusCircle, Heart } from 'lucide-react'
 
 function Skeleton({ w, h, radius = 4 }: { w?: string | number; h?: number; radius?: number }) {
   return (
@@ -25,12 +25,28 @@ function AdminDashboard() {
   const [stats, setStats]   = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]   = useState('')
+  const [wpStats, setWpStats] = useState<{ total: number; new: number; contacted: number; accepted: number }>({ total: 0, new: 0, contacted: 0, accepted: 0 })
 
   useEffect(() => {
     fetch('/api/admin/stats')
       .then(r => r.json())
       .then(d => { setStats(d); setLoading(false) })
       .catch(() => { setError('No se pudieron cargar las estadísticas'); setLoading(false) })
+
+    // Fetch WP peticiones stats
+    const supabase = createClient()
+    supabase.from('leads').select('planner_status', { count: 'exact' })
+      .eq('wants_wedding_planner', true)
+      .then(({ data }) => {
+        if (data) {
+          setWpStats({
+            total: data.length,
+            new: data.filter((l: any) => !l.planner_status || l.planner_status === 'new').length,
+            contacted: data.filter((l: any) => l.planner_status === 'contacted').length,
+            accepted: data.filter((l: any) => l.planner_status === 'accepted').length,
+          })
+        }
+      })
   }, [])
 
   const kpis = stats ? [
@@ -96,7 +112,7 @@ function AdminDashboard() {
                   { href: '/admin',            icon: <Users size={15} />,     label: 'CRM',            sub: 'Gestionar usuarios'    },
                   { href: '/admin/planes',      icon: <CreditCard size={15} />, label: 'Planes',        sub: 'Precios y funciones'   },
                   { href: '/admin/onboarding',  icon: <ClipboardList size={15} />, label: 'Solicitudes', sub: 'Revisar registros'    },
-                  { href: '/estadisticas',      icon: <BarChart2 size={15} />, label: 'Estadísticas',   sub: 'Métricas globales'     },
+                  { href: '/admin/wedding-planners', icon: <Heart size={15} />, label: 'Peticiones WP', sub: `${wpStats.new} nuevas` },
                 ].map((item, i, arr) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                     <Link href={item.href}
@@ -193,7 +209,32 @@ function AdminDashboard() {
             </div>
           </div>
 
-          {/* Revenue summary */}
+          {/* Peticiones WP */}
+          {wpStats.total > 0 && (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="card-header">
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Heart size={14} /> Peticiones Wedding Planner</div>
+                <Link href="/admin/wedding-planners" style={{ fontSize: 11, color: 'var(--gold)' }}>Ver todas →</Link>
+              </div>
+              <div className="card-body" style={{ padding: '16px 20px' }}>
+                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Total', value: wpStats.total, color: '#a21caf', bg: '#fdf2f8' },
+                    { label: 'Nuevas', value: wpStats.new,  color: '#C4975A', bg: '#fdf8f4' },
+                    { label: 'Contactadas', value: wpStats.contacted, color: '#3b82f6', bg: '#eff6ff' },
+                    { label: 'Aceptadas', value: wpStats.accepted, color: '#22c55e', bg: '#f0fdf4' },
+                  ].map(item => (
+                    <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: item.bg, borderRadius: 8, flex: '1 1 120px' }}>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: item.color }}>{item.value}</div>
+                      <div style={{ fontSize: 12, color: item.color, fontWeight: 500 }}>{item.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Resumen de suscripciones */}
           {stats && (stats.active > 0 || stats.trial > 0) && (
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-header">

@@ -69,11 +69,18 @@ const BUDGET_LABEL: Record<string, string> = {
   mas_100k:    '> 100k€',
   // legacy values — keep for backwards compat
   menos_20k: '< 20k€', '20k_35k': '20–35k€', '35k_50k': '35–50k€', mas_50k: '> 50k€',
+  // WVS form ranges
+  'wvs_menos_20k': '< 20.000€',
+  'wvs_20k_35k':   '20.000–35.000€',
+  'wvs_35k_40k':   '35.000–40.000€',
+  'wvs_40k_51k':   '40.000–51.000€',
+  'wvs_51k_60k':   '51.000–60.000€',
+  'wvs_mas_60k':   '> 60.000€',
 }
 const BUDGET_OPTS = [
   'sin_definir',
-  'menos_10k', '10k_15k', '15k_20k', '20k_25k', '25k_30k',
-  '30k_40k', '40k_50k', '50k_75k', '75k_100k', 'mas_100k',
+  'wvs_menos_20k', 'wvs_20k_35k', 'wvs_35k_40k',
+  'wvs_40k_51k', 'wvs_51k_60k', 'wvs_mas_60k',
 ]
 const CEREMONY_LABEL: Record<string, string> = {
   sin_definir: '—', civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica',
@@ -317,7 +324,8 @@ const emptyForm = {
   original_wedding_season: 'summer',
   // other
   visit_date: '', guests: '', source: 'web',
-  notes: '', ceremony_type: 'sin_definir', budget: 'sin_definir',
+  notes: '', initial_message: '',
+  ceremony_type: 'sin_definir', budget: 'sin_definir',
   language: 'es', style: '',
   country: '', guests_adults: '', guests_children: '',
   catering_needed: 'sin_definir', tags: [] as string[],
@@ -389,6 +397,24 @@ export default function LeadsPage() {
       }
     }
   }, [user, authLoading, activeVenue?.id])
+
+  // Realtime: auto-refresh when a new lead arrives for this venue
+  useEffect(() => {
+    if (!activeVenue?.id) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`leads-${activeVenue.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'leads',
+        filter: `venue_id=eq.${activeVenue.id}`,
+      }, (payload) => {
+        setLeads(prev => [payload.new as any, ...prev])
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [activeVenue?.id])
 
   // Deep-link: open the visit-edit modal when arriving with ?openVisit=<leadId>
   useEffect(() => {
@@ -921,9 +947,9 @@ export default function LeadsPage() {
       original_wedding_month: lead.original_wedding_month ? String(lead.original_wedding_month) : '6',
       original_wedding_season: lead.original_wedding_season || 'summer',
       visit_date: lead.visit_date || '', guests: lead.guests?.toString() || '',
-      source: lead.source || 'web', notes: lead.notes || '',
+      source: lead.source || 'web', notes: lead.notes || '', initial_message: lead.initial_message || '',
       ceremony_type: lead.ceremony_type || 'sin_definir',
-      budget: lead.budget || 'sin_definir', language: lead.language || 'es',
+      budget: lead.budget || 'sin_definir', language: lead.language || '',
       style: lead.style || '',
       country: lead.country || '', guests_adults: lead.guests_adults?.toString() || '',
       guests_children: lead.guests_children?.toString() || '',
@@ -4571,7 +4597,7 @@ function FilterDateRangePicker({ from, to, onChange }: {
 // ── Mini Calendar Picker ───────────────────────────────────────────────────────
 function MiniCalendarPicker({
   venueId, value, onChange, rangeFrom, rangeTo,
-  highlights, readOnly = false,
+  highlights, readOnly = false, prevValue,
 }: {
   venueId: string
   value?: string
@@ -4580,6 +4606,7 @@ function MiniCalendarPicker({
   rangeTo?: string
   highlights?: string[]   // extra dates to highlight (other ranges in multi_range)
   readOnly?: boolean
+  prevValue?: string      // previously saved date — shown as ghost marker
 }) {
   const today = new Date().toISOString().slice(0, 10)
   const initStr = value || rangeFrom || (highlights && highlights.length > 0 ? highlights[0] : today)
@@ -4704,6 +4731,7 @@ function MiniCalendarPicker({
           const inR  = isInRange(d)
           const past = d < todayStr
           const isToday = d === todayStr
+          const isPrev = !!prevValue && d === prevValue && !sel
           const lCount = leadCounts[d] || 0
           const isRes  = eSt === 'reservado'
           const isBlk  = eSt === 'bloqueado'
@@ -4746,7 +4774,9 @@ function MiniCalendarPicker({
                 fontFamily: 'Manrope, sans-serif',
                 boxShadow: sel
                   ? 'inset 0 0 0 2px var(--gold)'
-                  : isToday ? 'inset 0 0 0 1.5px var(--gold)' : 'none',
+                  : isToday ? 'inset 0 0 0 1.5px var(--gold)'
+                  : isPrev  ? 'inset 0 0 0 1.5px var(--gold)' : 'none',
+                opacity: isPrev && !sel ? 0.45 : 1,
                 textDecoration: blocked ? 'line-through' : 'none',
                 position: 'relative',
                 outline: 'none',
@@ -5429,7 +5459,7 @@ function DateSummaryCard({
         <div style={{ fontSize: 10, fontWeight: 700, color: accent === 'gold' ? 'var(--gold)' : 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 }}>
           {miniLabel}
         </div>
-        <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 17, color: 'var(--espresso)', fontWeight: 500, lineHeight: 1.15 }}>
+        <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 14, color: 'var(--espresso)', fontWeight: 600, lineHeight: 1.2 }}>
           {title}
         </div>
         {subtitle && (
@@ -5686,7 +5716,8 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2 }}>
                 {isEdit ? 'Editar lead' : 'Nuevo lead'}
               </div>
-              <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 22, fontWeight: 500, color: 'var(--espresso)', lineHeight: 1.15, textTransform: 'capitalize' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, fontWeight: 700, color: 'var(--espresso)', lineHeight: 1.2, textTransform: 'capitalize' }}>
                 {isEdit ? (form.name || 'Pareja sin nombre') : 'Nueva pareja interesada'}
               </div>
               {isEdit && leadStatus && (() => {
@@ -5703,7 +5734,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 const info = STATUS_INFO[leadStatus] || STATUS_INFO.new
                 const hasVisit = form.visit_date
                 return (
-                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', gap: 5,
                       padding: '3px 10px 3px 8px', borderRadius: 20,
@@ -5723,6 +5754,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   </div>
                 )
               })()}
+              </div>
             </div>
           </div>
         </div>
@@ -5919,10 +5951,6 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     })()}
                   </div>
                 )}
-                {/* Divider */}
-                <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 18 }} />
-
-
               </>
             ) : (
               <>
@@ -5956,7 +5984,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   {/* EXACT DATE */}
                   {form.date_flexibility === 'exact' && (
                     <div>
-                      <MiniCalendarPicker venueId={venueId} value={form.wedding_date} onChange={d => set('wedding_date', d)} />
+                      <MiniCalendarPicker venueId={venueId} value={form.wedding_date} onChange={d => set('wedding_date', d)} prevValue={isEdit && editLead ? (editLead.wedding_date || undefined) : undefined} />
                       {form.wedding_date && (() => {
                         const dt = new Date(form.wedding_date + 'T12:00:00')
                         const wd = dt.toLocaleDateString('es-ES', { weekday: 'long' })
@@ -6062,53 +6090,25 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   {form.date_flexibility === 'flexible' && <DateSummaryCard accent="cream" miniLabel="Sin fecha definida" title="La pareja es flexible" subtitle="Acordaréis la fecha más adelante según disponibilidad" />}
                 </div>
 
-                {/* Guardado: chip — reference of DB-saved date while editing */}
-                {isEdit && editLead && (() => {
-                  const flex = editLead.date_flexibility; const date1 = editLead.wedding_date; const date2 = editLead.wedding_date_to; const ranges = editLead.wedding_date_ranges
-                  if (!flex || flex === 'flexible') return null
-                  const fmtLong  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-                  const fmtShort = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
-                  const fmtFull  = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
-                  let txt = ''
-                  if (flex === 'exact' && date1) txt = fmtLong(date1)
-                  else if (flex === 'range' && date1) txt = `${fmtShort(date1)}${date2 ? ` – ${fmtFull(date2)}` : ''}`
-                  else if (flex === 'multi_range' && ranges?.length) txt = ranges.map((r: any, i: number) => `Op. ${i+1}: ${fmtShort(r.from)}${r.to ? ` – ${fmtFull(r.to)}` : ''}`).join('  ·  ')
-                  else if (flex === 'month' && date1) txt = `${MONTHS[(parseInt(date1.slice(5,7)) || 1) - 1]} ${date1.slice(0,4)}`
-                  else if (flex === 'season' && date1) txt = `${SEASONS.find(s => s.value === date1)?.label || date1} ${date2 || ''}`
-                  if (!txt) return null
-                  return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 7, background: '#f5f0ea', border: '1px solid var(--ivory)', marginBottom: 4 }}>
-                      <Clock size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>Guardado:</span>
-                      <span style={{ fontSize: 12, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{txt}</span>
-                    </div>
-                  )
-                })()}
-
                 {/* Lo que pidió originalmente — also shown when editing a 'new' lead */}
                 {isEdit && editLead && (
-                  <div style={{ marginTop: 14 }}>
-                    <div style={{ borderTop: '1px dashed var(--ivory)', marginBottom: 14 }} />
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: (showOriginal || editingOriginal) ? 12 : 0 }}>
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: (showOriginal || editingOriginal) ? 10 : 0 }}>
                       <button type="button" onClick={() => setShowOriginal((v: boolean) => !v)} style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        background: 'none', border: 'none', padding: 0, cursor: 'pointer', outline: 'none', flex: 1, textAlign: 'left',
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: 0, background: 'none', border: 'none',
+                        color: 'var(--warm-gray)', fontSize: 11, fontWeight: 500,
+                        cursor: 'pointer', outline: 'none',
+                        textDecoration: 'underline', textDecorationColor: 'var(--ivory)',
+                        textUnderlineOffset: 3,
                       }}>
-                        <div style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', flexShrink: 0 }}>
-                          <CalendarDays size={14} />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--espresso)' }}>Lo que pidió originalmente la pareja</div>
-                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.3 }}>Solicitud inicial — se guarda automáticamente</div>
-                        </div>
-                        {(showOriginal || editingOriginal)
-                          ? <ChevronUp size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                          : <ChevronDown size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
+                        {(showOriginal || editingOriginal) ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                        Solicitud original
                       </button>
                       {(showOriginal || editingOriginal) && (
                         <button type="button" onClick={() => setEditingOriginal((v: boolean) => !v)} style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
-                          padding: '5px 10px', borderRadius: 8,
+                          padding: '3px 8px', borderRadius: 6,
                           background: editingOriginal ? '#ecfdf5' : '#f9fafb',
                           border: `1.5px solid ${editingOriginal ? '#86efac' : '#e5e7eb'}`,
                           color: editingOriginal ? '#15803d' : 'var(--warm-gray)',
@@ -6209,15 +6209,6 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
           {/* Divider */}
           <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 18 }} />
 
-          {/* Guests */}
-          <div className="form-group">
-            <label className="form-label">Nº de invitados aproximado</label>
-            <div style={{ position: 'relative' }}>
-              <Users size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', pointerEvents: 'none' }} />
-              <input className="form-input" type="number" min={0} value={form.guests} onChange={e => set('guests', e.target.value)} placeholder="150" style={{ paddingLeft: 34 }} />
-            </div>
-          </div>
-
           {/* Más detalles — collapsible */}
           <div style={{ marginBottom: 4 }}>
             <button type="button" onClick={() => setShowMoreDetails((v: boolean) => !v)} style={{
@@ -6268,12 +6259,19 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     </Select>
                   </div>
                 </div>
-                <div className="two-col">
-                  <div className="form-group">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Total invitados</label>
+                    <div style={{ position: 'relative' }}>
+                      <Users size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', pointerEvents: 'none' }} />
+                      <input className="form-input" type="number" min={0} value={form.guests} onChange={e => set('guests', e.target.value)} placeholder="150" style={{ paddingLeft: 34 }} />
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Adultos</label>
                     <input className="form-input" type="number" min={0} value={form.guests_adults} onChange={e => set('guests_adults', e.target.value)} placeholder="120" />
                   </div>
-                  <div className="form-group">
+                  <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Niños</label>
                     <input className="form-input" type="number" min={0} value={form.guests_children} onChange={e => set('guests_children', e.target.value)} placeholder="20" />
                   </div>
@@ -6746,6 +6744,15 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               <label className="form-label">WhatsApp <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--warm-gray)' }}>(si distinto del teléfono)</span></label>
               <input className="form-input" value={form.whatsapp} onChange={e => set('whatsapp', e.target.value)} placeholder="+34 600 000 000" />
             </div>
+
+            {isEdit && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '4px 10px', borderRadius: 20, background: editLead?.whatsapp_consent ? '#dcfce7' : '#fef2f2', border: `1px solid ${editLead?.whatsapp_consent ? '#86efac' : '#fca5a5'}` }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill={editLead?.whatsapp_consent ? '#16a34a' : '#dc2626'}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.555 4.118 1.528 5.847L0 24l6.335-1.508A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.65-.502-5.18-1.378l-.37-.22-3.862.919.977-3.773-.243-.387A9.953 9.953 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+                <span style={{ fontSize: 11, fontWeight: 600, color: editLead?.whatsapp_consent ? '#16a34a' : '#dc2626' }}>
+                  {editLead?.whatsapp_consent ? 'Acepta contacto por WhatsApp' : 'No acepta contacto por WhatsApp'}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Divider */}
@@ -6764,6 +6771,24 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 </SelectContent>
               </Select>
             </div>
+
+            {isEdit && editLead?.initial_message && (
+              <div style={{ marginBottom: 12 }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <LockKeyhole size={11} style={{ color: 'var(--warm-gray)' }} />
+                  Mensaje inicial de la pareja
+                  <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--warm-gray)' }}>(desde weddingvenuesspain.com)</span>
+                </label>
+                <div style={{
+                  padding: '10px 14px', borderRadius: 10,
+                  background: '#faf8f5', border: '1px solid var(--ivory)',
+                  fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.6,
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                }}>
+                  {editLead.initial_message}
+                </div>
+              </div>
+            )}
 
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Notas internas <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--warm-gray)' }}>(solo tú las verás)</span></label>

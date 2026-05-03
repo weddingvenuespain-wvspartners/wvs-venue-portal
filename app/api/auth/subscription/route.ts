@@ -19,42 +19,52 @@ export async function GET(req: Request) {
     const svc = getServiceClient()
     const SELECT = 'id, status, trial_end_date, plan_id, plan:venue_plans(id, name, display_name, permissions)'
 
-    // Priority 1: active subscription (paid)
-    let activeQuery = svc
-      .from('venue_subscriptions')
-      .select(SELECT)
-      .eq('user_id', session.user.id)
-      .eq('status', 'active')
-    if (venueId) activeQuery = activeQuery.eq('venue_id', venueId)
-    const { data: activeSub, error: e1 } = await activeQuery
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (e1) {
-      console.error('[/api/auth/subscription] active query:', e1.message)
-      return NextResponse.json({ subscription: null })
+    // Priority 1: active subscription (paid) — venue-specific first, then fallback to null venue_id
+    let activeSub: any = null
+    if (venueId) {
+      const { data } = await svc.from('venue_subscriptions').select(SELECT)
+        .eq('user_id', session.user.id).eq('status', 'active').eq('venue_id', venueId)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      activeSub = data
+    }
+    if (!activeSub) {
+      const { data } = await svc.from('venue_subscriptions').select(SELECT)
+        .eq('user_id', session.user.id).eq('status', 'active')
+        .is('venue_id', null)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      activeSub = data
+    }
+    if (!activeSub && !venueId) {
+      const { data } = await svc.from('venue_subscriptions').select(SELECT)
+        .eq('user_id', session.user.id).eq('status', 'active')
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      activeSub = data
     }
 
     if (activeSub) {
       return NextResponse.json({ subscription: activeSub })
     }
 
-    // Priority 2: trial or trial_expired subscription
-    let trialQuery = svc
-      .from('venue_subscriptions')
-      .select(SELECT)
-      .eq('user_id', session.user.id)
-      .in('status', ['trial', 'trial_expired'])
-    if (venueId) trialQuery = trialQuery.eq('venue_id', venueId)
-    const { data: trialSub, error: e2 } = await trialQuery
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (e2) {
-      console.error('[/api/auth/subscription] trial query:', e2.message)
-      return NextResponse.json({ subscription: null })
+    // Priority 2: trial or trial_expired — venue-specific first, then fallback to null venue_id
+    let trialSub: any = null
+    if (venueId) {
+      const { data } = await svc.from('venue_subscriptions').select(SELECT)
+        .eq('user_id', session.user.id).in('status', ['trial', 'trial_expired']).eq('venue_id', venueId)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      trialSub = data
+    }
+    if (!trialSub) {
+      const { data } = await svc.from('venue_subscriptions').select(SELECT)
+        .eq('user_id', session.user.id).in('status', ['trial', 'trial_expired'])
+        .is('venue_id', null)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      trialSub = data
+    }
+    if (!trialSub && !venueId) {
+      const { data } = await svc.from('venue_subscriptions').select(SELECT)
+        .eq('user_id', session.user.id).in('status', ['trial', 'trial_expired'])
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      trialSub = data
     }
 
     if (!trialSub) {

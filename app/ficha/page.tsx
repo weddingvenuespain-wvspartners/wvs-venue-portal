@@ -80,6 +80,8 @@ export default function FichaPage() {
   const [shortDesc, setShortDesc]   = useState('')
   const [leadsEmail, setLeadsEmail]         = useState('')
   const [leadsEmailSaved, setLeadsEmailSaved] = useState('')
+  const [leadsEmailEnabled, setLeadsEmailEnabled] = useState(true)
+  const [leadsEmailEnabledSaved, setLeadsEmailEnabledSaved] = useState(true)
   const [savingConfig, setSavingConfig]       = useState(false)
   const [configMsg, setConfigMsg]             = useState('')
   const [capacity, setCapacity]     = useState('')
@@ -411,6 +413,8 @@ export default function FichaPage() {
     setAirportMins(ap[2] || '')
     setLeadsEmail(d.leadsEmail || '')
     setLeadsEmailSaved(d.leadsEmail || '')
+    setLeadsEmailEnabled(d.leadsEmailEnabled !== false)
+    setLeadsEmailEnabledSaved(d.leadsEmailEnabled !== false)
     if (Array.isArray(d.gallery)) {
       setHGallery(d.gallery.map((entry: any) => {
         if (!entry) return null
@@ -626,7 +630,9 @@ export default function FichaPage() {
     if (!miniDesc.trim())                errs.push({ field: 'Mini título (H2)',          tab: 'descripcion', msg: 'Obligatorio' })
     else if (wordCount(miniDesc) > 6)    errs.push({ field: 'Mini título',              tab: 'descripcion', msg: 'Máximo 6 palabras' })
     if (!miniParagraph.trim())           errs.push({ field: 'Mini párrafo',             tab: 'descripcion', msg: 'Obligatorio' })
+    else if (wordCount(miniParagraph) > 60)  errs.push({ field: 'Mini párrafo',         tab: 'descripcion', msg: 'Máximo 60 palabras' })
     if (!postContent.trim())             errs.push({ field: 'Descripción completa',     tab: 'descripcion', msg: 'Obligatorio' })
+    else if (wordCount(postContent) > 280)   errs.push({ field: 'Descripción completa', tab: 'descripcion', msg: 'Máximo 280 palabras' })
 
     // Precios
     if (!accommodation)
@@ -635,6 +641,10 @@ export default function FichaPage() {
       errs.push({ field: 'Venue fee (precio)', tab: 'precios', msg: 'Indica el precio o activa "Included in menu"' })
     if (!cateringFeeValue.trim())
       errs.push({ field: 'Catering starting price', tab: 'precios', msg: 'Obligatorio' })
+    if (wordCount(breakdown1text) > 150)
+      errs.push({ field: 'Zonas del espacio e incluye', tab: 'precios', msg: 'Máximo 150 palabras' })
+    if (wordCount(breakdown3text) > 150)
+      errs.push({ field: 'Descripción del servicio', tab: 'precios', msg: 'Máximo 150 palabras' })
 
     // Ubicación
     if (!specificLocation.trim())
@@ -658,6 +668,10 @@ export default function FichaPage() {
           errs.push({ field: `Reseña ${i + 1}`, tab: 'resenas', msg: 'Nombre y texto son obligatorios, o desactiva las reseñas' })
       })
     }
+
+    // Configuración
+    if (!leadsEmail.trim())
+      errs.push({ field: 'Email de contacto', tab: 'config', msg: 'Añade al menos un email para recibir leads' })
 
     return errs
   }
@@ -1578,10 +1592,35 @@ export default function FichaPage() {
                     </div>
                   )}
 
+                  {/* Toggle notificaciones */}
+                  <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: leadsEmailEnabled ? '#f0fdf4' : '#fef2f2', border: `1px solid ${leadsEmailEnabled ? '#bbf7d0' : '#fecaca'}` }}>
+                    <button
+                      onClick={() => setLeadsEmailEnabled(!leadsEmailEnabled)}
+                      style={{
+                        position: 'relative', width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer',
+                        background: leadsEmailEnabled ? '#22c55e' : '#d1d5db', transition: 'background 0.2s', flexShrink: 0,
+                      }}
+                    >
+                      <div style={{
+                        position: 'absolute', top: 2, left: leadsEmailEnabled ? 20 : 2,
+                        width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                        transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                      }} />
+                    </button>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: leadsEmailEnabled ? '#15803d' : '#991b1b' }}>
+                        {leadsEmailEnabled ? 'Notificaciones activadas' : 'Notificaciones desactivadas'}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                        {leadsEmailEnabled ? 'Recibirás un email cada vez que llegue una nueva petición' : 'No recibirás emails cuando lleguen peticiones nuevas'}
+                      </div>
+                    </div>
+                  </div>
+
                   <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                     <button
                       className="btn btn-primary"
-                      disabled={savingConfig || leadsEmail === leadsEmailSaved}
+                      disabled={savingConfig || (leadsEmail === leadsEmailSaved && leadsEmailEnabled === leadsEmailEnabledSaved)}
                       onClick={async () => {
                         setSavingConfig(true)
                         setConfigMsg('')
@@ -1589,11 +1628,12 @@ export default function FichaPage() {
                           const res = await fetch('/api/venues/save-config', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ leadsEmail, venue_id: activeVenue?.id ?? null }),
+                            body: JSON.stringify({ leadsEmail, leadsEmailEnabled, venue_id: activeVenue?.id ?? null }),
                           })
                           const data = await res.json()
                           if (!res.ok) { setConfigMsg(data.error || 'Error al guardar'); return }
                           setLeadsEmailSaved(leadsEmail)
+                          setLeadsEmailEnabledSaved(leadsEmailEnabled)
                           setConfigMsg('Guardado correctamente ✓')
                           setTimeout(() => setConfigMsg(''), 3000)
                         } catch { setConfigMsg('Error de conexión') }
@@ -1604,8 +1644,8 @@ export default function FichaPage() {
                     </button>
                     <button
                       className="btn btn-ghost"
-                      disabled={savingConfig || leadsEmail === leadsEmailSaved}
-                      onClick={() => setLeadsEmail(leadsEmailSaved)}
+                      disabled={savingConfig || (leadsEmail === leadsEmailSaved && leadsEmailEnabled === leadsEmailEnabledSaved)}
+                      onClick={() => { setLeadsEmail(leadsEmailSaved); setLeadsEmailEnabled(leadsEmailEnabledSaved) }}
                     >
                       Cancelar
                     </button>
