@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-// Routes that don't require authentication
-const PUBLIC_ROUTES = [
+// Routes that don't require authentication.
+// String entries match by prefix; RegExp entries match the full pathname.
+const PUBLIC_ROUTES: Array<string | RegExp> = [
   '/api/leads/create',          // uses its own WVS_REST_TOKEN auth
   '/api/admin/backup',          // uses Bearer API key for GitHub Actions cron
   '/api/redsys/notification',   // Redsys webhook (server-to-server, no session)
@@ -12,7 +13,15 @@ const PUBLIC_ROUTES = [
   '/api/proposals/unlock',      // password gate for private proposals — anonymous by design
   '/api/proposals/inquiries',   // public POST: couple submits inquiry from proposal landing
   '/api/proposals/track-section', // public POST: section-level view tracking
+  // Per-proposal endpoints — public by design, called from /proposal/[slug]
+  /^\/api\/proposals\/[^/]+\/visit-slots$/,
+  /^\/api\/proposals\/[^/]+\/visit-request$/,
+  /^\/api\/proposals\/[^/]+\/select-date$/,
+  /^\/api\/proposals\/[^/]+\/menu-selection$/,
 ]
+
+const isPublicRoute = (pathname: string) =>
+  PUBLIC_ROUTES.some(r => typeof r === 'string' ? pathname.startsWith(r) : r.test(pathname))
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -21,7 +30,7 @@ export async function middleware(req: NextRequest) {
   if (!pathname.startsWith('/api/')) return NextResponse.next()
 
   // Skip public API routes
-  if (PUBLIC_ROUTES.some(r => pathname.startsWith(r))) return NextResponse.next()
+  if (isPublicRoute(pathname)) return NextResponse.next()
 
   // Verify Supabase session via cookies
   const res = NextResponse.next()
