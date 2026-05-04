@@ -123,9 +123,22 @@ export function WeddingProposal({
 
   // Per-extra guest counts (noche y madrugada items)
   const [extraGuestCounts, setExtraGuestCounts] = useState<Record<string, number>>({})
-  // Barra libre extra hours
-  const [barraExtraHours, setBarraExtraHours] = useState(0)
-  const [barraExtraPeople, setBarraExtraPeople] = useState(0)
+  // Barra libre extra hours (per-option, keyed by extra key)
+  const [barraExtraHours, setBarraExtraHours] = useState<Record<string, number>>({})
+  const [barraExtraPeople, setBarraExtraPeople] = useState<Record<string, number>>({})
+
+  // Menu min/max guest violations
+  const menuViolations = useMemo(() => {
+    const violations: Array<{ menuName: string; type: 'min' | 'max'; limit: number; count: number }> = []
+    menus.forEach((m, i) => {
+      const id = menuId(m, i)
+      const count = effectiveAllocations[id] || 0
+      if (!count) return
+      if (m.min_guests && count < m.min_guests) violations.push({ menuName: m.name, type: 'min', limit: m.min_guests, count })
+      if (m.max_guests && count > m.max_guests) violations.push({ menuName: m.name, type: 'max', limit: m.max_guests, count })
+    })
+    return violations
+  }, [menus, effectiveAllocations])
 
   const totalAllocated = useMemo(() => Object.values(effectiveAllocations).reduce((a, b) => a + b, 0), [effectiveAllocations])
   const guests = totalAllocated > 0 ? totalAllocated : guestTarget
@@ -149,18 +162,20 @@ export function WeddingProposal({
       if (!selectedExtras[extraId(e, i)]) return
       const key = extraId(e, i)
       const p = parsePrice(e.price)
-      // Barra libre with extra hours
+      const perPersonCount = extraGuestCounts[key] || guests
+      let itemTotal = e.price_type === 'per_person' ? p * perPersonCount : p
+      // Barra libre extra hours (per-option)
       if (e.category === 'open_bar' && e.extra_hour_price) {
-        const perPersonCount = extraGuestCounts[key] || guests
-        const base = e.price_type === 'per_person' ? p * perPersonCount : p
-        const extraHourP = parsePrice(e.extra_hour_price)
-        const extraHoursAmount = barraExtraHours > 0 && barraExtraPeople > 0
-          ? barraExtraHours * extraHourP * barraExtraPeople : 0
-        extrasTotal += base + extraHoursAmount
-      } else {
-        const perPersonCount = extraGuestCounts[key] || guests
-        extrasTotal += e.price_type === 'per_person' ? p * perPersonCount : p
+        const eh = barraExtraHours[key] || 0
+        const ep = barraExtraPeople[key] || 0
+        if (eh > 0 && ep > 0) itemTotal += eh * parsePrice(e.extra_hour_price) * ep
       }
+      // min_spend enforcement
+      if (e.min_spend) {
+        const ms = parsePrice(e.min_spend)
+        if (ms > 0 && itemTotal < ms) itemTotal = ms
+      }
+      extrasTotal += itemTotal
     })
     return menuTotal + extrasTotal
   }, [menus, effectiveAllocations, weddingDate, extras, selectedExtras, courseChoices, guests, extraGuestCounts, barraExtraHours, barraExtraPeople])
@@ -205,6 +220,7 @@ export function WeddingProposal({
     setError(null)
     const allocatedMenus = menus.filter((m, i) => (effectiveAllocations[menuId(m, i)] || 0) > 0)
     if (menus.length > 0 && !allocatedMenus.length) { setError('Asigna invitados a al menos un menú'); return }
+    if (menuViolations.length) { setError(menuViolations.map(v => v.type === 'min' ? `${v.menuName}: mínimo ${v.limit} comensales (tienes ${v.count})` : `${v.menuName}: máximo ${v.limit} comensales (tienes ${v.count})`).join('. ')); return }
     if (missingChoices.length) { setError(`Faltan opciones en: ${missingChoices.join(', ')}`); return }
     setSending(true)
     try {
@@ -424,6 +440,17 @@ export function WeddingProposal({
                         <button type="button" className={styles.wpStepperBtn} onClick={() => setGuestOverride(g => (g ?? originalGuests) + 1)}>+</button>
                       </div>
                     </div>
+                    {/* Min/max guest warning */}
+                    {m.min_guests && guestTarget < m.min_guests && (
+                      <div style={{ fontSize: '.78rem', color: '#ef4444', background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 8, padding: '8px 14px', marginBottom: 12, textAlign: 'center' }}>
+                        Este menú requiere un mínimo de <strong>{m.min_guests}</strong> comensales
+                      </div>
+                    )}
+                    {m.max_guests && guestTarget > m.max_guests && (
+                      <div style={{ fontSize: '.78rem', color: '#ef4444', background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 8, padding: '8px 14px', marginBottom: 12, textAlign: 'center' }}>
+                        Este menú tiene un máximo de <strong>{m.max_guests}</strong> comensales
+                      </div>
+                    )}
                     {/* Menu content */}
                     <div style={{ background: 'var(--wp-card)', border: '1px solid var(--wp-border)', borderRadius: 14, padding: '28px 32px', boxShadow: 'var(--wp-shadow)' }}>
                       {renderMenuContent(m, 0)}
@@ -462,6 +489,12 @@ export function WeddingProposal({
                                     onClick={() => { const next = (menuAllocations[id] || 0) + 1; if (!maxG || next <= maxG) setMenuAllocations(p => ({ ...p, [id]: next })) }}>+</button>
                                   <span style={{ fontSize: '.72rem', color: 'var(--wp-text-dim)', marginLeft: 2 }}>pax</span>
                                 </div>
+                                {count > 0 && m.min_guests && count < m.min_guests && (
+                                  <div style={{ fontSize: '.65rem', color: '#ef4444', marginTop: 4 }}>Mín. {m.min_guests} pax</div>
+                                )}
+                                {count > 0 && maxG && count > maxG && (
+                                  <div style={{ fontSize: '.65rem', color: '#ef4444', marginTop: 4 }}>Máx. {maxG} pax</div>
+                                )}
                               </div>
                             </div>
                           )
@@ -541,28 +574,16 @@ export function WeddingProposal({
                     </div>
                   </div>
                 )}
-                {openBarItems.length > 0 && (() => {
-                  const selectedBarraKey = openBarItems.find(ob => selectedExtras[ob.key])?.key ?? null
-                  const selectedBarra = selectedBarraKey ? openBarItems.find(ob => ob.key === selectedBarraKey)?.extra : null
-                  return (
-                    <div className={styles.wpXcat}>
-                      <div className={styles.wpXcatH}>Barra libre <span style={{ fontSize: '0.7em', fontWeight: 400, opacity: 0.65, marginLeft: 6 }}>elige una opción</span></div>
-                      <div className={styles.wpXgrid}>
-                        {openBarItems.map(({ extra, key }) => {
-                          const isSel = !!selectedExtras[key]
-                          const handleClick = () => {
-                            setSelectedExtras(p => {
-                              const next = { ...p }
-                              openBarItems.forEach(ob => { next[ob.key] = false })
-                              if (!p[key]) next[key] = true
-                              return next
-                            })
-                            setBarraExtraHours(0)
-                            setBarraExtraPeople(0)
-                          }
-                          return (
-                            <div key={key} className={cx(styles.wpX, isSel && styles.wpXsel)} onClick={handleClick}>
-                              <div className={cx(styles.wpXcheck, styles.wpItemCheckRound)} style={{ borderRadius: '50%' }}>{isSel ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--wp-on-primary)', display: 'block' }} /> : ''}</div>
+                {openBarItems.length > 0 && (
+                  <div className={styles.wpXcat}>
+                    <div className={styles.wpXcatH}>Barra libre</div>
+                    <div className={styles.wpXgrid}>
+                      {openBarItems.map(({ extra, key }) => {
+                        const isSel = !!selectedExtras[key]
+                        return (
+                          <div key={key}>
+                            <div className={cx(styles.wpX, isSel && styles.wpXsel)} onClick={() => setSelectedExtras(p => ({ ...p, [key]: !p[key] }))}>
+                              <div className={styles.wpXcheck}>{isSel ? '✓' : ''}</div>
                               {extra.photo_url && <img src={extra.photo_url} alt="" className={styles.wpXphoto} />}
                               <div className={styles.wpXbody}>
                                 <div className={styles.wpXname}>{extra.name}</div>
@@ -571,6 +592,7 @@ export function WeddingProposal({
                                   {extra.price} <small>{extra.price_type === 'per_person' ? '/persona' : 'total'}</small>
                                   {extra.hours_included ? <small style={{ marginLeft: 6 }}>· {extra.hours_included}h incluidas</small> : null}
                                 </div>
+                                {extra.min_spend && <div style={{ fontSize: '.72rem', color: 'var(--wp-text-dim)', marginTop: 2 }}>Gasto mín. {extra.min_spend}</div>}
                                 {isSel && extra.price_type === 'per_person' && (
                                   <div className={styles.wpXguests} onClick={e => e.stopPropagation()}>
                                     <span>Personas:</span>
@@ -581,43 +603,43 @@ export function WeddingProposal({
                                 )}
                               </div>
                             </div>
-                          )
-                        })}
-                      </div>
-                      {/* Barra libre extra hours config */}
-                      {selectedBarra?.extra_hour_price && (
-                        <div className={styles.wpBarraConfig} onClick={e => e.stopPropagation()}>
-                          <div className={styles.wpBarraRow}>
-                            <span className={styles.wpBarraLabel}>Horas extra</span>
-                            <div className={styles.wpStepper} style={{ marginTop: 0 }}>
-                              <button type="button" className={styles.wpStepperBtn} style={{ width: 28, height: 28, fontSize: '.95rem' }} onClick={() => setBarraExtraHours(h => Math.max(0, h - 1))}>−</button>
-                              <input type="number" className={styles.wpStepperInput} style={{ width: 40, fontSize: '.82rem', lineHeight: '28px' }} min={0} value={barraExtraHours} onChange={e => setBarraExtraHours(Math.max(0, parseInt(e.target.value) || 0))} />
-                              <button type="button" className={styles.wpStepperBtn} style={{ width: 28, height: 28, fontSize: '.95rem' }} onClick={() => setBarraExtraHours(h => h + 1)}>+</button>
-                            </div>
-                            <span style={{ fontSize: '.75rem', color: 'var(--wp-text-dim)' }}>× {selectedBarra.extra_hour_price}/pers.</span>
-                          </div>
-                          {barraExtraHours > 0 && (
-                            <div className={styles.wpBarraRow}>
-                              <span className={styles.wpBarraLabel}>Personas extra</span>
-                              <div className={styles.wpStepper} style={{ marginTop: 0 }}>
-                                <button type="button" className={styles.wpStepperBtn} style={{ width: 28, height: 28, fontSize: '.95rem' }} onClick={() => setBarraExtraPeople(p => Math.max(0, p - 1))}>−</button>
-                                <input type="number" className={styles.wpStepperInput} style={{ width: 50, fontSize: '.82rem', lineHeight: '28px' }} min={0} value={barraExtraPeople} onChange={e => setBarraExtraPeople(Math.max(0, parseInt(e.target.value) || 0))} />
-                                <button type="button" className={styles.wpStepperBtn} style={{ width: 28, height: 28, fontSize: '.95rem' }} onClick={() => setBarraExtraPeople(p => p + 1)}>+</button>
+                            {/* Per-option extra hours config */}
+                            {isSel && extra.extra_hour_price && (
+                              <div className={styles.wpBarraConfig} onClick={e => e.stopPropagation()}>
+                                <div className={styles.wpBarraRow}>
+                                  <span className={styles.wpBarraLabel}>Horas extra</span>
+                                  <div className={styles.wpStepper} style={{ marginTop: 0 }}>
+                                    <button type="button" className={styles.wpStepperBtn} style={{ width: 28, height: 28, fontSize: '.95rem' }} onClick={() => setBarraExtraHours(p => ({ ...p, [key]: Math.max(0, (p[key] || 0) - 1) }))}>−</button>
+                                    <input type="number" className={styles.wpStepperInput} style={{ width: 40, fontSize: '.82rem', lineHeight: '28px' }} min={0} value={barraExtraHours[key] || 0} onChange={e => setBarraExtraHours(p => ({ ...p, [key]: Math.max(0, parseInt(e.target.value) || 0) }))} />
+                                    <button type="button" className={styles.wpStepperBtn} style={{ width: 28, height: 28, fontSize: '.95rem' }} onClick={() => setBarraExtraHours(p => ({ ...p, [key]: (p[key] || 0) + 1 }))}>+</button>
+                                  </div>
+                                  <span style={{ fontSize: '.75rem', color: 'var(--wp-text-dim)' }}>× {extra.extra_hour_price}/pers.</span>
+                                </div>
+                                {(barraExtraHours[key] || 0) > 0 && (
+                                  <div className={styles.wpBarraRow}>
+                                    <span className={styles.wpBarraLabel}>Personas extra</span>
+                                    <div className={styles.wpStepper} style={{ marginTop: 0 }}>
+                                      <button type="button" className={styles.wpStepperBtn} style={{ width: 28, height: 28, fontSize: '.95rem' }} onClick={() => setBarraExtraPeople(p => ({ ...p, [key]: Math.max(0, (p[key] || 0) - 1) }))}>−</button>
+                                      <input type="number" className={styles.wpStepperInput} style={{ width: 50, fontSize: '.82rem', lineHeight: '28px' }} min={0} value={barraExtraPeople[key] || 0} onChange={e => setBarraExtraPeople(p => ({ ...p, [key]: Math.max(0, parseInt(e.target.value) || 0) }))} />
+                                      <button type="button" className={styles.wpStepperBtn} style={{ width: 28, height: 28, fontSize: '.95rem' }} onClick={() => setBarraExtraPeople(p => ({ ...p, [key]: (p[key] || 0) + 1 }))}>+</button>
+                                    </div>
+                                    <span style={{ fontSize: '.75rem', color: 'var(--wp-text-dim)' }}>personas</span>
+                                  </div>
+                                )}
+                                {(barraExtraHours[key] || 0) > 0 && (barraExtraPeople[key] || 0) > 0 && (
+                                  <div className={styles.wpBarraTotal}>
+                                    <span>Suplemento horas extra</span>
+                                    <span>{formatEuro((barraExtraHours[key] || 0) * parsePrice(extra.extra_hour_price) * (barraExtraPeople[key] || 0))}</span>
+                                  </div>
+                                )}
                               </div>
-                              <span style={{ fontSize: '.75rem', color: 'var(--wp-text-dim)' }}>personas</span>
-                            </div>
-                          )}
-                          {barraExtraHours > 0 && barraExtraPeople > 0 && (
-                            <div className={styles.wpBarraTotal}>
-                              <span>Suplemento horas extra</span>
-                              <span>{formatEuro(barraExtraHours * parsePrice(selectedBarra.extra_hour_price) * barraExtraPeople)}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
-                  )
-                })()}
+                  </div>
+                )}
               </div>
             </FadeUp>
           )
@@ -745,17 +767,21 @@ export function WeddingProposal({
                 if (!selectedExtras[key]) return null
                 const p = parsePrice(e.price)
                 const perPersonCount = extraGuestCounts[key] || guests
-                const baseAmount = e.price_type === 'per_person' ? p * perPersonCount : p
-                // Barra libre extra hours
-                const barraExtra = (e.category === 'open_bar' && e.extra_hour_price && barraExtraHours > 0 && barraExtraPeople > 0)
-                  ? barraExtraHours * parsePrice(e.extra_hour_price) * barraExtraPeople : 0
-                const amount = baseAmount + barraExtra
+                let baseAmount = e.price_type === 'per_person' ? p * perPersonCount : p
+                // Barra libre extra hours (per-option)
+                const eh = (e.category === 'open_bar' ? barraExtraHours[key] : 0) || 0
+                const ep = (e.category === 'open_bar' ? barraExtraPeople[key] : 0) || 0
+                const barraExtra = (eh > 0 && ep > 0 && e.extra_hour_price) ? eh * parsePrice(e.extra_hour_price) * ep : 0
+                let amount = baseAmount + barraExtra
+                // min_spend
+                if (e.min_spend) { const ms = parsePrice(e.min_spend); if (ms > 0 && amount < ms) amount = ms }
                 return (
                   <div key={key} className={styles.wpSumLine}>
                     <span className={styles.wpSumLineLbl}>
                       {e.name}
                       <span className={styles.wpSumLineDim}> ({e.price}{e.price_type === 'per_person' ? ` × ${perPersonCount}` : ''})</span>
-                      {barraExtra > 0 && <span className={styles.wpSumLineDim}> + {barraExtraHours}h extra × {barraExtraPeople} pers.</span>}
+                      {barraExtra > 0 && <span className={styles.wpSumLineDim}> + {eh}h extra × {ep} pers.</span>}
+                      {e.min_spend && amount === parsePrice(e.min_spend) && <span className={styles.wpSumLineDim}> (gasto mín.)</span>}
                     </span>
                     <span className={styles.wpSumLineVal}>{formatEuro(amount)}</span>
                   </div>
@@ -773,10 +799,11 @@ export function WeddingProposal({
             {!previewOnly && (
               <div className={styles.wpFootAction}>
                 <button className={styles.wpBtn} onClick={handleSubmit}
-                  disabled={sending || (menus.length > 1 && totalAllocated === 0) || missingChoices.length > 0}>
+                  disabled={sending || (menus.length > 1 && totalAllocated === 0) || missingChoices.length > 0 || menuViolations.length > 0}>
                   {sending ? 'Enviando…' : 'Enviar nuestra selección →'}
                 </button>
                 {menus.length > 1 && totalAllocated === 0 && !error && <div className={styles.wpErr}>Asigna invitados a al menos un menú</div>}
+                {menuViolations.length > 0 && !error && <div className={styles.wpErr}>{menuViolations.map(v => v.type === 'min' ? `${v.menuName}: mínimo ${v.limit} comensales` : `${v.menuName}: máximo ${v.limit} comensales`).join(' · ')}</div>}
                 {missingChoices.length > 0 && !error && <div className={styles.wpErr}>Faltan opciones en: {missingChoices.join(', ')}</div>}
                 {error && <div className={styles.wpErr}>{error}</div>}
               </div>
