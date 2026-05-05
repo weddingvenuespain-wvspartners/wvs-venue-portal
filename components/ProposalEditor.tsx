@@ -90,6 +90,24 @@ const emptySections: SectionsData = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+type ModalityPrice = { id: string; date_from: string; date_to: string; price: number; notes?: string | null }
+
+const DAYS_ES = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
+
+function getDayLabel(from: number, to: number): string {
+  if (from === to) return DAYS_ES[from] ?? ''
+  return `${DAYS_ES[from] ?? ''} → ${DAYS_ES[to] ?? ''}`
+}
+
+function formatSeasonLabel(dateFrom: string, dateTo: string): string {
+  const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+  const f = new Date(dateFrom + 'T12:00:00')
+  const t = new Date(dateTo + 'T12:00:00')
+  const fStr = `${f.getDate()} ${MONTHS[f.getMonth()]}`
+  const tStr = `${t.getDate()} ${MONTHS[t.getMonth()]}`
+  return `${fStr} – ${tStr}`
+}
+
 function getDefaultSections(cfg: { space_type: string; price_model: string; menu_included?: boolean; has_menu_types?: boolean; catering_own?: boolean }): Record<string, boolean> {
   const hasOwnMenu = cfg.menu_included === true || cfg.catering_own === true
   return {
@@ -189,23 +207,99 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       if (leadsData) setLeads(leadsData)
       if (tplData) setTemplates(tplData as ProposalTemplate[])
       if (venueRow) setVenue(venueRow)
-      if (Array.isArray(settingsRow?.space_groups)) setVenueSpaceGroups(settingsRow.space_groups as VenueSpaceGroup[])
-      if (settingsRow?.commercial_config) {
-        const cfg = settingsRow.commercial_config as { space_type: string; price_model: string }
-        setCommercialConfig(cfg)
-        // Apply smart section defaults only for NEW proposals (no sections_data yet)
-        if (!initial.sections_data || Object.keys(initial.sections_data.sections_enabled ?? {}).length === 0) {
-          setSections(prev => ({
-            ...prev,
-            sections_enabled: getDefaultSections(cfg),
+      const cfg = settingsRow?.commercial_config as { space_type: string; price_model: string } | null
+      if (cfg) setCommercialConfig(cfg)
+      if (settingsRow?.menu_catalog) setMenuCatalog(settingsRow.menu_catalog as SectionsData)
+
+      const spaceGroups = Array.isArray(settingsRow?.space_groups) ? settingsRow.space_groups as VenueSpaceGroup[] : []
+      if (spaceGroups.length) setVenueSpaceGroups(spaceGroups)
+
+      let loadedModalities: any[] = []
+      if (modalRes.ok) { const mj = await modalRes.json(); loadedModalities = mj.modalities ?? []; setModalities(loadedModalities) }
+      if (ctplRes.ok) { const ct = await ctplRes.json(); setContentTemplates(Array.isArray(ct) ? ct : []) }
+
+      // ── Auto-populate sections for NEW proposals ──────────────────────────
+      const isNew = !initial.sections_data || Object.keys(initial.sections_data.sections_enabled ?? {}).length === 0
+      if (isNew && cfg) {
+        const autoPatch: Partial<SectionsData> = {
+          sections_enabled: getDefaultSections(cfg),
+        }
+
+        // Task 2: Auto-populate space_groups from venue config
+        if (cfg.space_type === 'multiple_independent' && spaceGroups.length > 0) {
+          autoPatch.space_groups = spaceGroups.map(vg => ({
+            group_id: vg.id,
+            name: vg.name,
+            description: '',
+            note: '',
+            selection_mode: vg.selection_mode,
+            pick_n_min: vg.pick_n_min,
+            pick_n_max: vg.pick_n_max,
+            pricing_mode: vg.pricing_mode ?? 'per_space',
+            base_price: vg.base_price ?? '',
+            spaces: vg.spaces.map(vs => ({
+              zone_id: vs.id,
+              name: vs.name,
+              description: vs.description ?? '',
+              price: vs.price ?? '',
+              capacity_min: vs.capacity_min,
+              capacity_max: vs.capacity_max,
+            })),
           }))
         }
+
+        // Task 3: Auto-populate venue_rental grid from modality tariffs
+        if (cfg.price_model === 'rental' && loadedModalities.length > 0) {
+          const mod = loadedModalities[0] // use first (or selected) modality
+          const allPrices: ModalityPrice[] = mod.duration_type === 'package'
+            ? (mod.packages ?? []).flatMap((pkg: any) => pkg.prices ?? [])
+            : (mod.prices ?? [])
+
+          if (allPrices.length > 0) {
+            // Day tiers = package labels (or single column for non-package)
+            const dayTiers: string[] = mod.duration_type === 'package'
+              ? (mod.packages ?? []).map((pkg: any) => pkg.label || getDayLabel(pkg.day_from, pkg.day_to))
+              : ['Precio']
+
+            // Seasons = unique date ranges across all prices
+            const seasonMap = new Map<string, { season: string; date_from: string; date_to: string }>()
+            allPrices.forEach(p => {
+              const key = `${p.date_from}_${p.date_to}`
+              if (!seasonMap.has(key)) {
+                seasonMap.set(key, { season: formatSeasonLabel(p.date_from, p.date_to), date_from: p.date_from, date_to: p.date_to })
+              }
+            })
+            const seasons = Array.from(seasonMap.values()).sort((a, b) => a.date_from.localeCompare(b.date_from))
+
+            // Build rows: each season × each tier
+            const rows = seasons.map(s => {
+              const prices: string[] = mod.duration_type === 'package'
+                ? (mod.packages ?? []).map((pkg: any) => {
+                    const match = (pkg.prices ?? []).find((p: any) => p.date_from === s.date_from && p.date_to === s.date_to)
+                    return match ? String(match.price) : ''
+                  })
+                : [String(allPrices.find(p => p.date_from === s.date_from && p.date_to === s.date_to)?.price ?? '')]
+              return { season: s.season, prices }
+            })
+
+            autoPatch.venue_rental = { title: 'Tarifas de alquiler', intro: '', day_tiers: dayTiers, rows, notes: '' }
+          }
+        }
+
+        // Task 4: Auto-populate packages from modality packages
+        if (loadedModalities.length > 0) {
+          const mod = loadedModalities[0]
+          if (mod.duration_type === 'package' && (mod.packages ?? []).length > 0) {
+            autoPatch.packages_override = (mod.packages as any[]).map(pkg => ({
+              name: pkg.label || getDayLabel(pkg.day_from, pkg.day_to),
+              description: mod.description ?? '',
+              price: '',
+            }))
+          }
+        }
+
+        setSections(prev => ({ ...prev, ...autoPatch }))
       }
-      if (settingsRow?.menu_catalog) {
-        setMenuCatalog(settingsRow.menu_catalog as SectionsData)
-      }
-      if (modalRes.ok) { const mj = await modalRes.json(); setModalities(mj.modalities ?? []) }
-      if (ctplRes.ok) { const ct = await ctplRes.json(); setContentTemplates(Array.isArray(ct) ? ct : []) }
     })()
     if (!document.querySelector('link[data-gf-editor]')) {
       const link = document.createElement('link')

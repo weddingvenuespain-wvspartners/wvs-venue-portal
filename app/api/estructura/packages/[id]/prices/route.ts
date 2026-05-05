@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const body = await req.json()
-    const { date_from, date_to, price, notes, price_per_person, zone_prices, supplement_prices, venue_id } = body
+    const { date_from, date_to, price, notes, price_per_person, zone_prices, supplement_prices, group_prices, venue_id } = body
 
     if (!date_from || !date_to) return NextResponse.json({ error: 'Las fechas son obligatorias' }, { status: 400 })
     if (price === undefined || price === null) return NextResponse.json({ error: 'El precio es obligatorio' }, { status: 400 })
@@ -68,6 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         price_per_person:  price_per_person  != null ? parseFloat(price_per_person) : null,
         zone_prices:       zone_prices       ?? null,
         supplement_prices: supplement_prices ?? null,
+        group_prices:      group_prices      ?? null,
       })
       .select()
       .single()

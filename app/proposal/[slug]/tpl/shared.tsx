@@ -114,6 +114,8 @@ import {
   MapPin as MapPinIco, Phone as PhoneIco, Mail, Building as BuildingIco,
   DoorOpen, Flame, Snowflake, Star, Car, Flower2, HeartHandshake,
   Briefcase, Disc3, GlassWater, PartyPopper, FileCheck, ShieldCheck, Soup,
+  Palette, Cake, Baby, Dog, Shirt, Gift, Compass, Crown, Gem, Timer, Tent,
+  Waves, Glasses, Drumstick, ChefHat, Mic2, Zap, Trophy, Smile,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -149,6 +151,25 @@ const INCLUSION_ICONS: Record<string, LucideIcon> = {
   sgae: FileCheck, license: FileCheck, papers: FileCheck,
   party: PartyPopper, celebration: PartyPopper,
   soup: Soup, menu: Soup, 'menu-special': Soup,
+  palette: Palette, decoration: Palette, decor: Palette, art: Palette,
+  cake: Cake, dessert: Cake, bakery: Cake,
+  baby: Baby, kids: Baby, children: Baby,
+  dog: Dog, pets: Dog, animals: Dog,
+  shirt: Shirt, dress: Shirt, attire: Shirt, fashion: Shirt,
+  gift: Gift, present: Gift, favor: Gift, welcome: Gift,
+  compass: Compass, adventure: Compass, explore: Compass,
+  crown: Crown, luxury: Crown, royal: Crown, vip: Crown,
+  gem: Gem, diamond: Gem, ring: Gem, jewelry: Gem,
+  timer: Timer, countdown: Timer, duration: Timer,
+  tent: Tent, carpa: Tent,
+  waves: Waves, pool: Waves, water: Waves, beach: Waves,
+  glasses: Glasses, toast: Glasses, cheers: Glasses, brindis: Glasses,
+  drumstick: Drumstick, chicken: Drumstick, meat: Drumstick,
+  chef: ChefHat, cook: ChefHat, catering: ChefHat,
+  mic: Mic2, karaoke: Mic2, speech: Mic2, ceremony: Mic2,
+  zap: Zap, energy: Zap, power: Zap, electric: Zap,
+  trophy: Trophy, award: Trophy, winner: Trophy, best: Trophy,
+  smile: Smile, happy: Smile, fun: Smile, joy: Smile,
 }
 
 // List of icon names useful for inclusion pickers (curated)
@@ -188,6 +209,25 @@ export const INCLUSION_ICON_CHOICES: Array<{ value: string; label: string }> = [
   { value: 'flower',        label: 'Flores' },
   { value: 'sgae',          label: 'SGAE / Licencia' },
   { value: 'party',         label: 'Fiesta' },
+  { value: 'palette',       label: 'Decoración / Arte' },
+  { value: 'cake',          label: 'Tarta / Repostería' },
+  { value: 'baby',          label: 'Niños / Bebés' },
+  { value: 'dog',           label: 'Mascotas' },
+  { value: 'shirt',         label: 'Vestuario' },
+  { value: 'gift',          label: 'Regalos / Detalles' },
+  { value: 'compass',       label: 'Aventura / Explorar' },
+  { value: 'crown',         label: 'Lujo / VIP' },
+  { value: 'gem',           label: 'Anillo / Joyería' },
+  { value: 'timer',         label: 'Duración / Cuenta atrás' },
+  { value: 'tent',          label: 'Carpa / Exterior' },
+  { value: 'waves',         label: 'Piscina / Playa' },
+  { value: 'glasses',       label: 'Brindis' },
+  { value: 'drumstick',     label: 'Carne / Asado' },
+  { value: 'chef',          label: 'Chef / Catering' },
+  { value: 'mic',           label: 'Micro / Ceremonia' },
+  { value: 'zap',           label: 'Energía / Eléctrico' },
+  { value: 'trophy',        label: 'Premio / Mejor' },
+  { value: 'smile',         label: 'Diversión / Alegría' },
 ]
 
 export function InclusionIcon({ name, size = 22, color, strokeWidth = 1.6 }: {
@@ -251,7 +291,7 @@ export function FloatingWhatsApp({ phone, coupleName, primary, onPrimary }: {
 
   return (
     <div style={{
-      position: 'fixed', bottom: 24, right: 20, zIndex: 9000,
+      position: 'fixed', bottom: 80, right: 20, zIndex: 9000,
     }}>
       {open && (
         <div style={{
@@ -299,6 +339,7 @@ export function FloatingWhatsApp({ phone, coupleName, primary, onPrimary }: {
 function MobileSlider({ photos }: { photos: string[] }) {
   const ref = useRef<HTMLDivElement>(null)
   const [idx, setIdx] = useState(0)
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
   const n = photos.length
 
   useEffect(() => {
@@ -322,8 +363,8 @@ function MobileSlider({ photos }: { photos: string[] }) {
         {photos.map((url, i) => (
           <div key={i} className="mob-slider" style={{
             flex: '0 0 85%', scrollSnapAlign: 'center', height: 220,
-            overflow: 'hidden', marginRight: 6, borderRadius: 6,
-          }}>
+            overflow: 'hidden', marginRight: 6, borderRadius: 6, cursor: 'pointer',
+          }} onClick={() => setLightboxIdx(i)}>
             <img src={url} alt="" loading={i < 3 ? 'eager' : 'lazy'}
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
           </div>
@@ -340,6 +381,7 @@ function MobileSlider({ photos }: { photos: string[] }) {
           ))}
         </div>
       )}
+      {lightboxIdx !== null && <GalleryLightbox photos={photos} startIdx={lightboxIdx} onClose={() => setLightboxIdx(null)} />}
     </div>
   )
 }
@@ -427,6 +469,37 @@ export function Gallery({
   )
 }
 
+// ─── Gallery Lightbox (fullscreen overlay) ──────────────────────────────────
+function GalleryLightbox({ photos, startIdx, onClose }: { photos: string[]; startIdx: number; onClose: () => void }) {
+  const [idx, setIdx] = useState(startIdx)
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowRight') setIdx(i => (i + 1) % photos.length)
+      if (e.key === 'ArrowLeft') setIdx(i => (i - 1 + photos.length) % photos.length)
+    }
+    document.addEventListener('keydown', handleKey)
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', handleKey); document.body.style.overflow = '' }
+  }, [photos.length, onClose])
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}>
+      <img src={photos[idx]} alt="" style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 4 }} onClick={e => e.stopPropagation()} />
+      {photos.length > 1 && (
+        <>
+          <button onClick={e => { e.stopPropagation(); setIdx(i => (i - 1 + photos.length) % photos.length) }}
+            style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', fontSize: '1.5rem', width: 44, height: 44, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+          <button onClick={e => { e.stopPropagation(); setIdx(i => (i + 1) % photos.length) }}
+            style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', fontSize: '1.5rem', width: 44, height: 44, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+        </>
+      )}
+      <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', fontSize: '1.2rem', width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+      {photos.length > 1 && <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', color: 'rgba(255,255,255,.6)', fontSize: '.8rem' }}>{idx + 1} / {photos.length}</div>}
+    </div>
+  )
+}
+
 // ─── Gallery Mosaic — primera foto grande + grid asimétrico el resto ─────────
 export function GalleryMosaic({ photos }: { photos: string[]; primary?: string; dark?: boolean }) {
   const [isMobile, setIsMobile] = useState(false)
@@ -448,17 +521,32 @@ export function GalleryMosaic({ photos }: { photos: string[]; primary?: string; 
   const side = rest.slice(0, sideCount)
   const remainder = rest.slice(sideCount)
 
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
+  const allPhotos = [first, ...rest]
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 4, aspectRatio: '21/9' }}>
-        <div style={{ overflow: 'hidden' }}>
-          <img src={first} alt="" loading="eager"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+    <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 4, aspectRatio: '21/7' }}>
+          <div style={{ overflow: 'hidden', cursor: 'pointer' }} onClick={() => setLightboxIdx(0)}>
+            <img src={first} alt="" loading="eager"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          </div>
+          {side.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: side.length > 1 ? 'repeat(2, 1fr)' : '1fr', gridAutoRows: '1fr', gap: 4 }}>
+              {side.map((url, i) => (
+                <div key={i} style={{ overflow: 'hidden', cursor: 'pointer' }} onClick={() => setLightboxIdx(i + 1)}>
+                  <img src={url} alt="" loading="lazy"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        {side.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: side.length > 1 ? 'repeat(2, 1fr)' : '1fr', gridAutoRows: '1fr', gap: 4 }}>
-            {side.map((url, i) => (
-              <div key={i} style={{ overflow: 'hidden' }}>
+        {remainder.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(remainder.length, 4)}, 1fr)`, gap: 4 }}>
+            {remainder.slice(0, 4).map((url, i) => (
+              <div key={i} style={{ overflow: 'hidden', aspectRatio: '4/3', cursor: 'pointer' }} onClick={() => setLightboxIdx(sideCount + 1 + i)}>
                 <img src={url} alt="" loading="lazy"
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </div>
@@ -466,17 +554,8 @@ export function GalleryMosaic({ photos }: { photos: string[]; primary?: string; 
           </div>
         )}
       </div>
-      {remainder.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(remainder.length, 4)}, 1fr)`, gap: 4 }}>
-          {remainder.slice(0, 4).map((url, i) => (
-            <div key={i} style={{ overflow: 'hidden', aspectRatio: '4/3' }}>
-              <img src={url} alt="" loading="lazy"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+      {lightboxIdx !== null && <GalleryLightbox photos={allPhotos} startIdx={lightboxIdx} onClose={() => setLightboxIdx(null)} />}
+    </>
   )
 }
 
@@ -609,6 +688,7 @@ type TestimonialItem = {
   rating?: number
   wedding_date?: string
   date?: string
+  photo_url?: string
 }
 
 function fmtTestimonialDate(t: TestimonialItem): string {
@@ -724,6 +804,48 @@ export function TestimonialsCompact({ items, primary, dark = true }: { items: Te
           </div>
         )
       })}
+    </div>
+  )
+}
+
+export function TestimonialsFeatured({ items, primary, dark = true, font }: { items: TestimonialItem[]; primary: string; dark?: boolean; font?: string }) {
+  const [idx, setIdx] = useState(0)
+  if (!items.length) return null
+  const rgb = toRgb(primary)
+  const FONT = font || "'Cormorant Garamond', Georgia, serif"
+  const textColor = dark ? 'rgba(255,255,255,.85)' : '#3a342f'
+  const nameColor = dark ? '#fff' : '#181410'
+  const t = items[idx % items.length]
+  const name = t.couple_name || t.names || ''
+  const dateStr = fmtTestimonialDate(t)
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: t.photo_url ? '1fr 1fr' : '1fr', gap: 0, overflow: 'hidden', borderRadius: 8, background: dark ? 'rgba(255,255,255,.03)' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.08)'}` }}>
+      {t.photo_url && (
+        <div style={{ minHeight: 340 }}>
+          <img src={t.photo_url} alt={name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+        </div>
+      )}
+      <div style={{ padding: '48px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 20 }}>
+        <span aria-hidden style={{ fontFamily: FONT, fontSize: '5rem', lineHeight: .7, color: primary, opacity: .2 }}>"</span>
+        <p style={{ fontFamily: FONT, fontSize: 'clamp(1.1rem, 1.8vw, 1.4rem)', lineHeight: 1.7, fontStyle: 'italic', fontWeight: 300, color: textColor, margin: 0 }}>
+          {t.text}
+        </p>
+        <div>
+          <div style={{ width: 28, height: 2, background: primary, marginBottom: 14, borderRadius: 1 }} />
+          <div style={{ fontSize: '.95rem', fontWeight: 600, color: nameColor }}>{name}</div>
+          {dateStr && <div style={{ fontSize: '.72rem', color: primary, fontWeight: 500, letterSpacing: '.1em', textTransform: 'uppercase', marginTop: 4 }}>{dateStr}</div>}
+          <div style={{ marginTop: 10 }}><StarRating rating={t.rating ?? 5} size={14} color="#F5A623" /></div>
+        </div>
+        {items.length > 1 && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            {items.map((_, i) => (
+              <button key={i} onClick={() => setIdx(i)}
+                style={{ width: 10, height: 10, borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === idx ? primary : `rgba(${rgb},.25)`, transition: 'background .2s' }} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -1071,7 +1193,7 @@ export function extractData(data: ProposalData) {
                       ? so.testimonials_override
                       : (sec.testimonials && sec.testimonials.length ? sec.testimonials : (vc.testimonials ?? [])),
     techspecs:      vc.techspecs,
-    accom:          (so.accommodation && Object.keys(so.accommodation).length > 0) ? so.accommodation : vc.accommodation_info,
+    accom:          ((so as any).accommodation_override && Object.keys((so as any).accommodation_override).length > 0) ? (so as any).accommodation_override : (so.accommodation && Object.keys(so.accommodation).length > 0) ? so.accommodation : vc.accommodation_info,
     mapVC:          vc.map_info,
     budgetSim:      vc.budget_simulator,
     spaceGroups:    (so.space_groups ?? null) as import('@/lib/proposal-types').SpaceGroup[] | null,
@@ -1112,7 +1234,7 @@ export function TplWelcomeLight({
   font?: string
 }) {
   return (
-    <section id="sec-welcome" style={{ position: 'relative', padding: '120px 32px', background: bg, overflow: 'hidden' }}>
+    <section id="sec-welcome" style={{ position: 'relative', padding: '72px 32px', background: bg, overflow: 'hidden' }}>
       {imageUrl && (
         <img src={imageUrl} alt="" loading="lazy"
           onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
@@ -1151,7 +1273,7 @@ export function TplWelcomeSplit({
     <section id="sec-welcome" style={{ background: bg }}>
       <div style={{
         display: 'grid', gridTemplateColumns: imageUrl ? '1fr 1fr' : '1fr',
-        minHeight: 480,
+        minHeight: 360,
       }}>
         {imageUrl && !right && (
           <div style={{ background: '#000' }}>

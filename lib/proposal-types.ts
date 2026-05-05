@@ -142,18 +142,32 @@ export type VenueSpace = {
   description?: string
   capacity_min?: number
   capacity_max?: number
-  price?: string
+  price?: string          // legacy flat price
   photo_url?: string
+  // Supplement pricing
+  supplement_mode?: 'none' | 'flat' | 'seasonal'
+  supplement_flat?: string
+  supplement_prices?: string[][]  // [seasonIdx][tierIdx] — same grid shape as group base_prices
+}
+
+export type PricingSeason = {
+  label: string
+  date_from?: string
+  date_to?: string
 }
 
 export type VenueSpaceGroup = {
   id: string
   name: string
   selection_mode: 'pick_one' | 'pick_n' | 'optional'
-  pick_n_min?: number   // minimum selections (pick_n mode)
-  pick_n_max?: number   // maximum selections (pick_n mode)
+  pick_n_min?: number
+  pick_n_max?: number
   pricing_mode?: 'group_base' | 'per_space'  // default: per_space
-  base_price?: string  // when pricing_mode === 'group_base'
+  base_price?: string  // legacy flat base price
+  // Seasonal pricing grid
+  day_tiers?: string[]              // columns: ["Viernes", "Sábados y festivos", "Domingo"]
+  seasons?: PricingSeason[]         // rows: season definitions
+  base_prices?: string[][]          // [seasonIdx][tierIdx] = price
   spaces: VenueSpace[]
 }
 

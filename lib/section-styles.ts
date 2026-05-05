@@ -73,9 +73,10 @@ export const SECTION_STYLES: Record<string, SectionStyleConfig> = {
     sectionId: 'testimonials',
     defaultVariant: 'cards',
     variants: [
-      { id: 'cards',   label: 'Tarjetas', description: 'Cards en grid con cita destacada y estrellas' },
-      { id: 'quotes',  label: 'Citas',    description: 'Citas tipográficas grandes separadas por divisores' },
-      { id: 'compact', label: 'Compacto', description: 'Lista con avatar de iniciales y texto corto' },
+      { id: 'cards',    label: 'Tarjetas',  description: 'Cards en grid con cita destacada y estrellas' },
+      { id: 'quotes',   label: 'Citas',     description: 'Citas tipográficas grandes separadas por divisores' },
+      { id: 'compact',  label: 'Compacto',  description: 'Lista con avatar de iniciales y texto corto' },
+      { id: 'featured', label: 'Destacado', description: 'Un testimonio grande con foto, texto y navegación' },
     ],
   },
   faq: {

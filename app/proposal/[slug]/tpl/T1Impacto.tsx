@@ -5,7 +5,7 @@
 //            → Qué incluye → Testimoniales → Colaboradores → Extras → FAQ → CTA
 
 import { useEffect, useRef, useState } from 'react'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, StarRating, resolveContact, type ProposalData } from './shared'
+import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, TestimonialsFeatured, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, StarRating, resolveContact, type ProposalData } from './shared'
 import InquiryForm from '@/components/InquiryForm'
 import VisitBookingModal from '@/components/VisitBookingModal'
 import { buildSingleFontUrl } from '@/lib/fonts'
@@ -13,6 +13,33 @@ import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 import DateSelector from './DateSelector'
 import { getActiveStyle, isSectionGroupEnabled } from '@/lib/section-styles'
+
+function ZoneSlider({ photos, name }: { photos: string[]; name: string }) {
+  const [idx, setIdx] = useState(0)
+  if (photos.length === 1) {
+    return <img src={photos[0]} alt={name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+  }
+  return (
+    <>
+      <img src={photos[idx]} alt={name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'opacity .4s' }}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+      <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6, zIndex: 2 }}>
+        {photos.map((_, i) => (
+          <button key={i} onClick={() => setIdx(i)} style={{ width: 8, height: 8, borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === idx ? '#fff' : 'rgba(255,255,255,.4)', transition: 'background .2s' }} />
+        ))}
+      </div>
+      {photos.length > 1 && (
+        <>
+          <button onClick={() => setIdx(i => (i - 1 + photos.length) % photos.length)}
+            style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,.4)', border: 'none', color: '#fff', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+          <button onClick={() => setIdx(i => (i + 1) % photos.length)}
+            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,.4)', border: 'none', color: '#fff', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+        </>
+      )}
+    </>
+  )
+}
 
 function EmptySec({ label }: { label: string }) {
   return (
@@ -176,7 +203,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-hero{position:relative;height:100svh;min-height:620px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;background:radial-gradient(circle at 30% 40%,rgba(${rgb},.35),${pal.heroFade} 65%)}
     .t1-hero-img{position:absolute;inset:0;width:100%;height:120%;object-fit:cover;object-position:center 20%;transform-origin:center top}
     .t1-hero-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.15) 0%,rgba(0,0,0,.0) 30%,rgba(0,0,0,.7) 72%,rgba(0,0,0,.98) 100%)}
-    @keyframes zoom{from{transform:scale(1.06) translateY(0)}to{transform:scale(1.0) translateY(0)}}
+    @keyframes zoom{from{transform:scale(1.0) translateY(0)}to{transform:scale(1.0) translateY(0)}}
     @keyframes hf{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
     .ha{animation:hf .9s ease both}
 
@@ -468,7 +495,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           )}
           {on('schedule_visit') ? (
             <button style={{ background: 'rgba(255,255,255,.1)', color: '#fff', border: '1px solid rgba(255,255,255,.2)', padding: '9px 20px', fontSize: '.72rem', fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
-              onClick={() => document.getElementById('sec-schedule')?.scrollIntoView({ behavior: 'smooth' })}>
+              onClick={() => { document.getElementById('sec-schedule')?.scrollIntoView({ behavior: 'smooth' }); setVisitModalOpen(true) }}>
               Agendar visita →
             </button>
           ) : (hasCatering || contactOn) ? (
@@ -487,7 +514,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         {hero && (
           <>
             <img ref={heroRef} src={hero} alt="" className="t1-hero-img"
-              style={{ animation: 'zoom 14s ease both' }}
+              style={{}}
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
             <div className="t1-hero-overlay" />
           </>
@@ -542,12 +569,15 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ── STATS BAR ── */}
       {on('venue_specs') && (() => {
         const vs = (sec as any).venue_specs ?? {}
-        const items = [
-          { n: vs.founded_year ?? '1687',                                                l: 'Año de fundación' },
-          { n: vs.area ?? techspecs?.sqm?.split('·')[0]?.trim() ?? '8 Ha',               l: 'Extensión' },
-          { n: vs.max_capacity ?? '350',                                                  l: 'Capacidad máxima' },
-          { n: vs.extra_value ?? '1',                                                     l: vs.extra_label ?? 'Sola boda al día' },
-        ].filter(s => s.n !== '' && s.n != null)
+        // New format: stats array; fallback: legacy fields
+        const items: Array<{ n: string; l: string }> = Array.isArray(vs.stats) && vs.stats.length > 0
+          ? vs.stats.filter((s: any) => s.value).map((s: any) => ({ n: s.value, l: s.label }))
+          : [
+              { n: vs.founded_year ?? '',                                                    l: 'Año de fundación' },
+              { n: vs.area ?? techspecs?.sqm?.split('·')[0]?.trim() ?? '',                   l: 'Extensión' },
+              { n: vs.max_capacity ?? '',                                                    l: 'Capacidad máxima' },
+              { n: vs.extra_value ?? '',                                                     l: vs.extra_label ?? 'Sola boda al día' },
+            ].filter(s => s.n !== '' && s.n != null)
         if (!items.length) return null
         return (
           <div className="t1-stats">
@@ -653,9 +683,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 <p className="t1-story-body">{expShow.body}</p>
               </div>
             </FadeUp>
-            {((sec as any).experience_override?.image_url ?? sec.gallery_urls?.[0] ?? photos[1]) && (
+            {((sec as any).experience_override?.image_url ?? photos[1]) && (
               <div className="t1-story-img">
-                <img src={(sec as any).experience_override?.image_url ?? sec.gallery_urls?.[0] ?? photos[1]} alt="El espacio" loading="lazy"
+                <img src={(sec as any).experience_override?.image_url ?? photos[1]} alt="El espacio" loading="lazy"
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '40px 32px 28px', background: 'linear-gradient(to top, rgba(0,0,0,.8), transparent)' }}>
                   <div style={{ fontFamily: FONT, fontSize: '.85rem', fontStyle: 'italic', color: 'rgba(255,255,255,.6)' }}>{venue?.name} · {venue?.city}, {venue?.region}</div>
@@ -742,7 +772,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           </div>
           <div className="t1-zones">
             {zonesShow.map((z: any, i: number) => {
-              const zPhoto = z.photos?.[0] || photos[i + 2]
+              const zPhotos: string[] = z.photos?.length ? z.photos : (photos[i + 2] ? [photos[i + 2]] : [])
               const caps = formatZoneCapacities(z)
               const feats = formatZoneFeatures(z)
               const reverse = i % 2 === 1
@@ -750,9 +780,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 <FadeIn key={i} delay={0.05}>
                   <div className={`t1-zone${reverse ? ' t1-zone-reverse' : ''}`}>
                     <div className="t1-zone-img">
-                      {zPhoto
-                        ? <img src={zPhoto} alt={z.name} loading="lazy"
-                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                      {zPhotos.length > 0
+                        ? <ZoneSlider photos={zPhotos} name={z.name} />
                         : <div className="t1-zone-ph"><IcoBuilding width={48} height={48} style={{ opacity: .3, color: pal.text }} /></div>
                       }
                     </div>
@@ -918,11 +947,49 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       ) : _preview ? <EmptySec label="Menú" /> : null)}
 
       {/* ════════════════════════════════════════════
+          COLABORADORES (siempre tras menú)
+      ════════════════════════════════════════════ */}
+      {on('collaborators') && (collabsShow.length > 0 ? (() => {
+        const cm = (sec as any).collaborators_meta ?? {}
+        return (
+          <section className="t1-sec">
+            <div className="w">
+              <FadeUp>
+                <span className="t1-label">{cm.eyebrow || 'Proveedores de confianza'}</span>
+                <h2 className="t1-h2">{cm.title || 'Nuestros colaboradores'}</h2>
+                <p style={{ fontSize: '.9rem', color: fg(.5), lineHeight: 1.8, maxWidth: 560, marginBottom: 48, marginTop: -32 }}>
+                  {cm.subtitle || 'Trabajamos sin exclusividad, pero os recomendamos a quienes conocemos y en quienes confiamos.'}
+                </p>
+              </FadeUp>
+            </div>
+            <div className="t1-collabs-grid">
+              {collabsShow.map((c: any, i: number) => (
+                <FadeUp key={i} delay={(i % 4) * .05}>
+                  <div className="t1-collab">
+                    <div className="t1-collab-cat">{c.category}</div>
+                    <div className="t1-collab-name">{c.name}</div>
+                    {c.description && <div className="t1-collab-desc">{c.description}</div>}
+                    {(c.website || c.instagram || c.email) && (
+                      <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+                        {c.website && <a href={c.website.startsWith('http') ? c.website : `https://${c.website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.72rem', color: primary, textDecoration: 'none' }}>Web ↗</a>}
+                        {c.instagram && <a href={`https://instagram.com/${c.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.72rem', color: primary, textDecoration: 'none' }}>@{c.instagram.replace('@', '')}</a>}
+                        {c.email && <a href={`mailto:${c.email}`} style={{ fontSize: '.72rem', color: primary, textDecoration: 'none' }}>{c.email}</a>}
+                      </div>
+                    )}
+                  </div>
+                </FadeUp>
+              ))}
+            </div>
+          </section>
+        )
+      })() : _preview ? <EmptySec label="Colaboradores" /> : null)}
+
+      {/* ════════════════════════════════════════════
           TESTIMONIALES
       ════════════════════════════════════════════ */}
       {on('testimonials') && (testsShow.length > 0 ? (() => {
         const testimonialsStyle = getActiveStyle(sec, 'testimonials')
-        const TestimonialsComp = testimonialsStyle === 'quotes' ? TestimonialsQuotes : testimonialsStyle === 'compact' ? TestimonialsCompact : TestimonialsCards
+        const TestimonialsComp = testimonialsStyle === 'featured' ? TestimonialsFeatured : testimonialsStyle === 'quotes' ? TestimonialsQuotes : testimonialsStyle === 'compact' ? TestimonialsCompact : TestimonialsCards
         return (
           <section className="t1-sec" style={{ background: lightMode ? pal.surface : '#050505' }}>
             <div className="w">
@@ -939,34 +1006,6 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       })() : _preview ? <EmptySec label="Testimoniales" /> : null)}
 
       {/* ════════════════════════════════════════════
-          COLABORADORES
-      ════════════════════════════════════════════ */}
-      {on('collaborators') && (collabsShow.length > 0 ? (
-        <section className="t1-sec">
-          <div className="w">
-            <FadeUp>
-              <span className="t1-label">Proveedores de confianza</span>
-              <h2 className="t1-h2">Nuestros colaboradores</h2>
-              <p style={{ fontSize: '.9rem', color: fg(.5), lineHeight: 1.8, maxWidth: 560, marginBottom: 48, marginTop: -32 }}>
-                Trabajamos sin exclusividad, pero os recomendamos a quienes conocemos y en quienes confiamos.
-              </p>
-            </FadeUp>
-          </div>
-          <div className="t1-collabs-grid">
-            {collabsShow.map((c: any, i: number) => (
-              <FadeUp key={i} delay={(i % 4) * .05}>
-                <div className="t1-collab">
-                  <div className="t1-collab-cat">{c.category}</div>
-                  <div className="t1-collab-name">{c.name}</div>
-                  {c.description && <div className="t1-collab-desc">{c.description}</div>}
-                </div>
-              </FadeUp>
-            ))}
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="Colaboradores" /> : null)}
-
-      {/* ════════════════════════════════════════════
           ALOJAMIENTO
       ════════════════════════════════════════════ */}
       {on('accommodation') && accom && (
@@ -980,10 +1019,10 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               <FadeUp>
                 <div>
                   <p style={{ fontSize: '.95rem', color: fg(.6), lineHeight: 1.85, marginBottom: 24 }}>{accom.description}</p>
-                  {accom.rooms && (
+                  {(Array.isArray(accom.rooms_list) ? accom.rooms_list : accom.rooms ? accom.rooms.split('·') : []).filter(Boolean).length > 0 && (
                     <div className="t1-accom-rooms-list">
-                      {accom.rooms.split('·').map((r: string, i: number) => (
-                        <div key={i} className="t1-accom-room">{r.trim()}</div>
+                      {(Array.isArray(accom.rooms_list) ? accom.rooms_list : accom.rooms.split('·')).filter(Boolean).map((r: string, i: number) => (
+                        <div key={i} className="t1-accom-room">{typeof r === 'string' ? r.trim() : r}</div>
                       ))}
                     </div>
                   )}
@@ -1253,7 +1292,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       )}
 
       {/* ── FLOATING WHATSAPP ── */}
-      {contactOn && <FloatingWhatsApp phone={contact.phone} coupleName={couple_name} primary={primary} onPrimary={onPri} />}
+      {/* Floating WhatsApp — independent toggle */}
+      {on('floating_contact') && contact.phone && <FloatingWhatsApp phone={contact.phone} coupleName={couple_name} primary={primary} onPrimary={onPri} />}
 
       {/* ── FOOTER ── */}
       <footer className="t1-footer">

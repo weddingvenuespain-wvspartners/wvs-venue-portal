@@ -11,7 +11,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const body = await req.json()
-    const { date_from, date_to, price, notes, day_from, day_to, price_per_person, zone_prices, supplement_prices } = body
+    const { date_from, date_to, price, notes, day_from, day_to, price_per_person, zone_prices, supplement_prices, group_prices } = body
 
     if (date_from && date_to && date_to < date_from)
       return NextResponse.json({ error: 'La fecha de fin debe ser posterior a la de inicio' }, { status: 400 })
@@ -26,6 +26,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (price_per_person   !== undefined) update.price_per_person   = price_per_person != null ? parseFloat(price_per_person) : null
     if (zone_prices        !== undefined) update.zone_prices        = zone_prices
     if (supplement_prices  !== undefined) update.supplement_prices  = supplement_prices
+    if (group_prices       !== undefined) update.group_prices       = group_prices
 
     if (Object.keys(update).length === 0)
       return NextResponse.json({ error: 'Nada que actualizar' }, { status: 400 })

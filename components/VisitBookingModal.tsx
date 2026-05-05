@@ -29,7 +29,8 @@ export default function VisitBookingModal({
 }: Props) {
   const [slots, setSlots] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
-  const [step, setStep] = useState<'calendar' | 'time' | 'confirm'>('calendar')
+  const [step, setStep] = useState<'type' | 'calendar' | 'time' | 'confirm'>('type')
+  const [visitType, setVisitType] = useState<'presencial' | 'online' | null>(null)
   const [viewYear, setViewYear] = useState(new Date().getFullYear())
   const [viewMonth, setViewMonth] = useState(new Date().getMonth())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -77,6 +78,7 @@ export default function VisitBookingModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: selectedDate, time: selectedTime,
+          visit_type: visitType || 'presencial',
           message: message || null,
           couple_email: email.trim(),
           selected_spaces: selectedSpaces,
@@ -106,14 +108,15 @@ export default function VisitBookingModal({
         {/* Header */}
         <div style={{ padding: '20px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            {step !== 'calendar' && (
-              <button onClick={() => setStep(step === 'confirm' ? 'time' : 'calendar')}
+            {step !== 'type' && (
+              <button onClick={() => setStep(step === 'confirm' ? 'time' : step === 'time' ? 'calendar' : 'type')}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.5)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '0 0 8px' }}>
                 <ChevronLeft size={14} /> Atrás
               </button>
             )}
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: primaryColor }}>Solicitar visita</div>
             <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginTop: 2 }}>
+              {step === 'type' && '¿Cómo preferís la visita?'}
               {step === 'calendar' && 'Elige un día'}
               {step === 'time' && selectedDate && dateLabel(selectedDate)}
               {step === 'confirm' && 'Confirmar visita'}
@@ -136,6 +139,40 @@ export default function VisitBookingModal({
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,.4)', fontSize: 14 }}>
               No hay disponibilidad configurada.<br />
               <span style={{ fontSize: 12, marginTop: 4, display: 'block' }}>Contacta directamente con el venue.</span>
+            </div>
+          )}
+
+          {/* ── STEP: VISIT TYPE ── */}
+          {!loading && step === 'type' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button type="button" onClick={() => { setVisitType('presencial'); setStep('calendar') }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14, padding: '18px 20px', borderRadius: 12,
+                  border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)',
+                  color: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
+                }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: `${primaryColor}22`, border: `1px solid ${primaryColor}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={primaryColor} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>Visita presencial</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,.45)', marginTop: 2 }}>Ven a conocer el espacio en persona</div>
+                </div>
+              </button>
+              <button type="button" onClick={() => { setVisitType('online'); setStep('calendar') }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14, padding: '18px 20px', borderRadius: 12,
+                  border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)',
+                  color: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
+                }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: `${primaryColor}22`, border: `1px solid ${primaryColor}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={primaryColor} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M15.6 11.6a4 4 0 10-7.2 0"/><circle cx="12" cy="12" r="2"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/></svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>Videollamada</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,.45)', marginTop: 2 }}>Os enseñamos el venue por video</div>
+                </div>
+              </button>
             </div>
           )}
 
@@ -222,6 +259,10 @@ export default function VisitBookingModal({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Summary */}
               <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Tipo de visita</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{visitType === 'online' ? '📹 Videollamada' : '🏠 Presencial'}</div>
+                </div>
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Fecha y hora</div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>{dateLabel(selectedDate)} · {selectedTime}h</div>

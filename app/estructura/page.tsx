@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import DatePicker, { fmtDate } from '@/components/DatePicker'
-import type { VisitAvailability, DaySchedule, BlockedDate } from '@/lib/proposal-types'
+import type { VisitAvailability, DaySchedule, BlockedDate, VenueSpaceGroup, VenueSpace, PricingSeason } from '@/lib/proposal-types'
 
 // ── Duration types ─────────────────────────────────────────────────────────────
 
@@ -54,12 +54,15 @@ type SupplementItem = { id: string; name: string }
 type ZonePrice       = { zone_id: string; price: number }
 type SupplementPrice = { supplement_id: string; price: number }
 
+type GroupPrice = { group_id: string; base_price: number; space_supplements?: { space_id: string; price: number }[] }
+
 type ModalityPrice = {
   id: string; modality_id: string; package_id: string | null
   date_from: string; date_to: string; price: number; notes: string | null
   price_per_person?: number | null
   zone_prices?: ZonePrice[] | null
   supplement_prices?: SupplementPrice[] | null
+  group_prices?: GroupPrice[] | null
 }
 
 type ModalityPackage = {
@@ -132,6 +135,8 @@ const emptyPriceForm = {
   price_per_person: '',
   zone_prices: {} as Record<string, string>,
   supplement_prices: {} as Record<string, string>,
+  group_prices: {} as Record<string, string>,              // group_id → base_price
+  space_supplement_prices: {} as Record<string, string>,   // space_id → supplement
 }
 
 // ── Price helpers ──────────────────────────────────────────────────────────────
@@ -146,6 +151,19 @@ function buildPricePayload(form: typeof emptyPriceForm, cfg: CommercialConfig | 
     base.zone_prices = Object.entries(form.zone_prices)
       .filter(([, v]) => v !== '')
       .map(([zone_id, price]) => ({ zone_id, price: parseFloat(price) }))
+    // Group-based pricing
+    const gp = Object.entries(form.group_prices).filter(([, v]) => v !== '')
+    const sp = Object.entries(form.space_supplement_prices).filter(([, v]) => v !== '')
+    if (gp.length > 0) {
+      base.group_prices = gp.map(([group_id, price]) => {
+        const groupSupps = sp.filter(([sid]) => sid.startsWith(group_id + ':'))
+        return {
+          group_id,
+          base_price: parseFloat(price),
+          space_supplements: groupSupps.map(([sid, p]) => ({ space_id: sid.split(':')[1], price: parseFloat(p) })),
+        }
+      })
+    }
   } else {
     base.price = parseFloat(form.price) || 0
     if (model === 'per_person' || model === 'package') {
@@ -161,6 +179,14 @@ function buildPricePayload(form: typeof emptyPriceForm, cfg: CommercialConfig | 
 }
 
 function initPriceForm(p: ModalityPrice): typeof emptyPriceForm {
+  const groupPrices: Record<string, string> = {}
+  const spaceSupps: Record<string, string> = {}
+  ;(p.group_prices ?? []).forEach(gp => {
+    groupPrices[gp.group_id] = String(gp.base_price)
+    ;(gp.space_supplements ?? []).forEach(ss => {
+      spaceSupps[`${gp.group_id}:${ss.space_id}`] = String(ss.price)
+    })
+  })
   return {
     date_from: p.date_from,
     date_to:   p.date_to,
@@ -169,6 +195,8 @@ function initPriceForm(p: ModalityPrice): typeof emptyPriceForm {
     price_per_person: p.price_per_person != null ? String(p.price_per_person) : '',
     zone_prices: Object.fromEntries((p.zone_prices ?? []).map(z => [z.zone_id, String(z.price)])),
     supplement_prices: Object.fromEntries((p.supplement_prices ?? []).map(s => [s.supplement_id, String(s.price)])),
+    group_prices: groupPrices,
+    space_supplement_prices: spaceSupps,
   }
 }
 
@@ -319,12 +347,14 @@ export default function EstructuraPage() {
   const [wizardConfig, setWizardConfig]           = useState<WizardConfig>({})
   const [configSaving, setConfigSaving]           = useState(false)
 
-  // Zones & supplements
+  // Zones, supplements & space groups
   const [zones, setZones]                   = useState<ZoneItem[]>([])
   const [supplements, setSupplements]       = useState<SupplementItem[]>([])
   const [newZoneName, setNewZoneName]       = useState('')
   const [newSuppName, setNewSuppName]       = useState('')
   const [savingZS, setSavingZS]             = useState(false)
+  const [spaceGroups, setSpaceGroups]       = useState<VenueSpaceGroup[]>([])
+  const [savingSG, setSavingSG]             = useState(false)
 
   // Visit availability
   const DEFAULT_SCHEDULE: DaySchedule[] = [0,1,2,3,4].map(day => ({ day, enabled: true, from: '10:00', to: '19:00' }))
@@ -409,7 +439,7 @@ export default function EstructuraPage() {
     const supabase = createClient()
     const [res, { data: settingsRow }] = await Promise.all([
       fetch(`/api/estructura/modalities?venue_id=${activeVenue.id}`),
-      supabase.from('venue_settings').select('commercial_config, zones, supplements, visit_availability').eq('user_id', user!.id).eq('venue_id', activeVenue.id).maybeSingle(),
+      supabase.from('venue_settings').select('commercial_config, zones, supplements, space_groups, visit_availability').eq('user_id', user!.id).eq('venue_id', activeVenue.id).maybeSingle(),
     ])
     const json = await res.json()
     if (!res.ok) { setError(json.error ?? 'Error al cargar'); setLoading(false); return }
@@ -426,6 +456,9 @@ export default function EstructuraPage() {
     if (settingsRow?.commercial_config) setCommercialConfig(settingsRow.commercial_config as CommercialConfig)
     if (settingsRow?.zones)        setZones(settingsRow.zones as ZoneItem[])
     if (settingsRow?.supplements)  setSupplements(settingsRow.supplements as SupplementItem[])
+    if (Array.isArray(settingsRow?.space_groups)) {
+      setSpaceGroups(settingsRow.space_groups as VenueSpaceGroup[])
+    }
     if (settingsRow?.visit_availability) {
       const va = settingsRow.visit_availability as VisitAvailability & { blocked_dates?: Array<BlockedDate | string> }
       // Migrate legacy string[] blocked_dates → BlockedDate[]
@@ -463,6 +496,12 @@ export default function EstructuraPage() {
     setSavingZS(true)
     await saveSettings({ zones: newZones, supplements: newSupps })
     setSavingZS(false)
+  }
+
+  const saveSpaceGroups = async (groups: VenueSpaceGroup[]) => {
+    setSavingSG(true)
+    await saveSettings({ space_groups: groups })
+    setSavingSG(false)
   }
 
   const saveVisitAvail = async (va: VisitAvailability) => {
@@ -640,8 +679,12 @@ export default function EstructuraPage() {
     if (!priceAdding) return
     if (!priceForm.date_from || !priceForm.date_to) { setPriceError('Las fechas son obligatorias'); return }
     const isMulti = commercialConfig?.space_type === 'multiple_independent'
-    const needsPrice = !isMulti || Object.keys(priceForm.zone_prices).length === 0
     if (!isMulti && !priceForm.price) { setPriceError('El precio es obligatorio'); return }
+    if (isMulti) {
+      const filledZones = Object.values(priceForm.zone_prices).filter(v => v !== '' && v !== '0')
+      const filledGroups = Object.values(priceForm.group_prices).filter(v => v !== '' && v !== '0')
+      if (filledZones.length === 0 && filledGroups.length === 0) { setPriceError('Indica el precio de al menos una zona o grupo'); return }
+    }
     setPriceSaving(true); setPriceError('')
     try {
       const { modalityId, packageId } = priceAdding
@@ -681,6 +724,11 @@ export default function EstructuraPage() {
     if (!editPriceForm.date_from || !editPriceForm.date_to) { setPriceError('Las fechas son obligatorias'); return }
     const isMulti = commercialConfig?.space_type === 'multiple_independent'
     if (!isMulti && !editPriceForm.price) { setPriceError('El precio es obligatorio'); return }
+    if (isMulti) {
+      const filledZones = Object.values(editPriceForm.zone_prices).filter(v => v !== '' && v !== '0')
+      const filledGroups = Object.values(editPriceForm.group_prices).filter(v => v !== '' && v !== '0')
+      if (filledZones.length === 0 && filledGroups.length === 0) { setPriceError('Indica el precio de al menos una zona o grupo'); return }
+    }
     setPriceSaving(true); setPriceError('')
     try {
       const body = buildPricePayload(editPriceForm, commercialConfig)
@@ -841,6 +889,76 @@ export default function EstructuraPage() {
                 </button>
               </div>
               {zones.length === 0 && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 8 }}>Define las zonas para poder asignar precios por separado en cada modalidad.</div>}
+            </div>
+          )}
+
+          {/* Space groups panel — only for multiple_independent with zones */}
+          {commercialConfig?.space_type === 'multiple_independent' && zones.length >= 2 && (
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, maxWidth: 860 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Layers size={14} style={{ color: '#2563EB' }} /> Grupos de espacios
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 12 }}>
+                Agrupa las zonas para que la pareja pueda elegir. Cada grupo tendrá su propio precio en las tarifas.
+              </div>
+
+              {spaceGroups.map((g, gi) => {
+                const updateGroup = (patch: Partial<VenueSpaceGroup>) => {
+                  const next = [...spaceGroups]; next[gi] = { ...g, ...patch }; setSpaceGroups(next)
+                }
+                return (
+                <div key={g.id} style={{ border: '1px solid var(--ivory)', borderRadius: 8, padding: '12px 14px', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                    <input className="form-input" placeholder="Nombre del grupo (ej: Boda completa)" value={g.name}
+                      onChange={e => updateGroup({ name: e.target.value })}
+                      style={{ fontSize: 12, flex: 1 }} />
+                    <select className="form-input" value={g.selection_mode} style={{ fontSize: 11, width: 130 }}
+                      onChange={e => updateGroup({ selection_mode: e.target.value as any })}>
+                      <option value="pick_one">Elegir 1</option>
+                      <option value="optional">Opcional</option>
+                    </select>
+                    <button type="button" onClick={() => { const next = spaceGroups.filter((_, j) => j !== gi); setSpaceGroups(next); saveSpaceGroups(next) }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 2, display: 'flex' }}><X size={14} /></button>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {zones.map(z => {
+                      const checked = g.spaces.some(s => s.id === z.id)
+                      return (
+                        <label key={z.id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', padding: '3px 8px', borderRadius: 6, background: checked ? '#DBEAFE' : '#f5f5f5', border: `1px solid ${checked ? '#93C5FD' : 'var(--ivory)'}`, color: checked ? '#1D4ED8' : 'var(--warm-gray)', fontWeight: checked ? 600 : 400 }}>
+                          <input type="checkbox" checked={checked} style={{ display: 'none' }}
+                            onChange={() => {
+                              const spaces = checked
+                                ? g.spaces.filter(s => s.id !== z.id)
+                                : [...g.spaces, { id: z.id, name: z.name }]
+                              updateGroup({ spaces })
+                            }} />
+                          {checked && <Check size={10} />} {z.name}
+                        </label>
+                      )
+                    })}
+                  </div>
+                  {g.spaces.length > 0 && (
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 6 }}>
+                      Los precios base y suplementos por espacio se configuran en las tarifas de cada modalidad.
+                    </div>
+                  )}
+                </div>
+                )
+              })}
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => {
+                  setSpaceGroups([...spaceGroups, { id: crypto.randomUUID(), name: '', selection_mode: 'pick_one', spaces: [] }])
+                }} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Plus size={12} /> Añadir grupo
+                </button>
+                {spaceGroups.length > 0 && (
+                  <button className="btn btn-primary btn-sm" onClick={() => saveSpaceGroups(spaceGroups)} disabled={savingSG}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {savingSG ? 'Guardando…' : <><Check size={12} /> Guardar grupos</>}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -1045,6 +1163,7 @@ export default function EstructuraPage() {
                                                 cfg={commercialConfig}
                                                 zones={zones}
                                                 supplements={supplements}
+                                                spaceGroups={spaceGroups}
                                               />
                                             ) : (
                                               <PriceRow
@@ -1053,6 +1172,7 @@ export default function EstructuraPage() {
                                                 cfg={commercialConfig}
                                                 zones={zones}
                                                 supplements={supplements}
+                                                spaceGroups={spaceGroups}
                                                 onEdit={() => startEditPrice(p)}
                                                 onDelete={() => deletePrice(m.id, pkg.id, p.id)}
                                               />
@@ -1082,6 +1202,7 @@ export default function EstructuraPage() {
                                           cfg={commercialConfig}
                                           zones={zones}
                                           supplements={supplements}
+                                          spaceGroups={spaceGroups}
                                         />
                                       </div>
                                     )}
@@ -1157,6 +1278,7 @@ export default function EstructuraPage() {
                                           cfg={commercialConfig}
                                           zones={zones}
                                           supplements={supplements}
+                                          spaceGroups={spaceGroups}
                                         />
                                       ) : (
                                         <PriceRow
@@ -1165,6 +1287,7 @@ export default function EstructuraPage() {
                                           cfg={commercialConfig}
                                           zones={zones}
                                           supplements={supplements}
+                                          spaceGroups={spaceGroups}
                                           onEdit={() => startEditPrice(p)}
                                           onDelete={() => deletePrice(m.id, null, p.id)}
                                         />
@@ -1192,6 +1315,7 @@ export default function EstructuraPage() {
                                     cfg={commercialConfig}
                                     zones={zones}
                                     supplements={supplements}
+                                    spaceGroups={spaceGroups}
                                   />
                                 </div>
                               )}
@@ -1751,10 +1875,10 @@ export default function EstructuraPage() {
           if (q === 'space_type') return [
             { key: 'single',               icon: Building2, label: 'Un único espacio',                   sub: 'Solo un evento a la vez, sin posibilidad de reservar zonas adicionales',                          color: '#C4975A', bg: '#FDF8F0' },
             { key: 'single_with_supplements', icon: Layers, label: 'Espacio principal + zonas opcionales', sub: 'El cliente contrata el espacio base y puede añadir zonas extra con suplemento (jardín, terraza…)', color: '#7C3AED', bg: '#F5F3FF' },
-            { key: 'multiple_independent', icon: LayoutGrid, label: 'Varias zonas a elegir',              sub: 'El cliente escoge qué zona quiere. Cada zona es independiente y tiene su propio precio',           color: '#2563EB', bg: '#EFF6FF' },
+            { key: 'multiple_independent', icon: LayoutGrid, label: 'Varias zonas del venue',              sub: 'El cliente puede escoger una zona o combinar varias. Cada zona tiene su propio precio',            color: '#2563EB', bg: '#EFF6FF' },
           ] as { key: string; icon: any; label: string; sub: string; color: string; bg: string }[]
           if (q === 'price_model') return [
-            { key: 'rental',     icon: CreditCard, label: 'Alquiler del espacio', sub: 'Precio fijo por el espacio, sin importar el número de invitados', color: '#059669', bg: '#ECFDF5' },
+            { key: 'rental',     icon: CreditCard, label: 'Alquiler del espacio', sub: 'Precio fijo por el alquiler del espacio',                        color: '#059669', bg: '#ECFDF5' },
             { key: 'per_person', icon: Users,      label: 'Precio por persona',   sub: 'El total depende de cuántos asistentes hay',                     color: '#DC2626', bg: '#FEF2F2' },
             { key: 'package',    icon: Package,    label: 'Paquetes cerrados',    sub: 'Precio todo incluido (espacio + servicios) por persona o evento', color: '#C4975A', bg: '#FDF8F0' },
           ] as { key: string; icon: any; label: string; sub: string; color: string; bg: string }[]
@@ -1897,10 +2021,11 @@ export default function EstructuraPage() {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function PriceRow({ price, accent, cfg, zones, supplements, onEdit, onDelete }: {
+function PriceRow({ price, accent, cfg, zones, supplements, spaceGroups = [], onEdit, onDelete }: {
   price: ModalityPrice; accent: string
   cfg: CommercialConfig | null
   zones: ZoneItem[]; supplements: SupplementItem[]
+  spaceGroups?: VenueSpaceGroup[]
   onEdit: () => void; onDelete: () => void
 }) {
   const model = cfg?.price_model ?? 'rental'
@@ -1908,10 +2033,21 @@ function PriceRow({ price, accent, cfg, zones, supplements, onEdit, onDelete }: 
 
   const renderAmount = () => {
     if (space === 'multiple_independent') {
+      const gp = price.group_prices ?? []
       const zp = price.zone_prices ?? []
-      if (zp.length === 0) return <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin precios por zona</span>
+      if (gp.length === 0 && zp.length === 0) return <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin precios</span>
       return (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {gp.map(g => {
+            const grp = spaceGroups.find(sg => sg.id === g.group_id)
+            const suppCount = (g.space_supplements ?? []).filter(s => s.price > 0).length
+            return (
+              <span key={g.group_id} style={{ fontSize: 12, background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6, padding: '2px 8px', color: '#1D4ED8' }}>
+                {grp?.name ?? '?'}: <strong>{fmt(g.base_price)}</strong>
+                {suppCount > 0 && <span style={{ fontSize: 10, color: '#6B7280' }}> +{suppCount} supl.</span>}
+              </span>
+            )
+          })}
           {zp.map(z => {
             const zone = zones.find(zo => zo.id === z.zone_id)
             return zone ? (
@@ -1960,13 +2096,14 @@ function PriceRow({ price, accent, cfg, zones, supplements, onEdit, onDelete }: 
   )
 }
 
-function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, isEdit = false, cfg, zones, supplements }: {
+function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, isEdit = false, cfg, zones, supplements, spaceGroups = [] }: {
   form: typeof emptyPriceForm; onChange: (f: typeof emptyPriceForm) => void
   accent: string; saving: boolean; error: string
   onSave: () => void; onCancel: () => void
   isEdit?: boolean
   cfg: CommercialConfig | null
   zones: ZoneItem[]; supplements: SupplementItem[]
+  spaceGroups?: VenueSpaceGroup[]
 }) {
   const model = cfg?.price_model ?? 'rental'
   const space = cfg?.space_type  ?? 'single'
@@ -2014,9 +2151,44 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
           </div>
         </div>
       )}
-      {isMulti && zones.length === 0 && (
+      {isMulti && zones.length === 0 && spaceGroups.length === 0 && (
         <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>
           Define primero las zonas del venue para poder asignar precios por zona.
+        </div>
+      )}
+
+      {/* Group pricing — multiple_independent with groups defined */}
+      {isMulti && spaceGroups.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Precio base por grupo €</div>
+          {spaceGroups.map(grp => (
+            <div key={grp.id} style={{ border: '1px solid var(--ivory)', borderRadius: 8, padding: '10px 12px', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: grp.spaces.length > 0 ? 8 : 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#1D4ED8', flex: 1 }}>{grp.name || 'Grupo sin nombre'}</span>
+                <input type="number" className="form-input" placeholder="Precio base €"
+                  value={form.group_prices[grp.id] ?? ''}
+                  onChange={e => onChange({ ...form, group_prices: { ...form.group_prices, [grp.id]: e.target.value } })}
+                  style={{ fontSize: 12, width: 130 }} />
+              </div>
+              {/* Space supplements within this group */}
+              {grp.spaces.length > 0 && (
+                <div style={{ paddingLeft: 12, borderLeft: '2px solid #DBEAFE' }}>
+                  <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Suplemento por espacio</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6 }}>
+                    {grp.spaces.map(sp => (
+                      <div key={sp.id}>
+                        <div style={{ fontSize: 10, color: 'var(--charcoal)', marginBottom: 2 }}>{sp.name}</div>
+                        <input type="number" className="form-input" placeholder="+€ (0 = incluido)"
+                          value={form.space_supplement_prices[`${grp.id}:${sp.id}`] ?? ''}
+                          onChange={e => onChange({ ...form, space_supplement_prices: { ...form.space_supplement_prices, [`${grp.id}:${sp.id}`]: e.target.value } })}
+                          style={{ fontSize: 11 }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

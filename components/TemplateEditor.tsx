@@ -36,7 +36,7 @@ export const ALL_SECTION_IDS = [
   'single_space', 'zones', 'space_groups', 'venue_rental', 'inclusions', 'testimonials',
   'collaborators', 'accommodation', 'extra_services',
   'pricing',
-  'faq', 'schedule_visit', 'map', 'contact',
+  'faq', 'schedule_visit', 'map', 'contact', 'floating_contact',
 ] as const
 
 type SectionId = typeof ALL_SECTION_IDS[number]
@@ -66,6 +66,7 @@ const SECTION_LABELS: Record<SectionId, string> = {
   schedule_visit:    'Agendar visita / Hablemos',
   map:               'Mapa y ubicación',
   contact:           'Datos de contacto',
+  floating_contact:  'Botón flotante de contacto (WhatsApp)',
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -318,22 +319,47 @@ export default function TemplateEditor({
     if (secId === 'venue_specs') {
       const vs = (sections as any).venue_specs ?? {}
       const setVs = (patch: any) => { setSections((s: any) => ({ ...s, venue_specs: { ...((s as any).venue_specs ?? {}), ...patch } })); markDirty() }
+      const stats: Array<{ value: string; label: string }> = vs.stats ?? []
+      const setStats = (next: Array<{ value: string; label: string }>) => setVs({ stats: next })
+      const PRESETS = [
+        { value: '1687', label: 'Año fundación' },
+        { value: '8 Ha', label: 'Extensión' },
+        { value: '350', label: 'Capacidad máxima' },
+        { value: '1', label: 'Sola boda al día' },
+        { value: '12', label: 'Hectáreas de jardines' },
+        { value: '200', label: 'Plazas de parking' },
+        { value: '5', label: 'Espacios exteriores' },
+      ]
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-            <input className="form-input" style={{ fontSize: 12 }} placeholder="Año fundación (ej. 1687)"
-              value={vs.founded_year ?? ''} onChange={e => setVs({ founded_year: e.target.value })} />
-            <input className="form-input" style={{ fontSize: 12 }} placeholder="Extensión (ej. 8 Ha)"
-              value={vs.area ?? ''} onChange={e => setVs({ area: e.target.value })} />
-            <input className="form-input" style={{ fontSize: 12 }} placeholder="Capacidad máxima (ej. 350)"
-              value={vs.max_capacity ?? ''} onChange={e => setVs({ max_capacity: e.target.value })} />
-            <input className="form-input" style={{ fontSize: 12 }} placeholder="Valor extra (ej. 1)"
-              value={vs.extra_value ?? ''} onChange={e => setVs({ extra_value: e.target.value })} />
+          {stats.map((s, i) => (
+            <div key={i} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+              <input className="form-input" style={{ fontSize: 12, width: 80, flexShrink: 0 }} placeholder="Número"
+                value={s.value} onChange={e => setStats(stats.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
+              <input className="form-input" style={{ fontSize: 12, flex: 1 }} placeholder="Etiqueta"
+                value={s.label} onChange={e => setStats(stats.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
+              <button type="button" style={removeBtn} onClick={() => setStats(stats.filter((_, j) => j !== i))}><X size={12} /></button>
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button type="button" style={addBtn} onClick={() => setStats([...stats, { value: '', label: '' }])}>+ Añadir dato</button>
+            {stats.length === 0 && (
+              <button type="button" style={{ ...addBtn, color: 'var(--primary)' }} onClick={() => setStats(PRESETS.slice(0, 4))}>Usar presets</button>
+            )}
           </div>
-          <input className="form-input" style={{ fontSize: 12 }} placeholder="Etiqueta del valor extra (ej. Sola boda al día)"
-            value={vs.extra_label ?? ''} onChange={e => setVs({ extra_label: e.target.value })} />
+          {stats.length > 0 && (
+            <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 2 }}>
+              Presets rápidos:{' '}
+              {PRESETS.filter(p => !stats.some(s => s.label === p.label)).slice(0, 4).map((p, i) => (
+                <button key={i} type="button" onClick={() => setStats([...stats, p])}
+                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 4, fontSize: 10, padding: '2px 6px', cursor: 'pointer', marginRight: 4, color: 'var(--charcoal)' }}>
+                  {p.value} · {p.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.55 }}>
-            Estos datos aparecen en las plantillas que muestran estadísticas del venue (ej. T1Impacto). Deja un campo vacío para ocultarlo individualmente.
+            Estos datos aparecen como estadísticas en la propuesta. Máximo 4-5 elementos recomendados.
           </div>
         </div>
       )
@@ -487,7 +513,15 @@ export default function TemplateEditor({
             <input className="form-input" style={{ fontSize: 12 }} placeholder="m² (ej. 500)" value={ss.sqm ?? ''} onChange={e => setSs({ sqm: e.target.value })} />
             <input className="form-input" style={{ fontSize: 12 }} placeholder="Capacidad máx. (ej. 200)" value={ss.max_guests ?? ''} onChange={e => setSs({ max_guests: e.target.value })} />
           </div>
-          <input className="form-input" style={{ fontSize: 12 }} placeholder="URL imagen del espacio (opcional)" value={ss.image_url ?? ''} onChange={e => setSs({ image_url: e.target.value })} />
+          {ss.image_url ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <img src={ss.image_url} alt="" style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }} />
+              <span style={{ flex: 1, fontSize: 11, color: 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Imagen del espacio</span>
+              <button type="button" style={removeBtn} onClick={() => setSs({ image_url: '' })}><X size={12} /></button>
+            </div>
+          ) : (
+            <ImageUploader label="Subir imagen del espacio" height={80} onUpload={async (f) => { const url = await uploadImage(f, 'spaces'); if (url) setSs({ image_url: url }) }} />
+          )}
           <div>
             <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Características destacadas</div>
             {features.map((f, fi) => (
@@ -520,7 +554,19 @@ export default function TemplateEditor({
               <input className="form-input" style={{ fontSize: 12 }}
                 placeholder={commercialConfig?.space_type === 'single_with_supplements' ? 'Suplemento (ej. +500€)' : 'Precio (opcional)'}
                 value={z.price ?? ''} onChange={e => updateItem(overrideKey, i, 'price', e.target.value)} />
-              <ZonePhotoUpload zone={z} onUpload={async (file) => { const url = await uploadImage(file, 'zones'); if (url) updateItem(overrideKey, i, 'photos', [url]) }} onRemove={() => updateItem(overrideKey, i, 'photos', [])} />
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Fotos de la zona</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {(z.photos ?? []).map((url: string, pi: number) => (
+                    <div key={pi} style={{ position: 'relative', width: 56, height: 56 }}>
+                      <img src={url} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover' }} />
+                      <button type="button" onClick={() => { const next = [...(z.photos ?? [])]; next.splice(pi, 1); updateItem(overrideKey, i, 'photos', next) }}
+                        style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                    </div>
+                  ))}
+                  <ImageUploader label="+" height={48} onUpload={async (f) => { const url = await uploadImage(f, 'zones'); if (url) updateItem(overrideKey, i, 'photos', [...(z.photos ?? []), url]) }} />
+                </div>
+              </div>
             </div>
           </details>
         ))}
@@ -639,7 +685,7 @@ export default function TemplateEditor({
           {/* Style picker */}
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Estilo visual</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
               {testimonialsStyleConfig.variants.map(v => {
                 const sel = activeTestimonialsVariantId === v.id
                 return (
@@ -688,9 +734,21 @@ export default function TemplateEditor({
                     </div>
                   </div>
                   <textarea className="form-textarea" style={{ minHeight: 70, fontSize: 12 }} placeholder="Testimonio…" value={t.text ?? ''} onChange={e => updateItem(overrideKey, i, 'text', e.target.value)} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--warm-gray)' }}>
-                    Estrellas:
-                    <input className="form-input" type="number" min={1} max={5} style={{ width: 65, fontSize: 12 }} value={t.rating ?? 5} onChange={e => updateItem(overrideKey, i, 'rating', Number(e.target.value) || 5)} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--warm-gray)' }}>
+                      Estrellas:
+                      <input className="form-input" type="number" min={1} max={5} style={{ width: 65, fontSize: 12 }} value={t.rating ?? 5} onChange={e => updateItem(overrideKey, i, 'rating', Number(e.target.value) || 5)} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      {t.photo_url ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <img src={t.photo_url} alt="" style={{ width: 32, height: 32, borderRadius: 4, objectFit: 'cover' }} />
+                          <button type="button" style={removeBtn} onClick={() => updateItem(overrideKey, i, 'photo_url', '')}><X size={11} /></button>
+                        </div>
+                      ) : (
+                        <ImageUploader label="Foto" height={48} onUpload={async (f) => { const url = await uploadImage(f, 'testimonials'); if (url) updateItem(overrideKey, i, 'photo_url', url) }} />
+                      )}
+                    </div>
                   </div>
                 </div>
               </details>
@@ -701,31 +759,111 @@ export default function TemplateEditor({
       )
     }
 
-    if (secId === 'collaborators') return (
-      <div>
-        {getOverride(overrideKey).map((c: any, i: number) => (
-          <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 7, marginBottom: 7, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-              <input className="form-input" placeholder="Nombre *" style={{ fontSize: 12 }} value={c.name ?? ''} onChange={e => updateItem(overrideKey, i, 'name', e.target.value)} />
-              <input className="form-input" style={{ width: 130, flexShrink: 0, fontSize: 12 }} placeholder="Categoría" value={c.category ?? ''} onChange={e => updateItem(overrideKey, i, 'category', e.target.value)} />
-              <button type="button" style={removeBtn} onClick={() => removeItem(overrideKey, i)}><X size={12} /></button>
+    if (secId === 'collaborators') {
+      const collabMeta = (sections as any).collaborators_meta ?? {}
+      const setCollabMeta = (patch: any) => { setSections((s: any) => ({ ...s, collaborators_meta: { ...((s as any).collaborators_meta ?? {}), ...patch } })); markDirty() }
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input className="form-input" style={{ fontSize: 12 }} placeholder="Etiqueta superior (ej. Proveedores de confianza)" value={collabMeta.eyebrow ?? ''} onChange={e => setCollabMeta({ eyebrow: e.target.value })} />
+          <input className="form-input" style={{ fontSize: 12 }} placeholder="Título (ej. Nuestros colaboradores)" value={collabMeta.title ?? ''} onChange={e => setCollabMeta({ title: e.target.value })} />
+          <input className="form-input" style={{ fontSize: 12 }} placeholder="Subtítulo (ej. Trabajamos sin exclusividad…)" value={collabMeta.subtitle ?? ''} onChange={e => setCollabMeta({ subtitle: e.target.value })} />
+          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+          {getOverride(overrideKey).map((c: any, i: number) => (
+            <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 7, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                <input className="form-input" placeholder="Nombre *" style={{ fontSize: 12 }} value={c.name ?? ''} onChange={e => updateItem(overrideKey, i, 'name', e.target.value)} />
+                <input className="form-input" style={{ width: 130, flexShrink: 0, fontSize: 12 }} placeholder="Categoría" value={c.category ?? ''} onChange={e => updateItem(overrideKey, i, 'category', e.target.value)} />
+                <button type="button" style={removeBtn} onClick={() => removeItem(overrideKey, i)}><X size={12} /></button>
+              </div>
+              <input className="form-input" placeholder="Descripción" style={{ fontSize: 12 }} value={c.description ?? ''} onChange={e => updateItem(overrideKey, i, 'description', e.target.value)} />
+              <div style={{ display: 'flex', gap: 5 }}>
+                <input className="form-input" style={{ fontSize: 12 }} placeholder="Web (opcional)" value={c.website ?? ''} onChange={e => updateItem(overrideKey, i, 'website', e.target.value)} />
+                <input className="form-input" style={{ fontSize: 12, width: 130, flexShrink: 0 }} placeholder="@instagram" value={c.instagram ?? ''} onChange={e => updateItem(overrideKey, i, 'instagram', e.target.value)} />
+                <input className="form-input" style={{ fontSize: 12, width: 160, flexShrink: 0 }} placeholder="Email" value={c.email ?? ''} onChange={e => updateItem(overrideKey, i, 'email', e.target.value)} />
+              </div>
             </div>
-            <input className="form-input" placeholder="Descripción" style={{ fontSize: 12 }} value={c.description ?? ''} onChange={e => updateItem(overrideKey, i, 'description', e.target.value)} />
-          </div>
-        ))}
-        <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { name: '', category: '', description: '' })}>+ Añadir colaborador</button>
-      </div>
-    )
+          ))}
+          <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { name: '', category: '', description: '' })}>+ Añadir colaborador</button>
+        </div>
+      )
+    }
 
     if (secId === 'accommodation') {
       const acc: any = (sections as any).accommodation_override ?? {}
       const p = (patch: any) => { setSections(s => ({ ...s, accommodation_override: { ...((s as any).accommodation_override ?? {}), ...patch } } as any)); markDirty() }
+      const roomsList: string[] = Array.isArray(acc.rooms_list) ? acc.rooms_list : (acc.rooms ? acc.rooms.split('·').map((r: string) => r.trim()).filter(Boolean) : [])
+      const setRoomsList = (next: string[]) => p({ rooms_list: next, rooms: next.join(' · ') })
+      const options: any[] = Array.isArray(acc.options) ? acc.options : []
+      const setOptions = (next: any[]) => p({ options: next })
+      const updateOpt = (idx: number, patch: any) => setOptions(options.map((o, i) => i === idx ? { ...o, ...patch } : o))
+
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <input className="form-input" placeholder="Habitaciones disponibles" style={{ fontSize: 12 }} value={acc.rooms ?? ''} onChange={e => p({ rooms: e.target.value })} />
-          <textarea className="form-textarea" style={{ minHeight: 70, fontSize: 12 }} placeholder="Descripción del alojamiento…" value={acc.description ?? ''} onChange={e => p({ description: e.target.value })} />
-          <input className="form-input" placeholder="Información de precios (opcional)" style={{ fontSize: 12 }} value={acc.price_info ?? ''} onChange={e => p({ price_info: e.target.value })} />
-          <input className="form-input" placeholder="Alojamientos cercanos (opcional)" style={{ fontSize: 12 }} value={acc.nearby ?? ''} onChange={e => p({ nearby: e.target.value })} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Description */}
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Descripción</div>
+            <textarea className="form-textarea" style={{ minHeight: 60, fontSize: 12 }} placeholder="La finca dispone de 8 habitaciones…" value={acc.description ?? ''} onChange={e => p({ description: e.target.value })} />
+          </div>
+
+          {/* Rooms list */}
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Habitaciones (lista)</div>
+            {roomsList.map((r: string, ri: number) => (
+              <div key={ri} style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                <input className="form-input" style={{ fontSize: 12 }} placeholder="Ej. 4 Suites dobles" value={r} onChange={e => setRoomsList(roomsList.map((x, j) => j === ri ? e.target.value : x))} />
+                <button type="button" style={removeBtn} onClick={() => setRoomsList(roomsList.filter((_, j) => j !== ri))}><X size={12} /></button>
+              </div>
+            ))}
+            <button type="button" style={addBtn} onClick={() => setRoomsList([...roomsList, ''])}>+ Añadir tipo de habitación</button>
+          </div>
+
+          {/* Tariff options */}
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Tarifas de alojamiento</div>
+            {options.map((opt: any, oi: number) => {
+              const prices: any[] = Array.isArray(opt.prices) ? opt.prices : []
+              const setPrices = (next: any[]) => updateOpt(oi, { prices: next })
+              return (
+                <div key={oi} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                    <input className="form-input" style={{ fontSize: 12, flex: 1 }} placeholder="Nombre (Ej. Suite Nupcial)" value={opt.label ?? ''} onChange={e => updateOpt(oi, { label: e.target.value })} />
+                    <button type="button" style={removeBtn} onClick={() => setOptions(options.filter((_, j) => j !== oi))}><X size={12} /></button>
+                  </div>
+                  <input className="form-input" style={{ fontSize: 11, marginBottom: 4, width: '100%' }} placeholder="Descripción (opcional)" value={opt.description ?? ''} onChange={e => updateOpt(oi, { description: e.target.value })} />
+
+                  {/* Included toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <label style={{ fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={!!opt.included} onChange={e => updateOpt(oi, { included: e.target.checked })} />
+                      Incluido en tarifa
+                    </label>
+                  </div>
+
+                  {/* Prices by season (when not included) */}
+                  {!opt.included && (
+                    <div style={{ marginTop: 4 }}>
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 3 }}>Precios por temporada</div>
+                      {prices.map((pr: any, pi: number) => (
+                        <div key={pi} style={{ display: 'flex', gap: 4, marginBottom: 3 }}>
+                          <input className="form-input" style={{ fontSize: 11, flex: 1 }} placeholder="Temporada (Ej. Todo el año)" value={pr.season ?? ''} onChange={e => setPrices(prices.map((x, j) => j === pi ? { ...x, season: e.target.value } : x))} />
+                          <input className="form-input" style={{ fontSize: 11, width: 100 }} placeholder="Precio" value={pr.price ?? ''} onChange={e => setPrices(prices.map((x, j) => j === pi ? { ...x, price: e.target.value } : x))} />
+                          <button type="button" style={removeBtn} onClick={() => setPrices(prices.filter((_, j) => j !== pi))}><X size={12} /></button>
+                        </div>
+                      ))}
+                      <button type="button" style={{ ...addBtn, fontSize: 10 }} onClick={() => setPrices([...prices, { season: '', price: '' }])}>+ Temporada</button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            <button type="button" style={addBtn} onClick={() => setOptions([...options, { label: '', description: '', included: false, prices: [] }])}>+ Añadir tarifa</button>
+          </div>
+
+          {/* Nearby */}
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Alojamientos cercanos</div>
+            <input className="form-input" placeholder="Hotel Son Brull (10 min), Castell Son Claret (15 min)…" style={{ fontSize: 12 }} value={acc.nearby ?? ''} onChange={e => p({ nearby: e.target.value })} />
+          </div>
         </div>
       )
     }
@@ -1497,12 +1635,20 @@ export default function TemplateEditor({
 
             {/* ── MENÚS tab ─────────────────────────────────────────────────── */}
             {activeTab === 'menus' && (
-              <div style={{ padding: hasCatering ? 0 : '20px 16px' }}>
+              <div style={{ padding: 0 }}>
+                {/* Master menu toggle */}
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Mostrar secciones de menú</div>
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>Activa o desactiva todas las secciones de menú en la propuesta</div>
+                  </div>
+                  <Toggle value={hasCatering} onChange={v => { setSections(s => ({ ...s, has_catering: v })); markDirty() }} />
+                </div>
                 {!hasCatering ? (
                   <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--warm-gray)' }}>
                     <ChefHat size={28} style={{ opacity: 0.3, marginBottom: 10 }} />
-                    <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Catering desactivado</div>
-                    <div style={{ fontSize: 11, lineHeight: 1.5 }}>Activa "Incluye menús y catering" en la pestaña Secciones.</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Secciones de menú desactivadas</div>
+                    <div style={{ fontSize: 11, lineHeight: 1.5 }}>Activa el toggle de arriba para configurar menús y catering.</div>
                   </div>
                 ) : (
                   <ProposalMenuEditor
