@@ -50,19 +50,36 @@ export async function GET(
     const horizonIso = dateToIso(horizon)
 
     // 3. Already-scheduled visits (block those time slots)
-    const { data: visits } = await supabase
-      .from('leads')
-      .select('visit_date, visit_time')
-      .eq('user_id', proposal.user_id)
-      .eq('status', 'visit_scheduled')
-      .gte('visit_date', todayIso)
-      .lte('visit_date', horizonIso)
+    // Pull from both sources so we cover proposals with and without a linked
+    // lead: leads.visit_date is set when a proposal has a lead; otherwise the
+    // booking only lives in proposal_inquiries.
+    const [visitsRes, inquiriesRes] = await Promise.all([
+      supabase
+        .from('leads')
+        .select('visit_date, visit_time')
+        .eq('user_id', proposal.user_id)
+        .eq('status', 'visit_scheduled')
+        .gte('visit_date', todayIso)
+        .lte('visit_date', horizonIso),
+      supabase
+        .from('proposal_inquiries')
+        .select('payload, preferred_dates, status')
+        .eq('user_id', proposal.user_id)
+        .eq('kind', 'visit')
+        .neq('status', 'closed'),
+    ])
 
     const takenSlots: Record<string, Set<string>> = {}
-    for (const v of visits ?? []) {
-      if (!v.visit_date || !v.visit_time) continue
-      if (!takenSlots[v.visit_date]) takenSlots[v.visit_date] = new Set()
-      takenSlots[v.visit_date].add(v.visit_time)
+    const addTaken = (date: string | null | undefined, time: string | null | undefined) => {
+      if (!date || !time) return
+      if (date < todayIso || date > horizonIso) return
+      if (!takenSlots[date]) takenSlots[date] = new Set()
+      takenSlots[date].add(time)
+    }
+    for (const v of visitsRes.data ?? []) addTaken(v.visit_date, v.visit_time)
+    for (const inq of inquiriesRes.data ?? []) {
+      const p = (inq as any).payload || {}
+      addTaken(p.date ?? (inq as any).preferred_dates?.[0], p.time)
     }
 
     // 4. Blocked calendar dates — normalize legacy string[] to BlockedDate[]

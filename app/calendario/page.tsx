@@ -66,6 +66,26 @@ type Modality = {
   packages: ModalityPackage[]
 }
 
+// Lead-driven inbox events with date hints (call, video, visit).
+// Visits with a linked lead already surface via leads.visit_date — we dedupe
+// those so the same booking doesn't appear twice on the same cell.
+type PendingInquiry = {
+  id: string
+  proposal_id: string
+  kind: 'call' | 'video' | 'visit' | string
+  kind_label: string | null
+  name: string
+  email: string | null
+  phone: string | null
+  preferred_dates: string[]
+  message: string | null
+  status: 'new' | 'replied' | 'closed'
+  created_at: string
+  payload: Record<string, any> | null
+  event_at: string | null
+  proposals?: { id: string; couple_name: string | null; lead_id: string | null } | null
+}
+
 const DOW_NAMES_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']  // Mon=0 … Sun=6
 
 // ── Config ───────────────────────────────────────────────────────────────────
@@ -137,6 +157,7 @@ export default function CalendarioPage() {
   const [entries,      setEntries]      = useState<Record<string, Entry>>({})
   const [entries2,     setEntries2]     = useState<Record<string, Entry>>({}) // secondary half-day slot per date
   const [leads,        setLeads]        = useState<Lead[]>([])
+  const [pendingInquiries, setPendingInquiries] = useState<PendingInquiry[]>([])
   const [loading,      setLoading]      = useState(true)
   const [saving,       setSaving]       = useState(false)
   const [modalities,   setModalities]   = useState<Modality[]>([])
@@ -201,10 +222,17 @@ export default function CalendarioPage() {
     const from     = dateStr(year, month, 1)
     const to       = dateStr(year, month, lastDay)
 
-    const [entriesRes, leadsRes, modalitiesRes] = await Promise.all([
+    const [entriesRes, leadsRes, modalitiesRes, inquiriesRes] = await Promise.all([
       supabase.from('calendar_entries').select('*').eq('venue_id', activeVenue.id).gte('date', from).lte('date', to),
       supabase.from('leads').select('id,name,email,phone,whatsapp,wedding_date,wedding_date_to,wedding_date_ranges,date_flexibility,wedding_year,wedding_month,guests,status,budget,ceremony_type,visit_date,visit_time,visit_duration,notes,budget_date,budget_date_to,budget_date_ranges,budget_date_flexibility').eq('venue_id', activeVenue.id).order('wedding_date', { ascending: true }),
       supabase.from('venue_modalities').select('id,name,duration_type,packages:venue_modality_packages(id,day_from,day_to,label,sort_order)').eq('venue_id', activeVenue.id).order('sort_order'),
+      supabase
+        .from('proposal_inquiries')
+        .select('id, proposal_id, kind, kind_label, name, email, phone, preferred_dates, message, status, created_at, payload, event_at, proposals!inner(id, couple_name, lead_id, venue_id)')
+        .eq('proposals.venue_id', activeVenue.id)
+        .in('kind', ['call', 'video', 'visit'])
+        .neq('status', 'closed')
+        .order('created_at', { ascending: false }),
     ])
 
     const map: Record<string, Entry> = {}
@@ -223,6 +251,7 @@ export default function CalendarioPage() {
     setEntries2(map2)
     if (leadsRes.data) setLeads(leadsRes.data)
     if (modalitiesRes.data) setModalities(modalitiesRes.data as Modality[])
+    if (inquiriesRes.data) setPendingInquiries((inquiriesRes.data as any[]).map(r => ({ ...r, preferred_dates: r.preferred_dates ?? [] })) as PendingInquiry[])
     setLoading(false)
   }
 
@@ -307,6 +336,40 @@ export default function CalendarioPage() {
     })
     return m
   }, [leads])
+
+  // Pending inquiry requests (call/video/visit) indexed by event date.
+  // Visits already linked to a lead are deduped against visitsByDate so the
+  // same booking doesn't show up twice on the cell.
+  const inquiriesByDate = useMemo(() => {
+    const m: Record<string, PendingInquiry[]> = {}
+    pendingInquiries.forEach(inq => {
+      if (inq.kind === 'visit') {
+        // Visit: use payload.date (single confirmed slot, not preferred options)
+        const visitDate: string | null =
+          (typeof inq.payload?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(inq.payload.date))
+            ? inq.payload.date
+            : (inq.preferred_dates?.[0] && /^\d{4}-\d{2}-\d{2}$/.test(inq.preferred_dates[0]) ? inq.preferred_dates[0] : null)
+        if (!visitDate) return
+        // Dedupe: skip if a linked lead already shows this exact date+time
+        const visitTime: string | null = typeof inq.payload?.time === 'string' ? inq.payload.time : null
+        const linkedLeadId = inq.proposals?.lead_id ?? null
+        const alreadyOnLead = linkedLeadId && (visitsByDate[visitDate] ?? []).some(
+          l => l.id === linkedLeadId && (!visitTime || l.visit_time === visitTime)
+        )
+        if (alreadyOnLead) return
+        if (!m[visitDate]) m[visitDate] = []
+        m[visitDate].push(inq)
+      } else {
+        // call / video: index by every preferred_date the couple gave
+        ;(inq.preferred_dates || []).forEach(d => {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return
+          if (!m[d]) m[d] = []
+          m[d].push(inq)
+        })
+      }
+    })
+    return m
+  }, [pendingInquiries, visitsByDate])
 
   const [exporting, setExporting] = useState(false)
 
@@ -869,6 +932,8 @@ export default function CalendarioPage() {
                       const linkedLead = entry?.lead_id ? leadsById[entry.lead_id] : null
                       const visitLeads = visitsByDate[ds] || []
                       const hasVisits  = visitLeads.length > 0
+                      const dayInquiries = inquiriesByDate[ds] || []
+                      const hasInquiries = dayInquiries.length > 0
 
                       // Effective status — derived from actual lead statuses (bloqueado stays from DB)
                       const NEG_LEAD_STATUSES = ['contacted', 'post_visit', 'proposal_sent', 'budget_sent']
@@ -1026,6 +1091,27 @@ export default function CalendarioPage() {
                                 )}
                               </div>
                             )}
+                            {/* Row 2b: pending request indicator (visit/call/video without linked lead) */}
+                            {matchesFilter && hasInquiries && (() => {
+                              const visitInq = dayInquiries.find(i => i.kind === 'visit')
+                              const visitTime: string | null = visitInq && typeof visitInq.payload?.time === 'string' ? visitInq.payload.time : null
+                              const tip = dayInquiries.map(i => {
+                                const k = i.kind === 'visit' ? 'Visita' : i.kind === 'video' ? 'Videollamada' : 'Llamada'
+                                const t = i.kind === 'visit' && typeof i.payload?.time === 'string' ? ` · ${i.payload.time}` : ''
+                                return `${k} · ${i.name}${t}`
+                              }).join(' · ')
+                              const label = visitInq
+                                ? (visitTime ? `Visita ${visitTime}` : 'Visita')
+                                : dayInquiries.length === 1 ? 'Solicitud' : `${dayInquiries.length} solicitudes`
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={tip}>
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
+                                  <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--gold)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                                    {label}
+                                  </span>
+                                </div>
+                              )
+                            })()}
                             {/* Row 2: visit indicator (always its own line, below status) */}
                             {matchesFilter && hasVisits && (() => {
                               const sorted = [...visitLeads].sort((a: any, b: any) => ((a as any).visit_time || 'zz').localeCompare((b as any).visit_time || 'zz'))
@@ -1188,6 +1274,7 @@ export default function CalendarioPage() {
           entry2={entries2[modalDate] || null}
           leadsOnDate={leadsByDate[modalDate] || []}
           visitsOnDate={visitsByDate[modalDate] || []}
+          inquiriesOnDate={inquiriesByDate[modalDate] || []}
           allLeads={leads}
           leadsById={leadsById}
           saving={saving}
@@ -1259,7 +1346,7 @@ function getSpanDates(startDate: string, spanDays: number): string[] {
 // ── Day Modal ─────────────────────────────────────────────────────────────────
 
 function DayModal({
-  date, entry, entry2, leadsOnDate, visitsOnDate, allLeads, leadsById, saving, modalities,
+  date, entry, entry2, leadsOnDate, visitsOnDate, inquiriesOnDate, allLeads, leadsById, saving, modalities,
   onSave, onSave2, onDelete, onClose, onLeadCreated, onUpdateLead, onCancelWedding, venueId
 }: {
   date: string
@@ -1267,6 +1354,7 @@ function DayModal({
   entry2: Entry | null
   leadsOnDate: Lead[]
   visitsOnDate: Lead[]
+  inquiriesOnDate: PendingInquiry[]
   allLeads: Lead[]
   leadsById: Record<string, Lead>
   saving: boolean
@@ -1655,6 +1743,64 @@ function DayModal({
                               </button>
                             </div>
                           )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* ══ SOLICITUDES PENDIENTES (call/video/visit con fecha) ══ */}
+              {inquiriesOnDate.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--gold)', display: 'inline-block' }} /> Solicitudes pendientes
+                  </div>
+                  {inquiriesOnDate.map(inq => {
+                    const isVisit = inq.kind === 'visit'
+                    const kindLabel = inq.kind_label
+                      || (inq.kind === 'call' ? 'Llamada'
+                          : inq.kind === 'video' ? 'Videollamada'
+                          : isVisit ? 'Visita solicitada'
+                          : 'Solicitud')
+                    const otherDates = (inq.preferred_dates || []).filter(d => d !== date)
+                    const coupleName = inq.proposals?.couple_name
+                    const visitTime: string | null = isVisit && typeof inq.payload?.time === 'string' ? inq.payload.time : null
+                    const cornerLabel = isVisit ? 'VISITA' : 'SOLICITUD'
+                    return (
+                      <div key={inq.id} style={{ display: 'flex', alignItems: 'stretch', gap: 0, background: 'rgba(196,151,90,0.06)', border: '1px solid rgba(196,151,90,0.25)', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
+                        <div style={{ width: 64, flexShrink: 0, background: visitTime ? 'var(--gold)' : 'rgba(196,151,90,0.18)', color: visitTime ? '#fff' : 'var(--gold)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 4px', fontVariantNumeric: 'tabular-nums' }}>
+                          {visitTime ? (
+                            <>
+                              <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1, fontFamily: 'Manrope, sans-serif' }}>{visitTime}</div>
+                              <div style={{ fontSize: 8, fontWeight: 700, marginTop: 4, letterSpacing: '0.05em' }}>{cornerLabel}</div>
+                            </>
+                          ) : (
+                            <>
+                              <Calendar size={16} />
+                              <div style={{ fontSize: 8, fontWeight: 700, marginTop: 4, letterSpacing: '0.05em' }}>{cornerLabel}</div>
+                            </>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)' }}>
+                              {inq.name}
+                              {coupleName && coupleName !== inq.name && <span style={{ color: 'var(--warm-gray)', fontWeight: 400, fontSize: 11 }}> · propuesta de {coupleName}</span>}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                              {kindLabel}
+                              {inq.email ? ` · ${inq.email}` : ''}
+                              {inq.phone ? ` · ${inq.phone}` : ''}
+                              {!isVisit && otherDates.length > 0 && ` · 2ª opción: ${new Date(otherDates[0] + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 11, color: inq.status === 'new' ? 'var(--gold)' : 'var(--warm-gray)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {inq.status === 'new' ? 'Nueva' : 'Contestada'}
+                          </span>
+                          <a href={`/proposals?tab=inquiries`} title="Ver en Respuestas" style={{ padding: '5px 10px', borderRadius: 6, background: 'var(--gold)', color: '#fff', textDecoration: 'none', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <ExternalLink size={11} /> Ver
+                          </a>
                         </div>
                       </div>
                     )

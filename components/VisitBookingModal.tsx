@@ -64,8 +64,12 @@ export default function VisitBookingModal({
     setStep('time')
   }
 
+  const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
+
   const submit = async () => {
     if (!selectedDate || !selectedTime) return
+    if (!email.trim()) { setError('Indica tu email'); return }
+    if (!isValidEmail(email)) { setError('Email no válido'); return }
     setSubmitting(true); setError('')
     try {
       const res = await fetch(`/api/proposals/${proposalId}/visit-request`, {
@@ -74,7 +78,7 @@ export default function VisitBookingModal({
         body: JSON.stringify({
           date: selectedDate, time: selectedTime,
           message: message || null,
-          couple_email: email || null,
+          couple_email: email.trim(),
           selected_spaces: selectedSpaces,
           selected_menus: selectedMenus,
         }),
@@ -241,9 +245,10 @@ export default function VisitBookingModal({
               {/* Email */}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 6 }}>
-                  Tu email (para la confirmación)
+                  Tu email (para la confirmación) *
                 </label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  required
                   placeholder="hola@email.com"
                   style={{ width: '100%', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '10px 14px', color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
               </div>

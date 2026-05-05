@@ -343,7 +343,7 @@ function PropuestasPageContent() {
           tabs={[
             { key: 'proposals', label: 'Propuestas', icon: FileText },
             {
-              key: 'inquiries', label: 'Consultas', icon: Inbox,
+              key: 'inquiries', label: 'Respuestas', icon: Inbox,
               badge: inquiriesUnread > 0
                 ? <span style={{ marginLeft: 6, fontSize: 10, padding: '1px 6px', borderRadius: 99, background: 'var(--gold)', color: '#fff', fontWeight: 700 }}>{inquiriesUnread}</span>
                 : undefined,

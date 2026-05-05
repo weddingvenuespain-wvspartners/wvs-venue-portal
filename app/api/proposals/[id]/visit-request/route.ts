@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { sendVisitRequestEmail } from '@/lib/mailer'
+
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  )
+}
 
 // POST /api/proposals/[id]/visit-request
 // Public — couple submits a visit request from the proposal page.
@@ -16,6 +25,13 @@ export async function POST(
 
     if (!date || !time) {
       return NextResponse.json({ error: 'Fecha y hora son obligatorias' }, { status: 400 })
+    }
+    const trimmedEmail = typeof couple_email === 'string' ? couple_email.trim() : ''
+    if (!trimmedEmail) {
+      return NextResponse.json({ error: 'Indica tu email' }, { status: 400 })
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      return NextResponse.json({ error: 'Email no válido' }, { status: 400 })
     }
 
     const cookieStore = await cookies()
@@ -59,6 +75,37 @@ export async function POST(
         .update({ visit_date: date, visit_time: time, status: 'visit_scheduled' })
         .eq('id', proposal.lead_id)
       if (leadErr) console.error('[visit-request] lead update error', leadErr)
+    }
+
+    // 3b. Mirror into the unified responses inbox (proposal_inquiries).
+    //     Service client is required because the public anon caller can't
+    //     write user_id-bound rows under RLS. Delete-then-insert so a couple
+    //     changing their mind doesn't spawn duplicates (we keep "last pick wins"
+    //     for visits without relying on a partial unique index).
+    try {
+      const svc = getServiceClient()
+      const eventAt = new Date(`${date}T${/^\d{2}:\d{2}/.test(time) ? time : '12:00'}:00`).toISOString()
+      await svc.from('proposal_inquiries').delete().eq('proposal_id', id).eq('kind', 'visit')
+      const { error: inqInsErr } = await svc.from('proposal_inquiries').insert({
+        proposal_id: id,
+        user_id: proposal.user_id,
+        kind: 'visit',
+        name: proposal.couple_name || 'Pareja',
+        email: couple_email || null,
+        phone: null,
+        preferred_dates: [date],
+        message: message || null,
+        status: 'new',
+        payload: {
+          date, time,
+          selected_spaces: selected_spaces ?? [],
+          selected_menus: selected_menus ?? [],
+        },
+        event_at: eventAt,
+      })
+      if (inqInsErr) console.error('[visit-request] inquiries insert error', inqInsErr.message)
+    } catch (inqErr: any) {
+      console.error('[visit-request] inquiries mirror error', inqErr?.message)
     }
 
     // 4. Send email notification to venue

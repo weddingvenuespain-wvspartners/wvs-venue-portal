@@ -39,8 +39,11 @@ export async function POST(req: NextRequest) {
     if (!slug || !name || !kind || kind.length > KIND_MAX) {
       return NextResponse.json({ ok: false, error: 'Datos incompletos' }, { status: 400 })
     }
-    if (!email && !phone) {
-      return NextResponse.json({ ok: false, error: 'Indica al menos email o teléfono' }, { status: 400 })
+    if (!email) {
+      return NextResponse.json({ ok: false, error: 'Indica tu email' }, { status: 400 })
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ ok: false, error: 'Email no válido' }, { status: 400 })
     }
     const message = messageRaw && messageRaw.length > 2000 ? messageRaw.slice(0, 2000) : messageRaw
 
@@ -142,11 +145,15 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url)
     const status = url.searchParams.get('status')
 
+    // Use `*` so this endpoint tolerates the migration state — pre-migration
+    // the new columns (payload, event_at) just won't be in the response.
+    const baseSelect = '*, proposals!inner(id, slug, couple_name, lead_id, leads(id, name))'
+
     let query = supabase
       .from('proposal_inquiries')
-      .select('id, proposal_id, kind, kind_label, name, email, phone, preferred_dates, message, status, created_at, proposals!inner(id, slug, couple_name)')
+      .select(baseSelect)
       .order('created_at', { ascending: false })
-      .limit(100)
+      .limit(200)
     if (status) query = query.eq('status', status)
 
     const { data, error } = await query

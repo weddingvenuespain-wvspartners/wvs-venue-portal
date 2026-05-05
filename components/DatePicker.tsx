@@ -11,14 +11,21 @@ export function fmtDate(d: string) {
   return `${parseInt(day)} ${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(m)-1]} ${y.slice(2)}`
 }
 
-export default function DatePicker({ value, onChange, label, accent = '#C4975A', minDate, allowPast = false }: {
+export default function DatePicker({ value, onChange, label, accent = '#C4975A', minDate, allowPast = false, dark = false, placeholder = 'Seleccionar fecha' }: {
   value: string
   onChange: (v: string) => void
   label?: string
   accent?: string
   minDate?: string
   allowPast?: boolean
+  dark?: boolean
+  placeholder?: string
 }) {
+  const triggerBg     = dark ? 'rgba(255,255,255,.04)' : '#fff'
+  const triggerBorder = dark ? 'rgba(255,255,255,.18)' : 'var(--ivory)'
+  const triggerText   = dark ? 'rgba(255,255,255,.92)' : 'var(--charcoal)'
+  const triggerEmpty  = dark ? 'rgba(255,255,255,.45)' : '#AAA'
+  const subText       = dark ? 'rgba(255,255,255,.55)' : 'var(--warm-gray)'
   const [open, setOpen]         = useState(false)
   const [pos, setPos]           = useState({ top: 0, left: 0, width: 260 })
   const [viewYear, setViewYear] = useState(() => value ? parseInt(value.slice(0,4)) : new Date().getFullYear())
@@ -63,11 +70,11 @@ export default function DatePicker({ value, onChange, label, accent = '#C4975A',
 
   return (
     <div>
-      {label && <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</div>}
+      {label && <div style={{ fontSize: 10, fontWeight: 600, color: subText, marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</div>}
       <button ref={btnRef} type="button" onClick={toggle}
-        style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--ivory)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', fontSize: 12, color: value ? 'var(--charcoal)' : '#AAA', fontFamily: 'Manrope, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, outline: 'none' }}>
-        <span style={{ flex: 1 }}>{value ? fmtDate(value) : 'Seleccionar fecha'}</span>
-        <CalendarDays size={12} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+        style={{ width: '100%', padding: '8px 10px', border: `1px solid ${triggerBorder}`, borderRadius: 8, background: triggerBg, cursor: 'pointer', textAlign: 'left', fontSize: 12, color: value ? triggerText : triggerEmpty, fontFamily: 'Manrope, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, outline: 'none' }}>
+        <span style={{ flex: 1 }}>{value ? fmtDate(value) : placeholder}</span>
+        <CalendarDays size={12} style={{ color: subText, flexShrink: 0 }} />
       </button>
 
       {open && (

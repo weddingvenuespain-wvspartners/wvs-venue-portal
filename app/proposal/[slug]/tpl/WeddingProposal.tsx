@@ -7,6 +7,7 @@ import { useMemo, useState, type CSSProperties } from 'react'
 import type { ProposalData } from '../page'
 import type { Menu, MenuCourse, MenuExtra, AppetizerGroup } from './shared'
 import { toRgb, FadeUp, ivaLabel } from './shared'
+import DatePicker from '@/components/DatePicker'
 import styles from './WeddingProposal.module.css'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -224,6 +225,29 @@ export function WeddingProposal({
     if (missingChoices.length) { setError(`Faltan opciones en: ${missingChoices.join(', ')}`); return }
     setSending(true)
     try {
+      // Resolved extras: include human-readable name/category/price plus
+      // per-extra metadata so the venue inbox shows "DJ", "Barra libre 2h
+      // extra · 80 personas", etc., not just opaque IDs.
+      const CATEGORY_LABEL: Record<string, string> = {
+        station: 'Estación', resopon: 'Resopón', open_bar: 'Barra libre',
+        ceremony: 'Ceremonia', audiovisual: 'Audiovisual', music: 'Música', other: 'Otros',
+      }
+      const selectedExtraIds = Object.entries(selectedExtras).filter(([, v]) => v).map(([k]) => k)
+      const selectedExtrasDetail = (extras ?? [])
+        .map((e, i) => ({ e, key: extraId(e, i) }))
+        .filter(({ key }) => selectedExtras[key])
+        .map(({ e, key }) => ({
+          id: key,
+          name: e.name,
+          category: e.category,
+          category_label: CATEGORY_LABEL[e.category] || e.category,
+          price: e.price ?? null,
+          price_type: e.price_type ?? null,
+          guest_count: extraGuestCounts[key] ?? null,
+          barra_extra_hours: barraExtraHours[key] ?? null,
+          barra_extra_people: barraExtraPeople[key] ?? null,
+        }))
+
       const payload = {
         proposal_id: data.id,
         menu_allocations: allocatedMenus.map(m => {
@@ -235,7 +259,8 @@ export function WeddingProposal({
         selected_menu_name: allocatedMenus.map(m => m.name).join(' + ') || null,
         guest_count: guests, original_guest_count: originalGuests, guest_count_changed: guests !== originalGuests,
         course_choices: courseChoices,
-        selected_extras: Object.entries(selectedExtras).filter(([, v]) => v).map(([k]) => k),
+        selected_extras: selectedExtraIds,
+        selected_extras_detail: selectedExtrasDetail,
         extra_guest_counts: extraGuestCounts,
         barra_extra_hours: barraExtraHours, barra_extra_people: barraExtraPeople,
         comments, estimated_total: total, wedding_date: weddingDate,
@@ -694,13 +719,17 @@ export function WeddingProposal({
               <h3 className={styles.wpSectionH}>Vuestros datos</h3>
               {dateIsFlexible && (
                 <div style={{ marginBottom: 24 }}>
-                  <label className={styles.wpLabel}>Fecha de la boda</label>
-                  <div className={styles.wpDateWrap}>
-                    <input type="date" className={cx(styles.wpInput, styles.wpDateInput)} value={localDate} onChange={e => setLocalDate(e.target.value)} />
-                    {hasSeasonPrices && (
-                      <div className={styles.wpDateNote}>{localDate ? 'Precio actualizado según la fecha elegida' : 'Selecciona una fecha — el precio puede variar por temporada'}</div>
-                    )}
-                  </div>
+                  <DatePicker
+                    label="Fecha de la boda"
+                    value={localDate}
+                    onChange={setLocalDate}
+                    accent={primary}
+                    dark={dark}
+                    placeholder="Selecciona la fecha"
+                  />
+                  {hasSeasonPrices && (
+                    <div className={styles.wpDateNote} style={{ marginTop: 6 }}>{localDate ? 'Precio actualizado según la fecha elegida' : 'Selecciona una fecha — el precio puede variar por temporada'}</div>
+                  )}
                 </div>
               )}
               {menus.length === 0 && (

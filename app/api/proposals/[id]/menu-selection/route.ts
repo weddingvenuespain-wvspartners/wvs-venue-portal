@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { sendMenuSelectionEmail } from '@/lib/mailer'
+
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  )
+}
 
 // POST /api/proposals/[id]/menu-selection
 // Público: el invitado envía su selección del WeddingProposal.
@@ -41,6 +50,7 @@ export async function POST(
 
     // Normalizar campos del payload
     const menuAllocations = Array.isArray(body.menu_allocations) ? body.menu_allocations : []
+    const selectedExtrasDetail = Array.isArray(body.selected_extras_detail) ? body.selected_extras_detail : []
     const selection = {
       proposal_id: id,
       selected_menu_id:     body.selected_menu_id     ?? null,
@@ -55,6 +65,14 @@ export async function POST(
       menu_allocations:     menuAllocations,
       wedding_date:         body.wedding_date ?? null,
     }
+    // Extra fields not stored in proposal_menu_selections but mirrored to
+    // proposal_inquiries.payload so the inbox can render the full breakdown.
+    const extraFields = {
+      selected_extras_detail: selectedExtrasDetail,
+      extra_guest_counts:     body.extra_guest_counts ?? {},
+      barra_extra_hours:      body.barra_extra_hours ?? {},
+      barra_extra_people:     body.barra_extra_people ?? {},
+    }
 
     const { error: insErr } = await supabase
       .from('proposal_menu_selections')
@@ -63,6 +81,42 @@ export async function POST(
     if (insErr) {
       console.error('[menu-selection] insert error:', insErr.message)
       return NextResponse.json({ error: 'No se ha podido guardar' }, { status: 500 })
+    }
+
+    // Mirror into the unified responses inbox. Append (no dedup): the
+    // venue wants to see the history of menu picks if the couple iterates.
+    try {
+      const svc = getServiceClient()
+      const { error: inqInsErr } = await svc.from('proposal_inquiries').insert({
+        proposal_id: id,
+        user_id: proposal.user_id,
+        kind: 'menu_selection',
+        name: proposal.couple_name || 'Pareja',
+        email: null,
+        phone: null,
+        preferred_dates: [],
+        message: selection.comments,
+        status: 'new',
+        payload: {
+          selected_menu_id: selection.selected_menu_id,
+          selected_menu_name: selection.selected_menu_name,
+          guest_count: selection.guest_count,
+          original_guest_count: selection.original_guest_count,
+          guest_count_changed: selection.guest_count_changed,
+          estimated_total: selection.estimated_total,
+          course_choices: selection.course_choices,
+          selected_extras: selection.selected_extras,
+          menu_allocations: selection.menu_allocations,
+          wedding_date: selection.wedding_date,
+          ...extraFields,
+        },
+        event_at: selection.wedding_date
+          ? new Date(`${selection.wedding_date}T12:00:00`).toISOString()
+          : null,
+      })
+      if (inqInsErr) console.error('[menu-selection] inquiries insert error', inqInsErr.message)
+    } catch (inqErr: any) {
+      console.error('[menu-selection] inquiries mirror error', inqErr?.message)
     }
 
     // Email al venue (best-effort, no bloquea la respuesta al invitado)

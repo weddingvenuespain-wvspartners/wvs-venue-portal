@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { Calendar, Phone, Video, UtensilsCrossed, MessageCircle, Check, type LucideIcon } from 'lucide-react'
 import Spinner from '@/components/Spinner'
 import VisitBookingModal from '@/components/VisitBookingModal'
+import DatePicker from '@/components/DatePicker'
+
+const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
 
 export type InquiryKindOption = { id: string; label: string }
 
@@ -67,12 +70,14 @@ export default function InquiryForm({
       // Visit kind goes through the calendar modal so the venue gets a real
       // slot pick + the booking flows into proposal.visit_request + lead update.
       if (!proposalId) { setError('No se puede agendar visita en este momento'); return }
+      if (!name.trim()) { setError('Indica tu nombre'); return }
       setError(null)
       setVisitModalOpen(true)
       return
     }
     if (!name.trim()) { setError('Indica tu nombre'); return }
-    if (!email.trim() && !phone.trim()) { setError('Indica al menos email o teléfono'); return }
+    if (!email.trim()) { setError('Indica tu email'); return }
+    if (!isValidEmail(email)) { setError('Email no válido'); return }
 
     setError(null); setLoading(true)
     try {
@@ -172,12 +177,14 @@ export default function InquiryForm({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
           <div>
             <label style={labelStyle}>Nombre *</label>
-            <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Tu nombre y el de tu pareja" />
+            <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Tu nombre y el de tu pareja" required />
           </div>
-          <div>
-            <label style={labelStyle}>Email</label>
-            <input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="vosotros@email.com" />
-          </div>
+          {!isVisit && (
+            <div>
+              <label style={labelStyle}>Email *</label>
+              <input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="vosotros@email.com" required />
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
@@ -186,18 +193,12 @@ export default function InquiryForm({
             <input style={inputStyle} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+34 600 000 000" />
           </div>
           {!isVisit && (
-            <div>
-              <label style={labelStyle}>Fecha preferida</label>
-              <input type="date" style={inputStyle} value={date1} onChange={e => setDate1(e.target.value)} />
-            </div>
+            <DatePicker value={date1} onChange={setDate1} label="Fecha preferida" accent={primary} dark={dark} />
           )}
         </div>
 
         {!isVisit && date1 && (
-          <div>
-            <label style={labelStyle}>Segunda opción (opcional)</label>
-            <input type="date" style={inputStyle} value={date2} onChange={e => setDate2(e.target.value)} />
-          </div>
+          <DatePicker value={date2} onChange={setDate2} label="Segunda opción (opcional)" accent={primary} dark={dark} minDate={date1} />
         )}
 
         <div>
