@@ -8,9 +8,10 @@ import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import {
   Plus, ChevronDown, ChevronUp, Pencil, Trash2,
-  X, Check, Lock, Sun, Moon, CalendarDays, Package, SlidersHorizontal,
+  X, Check, Sun, Moon, CalendarDays, Package, SlidersHorizontal,
   Building2, Users, Layers, CreditCard, LayoutGrid, Settings2, ChevronRight, ChevronLeft,
 } from 'lucide-react'
+import FeatureGate from '@/components/FeatureGate'
 import { createClient } from '@/lib/supabase'
 import DatePicker, { fmtDate } from '@/components/DatePicker'
 import type { VisitAvailability, DaySchedule, BlockedDate, VenueSpaceGroup, VenueSpace, PricingSeason } from '@/lib/proposal-types'
@@ -781,19 +782,12 @@ export default function EstructuraPage() {
     </div>
   )
 
-  if (!features.estructura) return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--cream)' }}><Sidebar />
-      <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-        <div style={{ textAlign: 'center', maxWidth: 420, padding: '0 24px' }}>
-          <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-            <Lock size={32} style={{ color: 'var(--gold)', opacity: 0.7 }} />
-          </div>
-          <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--espresso)', marginBottom: 10 }}>Estructura comercial — Plan Premium</div>
-          <div style={{ fontSize: 14, color: 'var(--warm-gray)', lineHeight: 1.6, marginBottom: 24 }}>Define las modalidades de tu venue y sus tarifas por período. Disponible en el plan Premium.</div>
-          <a href="/perfil" style={{ display: 'inline-block', padding: '10px 24px', background: 'var(--gold)', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>Actualizar plan →</a>
-        </div>
-      </main>
-    </div>
+  if (features.loading || !features.estructura) return (
+    <FeatureGate
+      feature="estructura"
+      title="Estructura comercial — Plan Premium"
+      description="Define las modalidades de tu venue y sus tarifas por período."
+    />
   )
 
   // Total prices across all modalities (package prices + direct prices)

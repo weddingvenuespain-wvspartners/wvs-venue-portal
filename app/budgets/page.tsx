@@ -7,6 +7,7 @@ import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
+import FeatureGate from '@/components/FeatureGate'
 import {
   Plus, Trash2, Send, X, Check, Eye, Pencil, Copy,
   Search, Receipt, Star, MessageCircle, Mail, Link2,
@@ -128,24 +129,13 @@ export default function BudgetsPage() {
 
   if (isBlocked) return null
 
-  if (!features.presupuestos) return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--cream)' }}>
-      <Sidebar />
-      <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-        <div style={{ textAlign: 'center', maxWidth: 420, padding: '0 24px' }}>
-          <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: 32 }}>
-            <Receipt size={32} style={{ color: 'var(--gold)' }} />
-          </div>
-          <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Manrope, sans-serif', marginBottom: 10 }}>Presupuestos — Plan Premium</div>
-          <div style={{ fontSize: 14, color: 'var(--warm-gray)', lineHeight: 1.6, marginBottom: 24 }}>
-            Crea presupuestos digitales personalizados con desglose, plan de pagos y envíalos directamente a las parejas.
-          </div>
-          <a href="/perfil" style={{ display: 'inline-block', padding: '10px 24px', background: 'var(--gold)', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>
-            Actualizar plan →
-          </a>
-        </div>
-      </main>
-    </div>
+  if (features.loading || !features.presupuestos) return (
+    <FeatureGate
+      feature="presupuestos"
+      icon={Receipt}
+      title="Presupuestos — Plan Premium"
+      description="Crea presupuestos digitales personalizados con desglose, plan de pagos y envíalos directamente a las parejas."
+    />
   )
 
   return (

@@ -6,8 +6,9 @@ import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Lock, Loader2, FileText, Zap, Sparkles, ClipboardList, MessageCircle, Target, LayoutTemplate, ChevronLeft, ChevronRight, Search, Inbox, type LucideIcon } from 'lucide-react'
+import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Loader2, FileText, Zap, Sparkles, ClipboardList, MessageCircle, Target, LayoutTemplate, ChevronLeft, ChevronRight, Search, Inbox, type LucideIcon } from 'lucide-react'
 import InquiriesPanel from '@/components/InquiriesPanel'
+import FeatureGate from '@/components/FeatureGate'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import { DEFAULT_TEMPLATES, type DefaultTemplateId, type DefaultTemplateIcon } from '@/lib/proposal-starter-templates'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -259,23 +260,12 @@ function PropuestasPageContent() {
 
   if (isBlocked) return null
 
-  if (!features.propuestas) return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--cream)' }}>
-      <Sidebar />
-      <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-        <div style={{ textAlign: 'center', maxWidth: 480, padding: '40px 24px' }}>
-          <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-            <Lock size={32} style={{ color: 'var(--gold)', opacity: 0.7 }} />
-          </div>
-          <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 500, letterSpacing: '0.01em', color: 'var(--espresso)', marginBottom: 12 }}>Propuestas personalizadas</div>
-          <div style={{ fontSize: 14, color: 'var(--warm-gray)', lineHeight: 1.7, marginBottom: 28 }}>
-            Crea landings únicas para cada pareja con tu branding, precios y secciones personalizadas.<br />
-            Disponible en el plan <strong>Premium</strong>.
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Contacta con tu gestor de cuenta para actualizar tu plan</div>
-        </div>
-      </main>
-    </div>
+  if (features.loading || !features.propuestas) return (
+    <FeatureGate
+      feature="propuestas"
+      title="Propuestas — Plan Premium"
+      description="Crea landings únicas para cada pareja con tu branding, precios y secciones personalizadas."
+    />
   )
 
   return (

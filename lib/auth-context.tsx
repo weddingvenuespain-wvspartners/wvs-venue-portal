@@ -134,17 +134,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    // Skip if we already loaded for this exact user.
-    // Still call setLoading(false) so the spinner is never left hanging
-    // if this branch is hit during React Strict Mode's double-invocation.
-    if (u.id === loadedUserIdRef.current) { setLoading(false); return }
+    // Skip if we already started loading for this user. Don't touch `loading`
+    // here — the in-flight call (or the prior completed call) is responsible
+    // for setting it. Calling setLoading(false) in this branch creates a window
+    // where loading=false but profile=null (Strict Mode re-subscribes and re-fires
+    // INITIAL_SESSION while the original fetch is still pending), causing
+    // usePlanFeatures to fall back to BASIC and flicker premium UI as locked.
+    if (u.id === loadedUserIdRef.current) return
     loadedUserIdRef.current = u.id
     setUser(u)
-    const { profile: p, userVenues: v } = await fetchProfileAndVenues(u.id)
-    setProfile(p)
-    setUserVenues(v)
-    setActiveVenue(resolveActiveVenue(v))
-    setLoading(false)
+    try {
+      const { profile: p, userVenues: v } = await fetchProfileAndVenues(u.id)
+      setProfile(p)
+      setUserVenues(v)
+      setActiveVenue(resolveActiveVenue(v))
+    } catch (err) {
+      console.warn('[auth] loadForUser failed:', err)
+      loadedUserIdRef.current = null  // allow retry on next auth event
+    } finally {
+      setLoading(false)  // always clear the spinner, even on error
+    }
   }
 
   // Manual refresh — call after admin changes a venue's plan

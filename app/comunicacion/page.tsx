@@ -14,11 +14,12 @@ import {
   Pencil, Download, Star, Package, HelpCircle, Quote, List,
   GripVertical, ChevronsUpDown, Image as ImageIcon, Layers,
   MapPin, Calendar, XCircle, Images, Users, Timer, UtensilsCrossed,
-  Calculator, ScrollText, Ban, Lock,
+  Calculator, ScrollText, Ban,
   AlertTriangle, Camera, Flower2, Music, Snowflake
 } from 'lucide-react'
 import { GOOGLE_FONTS, FONT_CATEGORIES, ALL_FONTS_URL, getFontByValue } from '@/lib/fonts'
 import { usePlanFeatures } from '@/lib/use-plan-features'
+import FeatureGate from '@/components/FeatureGate'
 import Spinner from '@/components/Spinner'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -610,22 +611,13 @@ export default function ComunicacionPage() {
   )
 
   // Basic plan guard — full page locked
-  if (!features.comunicacion) return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--cream)' }}>
-      <Sidebar />
-      <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-        <div style={{ textAlign: 'center', maxWidth: 420, padding: '0 24px' }}>
-          <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', color: 'var(--gold)' }}><Mail size={32} strokeWidth={1.5} /></div>
-          <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Manrope, sans-serif', marginBottom: 10 }}>Comunicación — Plan Premium</div>
-          <div style={{ fontSize: 14, color: 'var(--warm-gray)', lineHeight: 1.6, marginBottom: 24 }}>
-            Crea plantillas de mensajes, diseña tu web de propuesta y genera dossiers personalizados para cada pareja.
-          </div>
-          <a href="/perfil" style={{ display: 'inline-block', padding: '10px 24px', background: 'var(--gold)', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>
-            Actualizar plan →
-          </a>
-        </div>
-      </main>
-    </div>
+  if (features.loading || !features.comunicacion) return (
+    <FeatureGate
+      feature="comunicacion"
+      icon={Mail}
+      title="Comunicación — Plan Premium"
+      description="Crea plantillas de mensajes, diseña tu web de propuesta y genera dossiers personalizados para cada pareja."
+    />
   )
 
 
