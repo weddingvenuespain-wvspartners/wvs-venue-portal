@@ -272,8 +272,11 @@ function VenueDashboard() {
   const [venue, setVenue]         = useState<any>(null)
   const [venueLoading, setVenueLoading] = useState(false)
   const [leads, setLeads]         = useState<any[]>([])
-  const [leadsMonthCount, setLeadsMonthCount] = useState<number>(0)
+  const [leadsMonthCount, setLeadsMonthCount] = useState<number | null>(null)
   const [leadsLoaded, setLeadsLoaded] = useState(false)
+  const [kpiNew, setKpiNew]         = useState<number | null>(null)
+  const [kpiActive, setKpiActive]   = useState<number | null>(null)
+  const [kpiBooked, setKpiBooked]   = useState<number | null>(null)
   const [onboarding, setOnboarding] = useState<any>(null)
 
   useEffect(() => {
@@ -299,10 +302,24 @@ function VenueDashboard() {
       .order('created_at', { ascending: false }).limit(5)
       .then(({ data }) => { if (data) setLeads(data); setLeadsLoaded(true) })
 
-    // Count all leads this month for the KPI
+    // KPI counts (independent queries — must NOT be derived from the limit(5) list above)
     supabase.from('leads').select('id', { count: 'exact', head: true })
       .eq('user_id', user.id).gte('created_at', monthStart)
       .then(({ count }) => { setLeadsMonthCount(count ?? 0) })
+
+    supabase.from('leads').select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id).eq('status', 'new')
+      .then(({ count }) => { setKpiNew(count ?? 0) })
+
+    supabase.from('leads').select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .in('status', ['contacted', 'proposal_sent', 'visit_scheduled', 'post_visit', 'budget_sent', 'qualified', 'proposal'])
+      .then(({ count }) => { setKpiActive(count ?? 0) })
+
+    supabase.from('leads').select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .in('status', ['won', 'booked'])
+      .then(({ count }) => { setKpiBooked(count ?? 0) })
 
     // Use activeVenue's wp_venue_id so switching venues updates the dashboard
     const wpVenueId = activeVenue?.wp_venue_id ?? profile?.wp_venue_id
@@ -328,10 +345,7 @@ function VenueDashboard() {
     }
   }, [authLoading, activeVenue?.id]) // eslint-disable-line
 
-  const venueName   = venue?.acf?.H1_Venue || venue?.title?.rendered || 'Mi Venue'
-  const newLeads    = leads.filter(l => l.status === 'new').length
-  const activeLeads = leads.filter(l => !['won','lost','booked'].includes(l.status)).length
-  const bookedLeads = leads.filter(l => l.status === 'won' || l.status === 'booked').length
+  const venueName = venue?.acf?.H1_Venue || venue?.title?.rendered || 'Mi Venue'
 
   const statusColors: Record<string, string> = {
     new: 'badge-new', contacted: 'badge-contacted',
@@ -431,10 +445,10 @@ function VenueDashboard() {
           </Link>
         </div>
         <div className="page-content">
-          {newLeads > 0 && leadsLoaded && (
+          {kpiNew !== null && kpiNew > 0 && (
             <div className="alert alert-warning">
               <Bell size={15} style={{ flexShrink: 0 }} />
-              <span><strong>{newLeads} {newLeads === 1 ? 'lead sin responder' : 'leads sin responder'}.</strong> <Link href="/leads" style={{ textDecoration: 'underline' }}>Ver ahora →</Link></span>
+              <span><strong>{kpiNew} {kpiNew === 1 ? 'lead sin responder' : 'leads sin responder'}.</strong> <Link href="/leads?tab=new" style={{ textDecoration: 'underline' }}>Ver ahora →</Link></span>
             </div>
           )}
 
@@ -443,36 +457,43 @@ function VenueDashboard() {
             {[
               {
                 label: 'Leads este mes', icon: <Sparkles size={16} />,
-                value: leadsLoaded ? leadsMonthCount : null,
+                value: leadsMonthCount,
+                href: '/leads',
                 sub: 'Desde tu ficha y canales',
                 accent: 'var(--espresso)', bg: '#fff',
                 border: 'var(--ivory)', stripe: 'var(--gold)',
               },
               {
                 label: 'En seguimiento', icon: <Users size={16} />,
-                value: leadsLoaded ? activeLeads : null,
+                value: kpiActive,
+                href: '/leads?tab=en_seguimiento',
                 sub: 'Leads activos en pipeline',
                 accent: 'var(--espresso)', bg: '#fff',
                 border: 'var(--ivory)', stripe: '#7c3aed',
               },
               {
                 label: 'Sin responder', icon: <Bell size={16} />,
-                value: leadsLoaded ? newLeads : null,
-                sub: newLeads > 0 ? 'Requieren atención' : 'Al día ✓',
-                accent: newLeads > 0 ? '#dc2626' : 'var(--espresso)',
-                bg: newLeads > 0 ? '#fff8f8' : '#fff',
-                border: newLeads > 0 ? '#fca5a5' : 'var(--ivory)',
-                stripe: newLeads > 0 ? '#dc2626' : '#16a34a',
+                value: kpiNew,
+                href: '/leads?tab=new',
+                sub: (kpiNew ?? 0) > 0 ? 'Requieren atención' : 'Al día ✓',
+                accent: (kpiNew ?? 0) > 0 ? '#dc2626' : 'var(--espresso)',
+                bg: (kpiNew ?? 0) > 0 ? '#fff8f8' : '#fff',
+                border: (kpiNew ?? 0) > 0 ? '#fca5a5' : 'var(--ivory)',
+                stripe: (kpiNew ?? 0) > 0 ? '#dc2626' : '#16a34a',
               },
               {
                 label: 'Bodas confirmadas', icon: <PartyPopper size={16} />,
-                value: leadsLoaded ? bookedLeads : null,
+                value: kpiBooked,
+                href: '/leads?tab=confirmed',
                 sub: 'Reservas cerradas',
                 accent: 'var(--espresso)', bg: '#fff',
                 border: 'var(--ivory)', stripe: '#be185d',
               },
             ].map((k: any, i) => (
-              <div key={i} style={{ background: k.bg, border: `1px solid ${k.border}`, borderRadius: 14, padding: '18px 20px', position: 'relative', overflow: 'hidden', borderTop: `3px solid ${k.stripe}` }}>
+              <Link key={i} href={k.href}
+                style={{ display: 'block', textDecoration: 'none', background: k.bg, border: `1px solid ${k.border}`, borderRadius: 14, padding: '18px 20px', position: 'relative', overflow: 'hidden', borderTop: `3px solid ${k.stripe}`, transition: 'box-shadow 0.15s, transform 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'translateY(0)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{k.label}</div>
                   <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: k.stripe }}>
@@ -483,7 +504,7 @@ function VenueDashboard() {
                   {k.value !== null ? k.value : <Skeleton w={40} h={28} radius={4} />}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{k.sub}</div>
-              </div>
+              </Link>
             ))}
           </div>
 

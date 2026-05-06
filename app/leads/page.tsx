@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo, useRef } from 'react'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
@@ -342,6 +342,7 @@ const emptyForm = {
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function LeadsPage() {
   const router   = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading: authLoading, activeVenue } = useAuth()
   const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
@@ -385,6 +386,14 @@ export default function LeadsPage() {
   const [cancelWeddingReason, setCancelWeddingReason] = useState('')
   const [deleteConfirmId,     setDeleteConfirmId]     = useState<string | null>(null)
   const [clearDatesConfirm,   setClearDatesConfirm]   = useState<any | null>(null)
+
+  // Deep-link: pick tab from ?tab= (e.g. dashboard KPIs link here)
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (!t) return
+    const valid: Tab[] = ['new', 'en_seguimiento', 'visit', 'budget', 'confirmed', 'lost']
+    if ((valid as string[]).includes(t)) setActiveTab(t as Tab)
+  }, [searchParams])
 
   useEffect(() => {
     if (authLoading) return
