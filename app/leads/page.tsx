@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef, Suspense } from 'react'
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -341,6 +341,14 @@ const emptyForm = {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function LeadsPage() {
+  return (
+    <Suspense fallback={null}>
+      <LeadsPageInner />
+    </Suspense>
+  )
+}
+
+function LeadsPageInner() {
   const router   = useRouter()
   const searchParams = useSearchParams()
   const { user, loading: authLoading, activeVenue } = useAuth()
