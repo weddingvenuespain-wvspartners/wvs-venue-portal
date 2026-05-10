@@ -5,12 +5,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { buildSingleFontUrl } from '@/lib/fonts'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoChat, IcoBuilding, ivaLabel, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, type ProposalData } from './shared'
+import { formatDate, formatPrice, isDark, toRgb, FadeUp, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoChat, IcoBuilding, ivaLabel, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, type ProposalData } from './shared'
 import { WeddingProposal } from './WeddingProposal'
+import DateSelector from './DateSelector'
 import VisitBookingModal from '@/components/VisitBookingModal'
-import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
-import InquiryForm from '@/components/InquiryForm'
-import { getActiveStyle } from '@/lib/section-styles'
 
 const SECTIONS_ALL = [
   { id: 'experience',    label: 'La experiencia' },
@@ -43,10 +41,7 @@ function EmptySec({ label }: { label: string }) {
 
 export default function T3TodoClaro({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
-  const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow, expShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, testsShow, seasonsShow, collabsShow, accom, spaceGroups, techspecs } = extractData(data)
-  const [, setSelectedSpaces] = useState<SpaceSelection[]>([])
-  const displayMsg = personal_message || (sec as any).welcome_default || null
-  const welcomeVariant = pickWelcomeVariant(sec)
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow, expShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, testsShow, seasonsShow, collabsShow, accom, dateSlots } = extractData(data)
 
   const primary = branding?.primary_color ?? '#1A3A5C'
   const rgb     = toRgb(primary)
@@ -58,6 +53,12 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
 
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone,      setVisitDone]      = useState(false)
+  const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
+
+  const selectedSlot = selectedDateSlotIdx !== null && dateSlots ? dateSlots[selectedDateSlotIdx] : null
+  const displayPrice = selectedSlot?.price_rental
+    ? parseInt(selectedSlot.price_rental.replace(/\D/g, '')) || price_estimate
+    : price_estimate
   const [heroLoaded, setHeroLoaded] = useState(false)
   const [openFaq, setOpenFaq] = useState<number|null>(null)
   const [activeSection, setActiveSection] = useState('')
@@ -209,8 +210,8 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           {logo ? <img src={logo} alt="" style={{ height: 24, objectFit: 'contain', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,.7))' }} />
             : <span style={{ fontFamily: 'Inter,sans-serif', fontSize: 10, letterSpacing: '.28em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)' }}>{venue?.name}</span>
           }
-          {show_price_estimate && price_estimate && (
-            <span style={{ fontFamily: font, fontSize: 20, fontWeight: 300, color: '#fff' }}>{formatPrice(price_estimate)}</span>
+          {show_price_estimate && displayPrice && (
+            <span style={{ fontFamily: font, fontSize: 20, fontWeight: 300, color: '#fff' }}>{formatPrice(displayPrice)}</span>
           )}
         </div>
 
@@ -231,6 +232,18 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} />
       )}
 
+      {/* ── SELECTOR DE FECHAS ── */}
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+        <DateSelector
+          slots={dateSlots}
+          primary={primary}
+          onPrimary={onPri}
+          font={font}
+          proposalId={data.id}
+          onSelect={setSelectedDateSlotIdx}
+        />
+      )}
+
       {/* ══════════════════════════════════════════
           MAIN LAYOUT — sidebar + content
       ══════════════════════════════════════════ */}
@@ -238,26 +251,22 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
 
         {/* ── Sidebar navigation ────────────────── */}
         <aside className="sidebar">
-          {on('sticky_nav') && (
-            <>
-              <div className="side-h">Contenido</div>
-              <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {SECTIONS_DEF.map(({ id, label, n }) => (
-                  <button key={id} className={`nav-item${activeSection === id ? ' active' : ''}`} onClick={() => scrollTo(id)}>
-                    <span className="side-n">{n}</span>
-                    <span className="side-l">{label}</span>
-                  </button>
-                ))}
-              </nav>
-            </>
-          )}
+          <div className="side-h">Contenido</div>
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {SECTIONS_DEF.map(({ id, label, n }) => (
+              <button key={id} className={`nav-item${activeSection === id ? ' active' : ''}`} onClick={() => scrollTo(id)}>
+                <span className="side-n">{n}</span>
+                <span className="side-l">{label}</span>
+              </button>
+            ))}
+          </nav>
 
           {/* Key info box */}
           <div className="side-box">
-            {show_price_estimate && price_estimate && (
+            {show_price_estimate && displayPrice && (
               <div style={{ marginBottom: 14 }}>
                 <div className="side-box-lbl">Estimación</div>
-                <div className="side-box-val-price">{formatPrice(price_estimate)}</div>
+                <div className="side-box-val-price">{formatPrice(displayPrice)}</div>
                 {ivaLabel(sec, true) && <div style={{ fontSize: 10, color: '#9a9590', marginTop: 3, letterSpacing: '.05em' }}>{ivaLabel(sec, true)}</div>}
               </div>
             )}
@@ -297,10 +306,10 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 <h2 className="sec-h">{(expShow as any).title || 'Vuestro día especial'}</h2>
                 <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 15, color: '#64605C', lineHeight: 1.9, maxWidth: 560 }}>{(expShow as any).body}</p>
               </FadeUp>
-              {welcomeVariant === 'welcome' && displayMsg && (
+              {on('welcome') && personal_message && (
                 <FadeUp delay={.1}>
                   <div style={{ marginTop: 36, padding: '24px 28px', borderLeft: `3px solid ${primary}`, background: '#fff', borderRadius: '0 12px 12px 0' }}>
-                    <p style={{ fontFamily: font, fontSize: 18, fontStyle: 'italic', fontWeight: 300, color: '#3a3430', lineHeight: 1.75 }}>&ldquo;{displayMsg}&rdquo;</p>
+                    <p style={{ fontFamily: font, fontSize: 18, fontStyle: 'italic', fontWeight: 300, color: '#3a3430', lineHeight: 1.75 }}>&ldquo;{personal_message}&rdquo;</p>
                     {venue?.name && <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 11, color: '#C8C3BE', marginTop: 12, letterSpacing: '.1em', textTransform: 'uppercase' }}>— {venue.name}</div>}
                   </div>
                 </FadeUp>
@@ -308,81 +317,10 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
             </div>
           )}
 
-          {/* Welcome variants — light / split / editorial */}
-          {welcomeVariant === 'welcome_light' && displayMsg && (
-            <div className="sec">
-              <TplWelcomeLight
-                message={displayMsg}
-                venueName={venue?.name}
-                imageUrl={(sec as any).welcome_light?.image_url}
-                primary={primary}
-                bg="#F8F6F3"
-                fg="#1a1614"
-                font={font}
-              />
-            </div>
-          )}
-          {welcomeVariant === 'welcome_split' && displayMsg && (
-            <div className="sec">
-              <TplWelcomeSplit
-                message={displayMsg}
-                venueName={venue?.name}
-                imageUrl={(sec as any).welcome_split?.image_url}
-                imageSide={(sec as any).welcome_split?.image_side}
-                primary={primary}
-                bg="#fff"
-                fg="#1a1614"
-                font={font}
-              />
-            </div>
-          )}
-          {welcomeVariant === 'welcome_editorial' && displayMsg && (
-            <div className="sec">
-              <TplWelcomeEditorial
-                message={displayMsg}
-                venueName={venue?.name}
-                eyebrow={(sec as any).welcome_editorial?.eyebrow}
-                primary={primary}
-                bg="#fff"
-                fg="#1a1614"
-                font={font}
-              />
-            </div>
-          )}
-
           {/* Gallery strip in content */}
           {on('gallery') && (gallery.length > 0 ? (
             <Gallery photos={gallery} primary={primary} dark={false} />
           ) : _preview ? <EmptySec label="Galería" /> : null)}
-
-          {/* Venue specs */}
-          {on('venue_specs') && (
-            <div className="sec">
-              <TplVenueSpecs
-                specs={(sec as any).venue_specs}
-                fallbackArea={techspecs?.sqm?.split('·')[0]?.trim() ?? null}
-                primary={primary}
-                fg="#1a1614"
-                font={font}
-                label="Datos del venue"
-              />
-            </div>
-          )}
-
-          {/* Single space */}
-          {on('single_space') && (
-            <div className="sec">
-              <TplSingleSpace
-                data={(sec as any).single_space}
-                fallbackImage={hero}
-                primary={primary}
-                bg="#fff"
-                fg="#1a1614"
-                font={font}
-                label="Vuestro espacio"
-              />
-            </div>
-          )}
 
           {/* Zones */}
           {on('zones') && (zonesShow.length > 0 ? (
@@ -430,21 +368,6 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
               </div>
             </div>
           ) : _preview ? <EmptySec label="Espacios" /> : null)}
-
-          {/* Space groups */}
-          {on('space_groups') && spaceGroups && spaceGroups.length > 0 && (
-            <div className="sec">
-              <SpaceGroupSelector
-                groups={spaceGroups}
-                primary={primary}
-                onPrimary={onPri}
-                dark={false}
-                font={font}
-                guestCount={guest_count ? Number(guest_count) : undefined}
-                onSelectionChange={setSelectedSpaces}
-              />
-            </div>
-          )}
 
           {/* Inclusions */}
           {on('inclusions') && (inclusionsShow.length > 0 ? (
@@ -715,62 +638,40 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           {/* Agendar visita */}
           {on('schedule_visit') && (() => {
             const sv = (sec as any).schedule_visit ?? {}
-            const variant = getActiveStyle(sec, 'schedule_visit')
-            const svTitle = sv.title || (variant === 'cta' ? 'Visitadnos en persona' : 'Agendar visita')
-            const svSub   = sv.subtitle || (variant === 'cta'
-              ? 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
-              : 'Selecciona qué prefieres y rellena tus datos. Si quieres venir a visitarnos, podrás elegir directamente fecha y hora disponibles.')
-
-            if (variant === 'cta') {
-              const svUrl = sv.url
-              const svCta = sv.cta_label || 'Reservar visita gratuita →'
-              return (
-                <div className="sec" style={{ textAlign: 'center' }}>
-                  <FadeUp>
-                    <div style={{ maxWidth: 520, margin: '0 auto' }}>
-                      <div style={{ width: 44, height: 44, borderRadius: '50%', background: `${primary}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                        <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                        </svg>
-                      </div>
-                      <div className="sec-n">Visita</div>
-                      <h2 className="sec-h" style={{ fontFamily: font }}>{svTitle}</h2>
-                      <p style={{ fontSize: '.95rem', color: '#6A6A6A', lineHeight: 1.7, marginBottom: 32 }}>{svSub}</p>
-                      {visitDone ? (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}18`, border: `1px solid ${primary}44`, borderRadius: 8, padding: '12px 24px', fontSize: '.88rem', color: primary, fontWeight: 600 }}>
-                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                          ¡Solicitud enviada! Os confirmaremos la visita pronto.
-                        </div>
-                      ) : svUrl ? (
-                        <a href={svUrl} target="_blank" rel="noopener"
-                          style={{ display: 'inline-block', background: primary, color: onPri, padding: '13px 32px', borderRadius: 6, fontSize: '.88rem', fontWeight: 600, textDecoration: 'none', letterSpacing: '.04em' }}>
-                          {svCta}
-                        </a>
-                      ) : (
-                        <button onClick={() => setVisitModalOpen(true)}
-                          style={{ background: primary, color: onPri, padding: '13px 32px', borderRadius: 6, fontSize: '.88rem', fontWeight: 600, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
-                          {svCta}
-                        </button>
-                      )}
-                      {sv.note && <p style={{ fontSize: '.78rem', color: '#9A9A9A', marginTop: 14 }}>{sv.note}</p>}
-                    </div>
-                  </FadeUp>
-                </div>
-              )
-            }
-
-            const svKinds = Array.isArray(sv.kinds) && sv.kinds.length > 0 ? sv.kinds : undefined
+            const svUrl   = sv.url
+            const svTitle = sv.title    || 'Visitadnos en persona'
+            const svSub   = sv.subtitle || 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
+            const svCta   = sv.cta_label || 'Reservar visita gratuita →'
             return (
-              <div className="sec">
+              <div className="sec" style={{ textAlign: 'center' }}>
                 <FadeUp>
-                  <div style={{ maxWidth: 720, marginLeft: 'auto', marginRight: 'auto', marginBottom: 28, textAlign: 'center' }}>
+                  <div style={{ maxWidth: 520, margin: '0 auto' }}>
+                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: `${primary}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>
+                    </div>
                     <div className="sec-n">Visita</div>
                     <h2 className="sec-h" style={{ fontFamily: font }}>{svTitle}</h2>
-                    <p style={{ fontSize: '.95rem', color: '#6A6A6A', lineHeight: 1.7 }}>{svSub}</p>
+                    <p style={{ fontSize: '.95rem', color: '#6A6A6A', lineHeight: 1.7, marginBottom: 32 }}>{svSub}</p>
+                    {visitDone ? (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}18`, border: `1px solid ${primary}44`, borderRadius: 8, padding: '12px 24px', fontSize: '.88rem', color: primary, fontWeight: 600 }}>
+                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        ¡Solicitud enviada! Os confirmaremos la visita pronto.
+                      </div>
+                    ) : svUrl ? (
+                      <a href={svUrl} target="_blank" rel="noopener"
+                        style={{ display: 'inline-block', background: primary, color: onPri, padding: '13px 32px', borderRadius: 6, fontSize: '.88rem', fontWeight: 600, textDecoration: 'none', letterSpacing: '.04em' }}>
+                        {svCta}
+                      </a>
+                    ) : (
+                      <button onClick={() => setVisitModalOpen(true)}
+                        style={{ background: primary, color: onPri, padding: '13px 32px', borderRadius: 6, fontSize: '.88rem', fontWeight: 600, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
+                        {svCta}
+                      </button>
+                    )}
+                    {sv.note && <p style={{ fontSize: '.78rem', color: '#9A9A9A', marginTop: 14 }}>{sv.note}</p>}
                   </div>
-                </FadeUp>
-                <FadeUp delay={.1}>
-                  <InquiryForm slug={data.slug} proposalId={data.id} coupleName={couple_name} kinds={svKinds} primary={primary} onPrimary={onPri} dark={false} />
                 </FadeUp>
               </div>
             )
@@ -782,6 +683,8 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
               coupleName={couple_name}
               primaryColor={primary}
               selectedSpaces={[]}
+              dateSlots={dateSlots ?? []}
+              preSelectedDateSlot={selectedDateSlotIdx}
               onClose={() => setVisitModalOpen(false)}
               onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
             />

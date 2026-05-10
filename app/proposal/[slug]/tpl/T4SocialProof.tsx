@@ -12,15 +12,11 @@ import {
   IcoCalendar, IcoUsers, IcoBuilding, IcoChat,
   formatZoneCapacities, formatZoneFeatures, ivaLabel,
   InclusionIcon, StarRating, resolveContact, VenueRentalGrid,
-  TplVenueSpecs, TplSingleSpace,
-  TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant,
 } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
+import DateSelector from './DateSelector'
 import VisitBookingModal from '@/components/VisitBookingModal'
-import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
-import InquiryForm from '@/components/InquiryForm'
-import { getActiveStyle } from '@/lib/section-styles'
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const CREAM  = '#FFFAF4'
@@ -32,7 +28,7 @@ const MUTED  = '#9C7B6A'
 const INK    = '#2A1F1A'
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
-const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, secRgb: string, font: string) => `
+const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) => `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
@@ -138,7 +134,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, se
   .t4-section-label {
     display: block; text-align: center;
     font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-    color: ${sec}; margin-bottom: 12px;
+    color: ${TERRA}; margin-bottom: 12px;
   }
   .t4-section-title {
     font-family: ${font}; font-weight: 400;
@@ -163,7 +159,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, se
     background: #fff; border-radius: 4px;
     padding: 36px 32px 28px;
     position: relative; overflow: hidden;
-    box-shadow: 0 2px 20px rgba(${secRgb},.07);
+    box-shadow: 0 2px 20px rgba(${toRgb(TERRA)},.07);
     display: flex; flex-direction: column; gap: 20px;
     border-bottom: 3px solid ${pri};
   }
@@ -194,7 +190,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, se
   }
   .t4-test-avatar-ph {
     width: 44px; height: 44px; border-radius: 50%;
-    background: linear-gradient(135deg, ${pri}, ${sec});
+    background: linear-gradient(135deg, ${pri}, ${TERRA});
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
     font-family: ${font}; color: #fff;
@@ -243,7 +239,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, se
   .t4-msg-wrap {
     max-width: 720px; margin: 0 auto; text-align: center; padding: 80px 48px;
   }
-  .t4-msg-icon { color: ${pri}; margin-bottom: 20px; display: inline-flex }
+  .t4-msg-icon { font-size: 2rem; margin-bottom: 20px }
   .t4-msg-title {
     font-family: ${font}; font-size: 1.6rem;
     color: ${INK}; margin-bottom: 20px;
@@ -270,7 +266,9 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, se
   }
   .t4-exp-img {
     width: 100%; height: 100%; object-fit: cover;
+    transition: transform .7s ease;
   }
+  .t4-exp-img-wrap:hover .t4-exp-img { transform: scale(1.04) }
 
   /* ── Packages ── */
   .t4-packages-grid {
@@ -362,7 +360,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, se
   .t4-zone-info { padding: 36px 32px; display: flex; flex-direction: column; gap: 10px }
   .t4-zone-name { font-family: ${font}; font-size: 1.4rem; color: ${INK} }
   .t4-zone-desc { font-size: .87rem; color: ${MUTED}; line-height: 1.7 }
-  .t4-zone-cap { font-size: .8rem; color: ${sec}; font-weight: 600 }
+  .t4-zone-cap { font-size: .8rem; color: ${TERRA}; font-weight: 600 }
   .t4-zone-price { font-size: .9rem; font-weight: 600; color: ${INK} }
 
   /* ── FAQ ── */
@@ -425,7 +423,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, se
   .t4-cta-av {
     width: 36px; height: 36px; border-radius: 50%;
     border: 2px solid rgba(255,255,255,.3);
-    background: linear-gradient(135deg, ${pri}, ${sec});
+    background: linear-gradient(135deg, ${pri}, ${TERRA});
     margin-left: -8px; display: flex; align-items: center; justify-content: center;
     font-size: .7rem; color: #fff; font-weight: 600;
     overflow: hidden;
@@ -580,18 +578,13 @@ function EmptySec({ label }: { label: string }) {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function T4SocialProof({ data }: { data: ProposalData }) {
-  const { sec, on, hasCatering, packagesShow, zonesShow, inclusionsShow, faqShow, expShow, testsShow, menuShow, menusStructured, menuExtras, appetizersBase, seasonsShow, collabsShow, extrasShow, accom, spaceGroups, techspecs } = extractData(data)
-  const [, setSelectedSpaces] = useState<SpaceSelection[]>([])
-  const displayMsg = data.personal_message || (sec as any).welcome_default || null
-  const welcomeVariant = pickWelcomeVariant(sec)
+  const { sec, on, hasCatering, packagesShow, zonesShow, inclusionsShow, faqShow, expShow, testsShow, menuShow, menusStructured, menuExtras, appetizersBase, seasonsShow, collabsShow, extrasShow, accom, dateSlots } = extractData(data)
 
   const _preview = !!(data as any)._preview
   const branding  = data.branding
   const primary   = branding?.primary_color || TERRA
   const priRgb    = toRgb(primary)
   const darkPri   = isDark(primary)
-  const secondary = branding?.secondary_color || TERRA
-  const secRgb    = toRgb(secondary)
   const font      = (branding as any)?.font_family || "'Playfair Display', Georgia, serif"
   const venueName = data.venue?.name || ''
   const contact   = resolveContact(data)
@@ -603,6 +596,12 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone,      setVisitDone]      = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
+
+  const selectedSlot = selectedDateSlotIdx !== null && dateSlots ? dateSlots[selectedDateSlotIdx] : null
+  const displayPrice = selectedSlot?.price_rental
+    ? parseInt(selectedSlot.price_rental.replace(/\D/g, '')) || data.price_estimate
+    : data.price_estimate
 
   useEffect(() => {
     const onScroll = () => {
@@ -637,20 +636,18 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
 
   return (
     <div className="t4 tpl-root">
-      <style dangerouslySetInnerHTML={{ __html: buildCss(primary, priRgb, darkPri, secondary, secRgb, font) }} />
+      <style dangerouslySetInnerHTML={{ __html: buildCss(primary, priRgb, darkPri, font) }} />
 
-      {/* NAV — controlled by sticky_nav toggle */}
-      {on('sticky_nav') && (
-        <nav className={`t4-nav ${scrolled ? 'scrolled' : ''}`}>
-          {branding?.logo_url
-            ? <img src={branding.logo_url} className="t4-logo" alt={venueName} />
-            : <span style={{ fontFamily: font, fontSize: '1.1rem', fontWeight: 600, color: scrolled ? INK : '#fff' }}>{venueName}</span>
-          }
-          <button className="t4-nav-cta" onClick={() => (document.getElementById(hasCatering ? 'menu' : 't4-cta') ?? document.getElementById('t4-cta'))?.scrollIntoView({ behavior: 'smooth' })}>
-            {hasCatering ? 'Ver menús' : 'Contactar'}
-          </button>
-        </nav>
-      )}
+      {/* NAV */}
+      <nav className={`t4-nav ${scrolled ? 'scrolled' : ''}`}>
+        {branding?.logo_url
+          ? <img src={branding.logo_url} className="t4-logo" alt={venueName} />
+          : <span style={{ fontFamily: font, fontSize: '1.1rem', fontWeight: 600, color: scrolled ? INK : '#fff' }}>{venueName}</span>
+        }
+        <button className="t4-nav-cta" onClick={() => (document.getElementById(hasCatering ? 'menu' : 't4-cta') ?? document.getElementById('t4-cta'))?.scrollIntoView({ behavior: 'smooth' })}>
+          {hasCatering ? 'Ver menús' : 'Contactar'}
+        </button>
+      </nav>
 
       {/* FIRST SCREEN — hero + stats lock to 100vh */}
       <div className="t4-first-screen">
@@ -672,8 +669,8 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
                 {data.guest_count && (
                   <span className="t4-hero-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IcoUsers width={12} height={12} /> {data.guest_count} invitados</span>
                 )}
-                {data.show_price_estimate && data.price_estimate && (
-                  <span className="t4-hero-pill pri-pill">Desde {formatPrice(data.price_estimate)}{ivaLabel(sec, true) ? ` · ${ivaLabel(sec, true)}` : ''}</span>
+                {data.show_price_estimate && displayPrice && (
+                  <span className="t4-hero-pill pri-pill">Desde {formatPrice(displayPrice)}{ivaLabel(sec, true) ? ` · ${ivaLabel(sec, true)}` : ''}</span>
                 )}
               </div>
             </FadeIn>
@@ -687,6 +684,18 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />
+      )}
+
+      {/* ── SELECTOR DE FECHAS ── */}
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+        <DateSelector
+          slots={dateSlots}
+          primary={primary}
+          onPrimary={darkPri ? '#fff' : '#111'}
+          font={font}
+          proposalId={data.id}
+          onSelect={setSelectedDateSlotIdx}
+        />
       )}
 
       {/* TESTIMONIALS — first content section */}
@@ -721,51 +730,17 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         </section>
       ) : _preview ? <EmptySec label="Galería" /> : null)}
 
-      {/* PERSONAL MESSAGE — variantes */}
-      {welcomeVariant === 'welcome' && displayMsg && (
-        <section id="sec-welcome" className="t4-msg-bg">
+      {/* PERSONAL MESSAGE */}
+      {on('welcome') && data.personal_message && (
+        <section className="t4-msg-bg">
           <FadeUp>
             <div className="t4-msg-wrap">
-              <div className="t4-msg-icon"><InclusionIcon name="mail" size={36} color={primary} strokeWidth={1.6} /></div>
+              <div className="t4-msg-icon">💌</div>
               <h2 className="t4-msg-title">Un mensaje para vosotros</h2>
-              <p className="t4-msg-text">{displayMsg}</p>
+              <p className="t4-msg-text">{data.personal_message}</p>
             </div>
           </FadeUp>
         </section>
-      )}
-      {welcomeVariant === 'welcome_light' && displayMsg && (
-        <TplWelcomeLight
-          message={displayMsg}
-          venueName={data.venue?.name}
-          imageUrl={(sec as any).welcome_light?.image_url}
-          primary={primary}
-          bg={WARM}
-          fg={INK}
-          font={font}
-        />
-      )}
-      {welcomeVariant === 'welcome_split' && displayMsg && (
-        <TplWelcomeSplit
-          message={displayMsg}
-          venueName={data.venue?.name}
-          imageUrl={(sec as any).welcome_split?.image_url}
-          imageSide={(sec as any).welcome_split?.image_side}
-          primary={primary}
-          bg={CREAM}
-          fg={INK}
-          font={font}
-        />
-      )}
-      {welcomeVariant === 'welcome_editorial' && displayMsg && (
-        <TplWelcomeEditorial
-          message={displayMsg}
-          venueName={data.venue?.name}
-          eyebrow={(sec as any).welcome_editorial?.eyebrow}
-          primary={primary}
-          bg={CREAM}
-          fg={INK}
-          font={font}
-        />
       )}
 
       {/* EXPERIENCE */}
@@ -856,33 +831,6 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         </section>
       ) : _preview ? <EmptySec label="Paquetes" /> : null)}
 
-      {/* VENUE SPECS */}
-      {on('venue_specs') && (
-        <section className="t4-section" style={{ background: CREAM }}>
-          <TplVenueSpecs
-            specs={(sec as any).venue_specs}
-            fallbackArea={techspecs?.sqm?.split('·')[0]?.trim() ?? null}
-            primary={primary}
-            fg={INK}
-            font={font}
-            label="Datos del venue"
-          />
-        </section>
-      )}
-
-      {/* SINGLE SPACE */}
-      {on('single_space') && (
-        <TplSingleSpace
-          data={(sec as any).single_space}
-          fallbackImage={heroPhoto}
-          primary={primary}
-          bg={WARM}
-          fg={INK}
-          font={font}
-          label="Vuestro espacio"
-        />
-      )}
-
       {/* ZONES */}
       {on('zones') && (zonesShow.length > 0 ? (
         <section className="t4-section" style={{ background: WARM }}>
@@ -934,21 +882,6 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           </div>
         </section>
       ) : _preview ? <EmptySec label="Espacios" /> : null)}
-
-      {/* SPACE GROUPS */}
-      {on('space_groups') && spaceGroups && spaceGroups.length > 0 && (
-        <section className="t4-section" style={{ background: CREAM }}>
-          <SpaceGroupSelector
-            groups={spaceGroups}
-            primary={primary}
-            onPrimary={darkPri ? '#fff' : '#111'}
-            dark={false}
-            font={font}
-            guestCount={data.guest_count ? Number(data.guest_count) : undefined}
-            onSelectionChange={setSelectedSpaces}
-          />
-        </section>
-      )}
 
       {/* VENUE RENTAL — grid temporada × día */}
       {on('venue_rental') && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
@@ -1063,7 +996,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
                 ) : null}
                 {accom.nearby && (
                   <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${SAND}` }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: secondary, marginBottom: 6 }}>Alojamientos cercanos</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: TERRA, marginBottom: 6 }}>Alojamientos cercanos</div>
                     <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.7 }}>{accom.nearby}</p>
                   </div>
                 )}
@@ -1112,7 +1045,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
               {collabsShow.map((c: any, i: number) => (
                 <FadeUp key={i} delay={(i % 4) * .04}>
                   <div style={{ background: '#fff', borderRadius: 4, padding: '20px 22px', boxShadow: '0 1px 12px rgba(0,0,0,.04)', height: '100%' }}>
-                    <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: secondary, marginBottom: 8 }}>{c.category}</div>
+                    <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: TERRA, marginBottom: 8 }}>{c.category}</div>
                     <div style={{ fontFamily: font, fontSize: 18, color: INK, marginBottom: 4 }}>{c.name}</div>
                     {c.description && <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.55 }}>{c.description}</div>}
                   </div>
@@ -1144,65 +1077,41 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       {/* AGENDAR VISITA */}
       {on('schedule_visit') && (() => {
         const sv = (sec as any).schedule_visit ?? {}
-        const variant = getActiveStyle(sec, 'schedule_visit')
-        const svTitle = sv.title || (variant === 'cta' ? 'Visitadnos en persona' : 'Agendar visita')
-        const svSub   = sv.subtitle || (variant === 'cta'
-          ? 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
-          : 'Selecciona qué prefieres y rellena tus datos. Si quieres venir a visitarnos, podrás elegir directamente fecha y hora disponibles.')
-
-        if (variant === 'cta') {
-          const svUrl = sv.url
-          const svCta = sv.cta_label || 'Reservar visita gratuita →'
-          return (
-            <section className="t4-section" style={{ background: WARM, textAlign: 'center' }}>
-              <div className="t4-inner">
-                <FadeUp>
-                  <div style={{ maxWidth: 540, margin: '0 auto' }}>
-                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: `${primary}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-                      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                      </svg>
-                    </div>
-                    <span className="t4-section-label">Visita</span>
-                    <h2 className="t4-section-title" style={{ marginBottom: 16 }}>{svTitle}</h2>
-                    <p style={{ fontSize: '.95rem', color: MUTED, lineHeight: 1.7, marginBottom: 36 }}>{svSub}</p>
-                    {visitDone ? (
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}18`, border: `1px solid ${primary}44`, borderRadius: 10, padding: '14px 28px', fontSize: '.88rem', color: primary, fontWeight: 600 }}>
-                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        ¡Solicitud enviada! Os confirmaremos la visita pronto.
-                      </div>
-                    ) : svUrl ? (
-                      <a href={svUrl} target="_blank" rel="noopener"
-                        style={{ display: 'inline-block', background: primary, color: darkPri ? '#fff' : '#111', padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 700, textDecoration: 'none', letterSpacing: '.04em' }}>
-                        {svCta}
-                      </a>
-                    ) : (
-                      <button onClick={() => setVisitModalOpen(true)}
-                        style={{ background: primary, color: darkPri ? '#fff' : '#111', padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 700, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
-                        {svCta}
-                      </button>
-                    )}
-                    {sv.note && <p style={{ fontSize: '.8rem', color: MUTED, marginTop: 16 }}>{sv.note}</p>}
-                  </div>
-                </FadeUp>
-              </div>
-            </section>
-          )
-        }
-
-        const svKinds = Array.isArray(sv.kinds) && sv.kinds.length > 0 ? sv.kinds : undefined
+        const svUrl   = sv.url
+        const svTitle = sv.title    || 'Visitadnos en persona'
+        const svSub   = sv.subtitle || 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
+        const svCta   = sv.cta_label || 'Reservar visita gratuita →'
         return (
-          <section className="t4-section" style={{ background: WARM }}>
+          <section className="t4-section" style={{ background: WARM, textAlign: 'center' }}>
             <div className="t4-inner">
               <FadeUp>
-                <div style={{ maxWidth: 720, marginLeft: 'auto', marginRight: 'auto', marginBottom: 28, textAlign: 'center' }}>
+                <div style={{ maxWidth: 540, margin: '0 auto' }}>
+                  <div style={{ width: 48, height: 48, borderRadius: '50%', background: `${primary}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                  </div>
                   <span className="t4-section-label">Visita</span>
                   <h2 className="t4-section-title" style={{ marginBottom: 16 }}>{svTitle}</h2>
-                  <p style={{ fontSize: '.95rem', color: MUTED, lineHeight: 1.7 }}>{svSub}</p>
+                  <p style={{ fontSize: '.95rem', color: MUTED, lineHeight: 1.7, marginBottom: 36 }}>{svSub}</p>
+                  {visitDone ? (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}18`, border: `1px solid ${primary}44`, borderRadius: 10, padding: '14px 28px', fontSize: '.88rem', color: primary, fontWeight: 600 }}>
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      ¡Solicitud enviada! Os confirmaremos la visita pronto.
+                    </div>
+                  ) : svUrl ? (
+                    <a href={svUrl} target="_blank" rel="noopener"
+                      style={{ display: 'inline-block', background: primary, color: darkPri ? '#fff' : '#111', padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 700, textDecoration: 'none', letterSpacing: '.04em' }}>
+                      {svCta}
+                    </a>
+                  ) : (
+                    <button onClick={() => setVisitModalOpen(true)}
+                      style={{ background: primary, color: darkPri ? '#fff' : '#111', padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 700, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
+                      {svCta}
+                    </button>
+                  )}
+                  {sv.note && <p style={{ fontSize: '.8rem', color: MUTED, marginTop: 16 }}>{sv.note}</p>}
                 </div>
-              </FadeUp>
-              <FadeUp delay={.1}>
-                <InquiryForm slug={data.slug} proposalId={data.id} coupleName={data.couple_name} kinds={svKinds} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} />
               </FadeUp>
             </div>
           </section>
@@ -1215,6 +1124,8 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           coupleName={data.couple_name}
           primaryColor={primary}
           selectedSpaces={[]}
+          dateSlots={dateSlots ?? []}
+          preSelectedDateSlot={selectedDateSlotIdx}
           onClose={() => setVisitModalOpen(false)}
           onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
         />

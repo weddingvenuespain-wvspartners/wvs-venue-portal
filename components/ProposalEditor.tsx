@@ -427,9 +427,59 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     return pkg.day_from === pkg.day_to ? DAYS[pkg.day_from] : `${DAYS[pkg.day_from]} → ${DAYS[pkg.day_to]}`
   }
 
+  // Regroup date slots by price so each slot has dates with the same price
+  const regroupDateSlots = (modalityId: string) => {
+    const currentSlots: any[] = (sections as any).date_slots ?? []
+    const allDates: string[] = currentSlots.flatMap((s: any) => s.dates ?? []).filter(Boolean)
+    if (!allDates.length || !modalityId) return
+
+    // Group dates by price
+    const byPrice = new Map<string, string[]>()
+    for (const d of allDates) {
+      const price = getPriceForDate(modalityId, d)
+      const key = price !== null ? String(price) : 'null'
+      if (!byPrice.has(key)) byPrice.set(key, [])
+      byPrice.get(key)!.push(d)
+    }
+
+    // If all dates have the same price (or no price), keep single slot
+    if (byPrice.size <= 1) {
+      const price = getPriceForDate(modalityId, allDates[0])
+      const label = getMatchedPackageLabel(modalityId, allDates[0])
+      setSections((s: any) => ({
+        ...s,
+        date_slots: [{
+          label: label || 'Fechas propuestas',
+          dates: allDates,
+          ...(price !== null ? { price_rental: `${price.toLocaleString('es-ES')}€` } : {}),
+        }],
+        sections_enabled: { ...(s.sections_enabled ?? {}), date_slots: true },
+      }))
+      return
+    }
+
+    // Multiple price groups → separate slots
+    const newSlots = Array.from(byPrice.entries()).map(([key, dates]) => {
+      const price = key !== 'null' ? parseFloat(key) : null
+      const label = getMatchedPackageLabel(modalityId, dates[0])
+      return {
+        label: label || (price !== null ? `${price.toLocaleString('es-ES')}€` : 'Fechas propuestas'),
+        dates,
+        ...(price !== null ? { price_rental: `${price.toLocaleString('es-ES')}€` } : {}),
+      }
+    })
+
+    setSections((s: any) => ({
+      ...s,
+      date_slots: newSlots,
+      sections_enabled: { ...(s.sections_enabled ?? {}), date_slots: true },
+    }))
+  }
+
   const onModalityChange = (modalityId: string) => {
     const price = modalityId && form.wedding_date ? getPriceForDate(modalityId, form.wedding_date) : null
     setForm(f => ({ ...f, modality_id: modalityId, ...(price !== null ? { price_estimate: String(price) } : {}) }))
+    if (modalityId) regroupDateSlots(modalityId)
   }
 
   const onWeddingDateChange = (date: string) => {
@@ -1806,13 +1856,17 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
           onConfirm={(dates) => {
             const first = dates[0] ?? ''
             onWeddingDateChange(first)
-            if (dates.length > 1) {
-              setSections((s: any) => ({
-                ...s,
-                date_slots: [{ label: 'Fechas propuestas', dates }],
-              }))
-            }
+            // Create date_slots and group by price if modality exists
+            setSections((s: any) => ({
+              ...s,
+              date_slots: [{ label: 'Fechas propuestas', dates }],
+              sections_enabled: { ...(s.sections_enabled ?? {}), date_slots: true },
+            }))
             setShowDateModal(false)
+            // After state update, regroup by price if modality is selected
+            if (form.modality_id) {
+              setTimeout(() => regroupDateSlots(form.modality_id), 0)
+            }
           }}
         />
       )}

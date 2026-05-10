@@ -5,12 +5,10 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { buildSingleFontUrl } from '@/lib/fonts'
-import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, TplStickyNav, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, type ProposalData } from './shared'
+import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, type ProposalData } from './shared'
 import { WeddingProposal } from './WeddingProposal'
+import DateSelector from './DateSelector'
 import VisitBookingModal from '@/components/VisitBookingModal'
-import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
-import InquiryForm from '@/components/InquiryForm'
-import { getActiveStyle } from '@/lib/section-styles'
 
 function EmptySec({ label }: { label: string }) {
   return (
@@ -27,10 +25,7 @@ function EmptySec({ label }: { label: string }) {
 
 export default function T2Emocion({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
-  const { sec, on, hasCatering, packagesShow, inclusionsShow, testsShow, extrasShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, collabsShow, accom, spaceGroups, techspecs } = extractData(data)
-  const [, setSelectedSpaces] = useState<SpaceSelection[]>([])
-  const displayMsg = data.personal_message || (sec as any).welcome_default || null
-  const welcomeVariant = pickWelcomeVariant(sec)
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, testsShow, extrasShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, collabsShow, accom, dateSlots } = extractData(data)
   const _preview = !!(data as any)._preview
 
   const primary = branding?.primary_color ?? '#6B4F3A'
@@ -45,6 +40,12 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
 
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone,      setVisitDone]      = useState(false)
+  const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
+
+  const selectedSlot = selectedDateSlotIdx !== null && dateSlots ? dateSlots[selectedDateSlotIdx] : null
+  const displayPrice = selectedSlot?.price_rental
+    ? parseInt(selectedSlot.price_rental.replace(/\D/g, '')) || price_estimate
+    : price_estimate
   const [heroLoaded, setHeroLoaded] = useState(false)
   const heroImgRef = useRef<HTMLImageElement>(null)
   useEffect(() => { if (heroImgRef.current?.complete) setHeroLoaded(true) }, [])
@@ -105,33 +106,9 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
     #cta .inp:focus{border-bottom-color:rgba(255,255,255,.7)}
   `
 
-  const stickyLinks = ([
-    welcomeVariant && displayMsg ? { label: 'Bienvenida', anchor: 'sec-welcome' } : null,
-    on('experience') && (expShow as any)?.body ? { label: 'Historia', anchor: 'sec-experience' } : null,
-    on('gallery') && gallery.length > 0 ? { label: 'Galería', anchor: 'sec-gallery' } : null,
-    on('single_space') && (sec as any).single_space?.title ? { label: 'Espacio', anchor: 'sec-single-space' } : null,
-    on('zones') && zonesShow.length > 0 ? { label: 'Espacios', anchor: 'sec-zones' } : null,
-    hasCatering ? { label: 'Menús', anchor: 'menu' } : null,
-    on('schedule_visit') ? { label: 'Visita', anchor: 'sec-schedule' } : null,
-    contactOn ? { label: 'Contacto', anchor: 'cta' } : null,
-  ].filter(Boolean) as { label: string; anchor: string }[])
-
   return (
     <div className="tpl-root" style={{ fontFamily: font, background: CREAM, color: '#2c2418', minHeight: '100vh' }}>
       <style dangerouslySetInnerHTML={{ __html: css }} />
-
-      {/* ── STICKY NAV ── */}
-      {on('sticky_nav') && (
-        <TplStickyNav
-          venueName={venue?.name}
-          logoUrl={logo}
-          primary={primary}
-          bg={CREAM}
-          fg="#2c2418"
-          fontSerif={font}
-          links={stickyLinks}
-        />
-      )}
 
       {/* ══════════════════════════════════════════
           HERO — minimal, image is everything
@@ -184,11 +161,23 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} />
       )}
 
+      {/* ── SELECTOR DE FECHAS ── */}
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+        <DateSelector
+          slots={dateSlots}
+          primary={primary}
+          onPrimary={onPri}
+          font={font}
+          proposalId={data.id}
+          onSelect={setSelectedDateSlotIdx}
+        />
+      )}
+
       {/* ══════════════════════════════════════════
           GALLERY — full-bleed, immediately
       ══════════════════════════════════════════ */}
       {on('gallery') && (gallery.length > 0 ? (
-        <section id="sec-gallery">
+        <section>
           <FadeIn>
             <Gallery photos={gallery} primary={primary} dark={false} />
           </FadeIn>
@@ -197,16 +186,16 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
 
 
       {/* ══════════════════════════════════════════
-          PERSONAL MESSAGE — variantes (default / light / split / editorial)
+          PERSONAL MESSAGE — editorial quote
       ══════════════════════════════════════════ */}
-      {welcomeVariant === 'welcome' && displayMsg && (
-        <section id="sec-welcome" style={{ background: '#fff', padding: '100px 0' }}>
+      {on('welcome') && personal_message && (
+        <section style={{ background: '#fff', padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
                 <div className="serif" style={{ fontSize: 120, fontWeight: 300, color: `rgba(${rgb},.1)`, lineHeight: 1, marginBottom: -28, fontStyle: 'italic' }}>"</div>
                 <p className="serif" style={{ fontSize: 'clamp(21px,3.2vw,28px)', fontWeight: 300, fontStyle: 'italic', color: '#3a2f28', lineHeight: 1.8, marginBottom: 36 }}>
-                  {displayMsg}
+                  {personal_message}
                 </p>
                 <div className="orn" style={{ maxWidth: 280 }}>
                   {venue?.name && <span className="sans" style={{ fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: `rgba(${rgb},.5)` }}>{venue.name}</span>}
@@ -216,47 +205,13 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           </div>
         </section>
       )}
-      {welcomeVariant === 'welcome_light' && displayMsg && (
-        <TplWelcomeLight
-          message={displayMsg}
-          venueName={venue?.name}
-          imageUrl={(sec as any).welcome_light?.image_url}
-          primary={primary}
-          bg={WARM}
-          fg="#2c2418"
-          font={font}
-        />
-      )}
-      {welcomeVariant === 'welcome_split' && displayMsg && (
-        <TplWelcomeSplit
-          message={displayMsg}
-          venueName={venue?.name}
-          imageUrl={(sec as any).welcome_split?.image_url}
-          imageSide={(sec as any).welcome_split?.image_side}
-          primary={primary}
-          bg={CREAM}
-          fg="#2c2418"
-          font={font}
-        />
-      )}
-      {welcomeVariant === 'welcome_editorial' && displayMsg && (
-        <TplWelcomeEditorial
-          message={displayMsg}
-          venueName={venue?.name}
-          eyebrow={(sec as any).welcome_editorial?.eyebrow}
-          primary={primary}
-          bg="#fff"
-          fg="#2c2418"
-          font={font}
-        />
-      )}
 
 
       {/* ══════════════════════════════════════════
           EXPERIENCE — full width editorial text
       ══════════════════════════════════════════ */}
       {on('experience') && expShow && (expShow as any).body && (
-        <section id="sec-experience" style={{ background: WARM, padding: '100px 0' }}>
+        <section style={{ background: WARM, padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 52 }}>
@@ -278,36 +233,11 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       )}
 
 
-      {/* ── VENUE SPECS ── */}
-      {on('venue_specs') && (
-        <TplVenueSpecs
-          specs={(sec as any).venue_specs}
-          fallbackArea={techspecs?.sqm?.split('·')[0]?.trim() ?? null}
-          primary={primary}
-          fg="#2c2418"
-          font={font}
-          label="Datos del venue"
-        />
-      )}
-
-      {/* ── SINGLE SPACE ── */}
-      {on('single_space') && (
-        <TplSingleSpace
-          data={(sec as any).single_space}
-          fallbackImage={hero}
-          primary={primary}
-          bg="#fff"
-          fg="#2c2418"
-          font={font}
-          label="Vuestro espacio"
-        />
-      )}
-
       {/* ══════════════════════════════════════════
           ZONES
       ══════════════════════════════════════════ */}
       {on('zones') && (zonesShow.length > 0 ? (
-        <section id="sec-zones" style={{ background: CREAM, padding: '100px 0' }}>
+        <section style={{ background: CREAM, padding: '100px 0' }}>
           <div className="w-full">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 56 }}>
@@ -355,19 +285,6 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           </div>
         </section>
       ) : _preview ? <EmptySec label="Espacios" /> : null)}
-
-      {/* ── SPACE GROUPS ── */}
-      {on('space_groups') && spaceGroups && spaceGroups.length > 0 && (
-        <SpaceGroupSelector
-          groups={spaceGroups}
-          primary={primary}
-          onPrimary={onPri}
-          dark={false}
-          font={font}
-          guestCount={guest_count ? Number(guest_count) : undefined}
-          onSelectionChange={setSelectedSpaces}
-        />
-      )}
 
       {/* ══════════════════════════════════════════
           VENUE RENTAL — grid temporada × día
@@ -703,60 +620,39 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       ══════════════════════════════════════════ */}
       {on('schedule_visit') && (() => {
         const sv = (sec as any).schedule_visit ?? {}
-        const variant = getActiveStyle(sec, 'schedule_visit')
-        const svTitle = sv.title || (variant === 'cta' ? 'Visitadnos en persona' : 'Agendar visita')
-        const svSub   = sv.subtitle || (variant === 'cta'
-          ? 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
-          : 'Selecciona qué prefieres y rellena tus datos. Si quieres venir a visitarnos, podrás elegir directamente fecha y hora disponibles.')
-
-        if (variant === 'cta') {
-          const svUrl = sv.url
-          const svCta = sv.cta_label || 'Reservar visita gratuita →'
-          return (
-            <section id="sec-schedule" style={{ padding: '100px 0', background: '#FAF7F2', textAlign: 'center' }}>
-              <FadeUp>
-                <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 24px' }}>
-                  <div style={{ width: 48, height: 48, borderRadius: '50%', background: `${primary}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-                    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                    </svg>
-                  </div>
-                  <h2 style={{ fontFamily: font, fontSize: 'clamp(1.8rem,3vw,2.6rem)', color: '#2A1F1A', marginBottom: 16, lineHeight: 1.2 }}>{svTitle}</h2>
-                  <p style={{ fontSize: '1rem', color: '#7A6A5A', lineHeight: 1.7, marginBottom: 36 }}>{svSub}</p>
-                  {visitDone ? (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}18`, border: `1px solid ${primary}44`, borderRadius: 10, padding: '14px 28px', fontSize: '.9rem', color: primary, fontWeight: 600 }}>
-                      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      ¡Solicitud enviada! Os confirmaremos la visita pronto.
-                    </div>
-                  ) : svUrl ? (
-                    <a href={svUrl} target="_blank" rel="noopener"
-                      style={{ display: 'inline-block', background: primary, color: onPri, padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 600, textDecoration: 'none', letterSpacing: '.04em' }}>
-                      {svCta}
-                    </a>
-                  ) : (
-                    <button onClick={() => setVisitModalOpen(true)}
-                      style={{ background: primary, color: onPri, padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 600, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
-                      {svCta}
-                    </button>
-                  )}
-                  {sv.note && <p style={{ fontSize: '.8rem', color: '#9A8A7A', marginTop: 16 }}>{sv.note}</p>}
-                </div>
-              </FadeUp>
-            </section>
-          )
-        }
-
-        const svKinds = Array.isArray(sv.kinds) && sv.kinds.length > 0 ? sv.kinds : undefined
+        const svUrl   = sv.url
+        const svTitle = sv.title    || 'Visitadnos en persona'
+        const svSub   = sv.subtitle || 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
+        const svCta   = sv.cta_label || 'Reservar visita gratuita →'
         return (
-          <section id="sec-schedule" style={{ padding: '100px 0', background: '#FAF7F2' }}>
+          <section id="sec-schedule" style={{ padding: '100px 0', background: '#FAF7F2', textAlign: 'center' }}>
             <FadeUp>
-              <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px', textAlign: 'center' }}>
+              <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 24px' }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: `${primary}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                  <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                </div>
                 <h2 style={{ fontFamily: font, fontSize: 'clamp(1.8rem,3vw,2.6rem)', color: '#2A1F1A', marginBottom: 16, lineHeight: 1.2 }}>{svTitle}</h2>
                 <p style={{ fontSize: '1rem', color: '#7A6A5A', lineHeight: 1.7, marginBottom: 36 }}>{svSub}</p>
+                {visitDone ? (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}18`, border: `1px solid ${primary}44`, borderRadius: 10, padding: '14px 28px', fontSize: '.9rem', color: primary, fontWeight: 600 }}>
+                    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ¡Solicitud enviada! Os confirmaremos la visita pronto.
+                  </div>
+                ) : svUrl ? (
+                  <a href={svUrl} target="_blank" rel="noopener"
+                    style={{ display: 'inline-block', background: primary, color: onPri, padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 600, textDecoration: 'none', letterSpacing: '.04em' }}>
+                    {svCta}
+                  </a>
+                ) : (
+                  <button onClick={() => setVisitModalOpen(true)}
+                    style={{ background: primary, color: onPri, padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 600, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
+                    {svCta}
+                  </button>
+                )}
+                {sv.note && <p style={{ fontSize: '.8rem', color: '#9A8A7A', marginTop: 16 }}>{sv.note}</p>}
               </div>
-            </FadeUp>
-            <FadeUp delay={.1}>
-              <InquiryForm slug={data.slug} proposalId={data.id} coupleName={couple_name} kinds={svKinds} primary={primary} onPrimary={onPri} dark={false} />
             </FadeUp>
           </section>
         )
@@ -768,6 +664,8 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           coupleName={couple_name}
           primaryColor={primary}
           selectedSpaces={[]}
+          dateSlots={dateSlots ?? []}
+          preSelectedDateSlot={selectedDateSlotIdx}
           onClose={() => setVisitModalOpen(false)}
           onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
         />

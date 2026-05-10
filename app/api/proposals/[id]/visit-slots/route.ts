@@ -23,7 +23,7 @@ export async function GET(
       { cookies: { get: (n: string) => cookieStore.get(n)?.value, set() {}, remove() {} } }
     )
 
-    // 1. Get proposal → user_id, venue_id
+    // 1. Get proposal → user_id + venue_id
     const { data: proposal } = await supabase
       .from('proposals')
       .select('user_id, venue_id')
@@ -32,13 +32,12 @@ export async function GET(
 
     if (!proposal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // 2. Get visit_availability config
-    let settingsQuery = supabase
+    // 2. Get visit_availability config (by venue_id for multi-venue support)
+    const { data: settings } = await supabase
       .from('venue_settings')
       .select('visit_availability')
-      .eq('user_id', proposal.user_id)
-    if (proposal.venue_id) settingsQuery = settingsQuery.eq('venue_id', proposal.venue_id)
-    const { data: settings } = await settingsQuery.maybeSingle()
+      .eq('venue_id', proposal.venue_id)
+      .maybeSingle()
 
     const config: VisitAvailability | null = settings?.visit_availability ?? null
     if (!config?.schedule?.length) return NextResponse.json({ slots: {} })
@@ -50,36 +49,19 @@ export async function GET(
     const horizonIso = dateToIso(horizon)
 
     // 3. Already-scheduled visits (block those time slots)
-    // Pull from both sources so we cover proposals with and without a linked
-    // lead: leads.visit_date is set when a proposal has a lead; otherwise the
-    // booking only lives in proposal_inquiries.
-    const [visitsRes, inquiriesRes] = await Promise.all([
-      supabase
-        .from('leads')
-        .select('visit_date, visit_time')
-        .eq('user_id', proposal.user_id)
-        .eq('status', 'visit_scheduled')
-        .gte('visit_date', todayIso)
-        .lte('visit_date', horizonIso),
-      supabase
-        .from('proposal_inquiries')
-        .select('payload, preferred_dates, status')
-        .eq('user_id', proposal.user_id)
-        .eq('kind', 'visit')
-        .neq('status', 'closed'),
-    ])
+    const { data: visits } = await supabase
+      .from('leads')
+      .select('visit_date, visit_time')
+      .eq('user_id', proposal.user_id)
+      .eq('status', 'visit_scheduled')
+      .gte('visit_date', todayIso)
+      .lte('visit_date', horizonIso)
 
     const takenSlots: Record<string, Set<string>> = {}
-    const addTaken = (date: string | null | undefined, time: string | null | undefined) => {
-      if (!date || !time) return
-      if (date < todayIso || date > horizonIso) return
-      if (!takenSlots[date]) takenSlots[date] = new Set()
-      takenSlots[date].add(time)
-    }
-    for (const v of visitsRes.data ?? []) addTaken(v.visit_date, v.visit_time)
-    for (const inq of inquiriesRes.data ?? []) {
-      const p = (inq as any).payload || {}
-      addTaken(p.date ?? (inq as any).preferred_dates?.[0], p.time)
+    for (const v of visits ?? []) {
+      if (!v.visit_date || !v.visit_time) continue
+      if (!takenSlots[v.visit_date]) takenSlots[v.visit_date] = new Set()
+      takenSlots[v.visit_date].add(v.visit_time)
     }
 
     // 4. Blocked calendar dates — normalize legacy string[] to BlockedDate[]

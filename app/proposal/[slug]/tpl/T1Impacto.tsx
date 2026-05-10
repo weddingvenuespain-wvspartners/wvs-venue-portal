@@ -5,41 +5,13 @@
 //            → Qué incluye → Testimoniales → Colaboradores → Extras → FAQ → CTA
 
 import { useEffect, useRef, useState } from 'react'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, TestimonialsFeatured, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, StarRating, resolveContact, type ProposalData } from './shared'
-import InquiryForm from '@/components/InquiryForm'
-import VisitBookingModal from '@/components/VisitBookingModal'
+import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, FaqAccordion, FaqCards, FaqNumbered, StarRating, resolveContact, type ProposalData } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 import DateSelector from './DateSelector'
+import VisitBookingModal from '@/components/VisitBookingModal'
 import { getActiveStyle, isSectionGroupEnabled } from '@/lib/section-styles'
-
-function ZoneSlider({ photos, name }: { photos: string[]; name: string }) {
-  const [idx, setIdx] = useState(0)
-  if (photos.length === 1) {
-    return <img src={photos[0]} alt={name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
-  }
-  return (
-    <>
-      <img src={photos[idx]} alt={name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'opacity .4s' }}
-        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
-      <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6, zIndex: 2 }}>
-        {photos.map((_, i) => (
-          <button key={i} onClick={() => setIdx(i)} style={{ width: 8, height: 8, borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === idx ? '#fff' : 'rgba(255,255,255,.4)', transition: 'background .2s' }} />
-        ))}
-      </div>
-      {photos.length > 1 && (
-        <>
-          <button onClick={() => setIdx(i => (i - 1 + photos.length) % photos.length)}
-            style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,.4)', border: 'none', color: '#fff', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
-          <button onClick={() => setIdx(i => (i + 1) % photos.length)}
-            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,.4)', border: 'none', color: '#fff', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
-        </>
-      )}
-    </>
-  )
-}
 
 function EmptySec({ label }: { label: string }) {
   return (
@@ -89,18 +61,22 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const contactOn = on('contact') && (contact.phone || contact.email)
   const waHref = contact.phone ? `https://wa.me/${contact.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, he visto la propuesta para ${couple_name} y me gustaría hablar con vosotros.`)}` : ''
   const mailHref = contact.email ? `mailto:${contact.email}?subject=${encodeURIComponent(`Propuesta ${couple_name}`)}` : ''
-  const scrollToContact = () => {
-    const target = on('schedule_visit') ? 'sec-schedule' : 't1-cta'
-    document.getElementById(target)?.scrollIntoView({ behavior: 'smooth' })
-  }
+  const scrollToContact = () => document.getElementById('t1-cta')?.scrollIntoView({ behavior: 'smooth' })
 
   const [scrolled, setScrolled]     = useState(false)
   const [ctaBar, setCtaBar]         = useState(false)
   const [openFaq, setOpenFaq]       = useState<number | null>(null)
-  const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone, setVisitDone]           = useState(false)
+  const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
   const heroRef                     = useRef<HTMLImageElement>(null)
+
+  // Dynamic price: if a date slot with different price is selected, use that price
+  const selectedSlot = selectedDateSlotIdx !== null && dateSlots ? dateSlots[selectedDateSlotIdx] : null
+  const displayPrice = selectedSlot?.price_rental
+    ? parseInt(selectedSlot.price_rental.replace(/\D/g, '')) || price_estimate
+    : price_estimate
 
   useEffect(() => {
     const fn = () => {
@@ -203,7 +179,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-hero{position:relative;height:100svh;min-height:620px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;background:radial-gradient(circle at 30% 40%,rgba(${rgb},.35),${pal.heroFade} 65%)}
     .t1-hero-img{position:absolute;inset:0;width:100%;height:120%;object-fit:cover;object-position:center 20%;transform-origin:center top}
     .t1-hero-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.15) 0%,rgba(0,0,0,.0) 30%,rgba(0,0,0,.7) 72%,rgba(0,0,0,.98) 100%)}
-    @keyframes zoom{from{transform:scale(1.0) translateY(0)}to{transform:scale(1.0) translateY(0)}}
+    @keyframes zoom{from{transform:scale(1.06) translateY(0)}to{transform:scale(1.0) translateY(0)}}
     @keyframes hf{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
     .ha{animation:hf .9s ease both}
 
@@ -230,7 +206,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-story-text{padding:80px 64px;background:${pal.surfaceAlt}}
     .t1-story-body{font-size:.97rem;color:${fg(.55)};line-height:1.9;white-space:pre-wrap;margin-top:4px;overflow-wrap:break-word}
     .t1-story-img{overflow:hidden;min-height:500px;position:relative;background:linear-gradient(135deg,rgba(${rgb},.25),${pal.surface} 70%,${pal.bg})}
-    .t1-story-img img{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(${lightMode ? '.95' : '.8'})}
+    .t1-story-img img{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(${lightMode ? '.95' : '.8'});transition:transform .8s ease}
+    .t1-story-img:hover img{transform:scale(1.04)}
     @media(max-width:900px){.t1-story-text{padding:48px 28px}.t1-story-img{min-height:260px;aspect-ratio:16/10}}
 
     /* ── Gallery mosaic ── */
@@ -462,8 +439,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               on('single_space') && (sec as any).single_space?.title ? { label: 'Vuestro espacio', anchor: 'sec-single-space' } : null,
               on('zones') && zonesShow.length > 0 ? { label: 'Espacios', anchor: 'sec-zones' } : null,
               hasCatering && on('menu') ? { label: 'Menús', anchor: 'menu' } : null,
-              on('schedule_visit') ? { label: 'Agendar visita', anchor: 'sec-schedule' } : null,
-              !on('schedule_visit') && contactOn ? { label: 'Contactar', anchor: 't1-cta' } : null,
+              on('schedule_visit') ? { label: 'Visita', anchor: 'sec-schedule' } : null,
+              contactOn ? { label: 'Contactar', anchor: 't1-cta' } : null,
             ].filter(Boolean) as { label: string; anchor: string }[]
             if (!navLinks.length) return null
             return (
@@ -487,15 +464,15 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <div style={{ fontSize: '.62rem', letterSpacing: '.14em', textTransform: 'uppercase', opacity: .6, marginTop: 2 }}>Propuesta exclusiva · {venue?.name}</div>
         </div>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          {show_price_estimate && price_estimate && (
+          {show_price_estimate && displayPrice && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1 }}>
-              <span style={{ fontFamily: FONT, fontSize: '1.5rem', fontWeight: 300 }}>{formatPrice(price_estimate)}</span>
+              <span style={{ fontFamily: FONT, fontSize: '1.5rem', fontWeight: 300 }}>{formatPrice(displayPrice)}</span>
               {ivaLabel(sec, true) && <span style={{ fontSize: '.6rem', opacity: .55, letterSpacing: '.08em', marginTop: 3 }}>{ivaLabel(sec, true)}</span>}
             </div>
           )}
           {on('schedule_visit') ? (
             <button style={{ background: 'rgba(255,255,255,.1)', color: '#fff', border: '1px solid rgba(255,255,255,.2)', padding: '9px 20px', fontSize: '.72rem', fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
-              onClick={() => { document.getElementById('sec-schedule')?.scrollIntoView({ behavior: 'smooth' }); setVisitModalOpen(true) }}>
+              onClick={() => document.getElementById('sec-schedule')?.scrollIntoView({ behavior: 'smooth' })}>
               Agendar visita →
             </button>
           ) : (hasCatering || contactOn) ? (
@@ -514,7 +491,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         {hero && (
           <>
             <img ref={heroRef} src={hero} alt="" className="t1-hero-img"
-              style={{}}
+              style={{ animation: 'zoom 14s ease both' }}
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
             <div className="t1-hero-overlay" />
           </>
@@ -532,9 +509,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
             {venue?.city && <span style={{ fontSize: '.82rem', color: 'rgba(255,255,255,.4)', letterSpacing: '.04em', display: 'flex', alignItems: 'center', gap: 5 }}><IcoPin width={12} height={12} /> {venue.name}, {venue.city}</span>}
             {wDate && <span style={{ fontSize: '.82rem', color: 'rgba(255,255,255,.4)', display: 'flex', alignItems: 'center', gap: 5 }}><IcoCalendar width={12} height={12} /> {wDate}</span>}
             {guest_count && <span style={{ fontSize: '.82rem', color: 'rgba(255,255,255,.4)', display: 'flex', alignItems: 'center', gap: 5 }}><IcoUsers width={12} height={12} /> {guest_count} invitados</span>}
-            {show_price_estimate && price_estimate && (
+            {show_price_estimate && displayPrice && (
               <span style={{ fontFamily: FONT, fontSize: '2rem', fontWeight: 300, color: '#fff', borderLeft: `2px solid ${primary}`, paddingLeft: 20, marginLeft: 4, lineHeight: 1, display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                {formatPrice(price_estimate)}
+                {formatPrice(displayPrice)}
                 {ivaLabel(sec, true) && <span style={{ fontSize: '.6rem', opacity: .55, letterSpacing: '.08em', marginTop: 4, fontFamily: "'Inter', sans-serif" }}>{ivaLabel(sec, true)}</span>}
               </span>
             )}
@@ -563,21 +540,19 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           dark={!lightMode}
           font={FONT}
           proposalId={data.id}
+          onSelect={setSelectedDateSlotIdx}
         />
       )}
 
       {/* ── STATS BAR ── */}
       {on('venue_specs') && (() => {
         const vs = (sec as any).venue_specs ?? {}
-        // New format: stats array; fallback: legacy fields
-        const items: Array<{ n: string; l: string }> = Array.isArray(vs.stats) && vs.stats.length > 0
-          ? vs.stats.filter((s: any) => s.value).map((s: any) => ({ n: s.value, l: s.label }))
-          : [
-              { n: vs.founded_year ?? '',                                                    l: 'Año de fundación' },
-              { n: vs.area ?? techspecs?.sqm?.split('·')[0]?.trim() ?? '',                   l: 'Extensión' },
-              { n: vs.max_capacity ?? '',                                                    l: 'Capacidad máxima' },
-              { n: vs.extra_value ?? '',                                                     l: vs.extra_label ?? 'Sola boda al día' },
-            ].filter(s => s.n !== '' && s.n != null)
+        const items = [
+          { n: vs.founded_year ?? '1687',                                                l: 'Año de fundación' },
+          { n: vs.area ?? techspecs?.sqm?.split('·')[0]?.trim() ?? '8 Ha',               l: 'Extensión' },
+          { n: vs.max_capacity ?? '350',                                                  l: 'Capacidad máxima' },
+          { n: vs.extra_value ?? '1',                                                     l: vs.extra_label ?? 'Sola boda al día' },
+        ].filter(s => s.n !== '' && s.n != null)
         if (!items.length) return null
         return (
           <div className="t1-stats">
@@ -683,9 +658,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 <p className="t1-story-body">{expShow.body}</p>
               </div>
             </FadeUp>
-            {((sec as any).experience_override?.image_url ?? photos[1]) && (
+            {(sec.gallery_urls?.[0] ?? photos[1]) && (
               <div className="t1-story-img">
-                <img src={(sec as any).experience_override?.image_url ?? photos[1]} alt="El espacio" loading="lazy"
+                <img src={sec.gallery_urls?.[0] ?? photos[1]} alt="El espacio" loading="lazy"
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '40px 32px 28px', background: 'linear-gradient(to top, rgba(0,0,0,.8), transparent)' }}>
                   <div style={{ fontFamily: FONT, fontSize: '.85rem', fontStyle: 'italic', color: 'rgba(255,255,255,.6)' }}>{venue?.name} · {venue?.city}, {venue?.region}</div>
@@ -772,7 +747,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           </div>
           <div className="t1-zones">
             {zonesShow.map((z: any, i: number) => {
-              const zPhotos: string[] = z.photos?.length ? z.photos : (photos[i + 2] ? [photos[i + 2]] : [])
+              const zPhoto = z.photos?.[0] || photos[i + 2]
               const caps = formatZoneCapacities(z)
               const feats = formatZoneFeatures(z)
               const reverse = i % 2 === 1
@@ -780,8 +755,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 <FadeIn key={i} delay={0.05}>
                   <div className={`t1-zone${reverse ? ' t1-zone-reverse' : ''}`}>
                     <div className="t1-zone-img">
-                      {zPhotos.length > 0
-                        ? <ZoneSlider photos={zPhotos} name={z.name} />
+                      {zPhoto
+                        ? <img src={zPhoto} alt={z.name} loading="lazy"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
                         : <div className="t1-zone-ph"><IcoBuilding width={48} height={48} style={{ opacity: .3, color: pal.text }} /></div>
                       }
                     </div>
@@ -830,39 +806,52 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           PAQUETES
       ════════════════════════════════════════════ */}
-      {on('pricing') && on('packages') && (() => {
-        const pricingStyle = getActiveStyle(sec, 'pricing')
-        const hasRentalRows = (sec.venue_rental?.rows?.length ?? 0) > 0 && (sec.venue_rental?.day_tiers?.length ?? 0) > 0
-        const hasContent = pkgs.length > 0 || (pricingStyle === 'rental_grid' && hasRentalRows)
-        if (!hasContent) return _preview ? <EmptySec label="Paquetes" /> : null
-        return (
-          <section className="t1-sec" style={{ background: lightMode ? pal.bg : '#050505' }}>
-            <div className="w">
-              <FadeUp>
-                <span className="t1-label">Paquetes y precios</span>
-                <h2 className="t1-h2">Elige tu propuesta</h2>
-              </FadeUp>
-              <FadeUp delay={.1}>
-                {pricingStyle === 'table' ? (
-                  <PricingTable packages={pkgs} primary={primary} dark={!lightMode} font={FONT} />
-                ) : pricingStyle === 'rental_grid' && hasRentalRows ? (
-                  <VenueRentalGrid data={sec.venue_rental} primary={primary} dark={!lightMode} />
-                ) : (
-                  <PricingCards packages={pkgs} primary={primary} dark={!lightMode} font={FONT} />
-                )}
-              </FadeUp>
-              {(hasCatering || contactOn) && (
-                <FadeUp delay={.2} style={{ marginTop: 48, textAlign: 'center' }}>
-                  <button style={{ background: primary, color: onPri, border: 'none', padding: '15px 44px', fontSize: '.78rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}
-                    onClick={() => hasCatering ? document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' }) : scrollToContact()}>
-                    {hasCatering ? 'Ver menús' : 'Solicitar información'} →
-                  </button>
+      {on('packages') && (pkgs.length > 0 ? (
+        <section className="t1-sec" style={{ background: lightMode ? pal.bg : '#050505' }}>
+          <div className="w">
+            <FadeUp>
+              <span className="t1-label">Paquetes y precios</span>
+              <h2 className="t1-h2">Elige tu propuesta</h2>
+            </FadeUp>
+            <div className="t1-pkgs">
+              {pkgs.map((pkg: any, i: number) => (
+                <FadeUp key={i} delay={i * .08}>
+                  <div className={`t1-pkg${pkg.is_recommended ? ' rec' : ''}`}>
+                    {pkg.is_recommended && <div className="t1-pkg-badge">Más elegido</div>}
+                    <div className="t1-pkg-name">{pkg.name}</div>
+                    {pkg.subtitle && <div className="t1-pkg-sub">{pkg.subtitle}</div>}
+                    {pkg.price && (
+                      <div className="t1-pkg-price">
+                        {pkg.price} <small>/ persona</small>
+                      </div>
+                    )}
+                    {pkg.includes?.length > 0 && (
+                      <ul className="t1-pkg-includes">
+                        {pkg.includes.filter(Boolean).map((inc: string, j: number) => (
+                          <li key={j}>{inc}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {(pkg.min_guests || pkg.max_guests) && (
+                      <div className="t1-pkg-guests">
+                        {pkg.min_guests && `Mín. ${pkg.min_guests}`}{pkg.min_guests && pkg.max_guests ? ' · ' : ''}{pkg.max_guests && `Máx. ${pkg.max_guests}`} invitados
+                      </div>
+                    )}
+                  </div>
                 </FadeUp>
-              )}
+              ))}
             </div>
-          </section>
-        )
-      })()}
+            {(hasCatering || contactOn) && (
+              <FadeUp delay={.2} style={{ marginTop: 48, textAlign: 'center' }}>
+                <button style={{ background: primary, color: onPri, border: 'none', padding: '15px 44px', fontSize: '.78rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}
+                  onClick={() => hasCatering ? document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' }) : scrollToContact()}>
+                  {hasCatering ? 'Ver menús' : 'Solicitar información'} →
+                </button>
+              </FadeUp>
+            )}
+          </div>
+        </section>
+      ) : _preview ? <EmptySec label="Paquetes" /> : null)}
 
       {/* ════════════════════════════════════════════
           TARIFAS DE ALQUILER (grid temporada × día)
@@ -947,49 +936,11 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       ) : _preview ? <EmptySec label="Menú" /> : null)}
 
       {/* ════════════════════════════════════════════
-          COLABORADORES (siempre tras menú)
-      ════════════════════════════════════════════ */}
-      {on('collaborators') && (collabsShow.length > 0 ? (() => {
-        const cm = (sec as any).collaborators_meta ?? {}
-        return (
-          <section className="t1-sec">
-            <div className="w">
-              <FadeUp>
-                <span className="t1-label">{cm.eyebrow || 'Proveedores de confianza'}</span>
-                <h2 className="t1-h2">{cm.title || 'Nuestros colaboradores'}</h2>
-                <p style={{ fontSize: '.9rem', color: fg(.5), lineHeight: 1.8, maxWidth: 560, marginBottom: 48, marginTop: -32 }}>
-                  {cm.subtitle || 'Trabajamos sin exclusividad, pero os recomendamos a quienes conocemos y en quienes confiamos.'}
-                </p>
-              </FadeUp>
-            </div>
-            <div className="t1-collabs-grid">
-              {collabsShow.map((c: any, i: number) => (
-                <FadeUp key={i} delay={(i % 4) * .05}>
-                  <div className="t1-collab">
-                    <div className="t1-collab-cat">{c.category}</div>
-                    <div className="t1-collab-name">{c.name}</div>
-                    {c.description && <div className="t1-collab-desc">{c.description}</div>}
-                    {(c.website || c.instagram || c.email) && (
-                      <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-                        {c.website && <a href={c.website.startsWith('http') ? c.website : `https://${c.website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.72rem', color: primary, textDecoration: 'none' }}>Web ↗</a>}
-                        {c.instagram && <a href={`https://instagram.com/${c.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.72rem', color: primary, textDecoration: 'none' }}>@{c.instagram.replace('@', '')}</a>}
-                        {c.email && <a href={`mailto:${c.email}`} style={{ fontSize: '.72rem', color: primary, textDecoration: 'none' }}>{c.email}</a>}
-                      </div>
-                    )}
-                  </div>
-                </FadeUp>
-              ))}
-            </div>
-          </section>
-        )
-      })() : _preview ? <EmptySec label="Colaboradores" /> : null)}
-
-      {/* ════════════════════════════════════════════
           TESTIMONIALES
       ════════════════════════════════════════════ */}
       {on('testimonials') && (testsShow.length > 0 ? (() => {
         const testimonialsStyle = getActiveStyle(sec, 'testimonials')
-        const TestimonialsComp = testimonialsStyle === 'featured' ? TestimonialsFeatured : testimonialsStyle === 'quotes' ? TestimonialsQuotes : testimonialsStyle === 'compact' ? TestimonialsCompact : TestimonialsCards
+        const TestimonialsComp = testimonialsStyle === 'quotes' ? TestimonialsQuotes : testimonialsStyle === 'compact' ? TestimonialsCompact : TestimonialsCards
         return (
           <section className="t1-sec" style={{ background: lightMode ? pal.surface : '#050505' }}>
             <div className="w">
@@ -1006,6 +957,34 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       })() : _preview ? <EmptySec label="Testimoniales" /> : null)}
 
       {/* ════════════════════════════════════════════
+          COLABORADORES
+      ════════════════════════════════════════════ */}
+      {on('collaborators') && (collabsShow.length > 0 ? (
+        <section className="t1-sec">
+          <div className="w">
+            <FadeUp>
+              <span className="t1-label">Proveedores de confianza</span>
+              <h2 className="t1-h2">Nuestros colaboradores</h2>
+              <p style={{ fontSize: '.9rem', color: fg(.5), lineHeight: 1.8, maxWidth: 560, marginBottom: 48, marginTop: -32 }}>
+                Trabajamos sin exclusividad, pero os recomendamos a quienes conocemos y en quienes confiamos.
+              </p>
+            </FadeUp>
+          </div>
+          <div className="t1-collabs-grid">
+            {collabsShow.map((c: any, i: number) => (
+              <FadeUp key={i} delay={(i % 4) * .05}>
+                <div className="t1-collab">
+                  <div className="t1-collab-cat">{c.category}</div>
+                  <div className="t1-collab-name">{c.name}</div>
+                  {c.description && <div className="t1-collab-desc">{c.description}</div>}
+                </div>
+              </FadeUp>
+            ))}
+          </div>
+        </section>
+      ) : _preview ? <EmptySec label="Colaboradores" /> : null)}
+
+      {/* ════════════════════════════════════════════
           ALOJAMIENTO
       ════════════════════════════════════════════ */}
       {on('accommodation') && accom && (
@@ -1019,10 +998,10 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               <FadeUp>
                 <div>
                   <p style={{ fontSize: '.95rem', color: fg(.6), lineHeight: 1.85, marginBottom: 24 }}>{accom.description}</p>
-                  {(Array.isArray(accom.rooms_list) ? accom.rooms_list : accom.rooms ? accom.rooms.split('·') : []).filter(Boolean).length > 0 && (
+                  {accom.rooms && (
                     <div className="t1-accom-rooms-list">
-                      {(Array.isArray(accom.rooms_list) ? accom.rooms_list : accom.rooms.split('·')).filter(Boolean).map((r: string, i: number) => (
-                        <div key={i} className="t1-accom-room">{typeof r === 'string' ? r.trim() : r}</div>
+                      {accom.rooms.split('·').map((r: string, i: number) => (
+                        <div key={i} className="t1-accom-room">{r.trim()}</div>
                       ))}
                     </div>
                   )}
@@ -1120,61 +1099,41 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       })() : _preview ? <EmptySec label="FAQ" /> : null)}
 
       {/* ════════════════════════════════════════════
-          AGENDAR VISITA / HABLEMOS — formulario unificado
+          AGENDAR VISITA
       ════════════════════════════════════════════ */}
       {on('schedule_visit') && (() => {
         const sv = (sec as any).schedule_visit ?? {}
-        const variant = getActiveStyle(sec, 'schedule_visit')
-        const svTitle = sv.title || 'Agendar visita'
-        const svSub = sv.subtitle || (variant === 'cta'
-          ? 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
-          : 'Selecciona qué prefieres y rellena tus datos. Si quieres venir a visitarnos, podrás elegir directamente fecha y hora disponibles.')
-
-        if (variant === 'cta') {
-          const svUrl = sv.url
-          const svCta = sv.cta_label || 'Reservar visita gratuita →'
-          return (
-            <section id="sec-schedule" className="t1-sv">
-              <FadeUp>
-                <div className="t1-sv-inner">
-                  <div className="t1-sv-icon">
-                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                    </svg>
-                  </div>
-                  <h2 className="t1-sv-title">{svTitle}</h2>
-                  <p className="t1-sv-sub">{svSub}</p>
-                  {visitDone ? (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}22`, border: `1px solid ${primary}55`, borderRadius: 10, padding: '14px 24px', fontSize: '.88rem', color: primary, fontWeight: 600 }}>
-                      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      ¡Solicitud enviada! Os confirmaremos la visita pronto.
-                    </div>
-                  ) : svUrl ? (
-                    <a className="t1-sv-btn" href={svUrl} target="_blank" rel="noopener">{svCta}</a>
-                  ) : (
-                    <button className="t1-sv-btn" onClick={() => setVisitModalOpen(true)}>{svCta}</button>
-                  )}
-                  {sv.note && <div className="t1-sv-note">{sv.note}</div>}
-                </div>
-              </FadeUp>
-            </section>
-          )
-        }
-
-        const svKinds = Array.isArray(sv.kinds) && sv.kinds.length > 0 ? sv.kinds : undefined
+        const svUrl = sv.url
+        const svTitle = sv.title || 'Visitadnos en persona'
+        const svSub = sv.subtitle || 'Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue.'
+        const svCta = sv.cta_label || 'Reservar visita gratuita →'
         return (
-          <section id="sec-schedule" className="t1-sec" style={{ background: lightMode ? pal.surfaceAlt : '#0a0a0a' }}>
-            <div className="w">
-              <FadeUp>
-                <span className="t1-label" style={{ display: 'block', textAlign: 'center' }}>{svTitle}</span>
-                <p style={{ textAlign: 'center', fontSize: '.95rem', color: fg(.55), maxWidth: 540, margin: '0 auto 40px', lineHeight: 1.7 }}>
-                  {svSub}
-                </p>
-              </FadeUp>
-              <FadeUp delay={.1}>
-                <InquiryForm slug={data.slug} proposalId={data.id} coupleName={couple_name} kinds={svKinds} primary={primary} onPrimary={onPri} dark={!lightMode} />
-              </FadeUp>
-            </div>
+          <section id="sec-schedule" className="t1-sv">
+            <FadeUp>
+              <div className="t1-sv-inner">
+                <div className="t1-sv-icon">
+                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                </div>
+                <h2 className="t1-sv-title">{svTitle}</h2>
+                <p className="t1-sv-sub">{svSub}</p>
+
+                {visitDone ? (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}22`, border: `1px solid ${primary}55`, borderRadius: 10, padding: '14px 24px', fontSize: '.88rem', color: primary, fontWeight: 600 }}>
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ¡Solicitud enviada! Os confirmaremos la visita pronto.
+                  </div>
+                ) : svUrl ? (
+                  <a className="t1-sv-btn" href={svUrl} target="_blank" rel="noopener">{svCta}</a>
+                ) : (
+                  <button className="t1-sv-btn" onClick={() => setVisitModalOpen(true)}>
+                    {svCta}
+                  </button>
+                )}
+                {sv.note && <div className="t1-sv-note">{sv.note}</div>}
+              </div>
+            </FadeUp>
           </section>
         )
       })()}
@@ -1185,6 +1144,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           coupleName={couple_name}
           primaryColor={primary}
           selectedSpaces={selectedSpaces}
+          dateSlots={dateSlots ?? []}
+          preSelectedDateSlot={selectedDateSlotIdx}
           onClose={() => setVisitModalOpen(false)}
           onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
         />
@@ -1292,8 +1253,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       )}
 
       {/* ── FLOATING WHATSAPP ── */}
-      {/* Floating WhatsApp — independent toggle */}
-      {on('floating_contact') && contact.phone && <FloatingWhatsApp phone={contact.phone} coupleName={couple_name} primary={primary} onPrimary={onPri} />}
+      {contactOn && <FloatingWhatsApp phone={contact.phone} coupleName={couple_name} primary={primary} onPrimary={onPri} />}
 
       {/* ── FOOTER ── */}
       <footer className="t1-footer">
