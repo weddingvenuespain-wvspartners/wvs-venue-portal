@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, LayoutTemplate, Trash2, Star, Loader2, Pencil, FileText, X, Zap, Sparkles, ClipboardList, MessageCircle, Target, Inbox, type LucideIcon } from 'lucide-react'
+import { Plus, LayoutTemplate, Trash2, Star, Loader2, Pencil, FileText, X, Zap, Sparkles, ClipboardList, MessageCircle, Target, Check, type LucideIcon } from 'lucide-react'
 import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
@@ -40,6 +40,8 @@ export default function TemplatesPage() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [activeSection, setActiveSection] = useState<'samples' | 'mine'>('samples')
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
 
   useEffect(() => {
     if (authLoading || !ready) return
@@ -83,6 +85,22 @@ export default function TemplatesPage() {
     })
   }
 
+  const startRename = (tpl: Template) => {
+    setRenamingId(tpl.id)
+    setRenameValue(tpl.name)
+  }
+
+  const commitRename = async () => {
+    if (!renamingId || !renameValue.trim()) { setRenamingId(null); return }
+    await fetch(`/api/proposal-templates/${renamingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: renameValue.trim() }) })
+    setTemplates(t => {
+      const next = t.map(x => x.id === renamingId ? { ...x, name: renameValue.trim() } : x)
+      cachedTemplates = next
+      return next
+    })
+    setRenamingId(null)
+  }
+
   return (
     <div style={{ display: 'flex' }}>
       <Sidebar />
@@ -100,7 +118,6 @@ export default function TemplatesPage() {
           activeKey="templates"
           tabs={[
             { key: 'proposals', label: 'Propuestas', icon: FileText, href: '/proposals' },
-            { key: 'inquiries', label: 'Consultas',  icon: Inbox,    href: '/proposals?tab=inquiries' },
             { key: 'templates', label: 'Plantillas', icon: LayoutTemplate },
           ]}
         />
@@ -114,7 +131,7 @@ export default function TemplatesPage() {
           {/* Sub-tab segmented control */}
           <div style={{ display: 'inline-flex', background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, marginBottom: 18 }}>
             {([
-              { key: 'samples', label: `Plantillas de muestra · ${DEFAULT_TEMPLATES.length}` },
+              { key: 'samples', label: `Estilos de página · ${DEFAULT_TEMPLATES.length}` },
               { key: 'mine',    label: `Mis plantillas · ${templates.length}` },
             ] as const).map(t => {
               const active = activeSection === t.key
@@ -142,7 +159,7 @@ export default function TemplatesPage() {
           {activeSection === 'samples' && (
             <div style={{ marginBottom: 12 }}>
               <p style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.55, marginBottom: 14 }}>
-                5 estilos visuales con datos de ejemplo. Haz clic en cualquiera para duplicarla a tu cuenta y editarla.
+                5 estilos de página con datos de ejemplo. Haz clic en cualquiera para duplicarla a tu cuenta y editarla.
               </p>
               <div style={{
                 display: 'grid',
@@ -194,7 +211,7 @@ export default function TemplatesPage() {
                             pointerEvents: 'none',
                           }}
                         />
-                        <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, fontWeight: 700, background: 'rgba(255,255,255,.85)', color: 'var(--charcoal)', padding: '2px 6px', borderRadius: 10, letterSpacing: '.04em' }}>MUESTRA</span>
+                        <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, fontWeight: 700, background: 'rgba(255,255,255,.85)', color: 'var(--charcoal)', padding: '2px 6px', borderRadius: 10, letterSpacing: '.04em' }}>ESTILO</span>
                         <div className="sample-card-hover" style={{
                           position: 'absolute', inset: 0,
                           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -306,25 +323,49 @@ export default function TemplatesPage() {
                 {/* Footer with name + actions */}
                 <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
-                      {tpl.name}
-                    </div>
-                    <div style={{ display: 'flex', gap: 0 }} onClick={e => e.stopPropagation()}>
-                      <button title="Editar" className="btn btn-ghost btn-sm" onClick={() => router.push(`/proposals/templates/${tpl.id}`)}
-                        style={{ height: 26, width: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Pencil size={12} />
-                      </button>
-                      {!tpl.is_default && (
-                        <button title="Marcar como por defecto" className="btn btn-ghost btn-sm" onClick={() => setDefault(tpl.id)}
-                          style={{ height: 26, width: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Star size={12} />
+                    {renamingId === tpl.id ? (
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
+                        <input
+                          autoFocus
+                          className="form-input"
+                          value={renameValue}
+                          onChange={e => setRenameValue(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null) }}
+                          onBlur={() => commitRename()}
+                          style={{ fontSize: 12, height: 26, padding: '0 8px', flex: 1, minWidth: 0 }}
+                        />
+                        <button className="btn btn-ghost btn-sm" onClick={commitRename}
+                          style={{ height: 26, width: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--sage)' }}>
+                          <Check size={12} />
                         </button>
-                      )}
-                      <button title="Eliminar" className="btn btn-ghost btn-sm" onClick={() => handleDelete(tpl.id)} disabled={deleting === tpl.id}
-                        style={{ height: 26, width: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
-                        {deleting === tpl.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                      </button>
-                    </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0, cursor: 'text' }}
+                          onClick={e => { e.stopPropagation(); startRename(tpl) }}
+                          title="Haz clic para renombrar"
+                        >
+                          {tpl.name}
+                        </div>
+                        <div style={{ display: 'flex', gap: 0 }} onClick={e => e.stopPropagation()}>
+                          <button title="Renombrar" className="btn btn-ghost btn-sm" onClick={() => startRename(tpl)}
+                            style={{ height: 26, width: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Pencil size={10} />
+                          </button>
+                          {!tpl.is_default && (
+                            <button title="Marcar como por defecto" className="btn btn-ghost btn-sm" onClick={() => setDefault(tpl.id)}
+                              style={{ height: 26, width: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Star size={12} />
+                            </button>
+                          )}
+                          <button title="Eliminar" className="btn btn-ghost btn-sm" onClick={() => handleDelete(tpl.id)} disabled={deleting === tpl.id}
+                            style={{ height: 26, width: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
+                            {deleting === tpl.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--warm-gray)', opacity: .7 }}>
                     Actualizada {new Date(tpl.updated_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -344,7 +385,7 @@ export default function TemplatesPage() {
           <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
               <div className="modal-title">Nueva plantilla</div>
-              <div className="modal-sub">Empieza desde cero o usa una de las plantillas de muestra como base</div>
+              <div className="modal-sub">Empieza desde cero o usa uno de los estilos de página como base</div>
               <button onClick={() => setPickerOpen(false)} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6, display: 'flex', alignItems: 'center', borderRadius: 6 }}>
                 <X size={20} />
               </button>

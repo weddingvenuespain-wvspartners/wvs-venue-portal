@@ -7,6 +7,7 @@ type Props = {
   groups: SpaceGroup[]
   onChange: (groups: SpaceGroup[]) => void
   uploadImage?: (file: File, folder: string) => Promise<string | null>
+  isTemplate?: boolean
 }
 
 const addBtn: React.CSSProperties = {
@@ -27,7 +28,7 @@ function newSpace(): VenueSpaceItem {
   return { name: '', description: '', price: '', price_label: '' }
 }
 
-export default function SpaceGroupEditor({ groups, onChange, uploadImage }: Props) {
+export default function SpaceGroupEditor({ groups, onChange, uploadImage, isTemplate }: Props) {
   const updateGroup = (gi: number, patch: Partial<SpaceGroup>) => {
     onChange(groups.map((g, i) => i === gi ? { ...g, ...patch } : g))
   }
@@ -98,27 +99,47 @@ export default function SpaceGroupEditor({ groups, onChange, uploadImage }: Prop
                     <input className="form-input" placeholder="Descripción breve" style={{ fontSize: 12 }}
                       value={s.description ?? ''} onChange={e => updateSpace(gi, si, { description: e.target.value })} />
 
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <input className="form-input" placeholder="Precio  (ej. +500€)" style={{ fontSize: 12, flex: 1 }}
-                        value={s.price ?? ''} onChange={e => updateSpace(gi, si, { price: e.target.value })} />
-                      <input className="form-input" placeholder="Etiqueta  (ej. hasta 80 pax)" style={{ fontSize: 12, flex: 1 }}
-                        value={s.price_label ?? ''} onChange={e => updateSpace(gi, si, { price_label: e.target.value })} />
-                      <input className="form-input" type="number" placeholder="Máx. pax" style={{ fontSize: 12, width: 90, flexShrink: 0 }}
-                        value={s.capacity_max ?? ''} onChange={e => updateSpace(gi, si, { capacity_max: e.target.value ? Number(e.target.value) : undefined })} />
-                    </div>
+                    {isTemplate ? (
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', padding: '6px 10px', background: '#faf8f5', border: '1px solid var(--ivory)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 12, color: 'var(--gold)' }}>ℹ</span>
+                        El precio se añadirá automáticamente desde tus tarifas al crear una propuesta
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input className="form-input" placeholder="Precio  (ej. +500€)" style={{ fontSize: 12, flex: 1 }}
+                          value={s.price ?? ''} onChange={e => updateSpace(gi, si, { price: e.target.value })} />
+                        <input className="form-input" placeholder="Etiqueta  (ej. hasta 80 pax)" style={{ fontSize: 12, flex: 1 }}
+                          value={s.price_label ?? ''} onChange={e => updateSpace(gi, si, { price_label: e.target.value })} />
+                        <input className="form-input" type="number" placeholder="Máx. pax" style={{ fontSize: 12, width: 90, flexShrink: 0 }}
+                          value={s.capacity_max ?? ''} onChange={e => updateSpace(gi, si, { capacity_max: e.target.value ? Number(e.target.value) : undefined })} />
+                      </div>
+                    )}
 
-                    {/* Photo */}
+                    {/* Photos */}
                     {uploadImage && (
-                      <div style={{ width: 100 }}>
-                        <ImageUploader
-                          compact
-                          value={s.photo_url ?? null}
-                          aspectRatio={4 / 3}
-                          label="Foto"
-                          alt={s.name || 'Espacio'}
-                          onUpload={(f) => handlePhotoUpload(gi, si, f)}
-                          onRemove={() => updateSpace(gi, si, { photo_url: undefined })}
-                        />
+                      <div>
+                        <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Fotos</div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                          {[...(Array.isArray((s as any).photos) ? (s as any).photos : []), ...(s.photo_url && !((s as any).photos ?? []).includes(s.photo_url) ? [s.photo_url] : [])].map((url: string, pi: number) => (
+                            <div key={pi} style={{ position: 'relative', width: 56, height: 56 }}>
+                              <img src={url} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover' }} />
+                              <button type="button" onClick={() => {
+                                const allPhotos = [...(Array.isArray((s as any).photos) ? (s as any).photos : []), ...(s.photo_url && !((s as any).photos ?? []).includes(s.photo_url) ? [s.photo_url] : [])]
+                                const next = allPhotos.filter((_: string, j: number) => j !== pi)
+                                updateSpace(gi, si, { photos: next, photo_url: next[0] ?? '' } as any)
+                              }}
+                                style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                            </div>
+                          ))}
+                          <ImageUploader label="+" height={48} onUpload={async (f) => {
+                            const url = await uploadImage(f, 'spaces')
+                            if (url) {
+                              const allPhotos = [...(Array.isArray((s as any).photos) ? (s as any).photos : []), ...(s.photo_url && !((s as any).photos ?? []).includes(s.photo_url) ? [s.photo_url] : [])]
+                              const next = [...allPhotos, url]
+                              updateSpace(gi, si, { photos: next, photo_url: next[0] } as any)
+                            }
+                          }} />
+                        </div>
                       </div>
                     )}
                   </div>

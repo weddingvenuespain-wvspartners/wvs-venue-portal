@@ -11,6 +11,7 @@ import ImportLeadsModal from '@/components/ImportLeadsModal'
 import { expandLeadDates, expandBudgetDates, pad } from '@/lib/lead-dates'
 import { LeadDatesSection } from '@/components/LeadDatesSection'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { renderPayload } from '@/components/InquiriesPanel'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -19,7 +20,7 @@ import {
   ExternalLink, Edit2, Trash2, Clock, Filter, FileText, Download,
   AlertTriangle, PartyPopper, Snowflake, Sparkles, Eye, Landmark, XCircle,
   Sprout, Sun, Leaf, Zap, LockKeyhole, OctagonAlert, Flower2, Info,
-  List, LayoutGrid, Receipt, ChevronDown, ChevronUp, Paperclip, Upload, CheckCircle2, CalendarDays, Package,
+  List, LayoutGrid, Receipt, ChevronDown, ChevronUp, Paperclip, Upload, CheckCircle2, CalendarDays, Package, Inbox,
 } from 'lucide-react'
 
 // ── Types & config ─────────────────────────────────────────────────────────────
@@ -395,6 +396,10 @@ function LeadsPageInner() {
   const [deleteConfirmId,     setDeleteConfirmId]     = useState<string | null>(null)
   const [clearDatesConfirm,   setClearDatesConfirm]   = useState<any | null>(null)
 
+  // Inquiry data (from proposal_inquiries linked through proposals)
+  const [inquiriesByLead, setInquiriesByLead] = useState<Record<string, any[]>>({})
+  const [inquiryModalLead, setInquiryModalLead] = useState<any | null>(null)
+
   // Deep-link: pick tab from ?tab= (e.g. dashboard KPIs link here)
   useEffect(() => {
     const t = searchParams.get('tab')
@@ -502,6 +507,34 @@ function LeadsPageInner() {
         toAutoMove.forEach((l: any) => { l.status = 'post_visit' })
       }
       setLeads(data)
+
+      // Fetch inquiry data: proposals → proposal_inquiries, indexed by lead_id
+      const leadIds = data.map((l: any) => l.id).filter(Boolean)
+      if (leadIds.length > 0) {
+        const { data: props } = await supabase
+          .from('proposals')
+          .select('id, lead_id')
+          .eq('venue_id', activeVenue.id)
+          .in('lead_id', leadIds)
+        if (props && props.length > 0) {
+          const propIds = props.map(p => p.id)
+          const propLeadMap: Record<string, string> = {}
+          props.forEach(p => { if (p.lead_id) propLeadMap[p.id] = p.lead_id })
+          const { data: inqs } = await supabase
+            .from('proposal_inquiries')
+            .select('*')
+            .in('proposal_id', propIds)
+            .order('created_at', { ascending: false })
+          if (inqs) {
+            const byLead: Record<string, any[]> = {}
+            inqs.forEach(inq => {
+              const lid = propLeadMap[inq.proposal_id]
+              if (lid) (byLead[lid] ??= []).push(inq)
+            })
+            setInquiriesByLead(byLead)
+          }
+        }
+      }
     }
     setLoading(false)
   }
@@ -1422,18 +1455,20 @@ function LeadsPageInner() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {activeTab === 'visit' ? (() => {
-                  const rowProps = { tab: activeTab as Tab, onMove: moveToStatusWithVisitCheck, onEdit: openEdit, onDelete: requestDeleteLead, onDetail: openEdit, onDateConfirm: triggerStatusChangeWithVisitCheck, onPdfDigital: (l: any) => { setPdfDigitalLead(l); setPdfDigitalKey(k => k + 1) } }
+                  const rowProps = { tab: activeTab as Tab, onMove: moveToStatusWithVisitCheck, onEdit: openEdit, onDelete: requestDeleteLead, onDetail: openEdit, onDateConfirm: triggerStatusChangeWithVisitCheck, onPdfDigital: (l: any) => { setPdfDigitalLead(l); setPdfDigitalKey(k => k + 1) }, onInquiries: (l: any) => setInquiryModalLead(l) }
                   const filtered = visibleLeads.filter(l =>
                     visitSubFilter === 'scheduled' ? l.status === 'visit_scheduled' :
                     visitSubFilter === 'post'      ? l.status === 'post_visit' : true
                   )
-                  return filtered.map(lead => <LeadRow key={lead.id} lead={lead} {...rowProps} />)
+                  return filtered.map(lead => <LeadRow key={lead.id} lead={lead} {...rowProps} inquiries={inquiriesByLead[lead.id]} />)
                 })() : visibleLeads.map(lead => (
                   <LeadRow key={lead.id} lead={lead} tab={activeTab}
                     onMove={moveToStatusWithVisitCheck} onEdit={openEdit}
                     onDelete={requestDeleteLead} onDetail={openEdit}
                     onDateConfirm={triggerStatusChangeWithVisitCheck}
-                    onPdfDigital={(l: any) => { setPdfDigitalLead(l); setPdfDigitalKey(k => k + 1) }} />
+                    onPdfDigital={(l: any) => { setPdfDigitalLead(l); setPdfDigitalKey(k => k + 1) }}
+                    inquiries={inquiriesByLead[lead.id]}
+                    onInquiries={(l: any) => setInquiryModalLead(l)} />
                 ))}
               </div>
             )}
@@ -1773,6 +1808,51 @@ function LeadsPageInner() {
           </div>
         </div>
       )}
+
+      {/* Inquiry detail modal */}
+      {inquiryModalLead && (() => {
+        const lInq = (inquiriesByLead[inquiryModalLead.id] || []).sort((a: any, b: any) => b.created_at.localeCompare(a.created_at))
+        const KIND_LABEL: Record<string, string> = { visit: 'Visita solicitada', call: 'Llamada', video: 'Videollamada', menu: 'Pregunta sobre menú', menu_selection: 'Selección de menú', date_pick: 'Fecha confirmada', other: 'Consulta' }
+        const KIND_EMOJI: Record<string, string> = { visit: '📍', call: '📞', video: '🎥', menu: '🍽️', menu_selection: '✅', date_pick: '📅', other: '💬' }
+        return (
+          <div className="modal-overlay" onClick={() => setInquiryModalLead(null)}>
+            <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <div className="modal-title">Respuestas de {inquiryModalLead.name}</div>
+                <div className="modal-sub">{lInq.length} {lInq.length === 1 ? 'respuesta' : 'respuestas'}</div>
+              </div>
+              <div className="modal-body" style={{ maxHeight: 450, overflowY: 'auto' }}>
+                {lInq.length === 0 && <div style={{ textAlign: 'center', padding: 20, color: 'var(--warm-gray)', fontSize: 13 }}>Sin respuestas aún.</div>}
+                {lInq.map((inq: any) => (
+                  <div key={inq.id} style={{ padding: '12px 14px', background: inq.status === 'new' ? '#FFFBEB' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#FDE68A' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 14 }}>{KIND_EMOJI[inq.kind] ?? '💬'}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{inq.kind_label || KIND_LABEL[inq.kind] || inq.kind}</span>
+                      {inq.status === 'new' && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 99, background: 'var(--gold)', color: '#fff', fontWeight: 700 }}>Nuevo</span>}
+                      <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--warm-gray)' }}>{new Date(inq.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    {inq.name && <div style={{ fontSize: 12, color: 'var(--charcoal)' }}>{inq.name}{inq.email ? ` · ${inq.email}` : ''}{inq.phone ? ` · ${inq.phone}` : ''}</div>}
+                    {inq.message && <div style={{ fontSize: 12, color: 'var(--charcoal)', marginTop: 4, whiteSpace: 'pre-wrap' }}>{inq.message}</div>}
+                    {inq.preferred_dates?.length > 0 && (
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4 }}>
+                        Fechas preferidas: {inq.preferred_dates.map((d: string) => new Date(d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })).join(', ')}
+                      </div>
+                    )}
+                    {inq.payload && Object.keys(inq.payload).length > 0 && (
+                      <div style={{ marginTop: 6 }}>
+                        {renderPayload(inq)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-ghost btn-sm" onClick={() => setInquiryModalLead(null)}>Cerrar</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -3616,7 +3696,7 @@ function timeAgo(dateStr: string): { text: string; urgent: boolean; warning: boo
 }
 
 // ── Lead Row ───────────────────────────────────────────────────────────────────
-function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm, onPdfDigital }: {
+function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm, onPdfDigital, inquiries, onInquiries }: {
   lead: any; tab: Tab
   onMove: (id: string, s: DbStatus) => void
   onEdit: (l: any) => void
@@ -3624,6 +3704,8 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
   onDetail: (l: any) => void
   onDateConfirm: (lead: any, s: DbStatus) => void
   onPdfDigital?: (lead: any) => void
+  inquiries?: any[]
+  onInquiries?: (lead: any) => void
 }) {
 
   // Fresh lead highlight: < 2h old in the "new" tab
@@ -3769,6 +3851,23 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
                 </div>
               )}
             </div>
+
+            {/* Inquiries badge */}
+            {inquiries && inquiries.length > 0 && (
+              <div style={{ minWidth: 50, flexShrink: 0, display: 'flex', alignItems: 'center' }}
+                onClick={e => { e.stopPropagation(); onInquiries?.(lead) }}>
+                <button className="btn btn-ghost btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', position: 'relative' }}>
+                  <Inbox size={12} style={{ color: 'var(--gold)' }} />
+                  <span style={{ fontWeight: 600 }}>{inquiries.length}</span>
+                  {(() => {
+                    const newCount = inquiries.filter(i => i.status === 'new').length
+                    return newCount > 0 ? (
+                      <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 99, background: 'var(--gold)', color: '#fff', fontWeight: 700 }}>{newCount} new</span>
+                    ) : null
+                  })()}
+                </button>
+              </div>
+            )}
 
             {/* Email + phone */}
             <div style={{ flex: 1, minWidth: 0 }}>

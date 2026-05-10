@@ -36,7 +36,7 @@ export const ALL_SECTION_IDS = [
   'single_space', 'zones', 'space_groups', 'venue_rental', 'inclusions', 'testimonials',
   'collaborators', 'accommodation', 'extra_services',
   'pricing',
-  'faq', 'schedule_visit', 'map', 'contact', 'floating_contact',
+  'faq', 'schedule_visit', 'map', 'floating_contact',
 ] as const
 
 type SectionId = typeof ALL_SECTION_IDS[number]
@@ -65,8 +65,7 @@ const SECTION_LABELS: Record<SectionId, string> = {
   faq:               'Preguntas frecuentes',
   schedule_visit:    'Agendar visita / Hablemos',
   map:               'Mapa y ubicación',
-  contact:           'Datos de contacto',
-  floating_contact:  'Botón flotante de contacto (WhatsApp)',
+  floating_contact:  'Botón flotante de contacto',
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -142,13 +141,13 @@ export default function TemplateEditor({
 
   // ── postMessage live preview ──────────────────────────────────────────────
   const buildPatch = useCallback(() => ({
-    couple_name:         'Sofía & Alejandro',
-    personal_message:    (sections as any).welcome_default || 'Querida Sofía & Alejandro, es un placer teneros aquí. Hemos preparado esta propuesta pensando en vosotros.',
+    couple_name:         'Nombre Ejemplo 1 & Nombre Ejemplo 2',
+    personal_message:    (sections as any).welcome_default || 'Queridos Nombre Ejemplo 1 & Nombre Ejemplo 2, es un placer presentaros esta propuesta. Aquí encontraréis todos los detalles sobre nuestro espacio y servicios.',
     guest_count:         150,
-    wedding_date:        null,
-    price_estimate:      null,
+    wedding_date:        '2026-09-19',
+    price_estimate:      18500,
     show_availability:   false,
-    show_price_estimate: false,
+    show_price_estimate: true,
     sections_data:       sections,
     branding: {
       logo_url:        sections.logo_url ?? null,
@@ -282,17 +281,58 @@ export default function TemplateEditor({
   const renderSectionContent = (secId: SectionId) => {
     const overrideKey = `${secId}_override`
 
-    if (secId === 'hero') return (
-      <ImageUploader
-        value={sections.hero_image_url ?? null}
-        height={120}
-        label="Foto principal"
-        hint="JPG, PNG o WEBP (máx. 10 MB)"
-        alt="Hero"
-        onUpload={async (f) => { await handleHeroUpload(f) }}
-        onRemove={() => { setSections(s => ({ ...s, hero_image_url: undefined })); markDirty() }}
-      />
-    )
+    if (secId === 'hero') {
+      const overlayColor = (sections as any).hero_overlay_color ?? '#000000'
+      const overlayOpacity = (sections as any).hero_overlay_opacity ?? 0.5
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <ImageUploader
+            value={sections.hero_image_url ?? null}
+            height={120}
+            label="Foto principal"
+            hint="JPG, PNG o WEBP (máx. 10 MB)"
+            alt="Hero"
+            onUpload={async (f) => { await handleHeroUpload(f) }}
+            onRemove={() => { setSections(s => ({ ...s, hero_image_url: undefined })); markDirty() }}
+          />
+          {/* Overlay controls */}
+          <div style={{ background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Capa sobre la foto</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <input type="color" value={overlayColor}
+                onChange={e => { setSections(s => ({ ...s, hero_overlay_color: e.target.value } as any)); markDirty() }}
+                style={{ width: 24, height: 24, padding: 2, borderRadius: 5, border: '1px solid var(--border)', cursor: 'pointer', background: 'none' }} />
+              <span style={{ fontSize: 11, color: 'var(--charcoal)', fontWeight: 500 }}>Color</span>
+              <span style={{ fontSize: 10, color: 'var(--warm-gray)', marginLeft: 'auto', fontFamily: 'monospace' }}>{overlayColor}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input type="range" min={0} max={100} step={5} value={Math.round(overlayOpacity * 100)}
+                onChange={e => { setSections(s => ({ ...s, hero_overlay_opacity: parseInt(e.target.value) / 100 } as any)); markDirty() }}
+                style={{ flex: 1, accentColor: 'var(--gold)', cursor: 'pointer' }} />
+              <span style={{ fontSize: 11, color: 'var(--charcoal)', fontWeight: 600, minWidth: 32, textAlign: 'right' }}>{Math.round(overlayOpacity * 100)}%</span>
+            </div>
+          </div>
+          {/* Hero text colors */}
+          <div style={{ background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Colores del texto</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <input type="color" value={(sections as any).hero_title_color ?? '#ffffff'}
+                onChange={e => { setSections(s => ({ ...s, hero_title_color: e.target.value } as any)); markDirty() }}
+                style={{ width: 24, height: 24, padding: 2, borderRadius: 5, border: '1px solid var(--border)', cursor: 'pointer', background: 'none' }} />
+              <span style={{ fontSize: 11, color: 'var(--charcoal)', fontWeight: 500 }}>Título (nombre pareja)</span>
+              <span style={{ fontSize: 10, color: 'var(--warm-gray)', marginLeft: 'auto', fontFamily: 'monospace' }}>{(sections as any).hero_title_color ?? '#ffffff'}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input type="color" value={(sections as any).hero_subtitle_color ?? '#ffffff'}
+                onChange={e => { setSections(s => ({ ...s, hero_subtitle_color: e.target.value } as any)); markDirty() }}
+                style={{ width: 24, height: 24, padding: 2, borderRadius: 5, border: '1px solid var(--border)', cursor: 'pointer', background: 'none' }} />
+              <span style={{ fontSize: 11, color: 'var(--charcoal)', fontWeight: 500 }}>Datos (fecha, invitados, precio)</span>
+              <span style={{ fontSize: 10, color: 'var(--warm-gray)', marginLeft: 'auto', fontFamily: 'monospace' }}>{(sections as any).hero_subtitle_color ?? '#ffffff'}</span>
+            </div>
+          </div>
+        </div>
+      )
+    }
 
     if (secId === 'welcome') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -513,15 +553,31 @@ export default function TemplateEditor({
             <input className="form-input" style={{ fontSize: 12 }} placeholder="m² (ej. 500)" value={ss.sqm ?? ''} onChange={e => setSs({ sqm: e.target.value })} />
             <input className="form-input" style={{ fontSize: 12 }} placeholder="Capacidad máx. (ej. 200)" value={ss.max_guests ?? ''} onChange={e => setSs({ max_guests: e.target.value })} />
           </div>
-          {ss.image_url ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <img src={ss.image_url} alt="" style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }} />
-              <span style={{ flex: 1, fontSize: 11, color: 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Imagen del espacio</span>
-              <button type="button" style={removeBtn} onClick={() => setSs({ image_url: '' })}><X size={12} /></button>
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Fotos del espacio</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              {/* Migrate legacy single image_url into photos array */}
+              {[...(Array.isArray(ss.photos) ? ss.photos : []), ...(ss.image_url && !(ss.photos ?? []).includes(ss.image_url) ? [ss.image_url] : [])].map((url: string, pi: number) => (
+                <div key={pi} style={{ position: 'relative', width: 56, height: 56 }}>
+                  <img src={url} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover' }} />
+                  <button type="button" onClick={() => {
+                    const allPhotos = [...(Array.isArray(ss.photos) ? ss.photos : []), ...(ss.image_url && !(ss.photos ?? []).includes(ss.image_url) ? [ss.image_url] : [])]
+                    const next = allPhotos.filter((_: string, j: number) => j !== pi)
+                    setSs({ photos: next, image_url: next[0] ?? '' })
+                  }}
+                    style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                </div>
+              ))}
+              <ImageUploader label="+" height={48} onUpload={async (f) => {
+                const url = await uploadImage(f, 'spaces')
+                if (url) {
+                  const allPhotos = [...(Array.isArray(ss.photos) ? ss.photos : []), ...(ss.image_url && !(ss.photos ?? []).includes(ss.image_url) ? [ss.image_url] : [])]
+                  const next = [...allPhotos, url]
+                  setSs({ photos: next, image_url: next[0] })
+                }
+              }} />
             </div>
-          ) : (
-            <ImageUploader label="Subir imagen del espacio" height={80} onUpload={async (f) => { const url = await uploadImage(f, 'spaces'); if (url) setSs({ image_url: url }) }} />
-          )}
+          </div>
           <div>
             <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Características destacadas</div>
             {features.map((f, fi) => (
@@ -551,9 +607,12 @@ export default function TemplateEditor({
                 <input className="form-input" style={{ width: 75, flexShrink: 0, fontSize: 12 }} type="number" placeholder="m²" value={z.sqm ?? ''} onChange={e => updateItem(overrideKey, i, 'sqm', e.target.value ? Number(e.target.value) : undefined)} />
               </div>
               <input className="form-input" placeholder="Descripción" style={{ fontSize: 12 }} value={z.description ?? ''} onChange={e => updateItem(overrideKey, i, 'description', e.target.value)} />
-              <input className="form-input" style={{ fontSize: 12 }}
-                placeholder={commercialConfig?.space_type === 'single_with_supplements' ? 'Suplemento (ej. +500€)' : 'Precio (opcional)'}
-                value={z.price ?? ''} onChange={e => updateItem(overrideKey, i, 'price', e.target.value)} />
+              <div style={{ fontSize: 11, color: 'var(--warm-gray)', padding: '6px 10px', background: '#faf8f5', border: '1px solid var(--ivory)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Info size={12} style={{ flexShrink: 0, color: 'var(--gold)' }} />
+                {commercialConfig?.space_type === 'single_with_supplements'
+                  ? 'El suplemento se añadirá automáticamente desde tus tarifas al crear una propuesta'
+                  : 'El precio se añadirá automáticamente desde tus tarifas al crear una propuesta'}
+              </div>
               <div>
                 <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Fotos de la zona</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -582,6 +641,7 @@ export default function TemplateEditor({
             groups={(sections as any).space_groups ?? []}
             onChange={val => { setSections((s: any) => ({ ...s, space_groups: val })); markDirty() }}
             uploadImage={uploadImage}
+            isTemplate
           />
         )
       }
@@ -590,6 +650,7 @@ export default function TemplateEditor({
           groups={(sections as any).space_groups ?? []}
           onChange={val => { setSections((s: any) => ({ ...s, space_groups: val })); markDirty() }}
           uploadImage={uploadImage}
+          isTemplate
         />
       )
     }
@@ -597,7 +658,7 @@ export default function TemplateEditor({
     if (secId === 'venue_rental') return (
       <div style={{ padding: '10px 12px', background: 'var(--cream)', borderRadius: 7, fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5, display: 'flex', gap: 8 }}>
         <Info size={13} style={{ flexShrink: 0, marginTop: 1, color: 'var(--gold)' }} />
-        Las tarifas se configuran en <strong>Estructura → Modalidades</strong> y se asignan por propuesta según la fecha.
+        Las tarifas se configuran en <strong>Configuración → Opciones y tarifas</strong> y se asignan por propuesta según la fecha.
       </div>
     )
 
@@ -610,6 +671,37 @@ export default function TemplateEditor({
       }
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Title + subtitle */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Título</div>
+            <input className="form-input" style={{ fontSize: 12, marginBottom: 8 }} placeholder="Qué incluye"
+              value={(sections as any).inclusions_title ?? ''}
+              onChange={e => { setSections(s => ({ ...s, inclusions_title: e.target.value } as any)); markDirty() }} />
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Subtítulo</div>
+            <input className="form-input" style={{ fontSize: 12 }} placeholder="Todo lo que necesitáis, sin sorpresas"
+              value={(sections as any).inclusions_subtitle ?? ''}
+              onChange={e => { setSections(s => ({ ...s, inclusions_subtitle: e.target.value } as any)); markDirty() }} />
+          </div>
+          {/* Column count */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Columnas</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+              {[1, 2, 3, 4].map(n => {
+                const active = ((sections as any).inclusions_columns ?? 2) === n
+                return (
+                  <button key={n} type="button"
+                    onClick={() => { setSections(s => ({ ...s, inclusions_columns: n } as any)); markDirty() }}
+                    style={{
+                      padding: '6px 0', textAlign: 'center', fontSize: 12, fontWeight: 600,
+                      border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                      borderRadius: 6, cursor: 'pointer',
+                      background: active ? 'rgba(196,151,90,0.08)' : '#fff',
+                      color: active ? 'var(--gold)' : 'var(--charcoal)',
+                    }}>{n}</button>
+                )
+              })}
+            </div>
+          </div>
           {/* Style picker */}
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Estilo visual</div>
@@ -769,7 +861,7 @@ export default function TemplateEditor({
           <input className="form-input" style={{ fontSize: 12 }} placeholder="Subtítulo (ej. Trabajamos sin exclusividad…)" value={collabMeta.subtitle ?? ''} onChange={e => setCollabMeta({ subtitle: e.target.value })} />
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
           {getOverride(overrideKey).map((c: any, i: number) => (
-            <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 7, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div key={i} style={{ border: `1px solid ${c.exclusive ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 7, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5, background: c.exclusive ? 'rgba(var(--primary-rgb, 180,130,80), 0.04)' : 'transparent' }}>
               <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
                 <input className="form-input" placeholder="Nombre *" style={{ fontSize: 12 }} value={c.name ?? ''} onChange={e => updateItem(overrideKey, i, 'name', e.target.value)} />
                 <input className="form-input" style={{ width: 130, flexShrink: 0, fontSize: 12 }} placeholder="Categoría" value={c.category ?? ''} onChange={e => updateItem(overrideKey, i, 'category', e.target.value)} />
@@ -781,6 +873,14 @@ export default function TemplateEditor({
                 <input className="form-input" style={{ fontSize: 12, width: 130, flexShrink: 0 }} placeholder="@instagram" value={c.instagram ?? ''} onChange={e => updateItem(overrideKey, i, 'instagram', e.target.value)} />
                 <input className="form-input" style={{ fontSize: 12, width: 160, flexShrink: 0 }} placeholder="Email" value={c.email ?? ''} onChange={e => updateItem(overrideKey, i, 'email', e.target.value)} />
               </div>
+              <div style={{ display: 'flex', gap: 5 }}>
+                <input className="form-input" style={{ fontSize: 12, width: 160, flexShrink: 0 }} placeholder="Teléfono" value={c.phone ?? ''} onChange={e => updateItem(overrideKey, i, 'phone', e.target.value)} />
+                <input className="form-input" style={{ fontSize: 12 }} placeholder="Info precios orientativa" value={c.price_info ?? ''} onChange={e => updateItem(overrideKey, i, 'price_info', e.target.value)} />
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: c.exclusive ? 'var(--primary)' : 'var(--warm-gray)' }}>
+                <input type="checkbox" checked={!!c.exclusive} onChange={e => updateItem(overrideKey, i, 'exclusive', e.target.checked)} style={{ accentColor: 'var(--primary)' }} />
+                Exclusividad
+              </label>
             </div>
           ))}
           <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { name: '', category: '', description: '' })}>+ Añadir colaborador</button>
@@ -1008,15 +1108,16 @@ export default function TemplateEditor({
       )
     }
 
-    if (secId === 'contact') {
+    if (secId === 'floating_contact') {
       const c: any = (sections as any).contact ?? {}
       const p = (patch: any) => { setSections(s => ({ ...s, contact: { ...((s as any).contact ?? {}), ...patch } } as any)); markDirty() }
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <input className="form-input" placeholder="Teléfono / WhatsApp" style={{ fontSize: 12 }} value={c.phone ?? ''} onChange={e => p({ phone: e.target.value })} />
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 2 }}>Datos de contacto</div>
+          <input className="form-input" placeholder="Teléfono / WhatsApp (ej: +34 600 000 000)" style={{ fontSize: 12 }} value={c.phone ?? ''} onChange={e => p({ phone: e.target.value })} />
           <input className="form-input" type="email" placeholder="Email de contacto" style={{ fontSize: 12 }} value={c.email ?? ''} onChange={e => p({ email: e.target.value })} />
           <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.5, marginTop: 2 }}>
-            Sustituye los datos de la demo por los tuyos. Si lo dejas vacío, se usa el contacto del venue.
+            Se usa para el botón flotante y la sección de contacto. Si lo dejas vacío, se usa el contacto del venue.
           </div>
         </div>
       )
@@ -1303,13 +1404,6 @@ export default function TemplateEditor({
             {activeTab === 'sections' && (
               <div style={{ padding: '16px 16px 32px' }}>
 
-                {/* Description */}
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 6 }}>Descripción</div>
-                  <textarea className="form-input" value={description} onChange={e => { setDescription(e.target.value); markDirty() }}
-                    placeholder="Descripción breve (opcional)" rows={2} style={{ fontSize: 12, resize: 'none', color: 'var(--warm-gray)' }} />
-                </div>
-
                 {/* Catering toggle */}
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Tipo</div>
                 <div style={{ background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 18 }}>
@@ -1427,6 +1521,19 @@ export default function TemplateEditor({
                     return (
                       <Fragment key={secId}>
                       {isInSpaceGroup && isFirstSpaceVisible && renderSpaceGroupHeader()}
+                      {/* Menu row — appears after inclusions when catering is enabled */}
+                      {secId === 'testimonials' && hasCatering && (
+                        <div style={{ borderBottom: '1px solid var(--border)', background: 'rgba(196,151,90,0.04)' }}>
+                          <div
+                            onClick={() => setActiveTab('menus' as any)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', transition: 'background .15s' }}
+                          >
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0, opacity: .6 }} />
+                            <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: 'var(--gold)', userSelect: 'none' }}>Menús y catering</span>
+                            <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Ir al tab →</span>
+                          </div>
+                        </div>
+                      )}
                       <div style={{ borderBottom: isLast ? 'none' : '1px solid var(--border)', opacity: isOn ? 1 : 0.5, transition: 'opacity .15s', ...(isInSpaceGroup ? { paddingLeft: 14, borderLeft: '2px solid rgba(196,151,90,0.25)', background: 'rgba(196,151,90,0.02)' } : {}) }}>
                         {/* Row header */}
                         <div
@@ -1459,7 +1566,7 @@ export default function TemplateEditor({
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 12, background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.4 }}>
                                   <Info size={13} style={{ flexShrink: 0, color: 'var(--warm-gray)' }} />
                                   <span style={{ flex: 1 }}>Aplica si tu configuración es: <strong>{targetLabels}</strong></span>
-                                  <a href="/estructura" style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)', textDecoration: 'none', whiteSpace: 'nowrap' }}>Cambiar →</a>
+                                  <a href="/configuracion" style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)', textDecoration: 'none', whiteSpace: 'nowrap' }}>Cambiar →</a>
                                 </div>
                               )
                             })()}
@@ -1480,36 +1587,6 @@ export default function TemplateEditor({
               <div style={{ padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 0 }}>
                 {/* Load fonts for preview */}
                 <link rel="stylesheet" href={ALL_FONTS_URL} />
-
-                {/* Design style */}
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Estilo de diseño</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 20 }}>
-                  {([
-                    { id: 1, icon: '⚡', name: 'Impacto Directo', desc: 'Dark luxury' },
-                    { id: 2, icon: '✨', name: 'Emoción Primero', desc: 'Cream editorial' },
-                    { id: 3, icon: '📋', name: 'Todo Claro',      desc: 'Estructurado' },
-                    { id: 4, icon: '💬', name: 'Social Proof',    desc: 'Stats + confianza' },
-                    { id: 5, icon: '◻',  name: 'Minimalista',     desc: 'CTA prominente' },
-                  ] as const).map(tpl => {
-                    const active = (sections.visual_template_id ?? 1) === tpl.id
-                    return (
-                      <button key={tpl.id} type="button"
-                        onClick={() => { setSections(s => ({ ...s, visual_template_id: tpl.id })); markDirty() }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                          borderRadius: 7, cursor: 'pointer', textAlign: 'left',
-                          border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
-                          background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
-                        }}>
-                        <span style={{ fontSize: 14 }}>{tpl.icon}</span>
-                        <div>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)' }}>{tpl.name}</div>
-                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{tpl.desc}</div>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
 
                 {/* Logo */}
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Logo del venue</div>
@@ -1548,53 +1625,45 @@ export default function TemplateEditor({
                   <div style={{ height: 5, borderRadius: 3, background: sections.primary_color ?? '#C4975A', opacity: 0.8 }} />
                 </div>
 
-                {/* Secondary color */}
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Color secundario</div>
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
-                    {['#8B6914','#7a5c3c','#6b2d42','#2a6b4a','#4a4a4a','#1a3a5c','#5c2d6b','#A0826D','#3D5A80','#293241'].map(c => (
-                      <div key={c} onClick={() => { setSections(s => ({ ...s, secondary_color: c })); markDirty() }}
-                        style={{
-                          width: 24, height: 24, borderRadius: 5, background: c, cursor: 'pointer', flexShrink: 0,
-                          border: sections.secondary_color === c ? '2px solid var(--espresso)' : '1px solid var(--border)',
-                          transform: sections.secondary_color === c ? 'scale(1.2)' : 'scale(1)', transition: 'transform .1s',
-                        }} />
-                    ))}
-                    <input type="color" value={sections.secondary_color ?? '#8B6914'}
-                      onChange={e => { setSections(s => ({ ...s, secondary_color: e.target.value })); markDirty() }}
-                      style={{ width: 24, height: 24, padding: 2, borderRadius: 5, border: '1px solid var(--border)', cursor: 'pointer', background: 'none' }} />
-                  </div>
-                  <div style={{ height: 5, borderRadius: 3, background: sections.secondary_color ?? '#8B6914', opacity: 0.8 }} />
-                  <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 6, lineHeight: 1.45 }}>
-                    Disponible como variable <code style={{ background: 'var(--cream)', padding: '0 4px', borderRadius: 3 }}>--tpl-secondary</code> para usos personalizados.
-                  </div>
-                </div>
+                {/* Color mode — only for templates that support it (T1) */}
+                {((sections.visual_template_id as number | undefined) ?? 1) === 1 && (
+                  <>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Modo</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 20 }}>
+                      {([
+                        { id: 'light', label: 'Claro',   bg: '#FAF7F2', fg: '#1A1A1A', sub: 'Fondo crema · texto oscuro' },
+                        { id: 'dark',  label: 'Oscuro',  bg: '#0A0A0A', fg: '#F5F5F5', sub: 'Fondo negro · texto claro' },
+                      ] as const).map(opt => {
+                        const active = (sections.color_mode ?? 'light') === opt.id
+                        return (
+                          <button key={opt.id} type="button"
+                            onClick={() => { setSections(s => ({ ...s, color_mode: opt.id })); markDirty() }}
+                            style={{
+                              display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 12px',
+                              borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                              border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                              background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
+                            }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ width: 16, height: 16, borderRadius: 4, background: opt.bg, border: '1px solid var(--border)', flexShrink: 0 }} />
+                              <span style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)' }}>{opt.label}</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{opt.sub}</div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
 
-                {/* Color mode (light / dark variant of the chosen design) */}
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Modo</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 20 }}>
-                  {([
-                    { id: 'light', label: 'Claro',   bg: '#FAF7F2', fg: '#1A1A1A', sub: 'Fondo crema · texto oscuro' },
-                    { id: 'dark',  label: 'Oscuro',  bg: '#0A0A0A', fg: '#F5F5F5', sub: 'Fondo negro · texto claro' },
-                  ] as const).map(opt => {
-                    const active = (sections.color_mode ?? 'light') === opt.id
-                    return (
-                      <button key={opt.id} type="button"
-                        onClick={() => { setSections(s => ({ ...s, color_mode: opt.id })); markDirty() }}
-                        style={{
-                          display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 12px',
-                          borderRadius: 7, cursor: 'pointer', textAlign: 'left',
-                          border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
-                          background: active ? 'rgba(196,151,90,.08)' : 'var(--surface)',
-                        }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ width: 16, height: 16, borderRadius: 4, background: opt.bg, border: '1px solid var(--border)', flexShrink: 0 }} />
-                          <span style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--gold)' : 'var(--text)' }}>{opt.label}</span>
-                        </div>
-                        <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{opt.sub}</div>
-                      </button>
-                    )
-                  })}
+                {/* Sticky footer text color */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Color texto barra inferior</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                  <input type="color" value={(sections as any).sbar_text_color ?? '#ffffff'}
+                    onChange={e => { setSections(s => ({ ...s, sbar_text_color: e.target.value } as any)); markDirty() }}
+                    style={{ width: 24, height: 24, padding: 2, borderRadius: 5, border: '1px solid var(--border)', cursor: 'pointer', background: 'none' }} />
+                  <span style={{ fontSize: 11, color: 'var(--charcoal)', fontWeight: 500 }}>Texto y botones</span>
+                  <span style={{ fontSize: 10, color: 'var(--warm-gray)', marginLeft: 'auto', fontFamily: 'monospace' }}>{(sections as any).sbar_text_color ?? '#ffffff'}</span>
                 </div>
 
                 {/* Typography */}

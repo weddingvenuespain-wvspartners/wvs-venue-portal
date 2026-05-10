@@ -31,31 +31,30 @@ type Props = {
   onSuccess: () => void
 }
 
-/** Format dates as "15 may, 16 may o 17 may" (individual options, not ranges) */
+/** Show dates as individual options: "15 may, 16 may o 17 may" */
 function fmtDatesAsOptions(dates: string[]): string {
   if (!dates.length) return ''
-  const sorted = [...dates].sort()
-  const labels = sorted.map(d => {
+  const labels = dates.map(d => {
     const dt = new Date(d + 'T12:00:00')
     return dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
   })
   if (labels.length === 1) return labels[0]
-  if (labels.length === 2) return `${labels[0]} o ${labels[1]}`
   return labels.slice(0, -1).join(', ') + ' o ' + labels[labels.length - 1]
 }
 
 export default function VisitBookingModal({
   proposalId, coupleName, primaryColor = '#C4975A',
-  selectedSpaces = [], selectedMenus = [],
-  dateSlots = [], preSelectedDateSlot = null,
+  selectedSpaces = [], selectedMenus = [], dateSlots = [],
+  preSelectedDateSlot = null,
   onClose, onSuccess,
 }: Props) {
   const [slots, setSlots] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
   const hasMultipleDateSlots = dateSlots.length > 1
   const [step, setStep] = useState<'type' | 'date_pref' | 'calendar' | 'time' | 'confirm'>('type')
-  const [visitType, setVisitType] = useState<string | null>(null)
+  const [visitType, setVisitType] = useState<'presencial' | 'online' | null>(null)
   const [preferredDateSlot, setPreferredDateSlot] = useState<number | null>(preSelectedDateSlot)
+  const [preferredWeddingDate, setPreferredWeddingDate] = useState<string | null>(null)
   const [viewYear, setViewYear] = useState(new Date().getFullYear())
   const [viewMonth, setViewMonth] = useState(new Date().getMonth())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -90,8 +89,12 @@ export default function VisitBookingModal({
     setStep('time')
   }
 
+  const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
+
   const submit = async () => {
     if (!selectedDate || !selectedTime) return
+    if (!email.trim()) { setError('Indica tu email'); return }
+    if (!isValidEmail(email)) { setError('Email no válido'); return }
     setSubmitting(true); setError('')
     try {
       const res = await fetch(`/api/proposals/${proposalId}/visit-request`, {
@@ -99,12 +102,13 @@ export default function VisitBookingModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: selectedDate, time: selectedTime,
+          visit_type: visitType || 'presencial',
           message: message || null,
-          couple_email: email || null,
-          visit_type: visitType,
+          couple_email: email.trim(),
           selected_spaces: selectedSpaces,
           selected_menus: selectedMenus,
-          preferred_date_slot: preferredDateSlot !== null ? dateSlots[preferredDateSlot] : null,
+          preferred_date_slot: preferredDateSlot !== null && dateSlots[preferredDateSlot] ? dateSlots[preferredDateSlot] : null,
+          preferred_wedding_date: preferredWeddingDate || null,
         }),
       })
       if (!res.ok) { const d = await res.json(); setError(d.error || 'Error al enviar'); setSubmitting(false); return }
@@ -131,20 +135,21 @@ export default function VisitBookingModal({
         <div style={{ padding: '20px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             {step !== 'type' && (
-              <button onClick={() => {
-                if (step === 'confirm') setStep('time')
-                else if (step === 'time') setStep('calendar')
-                else if (step === 'calendar') setStep(hasMultipleDateSlots ? 'date_pref' : 'type')
-                else if (step === 'date_pref') setStep('type')
-              }}
+              <button onClick={() => setStep(
+                  step === 'confirm' ? 'time'
+                  : step === 'time' ? 'calendar'
+                  : step === 'calendar' ? (hasMultipleDateSlots ? 'date_pref' : 'type')
+                  : step === 'date_pref' ? 'type'
+                  : 'type'
+                )}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.5)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '0 0 8px' }}>
                 <ChevronLeft size={14} /> Atrás
               </button>
             )}
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: primaryColor }}>Solicitar visita</div>
             <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginTop: 2 }}>
-              {step === 'type' && '¿Cómo os gustaría conocernos?'}
-              {step === 'date_pref' && '¿Qué fecha de boda os gusta más?'}
+              {step === 'type' && '¿Cómo preferís la visita?'}
+              {step === 'date_pref' && 'Fecha de vuestra boda'}
               {step === 'calendar' && 'Elige un día para la visita'}
               {step === 'time' && selectedDate && dateLabel(selectedDate)}
               {step === 'confirm' && 'Confirmar visita'}
@@ -171,95 +176,169 @@ export default function VisitBookingModal({
           )}
 
           {/* ── STEP: VISIT TYPE ── */}
-          {step === 'type' && (
+          {!loading && step === 'type' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[
-                { id: 'presencial', icon: '🏛️', label: 'Visitar el venue', desc: 'Ven a conocer el espacio en persona' },
-                { id: 'videollamada', icon: '📹', label: 'Videollamada', desc: 'Conoced el venue desde casa' },
-                { id: 'llamada', icon: '📞', label: 'Llamada telefónica', desc: 'Hablad con nuestro equipo' },
-              ].map(opt => (
-                <button key={opt.id} type="button"
-                  onClick={() => {
-                    setVisitType(opt.id)
-                    setStep(hasMultipleDateSlots ? 'date_pref' : 'calendar')
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14,
-                    padding: '16px 18px', borderRadius: 10,
-                    background: 'rgba(255,255,255,.04)',
-                    border: '1px solid rgba(255,255,255,.1)',
-                    cursor: 'pointer', color: '#fff', textAlign: 'left',
-                    transition: 'background .15s, border-color .15s',
-                  }}>
-                  <span style={{ fontSize: 22 }}>{opt.icon}</span>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>{opt.label}</div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', marginTop: 1 }}>{opt.desc}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* ── STEP: WEDDING DATE PREFERENCE ── */}
-          {!loading && step === 'date_pref' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{
-                background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)',
-                borderRadius: 8, padding: '10px 14px', marginBottom: 4,
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={primaryColor} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                </svg>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', lineHeight: 1.4 }}>
-                  Antes de agendar la visita, decidnos qué <strong style={{ color: '#fff' }}>fecha de boda</strong> os interesa más
-                </span>
-              </div>
-              {dateSlots.map((ds, i) => {
-                const isSel = preferredDateSlot === i
-                return (
-                  <button key={i} type="button"
-                    onClick={() => { setPreferredDateSlot(i); setStep('calendar') }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '14px 16px', borderRadius: 10,
-                      background: isSel ? `${primaryColor}22` : 'rgba(255,255,255,.04)',
-                      border: `1px solid ${isSel ? primaryColor : 'rgba(255,255,255,.1)'}`,
-                      cursor: 'pointer', color: '#fff', textAlign: 'left',
-                    }}>
-                    <div style={{
-                      width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-                      border: `2px solid ${isSel ? primaryColor : 'rgba(255,255,255,.2)'}`,
-                      background: isSel ? primaryColor : 'transparent',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      {isSel && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600 }}>{fmtDatesAsOptions(ds.dates)}</div>
-                      {ds.label && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 1 }}>{ds.label}</div>}
-                    </div>
-                    {(ds.price_rental || ds.price_per_person) && (
-                      <div style={{ fontSize: 15, fontWeight: 700, color: primaryColor, flexShrink: 0 }}>
-                        {ds.price_rental || ds.price_per_person}
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-              <button type="button"
-                onClick={() => { setPreferredDateSlot(null); setStep('calendar') }}
+              <button type="button" onClick={() => {
+                  setVisitType('presencial')
+                  if (hasMultipleDateSlots) {
+                    // Jump calendar to month of first proposed date
+                    const firstDate = dateSlots[0]?.dates?.[0]
+                    if (firstDate) { const d = new Date(firstDate + 'T12:00:00'); setViewYear(d.getFullYear()); setViewMonth(d.getMonth()) }
+                    setStep('date_pref')
+                  } else { setStep('calendar') }
+                }}
                 style={{
-                  padding: '11px 16px', borderRadius: 10,
-                  background: 'transparent', border: '1px dashed rgba(255,255,255,.12)',
-                  cursor: 'pointer', color: 'rgba(255,255,255,.35)', fontSize: 12,
-                  textAlign: 'center',
+                  display: 'flex', alignItems: 'center', gap: 14, padding: '18px 20px', borderRadius: 12,
+                  border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)',
+                  color: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
                 }}>
-                Aún no lo tengo claro
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: `${primaryColor}22`, border: `1px solid ${primaryColor}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={primaryColor} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>Visita presencial</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,.45)', marginTop: 2 }}>Ven a conocer el espacio en persona</div>
+                </div>
+              </button>
+              <button type="button" onClick={() => {
+                  setVisitType('online')
+                  if (hasMultipleDateSlots) {
+                    const firstDate = dateSlots[0]?.dates?.[0]
+                    if (firstDate) { const d = new Date(firstDate + 'T12:00:00'); setViewYear(d.getFullYear()); setViewMonth(d.getMonth()) }
+                    setStep('date_pref')
+                  } else { setStep('calendar') }
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14, padding: '18px 20px', borderRadius: 12,
+                  border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)',
+                  color: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
+                }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: `${primaryColor}22`, border: `1px solid ${primaryColor}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={primaryColor} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M15.6 11.6a4 4 0 10-7.2 0"/><circle cx="12" cy="12" r="2"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/></svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>Videollamada</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,.45)', marginTop: 2 }}>Os enseñamos el venue por video</div>
+                </div>
               </button>
             </div>
           )}
+
+          {/* ── STEP: DATE PREFERENCE — calendar, select ONE individual date ── */}
+          {!loading && step === 'date_pref' && hasMultipleDateSlots && (() => {
+            // Map each individual date → its slot index + price
+            const dateInfo = new Map<string, { slotIdx: number; price: string }>()
+            dateSlots.forEach((slot, si) => {
+              const price = slot.price_rental || slot.price_per_person || ''
+              slot.dates.forEach(d => dateInfo.set(d, { slotIdx: si, price }))
+            })
+
+            const calYear = viewYear
+            const calMonth = viewMonth
+            const calDaysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
+            const calFirstDow = (() => { const d = new Date(calYear, calMonth, 1).getDay(); return d === 0 ? 6 : d - 1 })()
+
+            // Price for currently selected individual date
+            const selInfo = preferredWeddingDate ? dateInfo.get(preferredWeddingDate) : null
+
+            return (
+              <div>
+                <div style={{ margin: '0 0 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill={primaryColor} stroke="none">
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    </svg>
+                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', lineHeight: 1.5 }}>
+                      ¿Qué <strong style={{ color: '#fff' }}>fecha de boda</strong> os interesa más?
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', marginLeft: 24 }}>
+                    No te preocupes, se puede cambiar más adelante
+                  </div>
+                </div>
+
+                {/* Month nav */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.5)', padding: 4 }}><ChevronLeft size={16} /></button>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{MONTHS[calMonth]} {calYear}</span>
+                  <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.5)', padding: 4 }}><ChevronRight size={16} /></button>
+                </div>
+
+                {/* Weekday headers */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
+                  {DAYS_SHORT.map(d => (
+                    <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', letterSpacing: '.06em', padding: '4px 0' }}>{d}</div>
+                  ))}
+                </div>
+
+                {/* Days grid — only proposed dates clickable */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+                  {Array.from({ length: calFirstDow }).map((_, i) => <div key={`e${i}`} />)}
+                  {Array.from({ length: calDaysInMonth }).map((_, i) => {
+                    const day = i + 1
+                    const iso = `${calYear}-${pad(calMonth + 1)}-${pad(day)}`
+                    const proposed = dateInfo.has(iso)
+                    const isSelected = preferredWeddingDate === iso
+                    return (
+                      <button key={day} type="button"
+                        onClick={() => {
+                          if (!proposed) return
+                          const info = dateInfo.get(iso)!
+                          setPreferredWeddingDate(iso)
+                          setPreferredDateSlot(info.slotIdx)
+                        }}
+                        disabled={!proposed}
+                        style={{
+                          aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 13, fontWeight: proposed ? 600 : 400, borderRadius: 8, border: 'none',
+                          cursor: proposed ? 'pointer' : 'default',
+                          background: isSelected ? primaryColor : proposed ? 'rgba(255,255,255,.1)' : 'transparent',
+                          color: isSelected ? '#fff' : proposed ? '#fff' : 'rgba(255,255,255,.15)',
+                          position: 'relative',
+                          transition: 'background .15s',
+                        }}>
+                        {day}
+                        {proposed && !isSelected && (
+                          <span style={{ position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: primaryColor }} />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Selected date → show date label + price */}
+                {preferredWeddingDate && selInfo && (
+                  <div style={{
+                    marginTop: 16, padding: '12px 16px', borderRadius: 10,
+                    background: `${primaryColor}15`, border: `1px solid ${primaryColor}33`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>
+                      {dateLabel(preferredWeddingDate)}
+                    </div>
+                    {selInfo.price && (
+                      <div style={{ fontSize: 18, fontWeight: 700, color: primaryColor }}>
+                        {selInfo.price}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Next / skip */}
+                <button type="button"
+                  onClick={() => setStep('calendar')}
+                  style={{
+                    marginTop: 16, width: '100%', padding: '13px 0', borderRadius: 10,
+                    background: preferredWeddingDate ? primaryColor : 'rgba(255,255,255,.08)',
+                    color: preferredWeddingDate ? '#fff' : 'rgba(255,255,255,.4)',
+                    border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                    transition: 'all .2s',
+                  }}>
+                  {preferredWeddingDate ? 'Siguiente →' : 'Aún no lo tengo claro — saltar'}
+                </button>
+              </div>
+            )
+          })()}
 
           {/* ── STEP: CALENDAR ── */}
           {!loading && Object.keys(slots).length > 0 && step === 'calendar' && (
@@ -344,24 +423,20 @@ export default function VisitBookingModal({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Summary */}
               <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {visitType && (
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Tipo de visita</div>
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,.7)' }}>
-                      {visitType === 'presencial' ? '🏛️ Visita al venue' : visitType === 'videollamada' ? '📹 Videollamada' : '📞 Llamada telefónica'}
-                    </div>
-                  </div>
-                )}
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Tipo de visita</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{visitType === 'online' ? '📹 Videollamada' : '🏠 Presencial'}</div>
+                </div>
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Fecha y hora</div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>{dateLabel(selectedDate)} · {selectedTime}h</div>
                 </div>
-                {preferredDateSlot !== null && dateSlots[preferredDateSlot] && (
+                {preferredWeddingDate && (
                   <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Fecha de boda preferida</div>
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,.7)' }}>
-                      <strong style={{ color: '#fff' }}>{fmtDatesAsOptions(dateSlots[preferredDateSlot].dates)}</strong>
-                      {dateSlots[preferredDateSlot].price_rental && <span style={{ color: primaryColor, marginLeft: 8 }}>{dateSlots[preferredDateSlot].price_rental}</span>}
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Fecha preferida para la boda</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>
+                      {dateLabel(preferredWeddingDate)}
+                      {preferredDateSlot !== null && dateSlots[preferredDateSlot]?.price_rental && <span style={{ color: primaryColor, marginLeft: 8 }}>{dateSlots[preferredDateSlot].price_rental}</span>}
                     </div>
                   </div>
                 )}
@@ -384,9 +459,10 @@ export default function VisitBookingModal({
               {/* Email */}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 6 }}>
-                  Tu email (para la confirmación)
+                  Tu email (para la confirmación) *
                 </label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  required
                   placeholder="hola@email.com"
                   style={{ width: '100%', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '10px 14px', color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
               </div>

@@ -10,6 +10,7 @@ type Props = {
   onChange: (groups: SpaceGroup[]) => void
   uploadImage?: (file: File, folder: string) => Promise<string | null>
   guestCount?: number
+  isTemplate?: boolean
 }
 
 const removeBtn: React.CSSProperties = {
@@ -25,7 +26,7 @@ function capacityOk(space: { capacity_min?: number; capacity_max?: number }, gue
   return true
 }
 
-export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange, uploadImage, guestCount }: Props) {
+export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange, uploadImage, guestCount, isTemplate }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(venueSpaceGroups.map(g => g.id)))
 
   if (venueSpaceGroups.length === 0) {
@@ -34,7 +35,7 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
         <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1, color: '#ea580c' }} />
         <div style={{ flex: 1 }}>
           <strong>No hay grupos de espacios definidos</strong> en tu estructura comercial.
-          <div style={{ marginTop: 4 }}>Ve a <a href="/estructura" style={{ color: '#c2410c', fontWeight: 600 }}>Estructura comercial → Grupos y espacios</a> para configurarlos.</div>
+          <div style={{ marginTop: 4 }}>Ve a <a href="/configuracion" style={{ color: '#c2410c', fontWeight: 600 }}>Estructura comercial → Grupos y espacios</a> para configurarlos.</div>
         </div>
       </div>
     )
@@ -122,7 +123,7 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
           <>
             <Check size={13} style={{ color: '#166534', flexShrink: 0 }} />
             <span style={{ color: '#166534', flex: 1 }}>
-              Sincronizado con <a href="/estructura" style={{ color: '#15803d', fontWeight: 600 }}>estructura comercial</a> ({venueSpaceGroups.length} {venueSpaceGroups.length === 1 ? 'grupo' : 'grupos'})
+              Sincronizado con <a href="/configuracion" style={{ color: '#15803d', fontWeight: 600 }}>estructura comercial</a> ({venueSpaceGroups.length} {venueSpaceGroups.length === 1 ? 'grupo' : 'grupos'})
             </span>
           </>
         ) : (
@@ -181,7 +182,7 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
                   placeholder="Texto introductorio del grupo (opcional)"
                   value={pg.description ?? ''} onChange={e => updateGroup(vg.id, { description: e.target.value })} />
 
-                {(pg.pricing_mode ?? vg.pricing_mode) === 'group_base' && (
+                {(pg.pricing_mode ?? vg.pricing_mode) === 'group_base' && !isTemplate && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#F0FDFA', border: '1px solid #99F6E4', borderRadius: 6 }}>
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#0F766E', whiteSpace: 'nowrap' }}>Precio base:</span>
                     <input className="form-input" placeholder="ej. 5.000€"
@@ -231,26 +232,48 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
                         placeholder="Descripción breve (opcional)"
                         value={ps.description ?? ''} onChange={e => updateSpace(vg.id, vs.id, { description: e.target.value })} />
 
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <input className="form-input" style={{ fontSize: 12, flex: 1 }}
-                          placeholder={(pg.pricing_mode ?? vg.pricing_mode) === 'group_base' ? 'Suplemento (ej. +500€)' : 'Precio (ej. 5.000€)'}
-                          value={ps.price ?? ''} onChange={e => updateSpace(vg.id, vs.id, { price: e.target.value })} />
-                      </div>
-
-                      {/* Photo */}
-                      {uploadImage ? (
-                        <div style={{ width: 100 }}>
-                          <ImageUploader
-                            compact
-                            value={ps.photo_url ?? null}
-                            aspectRatio={4 / 3}
-                            label="Foto"
-                            alt={vs.name}
-                            onUpload={(f) => handleUpload(vg.id, vs.id, f)}
-                            onRemove={() => updateSpace(vg.id, vs.id, { photo_url: undefined })}
-                          />
+                      {isTemplate ? (
+                        <div style={{ fontSize: 11, color: 'var(--warm-gray)', padding: '6px 10px', background: '#faf8f5', border: '1px solid var(--ivory)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <AlertCircle size={12} style={{ flexShrink: 0, color: 'var(--gold)' }} />
+                          El precio se añadirá automáticamente desde tus tarifas al crear una propuesta
                         </div>
                       ) : (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <input className="form-input" style={{ fontSize: 12, flex: 1 }}
+                            placeholder={(pg.pricing_mode ?? vg.pricing_mode) === 'group_base' ? 'Suplemento (ej. +500€)' : 'Precio (ej. 5.000€)'}
+                            value={ps.price ?? ''} onChange={e => updateSpace(vg.id, vs.id, { price: e.target.value })} />
+                        </div>
+                      )}
+
+                      {/* Photos */}
+                      {uploadImage && (
+                        <div>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Fotos</div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                            {/* Legacy single photo_url + multi photos array */}
+                            {[...(Array.isArray((ps as any).photos) ? (ps as any).photos : []), ...(ps.photo_url && !((ps as any).photos ?? []).includes(ps.photo_url) ? [ps.photo_url] : [])].map((url: string, pi: number) => (
+                              <div key={pi} style={{ position: 'relative', width: 56, height: 56 }}>
+                                <img src={url} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover' }} />
+                                <button type="button" onClick={() => {
+                                  const allPhotos = [...(Array.isArray((ps as any).photos) ? (ps as any).photos : []), ...(ps.photo_url && !((ps as any).photos ?? []).includes(ps.photo_url) ? [ps.photo_url] : [])]
+                                  const next = allPhotos.filter((_: string, j: number) => j !== pi)
+                                  updateSpace(vg.id, vs.id, { photos: next, photo_url: next[0] ?? '' } as any)
+                                }}
+                                  style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                              </div>
+                            ))}
+                            <ImageUploader label="+" height={48} onUpload={async (f) => {
+                              const url = await uploadImage(f, 'zones')
+                              if (url) {
+                                const allPhotos = [...(Array.isArray((ps as any).photos) ? (ps as any).photos : []), ...(ps.photo_url && !((ps as any).photos ?? []).includes(ps.photo_url) ? [ps.photo_url] : [])]
+                                const next = [...allPhotos, url]
+                                updateSpace(vg.id, vs.id, { photos: next, photo_url: next[0] } as any)
+                              }
+                            }} />
+                          </div>
+                        </div>
+                      )}
+                      {!uploadImage && (
                         <input className="form-input" style={{ fontSize: 12, flex: 1 }}
                           placeholder="URL imagen" value={ps.photo_url ?? ''} onChange={e => updateSpace(vg.id, vs.id, { photo_url: e.target.value })} />
                       )}

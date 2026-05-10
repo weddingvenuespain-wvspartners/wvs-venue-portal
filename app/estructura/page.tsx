@@ -785,8 +785,8 @@ export default function EstructuraPage() {
   if (features.loading || !features.estructura) return (
     <FeatureGate
       feature="estructura"
-      title="Estructura comercial — Plan Premium"
-      description="Define las modalidades de tu venue y sus tarifas por período."
+      title="Configuración — Plan Premium"
+      description="Configura el alquiler de tu venue y sus tarifas por periodo."
     />
   )
 
@@ -813,7 +813,7 @@ export default function EstructuraPage() {
           activeKey={activeTab}
           onChange={k => setActiveTab(k as 'modalidades' | 'visitas')}
           tabs={[
-            { key: 'modalidades', label: 'Modalidades y tarifas', icon: LayoutGrid,   desc: 'Modalidades y precios por temporada' },
+            { key: 'modalidades', label: 'Alquiler y tarifas', icon: LayoutGrid,   desc: 'Configuración de alquiler y precios por temporada' },
             { key: 'visitas',     label: 'Visitas',               icon: CalendarDays, desc: 'Disponibilidad y bloqueos para visitas' },
           ]}
         />
@@ -827,7 +827,7 @@ export default function EstructuraPage() {
 
           {/* Commercial config banner */}
           {commercialConfig ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '12px 16px', marginBottom: 24, maxWidth: 860 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: modalities.length > 0 ? '12px 16px 36px' : '12px 16px', marginBottom: 24, maxWidth: 'none', position: 'relative' }}>
               <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Settings2 size={18} style={{ color: 'var(--gold)' }} />
               </div>
@@ -845,9 +845,16 @@ export default function EstructuraPage() {
                 </div>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={openWizard} style={{ flexShrink: 0 }}>Editar</button>
+              {modalities.length > 0 && (
+                <div style={{ position: 'absolute', bottom: 0, left: 16, right: 16, borderTop: '1px solid var(--ivory)', padding: '8px 0', display: 'flex', gap: 16 }}>
+                  <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{modalities.filter(m => m.is_active).length}</strong> activas</span>
+                  <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{modalities.length}</strong> total</span>
+                  <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{totalPrices}</strong> tarifas</span>
+                </div>
+              )}
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FDF8F0', border: '1px dashed #C4975A66', borderRadius: 10, padding: '14px 16px', marginBottom: 24, maxWidth: 860 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FDF8F0', border: '1px dashed #C4975A66', borderRadius: 10, padding: '14px 16px', marginBottom: 24, maxWidth: 'none' }}>
               <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #C4975A44' }}>
                 <Settings2 size={18} style={{ color: '#C4975A' }} />
               </div>
@@ -861,7 +868,7 @@ export default function EstructuraPage() {
 
           {/* Zones panel — only for multiple_independent */}
           {commercialConfig?.space_type === 'multiple_independent' && (
-            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, maxWidth: 860 }}>
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, maxWidth: 'none' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <LayoutGrid size={14} style={{ color: '#2563EB' }} /> Zonas del venue
               </div>
@@ -888,7 +895,7 @@ export default function EstructuraPage() {
 
           {/* Space groups panel — only for multiple_independent with zones */}
           {commercialConfig?.space_type === 'multiple_independent' && zones.length >= 2 && (
-            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, maxWidth: 860 }}>
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, maxWidth: 'none' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Layers size={14} style={{ color: '#2563EB' }} /> Grupos de espacios
               </div>
@@ -958,7 +965,7 @@ export default function EstructuraPage() {
 
           {/* Supplements panel — only for single_with_supplements */}
           {commercialConfig?.space_type === 'single_with_supplements' && (
-            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, maxWidth: 860 }}>
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, maxWidth: 'none' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Layers size={14} style={{ color: '#7C3AED' }} /> Extras / Suplementos
               </div>
@@ -983,21 +990,7 @@ export default function EstructuraPage() {
             </div>
           )}
 
-          {/* Stats */}
-          {modalities.length > 0 && (
-            <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
-              {[
-                { label: 'Modalidades activas', value: modalities.filter(m => m.is_active).length },
-                { label: 'Total modalidades',   value: modalities.length },
-                { label: 'Tarifas definidas',   value: totalPrices },
-              ].map(s => (
-                <div key={s.label} style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '12px 20px', minWidth: 120 }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--charcoal)', lineHeight: 1 }}>{s.value}</div>
-                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4 }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Stats now inline in commercial config banner */}
 
           {/* Empty state */}
           {modalities.length === 0 && (
@@ -1016,7 +1009,7 @@ export default function EstructuraPage() {
           )}
 
           {/* Modality cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 860 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 'none' }}>
             {modalities.map(m => {
               const dt         = getDT(m.duration_type)
               const isExpanded = expanded.has(m.id)
@@ -1409,7 +1402,7 @@ export default function EstructuraPage() {
               setBlockRangeEnd(null)
             }
             return (
-              <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, marginBottom: 16, maxWidth: 860, overflow: 'hidden' }}>
+              <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, marginBottom: 16, maxWidth: 'none', overflow: 'hidden' }}>
                 {/* Header */}
                 <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <CalendarDays size={14} style={{ color: '#059669', flexShrink: 0 }} />

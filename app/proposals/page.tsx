@@ -6,20 +6,11 @@ import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Loader2, FileText, Zap, Sparkles, ClipboardList, MessageCircle, Target, LayoutTemplate, ChevronLeft, ChevronRight, Search, Inbox, type LucideIcon } from 'lucide-react'
-import InquiriesPanel from '@/components/InquiriesPanel'
+import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Loader2, FileText, LayoutTemplate, ChevronLeft, ChevronRight, Search, Inbox } from 'lucide-react'
+import { renderPayload } from '@/components/InquiriesPanel'
 import FeatureGate from '@/components/FeatureGate'
 import { usePlanFeatures } from '@/lib/use-plan-features'
-import { DEFAULT_TEMPLATES, type DefaultTemplateId, type DefaultTemplateIcon } from '@/lib/proposal-starter-templates'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-
-const TEMPLATE_ICON: Record<DefaultTemplateIcon, LucideIcon> = {
-  'zap': Zap,
-  'sparkles': Sparkles,
-  'clipboard-list': ClipboardList,
-  'message-circle': MessageCircle,
-  'target': Target,
-}
 
 const MAX_PROPOSALS_PER_LEAD = 6
 const PAGE_SIZE = 10
@@ -83,12 +74,12 @@ function PropuestasPageContent() {
   const [sendErrAlert, setSendErrAlert] = useState(false)
   const [smtpConfigured, setSmtpConfigured] = useState<boolean | null>(cachedSmtpConfigured)
   const [newModalOpen, setNewModalOpen] = useState(false)
+  const [contentTemplates, setContentTemplates] = useState<{ id: string; name: string; description: string | null; is_default: boolean }[]>([])
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
-  const [currentTab, setCurrentTab] = useState<'proposals' | 'inquiries'>(
-    searchParams.get('tab') === 'inquiries' ? 'inquiries' : 'proposals'
-  )
-  const [inquiriesUnread, setInquiriesUnread] = useState(0)
+  const [currentTab, setCurrentTab] = useState<'proposals'>('proposals')
+  const [inquiries, setInquiries] = useState<any[]>([])
+  const [responseModalProposal, setResponseModalProposal] = useState<Proposal | null>(null)
   const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({})
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'sent' | 'viewed' | 'expired'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'last_7d' | 'last_30d'>('all')
@@ -112,16 +103,23 @@ function PropuestasPageContent() {
   const load = async () => {
     if (!activeVenue) { setLoading(false); return }
     const supabase = createClient()
-    const [{ data: props }, { data: leadsData }, { data: venueRow }] = await Promise.all([
+    const [{ data: props }, { data: leadsData }, { data: venueRow }, { data: inqData }] = await Promise.all([
       supabase.from('proposals').select('*, branding:proposal_branding(*)').eq('venue_id', activeVenue.id).order('created_at', { ascending: false }),
       supabase.from('leads').select('id, name, email').eq('venue_id', activeVenue.id).order('created_at', { ascending: false }),
       supabase.from('venue_onboarding').select('smtp_from_email').eq('user_id', user.id).maybeSingle(),
+      supabase.from('proposal_inquiries').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
     ])
     cachedSmtpConfigured = !!(venueRow as any)?.smtp_from_email
     setSmtpConfigured(cachedSmtpConfigured)
     if (props) { cachedProposals = props as Proposal[]; setProposals(cachedProposals) }
     if (leadsData) { cachedLeads = leadsData; setLeads(leadsData) }
+    if (inqData) setInquiries(inqData)
     setLoading(false)
+
+    // Fetch user content templates for "new proposal" modal
+    fetch('/api/proposal-templates').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setContentTemplates(data)
+    }).catch(() => {})
 
     // Section view counts (best-effort; venue scope handled by RPC SECURITY DEFINER)
     supabase.rpc('get_proposal_section_counts').then(({ data }) => {
@@ -141,11 +139,6 @@ function PropuestasPageContent() {
 
   const handleNew = () => {
     setNewModalOpen(true)
-  }
-
-  const createFromStarter = (tpl: DefaultTemplateId | null) => {
-    setNewModalOpen(false)
-    router.push(tpl ? `/proposals/new?template=${tpl}` : '/proposals/new')
   }
 
   const handleEdit = (p: Proposal) => {
@@ -329,24 +322,15 @@ function PropuestasPageContent() {
 
         <Tabs
           activeKey={currentTab}
-          onChange={(key) => setCurrentTab(key as 'proposals' | 'inquiries')}
+          onChange={() => {}}
           tabs={[
             { key: 'proposals', label: 'Propuestas', icon: FileText },
-            {
-              key: 'inquiries', label: 'Respuestas', icon: Inbox,
-              badge: inquiriesUnread > 0
-                ? <span style={{ marginLeft: 6, fontSize: 10, padding: '1px 6px', borderRadius: 99, background: 'var(--gold)', color: '#fff', fontWeight: 700 }}>{inquiriesUnread}</span>
-                : undefined,
-            },
             { key: 'templates', label: 'Plantillas', icon: LayoutTemplate, href: '/proposals/templates' },
           ]}
         />
 
         <div className="page-content">
-
-          {currentTab === 'inquiries' ? (
-            <InquiriesPanel onCountChange={setInquiriesUnread} />
-          ) : (<>
+          <>
 
           {smtpConfigured === false && (
             <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -464,16 +448,15 @@ function PropuestasPageContent() {
                     <th>Boda</th>
                     <th>Estado</th>
                     <th>Vistas</th>
+                    <th>Respuestas</th>
                     <th>Branding</th>
-                    <th>Creada</th>
-                    <th>Compartir</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {proposals.length === 0 && (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--warm-gray)' }}>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--warm-gray)' }}>
                         <Send size={28} style={{ margin: '0 auto 12px', opacity: 0.3, display: 'block' }} />
                         <div style={{ marginBottom: 4 }}>Aún no has creado ninguna propuesta.</div>
                         <div style={{ fontSize: 12, marginBottom: 16 }}>Crea una landing personalizada para cada pareja.</div>
@@ -483,7 +466,7 @@ function PropuestasPageContent() {
                   )}
                   {proposals.length > 0 && filteredProposals.length === 0 && (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--warm-gray)', fontSize: 13 }}>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--warm-gray)', fontSize: 13 }}>
                         Sin resultados con esos filtros.
                       </td>
                     </tr>
@@ -527,39 +510,55 @@ function PropuestasPageContent() {
                             </div>
                           )}
                         </td>
+                        <td onClick={e => e.stopPropagation()}>
+                          {(() => {
+                            const pInq = inquiries.filter(i => i.proposal_id === p.id)
+                            const newCount = pInq.filter(i => i.status === 'new').length
+                            if (pInq.length === 0) return <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>—</span>
+                            return (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => setResponseModalProposal(p)}
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', position: 'relative' }}
+                              >
+                                <Inbox size={12} />
+                                {pInq.length}
+                                {newCount > 0 && (
+                                  <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 99, background: 'var(--gold)', color: '#fff', fontWeight: 700 }}>{newCount} new</span>
+                                )}
+                              </button>
+                            )
+                          })()}
+                        </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <div style={{ width: 16, height: 16, borderRadius: 4, background: p.branding?.primary_color ?? '#2d4a7a', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }} />
                             {p.branding?.logo_url ? <img src={p.branding.logo_url} alt="logo" style={{ height: 16, maxWidth: 40, objectFit: 'contain', opacity: 0.8 }} /> : <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>sin logo</span>}
                           </div>
-                        </td>
-                        <td style={{ fontSize: 12, color: 'var(--warm-gray)' }}>
-                          {new Date(p.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                        </td>
-                        <td onClick={e => e.stopPropagation()}>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <button className="btn btn-ghost btn-sm" onClick={() => copyUrl(p.slug)} style={{ height: 34 }}>
-                              {copied === p.slug ? <><Check size={12} style={{ color: 'var(--sage)' }} /> Copiado</> : <><Copy size={12} /> Copiar URL</>}
-                            </button>
-                            <a href={`/proposal/${p.slug}`} target="_blank" rel="noopener" className="btn btn-ghost btn-sm" title="Ver landing" style={{ height: 34, width: 34, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <ExternalLink size={11} />
-                            </a>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 3 }}>
+                            {new Date(p.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
                           </div>
                         </td>
                         <td onClick={e => e.stopPropagation()}>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => copyUrl(p.slug)} title="Copiar URL" style={{ height: 32, width: 32, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {copied === p.slug ? <Check size={12} style={{ color: 'var(--sage)' }} /> : <Copy size={12} />}
+                            </button>
+                            <a href={`/proposal/${p.slug}`} target="_blank" rel="noopener" className="btn btn-ghost btn-sm" title="Ver landing" style={{ height: 32, width: 32, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <ExternalLink size={11} />
+                            </a>
+                            <button className="btn btn-ghost btn-sm" onClick={() => handleEdit(p)} title="Editar" style={{ height: 32, width: 32, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Pencil size={11} />
+                            </button>
                             <button
                               className="btn btn-primary btn-sm"
                               onClick={() => { if (smtpConfigured !== false && sendingId !== p.id) markSent(p) }}
                               title={smtpConfigured === false ? 'Configura el correo de envío' : p.status === 'draft' ? 'Enviar propuesta' : 'Reenviar propuesta'}
-                              style={{ height: 34, minWidth: 100, ...(smtpConfigured === false || sendingId === p.id ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}
+                              style={{ height: 32, ...(smtpConfigured === false || sendingId === p.id ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}
                             >
-                              {sendingId === p.id ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />} {sendingId === p.id ? 'Enviando' : p.status === 'draft' ? 'Enviar' : 'Reenviar'}
+                              {sendingId === p.id ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />} {sendingId === p.id ? '…' : p.status === 'draft' ? 'Enviar' : 'Reenviar'}
                             </button>
-                            <button className="btn btn-ghost btn-sm" onClick={() => handleEdit(p)} title="Editar" style={{ height: 34, width: 34, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <Pencil size={11} />
-                            </button>
-                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id)} title="Eliminar" style={{ height: 34, width: 34, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id)} title="Eliminar" style={{ height: 32, width: 32, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                               <Trash2 size={11} />
                             </button>
                           </div>
@@ -597,55 +596,117 @@ function PropuestasPageContent() {
           )}
           </>
           )}
-          </>)}
+          </>
         </div>
       </div>
 
+      {/* Response detail modal */}
+      {responseModalProposal && (() => {
+        const rp = responseModalProposal
+        const pInq = inquiries.filter(i => i.proposal_id === rp.id).sort((a: any, b: any) => b.created_at.localeCompare(a.created_at))
+        const KIND_LABEL: Record<string, string> = { visit: 'Visita solicitada', call: 'Llamada', video: 'Videollamada', menu: 'Pregunta sobre menú', menu_selection: 'Selección de menú', date_pick: 'Fecha confirmada', other: 'Consulta' }
+        const KIND_EMOJI: Record<string, string> = { visit: '📍', call: '📞', video: '🎥', menu: '🍽️', menu_selection: '✅', date_pick: '📅', other: '💬' }
+        return (
+          <div className="modal-overlay" onClick={() => setResponseModalProposal(null)}>
+            <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <div className="modal-title">Respuestas de {rp.couple_name}</div>
+                <div className="modal-sub">{pInq.length} {pInq.length === 1 ? 'respuesta' : 'respuestas'}</div>
+              </div>
+              <div className="modal-body" style={{ maxHeight: 450, overflowY: 'auto' }}>
+                {pInq.length === 0 && <div style={{ textAlign: 'center', padding: 20, color: 'var(--warm-gray)', fontSize: 13 }}>Sin respuestas aún.</div>}
+                {pInq.map((inq: any) => (
+                  <div key={inq.id} style={{ padding: '12px 14px', background: inq.status === 'new' ? '#FFFBEB' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#FDE68A' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 14 }}>{KIND_EMOJI[inq.kind] ?? '💬'}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{inq.kind_label || KIND_LABEL[inq.kind] || inq.kind}</span>
+                      {inq.status === 'new' && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 99, background: 'var(--gold)', color: '#fff', fontWeight: 700 }}>Nuevo</span>}
+                      <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--warm-gray)' }}>{new Date(inq.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    {inq.name && <div style={{ fontSize: 12, color: 'var(--charcoal)' }}>{inq.name}{inq.email ? ` · ${inq.email}` : ''}{inq.phone ? ` · ${inq.phone}` : ''}</div>}
+                    {inq.message && <div style={{ fontSize: 12, color: 'var(--charcoal)', marginTop: 4, whiteSpace: 'pre-wrap' }}>{inq.message}</div>}
+                    {inq.preferred_dates?.length > 0 && (
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4 }}>
+                        Fechas preferidas: {inq.preferred_dates.map((d: string) => new Date(d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })).join(', ')}
+                      </div>
+                    )}
+                    {inq.payload && Object.keys(inq.payload).length > 0 && (
+                      <div style={{ marginTop: 6 }}>
+                        {renderPayload(inq)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-ghost btn-sm" onClick={() => setResponseModalProposal(null)}>Cerrar</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {newModalOpen && (
         <div className="modal-overlay" onClick={() => setNewModalOpen(false)}>
-          <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
               <div className="modal-title">Nueva propuesta</div>
-              <div className="modal-sub">Elige cómo quieres empezar</div>
+              <div className="modal-sub">Elige una plantilla para empezar</div>
               <button onClick={() => setNewModalOpen(false)} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6, display: 'flex', alignItems: 'center', borderRadius: 6 }}>
                 <X size={20} />
               </button>
             </div>
-            <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <button
-                type="button"
-                onClick={() => createFromStarter(null)}
-                className="starter-card"
-                style={{ flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}
-              >
-                <div className="starter-card-icon">
-                  <FileText size={20} strokeWidth={1.6} />
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {contentTemplates.length === 0 ? (
+                <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 13, lineHeight: 1.6 }}>
+                  <LayoutTemplate size={28} style={{ margin: '0 auto 10px', opacity: 0.3, display: 'block' }} />
+                  No tienes plantillas creadas aún.
+                  <div style={{ marginTop: 8 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { setNewModalOpen(false); router.push('/proposals/templates') }}>
+                      Ir a Plantillas →
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>En blanco</div>
-                  <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>Propuesta vacía para rellenar desde cero.</div>
-                </div>
-              </button>
-              {DEFAULT_TEMPLATES.map(tpl => {
-                const Icon = TEMPLATE_ICON[tpl.icon]
-                return (
+              ) : (
+                <>
+                  {contentTemplates.map(tpl => (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      onClick={() => { setNewModalOpen(false); router.push(`/proposals/new?content_template_id=${tpl.id}`) }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                        borderRadius: 8, cursor: 'pointer', textAlign: 'left', width: '100%',
+                        border: `1.5px solid ${tpl.is_default ? 'var(--gold)' : 'var(--border)'}`,
+                        background: tpl.is_default ? 'rgba(196,151,90,0.06)' : 'var(--surface)',
+                      }}
+                    >
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: tpl.is_default ? 'rgba(196,151,90,0.15)' : 'var(--cream)', border: `1px solid ${tpl.is_default ? 'var(--gold)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <LayoutTemplate size={15} style={{ color: tpl.is_default ? 'var(--gold)' : 'var(--warm-gray)' }} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {tpl.name}
+                          {tpl.is_default && <span style={{ fontSize: 9, background: 'var(--gold)', color: '#fff', padding: '1px 5px', borderRadius: 8, fontWeight: 700 }}>POR DEFECTO</span>}
+                        </div>
+                        {tpl.description && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>{tpl.description}</div>}
+                      </div>
+                    </button>
+                  ))}
                   <button
-                    key={tpl.id}
                     type="button"
-                    onClick={() => createFromStarter(tpl.id)}
-                    className="starter-card"
-                    style={{ flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}
+                    onClick={() => { setNewModalOpen(false); router.push('/proposals/new') }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                      borderRadius: 8, cursor: 'pointer', textAlign: 'left', width: '100%',
+                      border: '1.5px dashed var(--border)', background: 'transparent',
+                    }}
                   >
-                    <div className="starter-card-icon">
-                      <Icon size={20} strokeWidth={1.6} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>{tpl.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>{tpl.description}</div>
-                    </div>
+                    <FileText size={15} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>En blanco (sin plantilla)</div>
                   </button>
-                )
-              })}
+                </>
+              )}
             </div>
           </div>
         </div>

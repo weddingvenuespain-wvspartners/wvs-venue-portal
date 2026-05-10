@@ -67,7 +67,7 @@ function PayloadField({ label, value }: { label: string; value: React.ReactNode 
   )
 }
 
-function renderPayload(inq: Inquiry) {
+export function renderPayload(inq: { kind: string; payload: Record<string, any> | null }) {
   const p = inq.payload || {}
 
   if (inq.kind === 'visit') {

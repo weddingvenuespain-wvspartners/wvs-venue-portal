@@ -61,7 +61,18 @@ export function formatZoneFeatures(z: any): string[] {
 
 export function formatDate(iso: string | null) {
   if (!iso) return null
-  return new Date(iso).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  return new Date(iso + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+/** Replace {{pareja}}, {{invitados}}, {{fecha}} in any string */
+export function replacePlaceholders(text: string | null, data: { couple_name?: string | null; guest_count?: number | null; wedding_date?: string | null }): string | null {
+  if (!text) return null
+  return text
+    .replace(/\{\{pareja\}\}/gi, data.couple_name ?? '')
+    .replace(/\{\{invitados\}\}/gi, String(data.guest_count ?? ''))
+    .replace(/\{\{fecha\}\}/gi, data.wedding_date
+      ? new Date(data.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+      : '')
 }
 export function formatPrice(n: number) {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -600,7 +611,7 @@ function InclusionGlyph({ inc, primary, size = 22 }: { inc: InclusionItem; prima
   return <InclusionIcon name="check" size={size} color={primary} />
 }
 
-export function InclusionsGrid({ items, primary, dark = true }: { items: InclusionItem[]; primary: string; dark?: boolean }) {
+export function InclusionsGrid({ items, primary, dark = true, columns = 2 }: { items: InclusionItem[]; primary: string; dark?: boolean; columns?: number }) {
   if (!items.length) return null
   const rgb = toRgb(primary)
   const border = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
@@ -608,7 +619,7 @@ export function InclusionsGrid({ items, primary, dark = true }: { items: Inclusi
   const titleColor = dark ? 'rgba(255,255,255,.88)' : '#181410'
   const descColor = dark ? 'rgba(255,255,255,.45)' : '#6a6560'
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 14 }}>
       {items.map((inc, i) => (
         <div key={i}
           style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '22px 20px', border: `1px solid ${border}`, borderRadius: 14, background: bg, transition: 'border-color .2s, background .2s' }}
@@ -628,29 +639,35 @@ export function InclusionsGrid({ items, primary, dark = true }: { items: Inclusi
   )
 }
 
-export function InclusionsList({ items, primary, dark = true }: { items: InclusionItem[]; primary: string; dark?: boolean }) {
+export function InclusionsList({ items, primary, dark = true, columns = 2 }: { items: InclusionItem[]; primary: string; dark?: boolean; columns?: number }) {
   if (!items.length) return null
   const divider = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
   const titleColor = dark ? 'rgba(255,255,255,.92)' : '#181410'
   const descColor = dark ? 'rgba(255,255,255,.5)' : '#6a6560'
+  const perCol = Math.ceil(items.length / columns)
+  const cols = Array.from({ length: columns }, (_, ci) => items.slice(ci * perCol, (ci + 1) * perCol))
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {items.map((inc, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 4px', borderBottom: i < items.length - 1 ? `1px solid ${divider}` : 'none' }}>
-          <span style={{ flexShrink: 0, color: primary, display: 'inline-flex' }}>
-            <InclusionGlyph inc={inc} primary={primary} size={18} />
-          </span>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <div style={{ fontSize: '.95rem', fontWeight: 500, color: titleColor }}>{inc.title}</div>
-            {inc.description && <div style={{ fontSize: '.78rem', color: descColor, lineHeight: 1.5 }}>{inc.description}</div>}
-          </div>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: '0 32px' }}>
+      {cols.map((col, ci) => (
+        <div key={ci} style={{ display: 'flex', flexDirection: 'column' }}>
+          {col.map((inc, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 4px', borderBottom: i < col.length - 1 ? `1px solid ${divider}` : 'none' }}>
+              <span style={{ flexShrink: 0, color: primary, display: 'inline-flex' }}>
+                <InclusionGlyph inc={inc} primary={primary} size={18} />
+              </span>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ fontSize: '.95rem', fontWeight: 500, color: titleColor }}>{inc.title}</div>
+                {inc.description && <div style={{ fontSize: '.78rem', color: descColor, lineHeight: 1.5 }}>{inc.description}</div>}
+              </div>
+            </div>
+          ))}
         </div>
       ))}
     </div>
   )
 }
 
-export function InclusionsCards({ items, primary, dark = true }: { items: InclusionItem[]; primary: string; dark?: boolean }) {
+export function InclusionsCards({ items, primary, dark = true, columns = 2 }: { items: InclusionItem[]; primary: string; dark?: boolean; columns?: number }) {
   if (!items.length) return null
   const rgb = toRgb(primary)
   const border = dark ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.08)'
@@ -658,7 +675,7 @@ export function InclusionsCards({ items, primary, dark = true }: { items: Inclus
   const titleColor = dark ? '#fff' : '#181410'
   const descColor = dark ? 'rgba(255,255,255,.55)' : '#6a6560'
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 18 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 18 }}>
       {items.map((inc, i) => (
         <div key={i}
           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14, padding: '32px 20px 26px', border: `1px solid ${border}`, borderRadius: 16, background: bg, transition: 'border-color .25s, background .25s, transform .25s' }}

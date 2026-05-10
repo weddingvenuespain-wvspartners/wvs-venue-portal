@@ -49,12 +49,12 @@ export default function SpaceGroupSelector({ groups, primary, onPrimary, dark = 
   const cardBorder = dark ? 'rgba(255,255,255,.08)' : '#e8e2d8'
   const secBg      = dark ? '#0a0a0a' : '#f9f7f4'
 
-  const isSpaceSelected = (gi: number, si: number, mode: 'pick_one' | 'pick_n' | 'optional'): boolean => {
+  const isSpaceSelected = (gi: number, si: number, mode: string): boolean => {
     if (mode === 'pick_one') return singleSel[gi] === si
     return multiSel[gi]?.has(si) ?? false
   }
 
-  const toggleSpace = (gi: number, si: number, mode: 'pick_one' | 'pick_n' | 'optional', max?: number) => {
+  const toggleSpace = (gi: number, si: number, mode: string, max?: number) => {
     if (mode === 'pick_one') {
       const next = { ...singleSel, [gi]: singleSel[gi] === si ? -1 : si }
       setSingleSel(next)

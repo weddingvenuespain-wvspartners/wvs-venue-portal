@@ -154,6 +154,8 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   const [contentTemplates, setContentTemplates] = useState<Array<{ id: string; name: string; description: string | null; sections_data: SectionsData; is_default: boolean }>>([])
   const [applyingTemplate, setApplyingTemplate] = useState(false)
   const [showDateModal, setShowDateModal] = useState(false)
+  const [showTemplateList, setShowTemplateList] = useState(false)
+  const [showFontList, setShowFontList] = useState(false)
 
   const [form, setForm] = useState({
     lead_id: initial.lead_id ?? '',
@@ -310,6 +312,17 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     }
   }, [user])
 
+  // Re-group date slots with prices when modalities load for existing proposals
+  useEffect(() => {
+    if (!modalities.length || !form.modality_id) return
+    const currentSlots: any[] = (sections as any).date_slots ?? []
+    if (!currentSlots.length) return
+    // Check if any slot is missing price info — if so, regroup
+    const missingPrices = currentSlots.some((s: any) => !s.price_rental && !s.price_per_person)
+    if (missingPrices) regroupDateSlots(form.modality_id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalities])
+
   const notify = (msg: string, err = false) => {
     setToast({ msg, err })
     setTimeout(() => setToast(null), 3500)
@@ -427,58 +440,53 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     return pkg.day_from === pkg.day_to ? DAYS[pkg.day_from] : `${DAYS[pkg.day_from]} → ${DAYS[pkg.day_to]}`
   }
 
-  // Regroup date slots by price so each slot has dates with the same price
+  // Re-group existing date_slots by price when modality changes or dates exist without prices
   const regroupDateSlots = (modalityId: string) => {
-    const currentSlots: any[] = (sections as any).date_slots ?? []
-    const allDates: string[] = currentSlots.flatMap((s: any) => s.dates ?? []).filter(Boolean)
-    if (!allDates.length || !modalityId) return
+    setSections((s: any) => {
+      const currentSlots: any[] = s.date_slots ?? []
+      if (!currentSlots.length) return s
+      // Collect all dates from all slots
+      const allDates: string[] = currentSlots.flatMap((slot: any) => slot.dates ?? []).filter(Boolean)
+      if (!allDates.length) return s
 
-    // Group dates by price
-    const byPrice = new Map<string, string[]>()
-    for (const d of allDates) {
-      const price = getPriceForDate(modalityId, d)
-      const key = price !== null ? String(price) : 'null'
-      if (!byPrice.has(key)) byPrice.set(key, [])
-      byPrice.get(key)!.push(d)
-    }
+      const priceGroups = new Map<string, string[]>()
+      for (const d of allDates) {
+        const price = getPriceForDate(modalityId, d)
+        const key = price !== null ? String(price) : 'none'
+        if (!priceGroups.has(key)) priceGroups.set(key, [])
+        priceGroups.get(key)!.push(d)
+      }
 
-    // If all dates have the same price (or no price), keep single slot
-    if (byPrice.size <= 1) {
-      const price = getPriceForDate(modalityId, allDates[0])
-      const label = getMatchedPackageLabel(modalityId, allDates[0])
-      setSections((s: any) => ({
-        ...s,
-        date_slots: [{
-          label: label || 'Fechas propuestas',
-          dates: allDates,
-          ...(price !== null ? { price_rental: `${price.toLocaleString('es-ES')}€` } : {}),
-        }],
-        sections_enabled: { ...(s.sections_enabled ?? {}), date_slots: true },
-      }))
-      return
-    }
-
-    // Multiple price groups → separate slots
-    const newSlots = Array.from(byPrice.entries()).map(([key, dates]) => {
-      const price = key !== 'null' ? parseFloat(key) : null
-      const label = getMatchedPackageLabel(modalityId, dates[0])
-      return {
-        label: label || (price !== null ? `${price.toLocaleString('es-ES')}€` : 'Fechas propuestas'),
-        dates,
-        ...(price !== null ? { price_rental: `${price.toLocaleString('es-ES')}€` } : {}),
+      if (priceGroups.size > 1) {
+        const newSlots = Array.from(priceGroups.entries()).map(([priceKey, slotDates]) => ({
+          label: '',
+          dates: slotDates,
+          price_rental: priceKey !== 'none' ? `${Number(priceKey).toLocaleString('es-ES')} €` : '',
+          price_per_person: '',
+          notes: '',
+        }))
+        return { ...s, date_slots: newSlots, sections_enabled: { ...s.sections_enabled, date_slots: true } }
+      } else {
+        const price = getPriceForDate(modalityId, allDates[0])
+        return {
+          ...s,
+          date_slots: [{
+            label: currentSlots.length === 1 && currentSlots[0].label ? currentSlots[0].label : 'Fechas propuestas',
+            dates: allDates,
+            price_rental: price !== null ? `${price.toLocaleString('es-ES')} €` : '',
+            price_per_person: currentSlots[0]?.price_per_person ?? '',
+            notes: currentSlots[0]?.notes ?? '',
+          }],
+          sections_enabled: { ...s.sections_enabled, date_slots: true },
+        }
       }
     })
-
-    setSections((s: any) => ({
-      ...s,
-      date_slots: newSlots,
-      sections_enabled: { ...(s.sections_enabled ?? {}), date_slots: true },
-    }))
   }
 
   const onModalityChange = (modalityId: string) => {
     const price = modalityId && form.wedding_date ? getPriceForDate(modalityId, form.wedding_date) : null
     setForm(f => ({ ...f, modality_id: modalityId, ...(price !== null ? { price_estimate: String(price) } : {}) }))
+    // Re-group date slots with correct prices
     if (modalityId) regroupDateSlots(modalityId)
   }
 
@@ -516,15 +524,11 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     isSample: boolean
   }
   const allTemplates: SelectorTemplate[] = useMemo(() => {
-    const samples: SelectorTemplate[] = DEFAULT_TEMPLATES.map(t => ({
-      id: t.id, name: t.name, description: t.description,
-      sections_data: t.sections_data, is_default: false, isSample: true,
-    }))
-    const own: SelectorTemplate[] = contentTemplates.map(t => ({
+    // Only show user's own templates — NOT the sample/default style templates
+    return contentTemplates.map(t => ({
       id: t.id, name: t.name, description: t.description,
       sections_data: t.sections_data, is_default: t.is_default, isSample: false,
     }))
-    return [...samples, ...own]
   }, [contentTemplates])
 
   // ── Apply a content template to sections (con confirm si sobrescribe overrides)
@@ -779,43 +783,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
               <PasswordProtectionBlock form={form} setForm={setForm} />
 
-              {allTemplates.length > 0 && (
-                <div className="form-group" style={{ marginTop: 14 }}>
-                  <label className="form-label">Plantilla de contenido</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {allTemplates.map(tpl => {
-                      const isActive = (sections as any).content_template_id === tpl.id
-                      return (
-                        <button key={tpl.id} type="button"
-                          onClick={() => applyContentTemplate(tpl.id)}
-                          style={{
-                            display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
-                            borderRadius: 8, cursor: 'pointer', textAlign: 'left', width: '100%',
-                            border: `1.5px solid ${isActive ? 'var(--gold)' : 'var(--border)'}`,
-                            background: isActive ? 'rgba(196,151,90,0.08)' : 'var(--surface)',
-                          }}>
-                          <div style={{ width: 28, height: 28, borderRadius: 6, background: isActive ? 'rgba(196,151,90,0.2)' : 'var(--cream)', border: `1px solid ${isActive ? 'var(--gold)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-                            <ChefHat size={13} style={{ color: isActive ? 'var(--gold)' : 'var(--warm-gray)' }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: isActive ? 'var(--gold)' : 'var(--charcoal)', marginBottom: 1, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                              {tpl.name}
-                              {tpl.isSample && <span style={{ fontSize: 9, background: 'rgba(0,0,0,.06)', color: 'var(--warm-gray)', padding: '1px 6px', borderRadius: 8, fontWeight: 700, letterSpacing: '.04em' }}>MUESTRA</span>}
-                              {tpl.is_default && <span style={{ fontSize: 9, background: isActive ? 'var(--gold)' : 'var(--warm-gray)', color: '#fff', padding: '1px 5px', borderRadius: 8, fontWeight: 700 }}>DEF</span>}
-                            </div>
-                            {tpl.description && <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{tpl.description}</div>}
-                            {isActive && applyingTemplate && <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 2 }}>✓ Aplicando…</div>}
-                            {isActive && !applyingTemplate && <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 2 }}>✓ Plantilla aplicada</div>}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 6, lineHeight: 1.5 }}>
-                    Al aplicar una plantilla se carga su configuración de secciones y contenido. Si tienes secciones editadas que la plantilla también define, te avisará antes de sobrescribirlas.
-                  </div>
-                </div>
-              )}
+              {/* Template selector moved to Visual tab */}
 
               <div className="form-group" style={{ marginTop: 14 }}>
                 <label className="form-label">Tipo de servicio</label>
@@ -871,7 +839,67 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
           {/* ══ TAB: VISUAL ══ */}
           {activeTab === 'visual' && (
             <div>
-              <div style={secLabel}>Aspecto visual de la landing</div>
+              {/* Template selector — collapsed: show current + edit btn */}
+              {allTemplates.length > 0 && (() => {
+                const currentTpl = allTemplates.find(t => t.id === (sections as any).content_template_id)
+                return (
+                  <>
+                    <div style={secLabel}>Plantilla</div>
+                    <div className="form-group">
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                        borderRadius: 8, border: '1.5px solid var(--gold)',
+                        background: 'rgba(196,151,90,0.06)',
+                      }}>
+                        <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(196,151,90,0.15)', border: '1px solid var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <ChefHat size={13} style={{ color: 'var(--gold)' }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>
+                            {currentTpl?.name ?? 'Ninguna seleccionada'}
+                          </div>
+                          {currentTpl?.description && <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{currentTpl.description}</div>}
+                        </div>
+                        <button type="button" onClick={() => setShowTemplateList(v => !v)}
+                          style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)', background: 'rgba(196,151,90,0.1)', border: '1px solid rgba(196,151,90,0.25)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          {showTemplateList ? 'Cerrar' : 'Cambiar'}
+                        </button>
+                      </div>
+
+                      {/* Expandable template list */}
+                      {showTemplateList && (
+                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 300, overflowY: 'auto', padding: '4px 0' }}>
+                          {allTemplates.map(tpl => {
+                            const isActive = (sections as any).content_template_id === tpl.id
+                            return (
+                              <button key={tpl.id} type="button"
+                                onClick={() => { applyContentTemplate(tpl.id); setShowTemplateList(false) }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+                                  borderRadius: 8, cursor: 'pointer', textAlign: 'left', width: '100%',
+                                  border: `1.5px solid ${isActive ? 'var(--gold)' : 'var(--border)'}`,
+                                  background: isActive ? 'rgba(196,151,90,0.08)' : 'var(--surface)',
+                                }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: isActive ? 'var(--gold)' : 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    {tpl.name}
+                                    {tpl.isSample && <span style={{ fontSize: 9, background: 'rgba(0,0,0,.06)', color: 'var(--warm-gray)', padding: '1px 6px', borderRadius: 8, fontWeight: 700, letterSpacing: '.04em' }}>MUESTRA</span>}
+                                    {tpl.is_default && <span style={{ fontSize: 9, background: isActive ? 'var(--gold)' : 'var(--warm-gray)', color: '#fff', padding: '1px 5px', borderRadius: 8, fontWeight: 700 }}>DEF</span>}
+                                  </div>
+                                  {tpl.description && <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4, marginTop: 1 }}>{tpl.description}</div>}
+                                </div>
+                                {isActive && <Check size={14} style={{ color: 'var(--gold)', flexShrink: 0 }} />}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )
+              })()}
+
+              <div style={secLabel}>Aspecto visual</div>
 
               <div className="form-group">
                 <label className="form-label">Color principal</label>
@@ -905,34 +933,48 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               </div>
 
               <div className="form-group">
-                <label className="form-label">Tipografía — {getFontByValue(form.font_family)?.label ?? 'Georgia'}</label>
-                <div style={{ padding: '8px 12px', background: 'var(--cream)', borderRadius: 8, marginBottom: 8, border: '1px solid var(--border)' }}>
-                  <span style={{ fontFamily: form.font_family, fontSize: 16, color: 'var(--text)' }}>Aa — {form.couple_name || 'Laura & Carlos'}</span>
+                <label className="form-label">Tipografía</label>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                  borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)',
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontFamily: form.font_family, fontSize: 16, color: 'var(--text)' }}>Aa — {form.couple_name || 'Laura & Carlos'}</span>
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{getFontByValue(form.font_family)?.label ?? 'Georgia'}</div>
+                  </div>
+                  <button type="button" onClick={() => setShowFontList(v => !v)}
+                    style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)', background: 'rgba(196,151,90,0.1)', border: '1px solid rgba(196,151,90,0.25)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    {showFontList ? 'Cerrar' : 'Cambiar'}
+                  </button>
                 </div>
-                <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {FONT_CATEGORIES.map(cat => (
-                    <div key={cat.key}>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{cat.label}</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        {GOOGLE_FONTS.filter(f => f.category === cat.key).map(opt => {
-                          const isActive = form.font_family === opt.value
-                          return (
-                            <button key={opt.value} type="button" onClick={() => setForm(f => ({ ...f, font_family: opt.value }))}
-                              style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                padding: '7px 10px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
-                                border: `1.5px solid ${isActive ? 'var(--gold)' : 'var(--border)'}`,
-                                background: isActive ? 'rgba(196,151,90,0.08)' : 'var(--surface)',
-                              }}>
-                              <span style={{ fontFamily: opt.value, fontSize: 13, color: 'var(--text)' }}>{opt.label}</span>
-                              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{opt.desc}</span>
-                            </button>
-                          )
-                        })}
+
+                {/* Expandable font list */}
+                {showFontList && (
+                  <div style={{ marginTop: 8, maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {FONT_CATEGORIES.map(cat => (
+                      <div key={cat.key}>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{cat.label}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          {GOOGLE_FONTS.filter(f => f.category === cat.key).map(opt => {
+                            const isActive = form.font_family === opt.value
+                            return (
+                              <button key={opt.value} type="button" onClick={() => { setForm(f => ({ ...f, font_family: opt.value })); setShowFontList(false) }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                  padding: '7px 10px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                                  border: `1.5px solid ${isActive ? 'var(--gold)' : 'var(--border)'}`,
+                                  background: isActive ? 'rgba(196,151,90,0.08)' : 'var(--surface)',
+                                }}>
+                                <span style={{ fontFamily: opt.value, fontSize: 13, color: 'var(--text)' }}>{opt.label}</span>
+                                {isActive ? <Check size={13} style={{ color: 'var(--gold)' }} /> : <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{opt.desc}</span>}
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1830,14 +1872,30 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
         </div>
 
         {/* Footer save */}
-        <div style={{ flexShrink: 0, padding: '12px 18px', borderTop: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flexShrink: 0, padding: '12px 18px', borderTop: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
-            className="btn btn-primary"
+            className="btn"
             onClick={handleSave}
             disabled={saving || !isDirty}
+            style={{ flex: 1, justifyContent: 'center', background: 'var(--cream)', color: 'var(--charcoal)', border: '1px solid var(--border)' }}
+          >
+            {saving ? 'Guardando…' : isDirty ? 'Guardar borrador' : 'Guardado'}
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={async () => {
+              await handleSave()
+              if (!form.couple_name.trim()) return
+              const supabase = createClient()
+              await supabase.from('proposals').update({ status: 'sent' }).eq('id', proposal.id)
+              setProposal(p => ({ ...p, status: 'sent' }))
+              copyUrl()
+              notify('Propuesta enviada — URL copiada')
+            }}
+            disabled={saving || !form.couple_name.trim()}
             style={{ flex: 1, justifyContent: 'center' }}
           >
-            {saving ? 'Guardando…' : isDirty ? 'Guardar cambios' : 'Guardado'}
+            Enviar propuesta
           </button>
         </div>
       </div>
@@ -1856,17 +1914,51 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
           onConfirm={(dates) => {
             const first = dates[0] ?? ''
             onWeddingDateChange(first)
-            // Create date_slots and group by price if modality exists
-            setSections((s: any) => ({
-              ...s,
-              date_slots: [{ label: 'Fechas propuestas', dates }],
-              sections_enabled: { ...(s.sections_enabled ?? {}), date_slots: true },
-            }))
-            setShowDateModal(false)
-            // After state update, regroup by price if modality is selected
-            if (form.modality_id) {
-              setTimeout(() => regroupDateSlots(form.modality_id), 0)
+            if (dates.length > 0) {
+              // Group dates by price so each slot has its own price
+              const modalityId = form.modality_id
+              if (modalityId) {
+                const priceGroups = new Map<string, string[]>()
+                for (const d of dates) {
+                  const price = getPriceForDate(modalityId, d)
+                  const key = price !== null ? String(price) : 'none'
+                  if (!priceGroups.has(key)) priceGroups.set(key, [])
+                  priceGroups.get(key)!.push(d)
+                }
+                if (priceGroups.size > 1) {
+                  // Different prices → separate slots
+                  const slots = Array.from(priceGroups.entries()).map(([priceKey, slotDates]) => ({
+                    label: '',
+                    dates: slotDates,
+                    price_rental: priceKey !== 'none' ? `${Number(priceKey).toLocaleString('es-ES')} €` : '',
+                    price_per_person: '',
+                    notes: '',
+                  }))
+                  setSections((s: any) => ({ ...s, date_slots: slots, sections_enabled: { ...s.sections_enabled, date_slots: true } }))
+                } else {
+                  // Same price → one slot
+                  const price = getPriceForDate(modalityId, first)
+                  setSections((s: any) => ({
+                    ...s,
+                    date_slots: [{
+                      label: 'Fechas propuestas',
+                      dates,
+                      price_rental: price !== null ? `${price.toLocaleString('es-ES')} €` : '',
+                      price_per_person: '',
+                      notes: '',
+                    }],
+                    sections_enabled: { ...s.sections_enabled, date_slots: true },
+                  }))
+                }
+              } else {
+                setSections((s: any) => ({
+                  ...s,
+                  date_slots: [{ label: 'Fechas propuestas', dates }],
+                  sections_enabled: { ...s.sections_enabled, date_slots: true },
+                }))
+              }
             }
+            setShowDateModal(false)
           }}
         />
       )}

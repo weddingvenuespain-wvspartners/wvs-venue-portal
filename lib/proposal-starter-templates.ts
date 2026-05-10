@@ -30,10 +30,10 @@ export type DefaultTemplate = {
 
 // ── Contenido base compartido (Finca Son Vell — catering completo) ────────────
 const BASE_PROPOSAL = {
-  couple_name: 'Sofía & Alejandro',
+  couple_name: 'Nombre Ejemplo 1 & Nombre Ejemplo 2',
   guest_count: 150,
-  personal_message: 'Queridos Sofía y Alejandro, ha sido un placer recibiros en la finca. Aquí tenéis nuestra propuesta completa, con todo el cariño que merece vuestro día.',
-  price_estimate: 23500,
+  personal_message: 'Queridos Nombre Ejemplo 1 & Nombre Ejemplo 2, es un placer presentaros esta propuesta. Aquí encontraréis todos los detalles sobre nuestro espacio y servicios.',
+  price_estimate: 18500,
   show_availability: true,
   show_price_estimate: true,
 }

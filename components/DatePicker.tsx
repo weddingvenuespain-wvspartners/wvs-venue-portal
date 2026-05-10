@@ -11,7 +11,7 @@ export function fmtDate(d: string) {
   return `${parseInt(day)} ${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(m)-1]} ${y.slice(2)}`
 }
 
-export default function DatePicker({ value, onChange, label, accent = '#C4975A', minDate, allowPast = false, dark = false, placeholder = 'Seleccionar fecha' }: {
+export default function DatePicker({ value, onChange, label, accent = '#C4975A', minDate, allowPast = false, dark = false, placeholder = 'Seleccionar fecha', disabledRanges = [] }: {
   value: string
   onChange: (v: string) => void
   label?: string
@@ -20,6 +20,7 @@ export default function DatePicker({ value, onChange, label, accent = '#C4975A',
   allowPast?: boolean
   dark?: boolean
   placeholder?: string
+  disabledRanges?: { from: string; to: string }[]
 }) {
   const triggerBg     = dark ? 'rgba(255,255,255,.04)' : '#fff'
   const triggerBorder = dark ? 'rgba(255,255,255,.18)' : 'var(--ivory)'
@@ -60,10 +61,13 @@ export default function DatePicker({ value, onChange, label, accent = '#C4975A',
   const prevMonth   = () => viewMonth === 0  ? (setViewMonth(11), setViewYear(y => y-1)) : setViewMonth(m => m-1)
   const nextMonth   = () => viewMonth === 11 ? (setViewMonth(0),  setViewYear(y => y+1)) : setViewMonth(m => m+1)
 
+  const isInDisabledRange = (iso: string) => disabledRanges.some(r => iso >= r.from && iso <= r.to)
+
   const selectDay = (day: number) => {
     const iso = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
     if (!allowPast && iso < today) return
     if (minDate && iso < minDate) return
+    if (isInDisabledRange(iso)) return
     onChange(iso)
     setOpen(false)
   }
@@ -94,7 +98,7 @@ export default function DatePicker({ value, onChange, label, accent = '#C4975A',
               const iso = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
               const isSel = iso === value
               const isToday = iso === today
-              const isDisabled = (!allowPast && iso < today) || (!!minDate && iso < minDate)
+              const isDisabled = (!allowPast && iso < today) || (!!minDate && iso < minDate) || isInDisabledRange(iso)
               return (
                 <button key={day} type="button" onClick={() => selectDay(day)} disabled={isDisabled}
                   style={{ padding: '6px 0', textAlign: 'center', fontSize: 12, border: 'none', borderRadius: 7, cursor: isDisabled ? 'default' : 'pointer', fontFamily: 'Manrope, sans-serif', background: isSel ? accent : 'transparent', color: isSel ? '#fff' : isDisabled ? '#ccc' : isToday ? accent : 'var(--charcoal)', fontWeight: isSel || isToday ? 700 : 400, outline: isToday && !isSel ? `1.5px solid ${accent}` : 'none', outlineOffset: -2 }}>

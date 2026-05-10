@@ -23,7 +23,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('proposal_content_templates')
-    .select('id, name, description, is_default, created_at, updated_at')
+    .select('id, name, description, is_default, sections_data, created_at, updated_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
