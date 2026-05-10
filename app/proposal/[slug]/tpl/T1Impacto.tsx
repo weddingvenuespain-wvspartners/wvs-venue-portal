@@ -69,7 +69,14 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone, setVisitDone]           = useState(false)
   const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
   const heroRef                     = useRef<HTMLImageElement>(null)
+
+  // Dynamic price: if a date slot with different price is selected, use that price
+  const selectedSlot = selectedDateSlotIdx !== null && dateSlots ? dateSlots[selectedDateSlotIdx] : null
+  const displayPrice = selectedSlot?.price_rental
+    ? parseInt(selectedSlot.price_rental.replace(/\D/g, '')) || price_estimate
+    : price_estimate
 
   useEffect(() => {
     const fn = () => {
@@ -457,9 +464,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <div style={{ fontSize: '.62rem', letterSpacing: '.14em', textTransform: 'uppercase', opacity: .6, marginTop: 2 }}>Propuesta exclusiva · {venue?.name}</div>
         </div>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          {show_price_estimate && price_estimate && (
+          {show_price_estimate && displayPrice && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1 }}>
-              <span style={{ fontFamily: FONT, fontSize: '1.5rem', fontWeight: 300 }}>{formatPrice(price_estimate)}</span>
+              <span style={{ fontFamily: FONT, fontSize: '1.5rem', fontWeight: 300 }}>{formatPrice(displayPrice)}</span>
               {ivaLabel(sec, true) && <span style={{ fontSize: '.6rem', opacity: .55, letterSpacing: '.08em', marginTop: 3 }}>{ivaLabel(sec, true)}</span>}
             </div>
           )}
@@ -502,9 +509,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
             {venue?.city && <span style={{ fontSize: '.82rem', color: 'rgba(255,255,255,.4)', letterSpacing: '.04em', display: 'flex', alignItems: 'center', gap: 5 }}><IcoPin width={12} height={12} /> {venue.name}, {venue.city}</span>}
             {wDate && <span style={{ fontSize: '.82rem', color: 'rgba(255,255,255,.4)', display: 'flex', alignItems: 'center', gap: 5 }}><IcoCalendar width={12} height={12} /> {wDate}</span>}
             {guest_count && <span style={{ fontSize: '.82rem', color: 'rgba(255,255,255,.4)', display: 'flex', alignItems: 'center', gap: 5 }}><IcoUsers width={12} height={12} /> {guest_count} invitados</span>}
-            {show_price_estimate && price_estimate && (
+            {show_price_estimate && displayPrice && (
               <span style={{ fontFamily: FONT, fontSize: '2rem', fontWeight: 300, color: '#fff', borderLeft: `2px solid ${primary}`, paddingLeft: 20, marginLeft: 4, lineHeight: 1, display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                {formatPrice(price_estimate)}
+                {formatPrice(displayPrice)}
                 {ivaLabel(sec, true) && <span style={{ fontSize: '.6rem', opacity: .55, letterSpacing: '.08em', marginTop: 4, fontFamily: "'Inter', sans-serif" }}>{ivaLabel(sec, true)}</span>}
               </span>
             )}
@@ -533,6 +540,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           dark={!lightMode}
           font={FONT}
           proposalId={data.id}
+          onSelect={setSelectedDateSlotIdx}
         />
       )}
 
@@ -1136,6 +1144,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           coupleName={couple_name}
           primaryColor={primary}
           selectedSpaces={selectedSpaces}
+          dateSlots={dateSlots ?? []}
+          preSelectedDateSlot={selectedDateSlotIdx}
           onClose={() => setVisitModalOpen(false)}
           onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
         />

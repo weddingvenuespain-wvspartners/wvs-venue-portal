@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { formatDate, formatPrice, isDark, toRgb, FadeUp, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoChat, IcoBuilding, ivaLabel, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, type ProposalData } from './shared'
 import { WeddingProposal } from './WeddingProposal'
+import DateSelector from './DateSelector'
 import VisitBookingModal from '@/components/VisitBookingModal'
 
 const SECTIONS_ALL = [
@@ -40,7 +41,7 @@ function EmptySec({ label }: { label: string }) {
 
 export default function T3TodoClaro({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
-  const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow, expShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, testsShow, seasonsShow, collabsShow, accom } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow, expShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, testsShow, seasonsShow, collabsShow, accom, dateSlots } = extractData(data)
 
   const primary = branding?.primary_color ?? '#1A3A5C'
   const rgb     = toRgb(primary)
@@ -52,6 +53,12 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
 
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone,      setVisitDone]      = useState(false)
+  const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
+
+  const selectedSlot = selectedDateSlotIdx !== null && dateSlots ? dateSlots[selectedDateSlotIdx] : null
+  const displayPrice = selectedSlot?.price_rental
+    ? parseInt(selectedSlot.price_rental.replace(/\D/g, '')) || price_estimate
+    : price_estimate
   const [heroLoaded, setHeroLoaded] = useState(false)
   const [openFaq, setOpenFaq] = useState<number|null>(null)
   const [activeSection, setActiveSection] = useState('')
@@ -203,8 +210,8 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           {logo ? <img src={logo} alt="" style={{ height: 24, objectFit: 'contain', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,.7))' }} />
             : <span style={{ fontFamily: 'Inter,sans-serif', fontSize: 10, letterSpacing: '.28em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)' }}>{venue?.name}</span>
           }
-          {show_price_estimate && price_estimate && (
-            <span style={{ fontFamily: font, fontSize: 20, fontWeight: 300, color: '#fff' }}>{formatPrice(price_estimate)}</span>
+          {show_price_estimate && displayPrice && (
+            <span style={{ fontFamily: font, fontSize: 20, fontWeight: 300, color: '#fff' }}>{formatPrice(displayPrice)}</span>
           )}
         </div>
 
@@ -223,6 +230,18 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} />
+      )}
+
+      {/* ── SELECTOR DE FECHAS ── */}
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+        <DateSelector
+          slots={dateSlots}
+          primary={primary}
+          onPrimary={onPri}
+          font={font}
+          proposalId={data.id}
+          onSelect={setSelectedDateSlotIdx}
+        />
       )}
 
       {/* ══════════════════════════════════════════
@@ -244,10 +263,10 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
 
           {/* Key info box */}
           <div className="side-box">
-            {show_price_estimate && price_estimate && (
+            {show_price_estimate && displayPrice && (
               <div style={{ marginBottom: 14 }}>
                 <div className="side-box-lbl">Estimación</div>
-                <div className="side-box-val-price">{formatPrice(price_estimate)}</div>
+                <div className="side-box-val-price">{formatPrice(displayPrice)}</div>
                 {ivaLabel(sec, true) && <div style={{ fontSize: 10, color: '#9a9590', marginTop: 3, letterSpacing: '.05em' }}>{ivaLabel(sec, true)}</div>}
               </div>
             )}
@@ -664,6 +683,8 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
               coupleName={couple_name}
               primaryColor={primary}
               selectedSpaces={[]}
+              dateSlots={dateSlots ?? []}
+              preSelectedDateSlot={selectedDateSlotIdx}
               onClose={() => setVisitModalOpen(false)}
               onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
             />

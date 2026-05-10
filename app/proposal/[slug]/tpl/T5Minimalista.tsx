@@ -15,6 +15,7 @@ import {
 } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
+import DateSelector from './DateSelector'
 import VisitBookingModal from '@/components/VisitBookingModal'
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
@@ -424,7 +425,7 @@ function EmptySec({ label }: { label: string }) {
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 export default function T5Minimalista({ data }: { data: ProposalData }) {
-  const { sec, on, hasCatering, packagesShow, inclusionsShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, testsShow, collabsShow, extrasShow, accom } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, testsShow, collabsShow, extrasShow, accom, dateSlots } = extractData(data)
 
   const _preview = !!(data as any)._preview
   const branding  = data.branding
@@ -444,6 +445,12 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone,      setVisitDone]      = useState(false)
   const [scrolled, setScrolled]     = useState(false)
+  const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
+
+  const selectedSlot = selectedDateSlotIdx !== null && dateSlots ? dateSlots[selectedDateSlotIdx] : null
+  const displayPrice = selectedSlot?.price_rental
+    ? parseInt(selectedSlot.price_rental.replace(/\D/g, '')) || data.price_estimate
+    : data.price_estimate
   const [progress, setProgress]     = useState(0)
 
   useEffect(() => {
@@ -545,9 +552,9 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
                   <span className="t5-hero-datum-lbl">Invitados</span>
                 </div>
               )}
-              {data.show_price_estimate && data.price_estimate && (
+              {data.show_price_estimate && displayPrice && (
                 <div className="t5-hero-datum">
-                  <span className="t5-hero-datum-val" style={{ color: primary }}>{formatPrice(data.price_estimate)}</span>
+                  <span className="t5-hero-datum-val" style={{ color: primary }}>{formatPrice(displayPrice)}</span>
                   <span className="t5-hero-datum-lbl">Precio estimado</span>
                 </div>
               )}
@@ -572,6 +579,18 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />
+      )}
+
+      {/* ── SELECTOR DE FECHAS ── */}
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+        <DateSelector
+          slots={dateSlots}
+          primary={primary}
+          onPrimary={darkPri ? '#fff' : '#111'}
+          font={font}
+          proposalId={data.id}
+          onSelect={setSelectedDateSlotIdx}
+        />
       )}
 
       {/* URGENCY BAR */}
@@ -687,7 +706,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       ) : _preview ? <EmptySec label="Qué incluye" /> : null)}
 
       {/* RECEIPT / PRICING */}
-      {data.show_price_estimate && data.price_estimate && (
+      {data.show_price_estimate && displayPrice && (
         <section className="t5-pricing-section">
           <FadeUp>
             <div className="t5-pricing-inner">
@@ -733,7 +752,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
                 </div>
                 <div className="t5-receipt-total">
                   <span className="t5-receipt-total-lbl">Total estimado</span>
-                  <span className="t5-receipt-total-val">{formatPrice(data.price_estimate)}</span>
+                  <span className="t5-receipt-total-val">{formatPrice(displayPrice)}</span>
                 </div>
                 <div className="t5-receipt-note">
                   * Precio orientativo para {data.guest_count || '—'} invitados. El precio final se confirma tras la visita.
@@ -1066,6 +1085,8 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
           coupleName={data.couple_name}
           primaryColor={primary}
           selectedSpaces={[]}
+          dateSlots={dateSlots ?? []}
+          preSelectedDateSlot={selectedDateSlotIdx}
           onClose={() => setVisitModalOpen(false)}
           onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
         />

@@ -7,6 +7,7 @@ import { useEffect, useState, useRef } from 'react'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, type ProposalData } from './shared'
 import { WeddingProposal } from './WeddingProposal'
+import DateSelector from './DateSelector'
 import VisitBookingModal from '@/components/VisitBookingModal'
 
 function EmptySec({ label }: { label: string }) {
@@ -24,7 +25,7 @@ function EmptySec({ label }: { label: string }) {
 
 export default function T2Emocion({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
-  const { sec, on, hasCatering, packagesShow, inclusionsShow, testsShow, extrasShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, collabsShow, accom } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, testsShow, extrasShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, collabsShow, accom, dateSlots } = extractData(data)
   const _preview = !!(data as any)._preview
 
   const primary = branding?.primary_color ?? '#6B4F3A'
@@ -39,6 +40,12 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
 
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone,      setVisitDone]      = useState(false)
+  const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
+
+  const selectedSlot = selectedDateSlotIdx !== null && dateSlots ? dateSlots[selectedDateSlotIdx] : null
+  const displayPrice = selectedSlot?.price_rental
+    ? parseInt(selectedSlot.price_rental.replace(/\D/g, '')) || price_estimate
+    : price_estimate
   const [heroLoaded, setHeroLoaded] = useState(false)
   const heroImgRef = useRef<HTMLImageElement>(null)
   useEffect(() => { if (heroImgRef.current?.complete) setHeroLoaded(true) }, [])
@@ -152,6 +159,18 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} />
+      )}
+
+      {/* ── SELECTOR DE FECHAS ── */}
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+        <DateSelector
+          slots={dateSlots}
+          primary={primary}
+          onPrimary={onPri}
+          font={font}
+          proposalId={data.id}
+          onSelect={setSelectedDateSlotIdx}
+        />
       )}
 
       {/* ══════════════════════════════════════════
@@ -645,6 +664,8 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           coupleName={couple_name}
           primaryColor={primary}
           selectedSpaces={[]}
+          dateSlots={dateSlots ?? []}
+          preSelectedDateSlot={selectedDateSlotIdx}
           onClose={() => setVisitModalOpen(false)}
           onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
         />

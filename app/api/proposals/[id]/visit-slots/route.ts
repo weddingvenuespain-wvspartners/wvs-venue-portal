@@ -23,20 +23,20 @@ export async function GET(
       { cookies: { get: (n: string) => cookieStore.get(n)?.value, set() {}, remove() {} } }
     )
 
-    // 1. Get proposal → user_id
+    // 1. Get proposal → user_id + venue_id
     const { data: proposal } = await supabase
       .from('proposals')
-      .select('user_id')
+      .select('user_id, venue_id')
       .eq('id', id)
       .maybeSingle()
 
     if (!proposal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // 2. Get visit_availability config
+    // 2. Get visit_availability config (by venue_id for multi-venue support)
     const { data: settings } = await supabase
       .from('venue_settings')
       .select('visit_availability')
-      .eq('user_id', proposal.user_id)
+      .eq('venue_id', proposal.venue_id)
       .maybeSingle()
 
     const config: VisitAvailability | null = settings?.visit_availability ?? null

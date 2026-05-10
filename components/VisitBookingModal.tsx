@@ -12,24 +12,50 @@ function dateLabel(iso: string) {
   return isoToDate(iso).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
+type DateSlotOption = {
+  label?: string
+  dates: string[]
+  price_rental?: string
+  price_per_person?: string
+}
+
 type Props = {
   proposalId: string
   coupleName: string
   primaryColor?: string
   selectedSpaces?: Array<{ group_name: string; space_name: string }>
   selectedMenus?: string[]
+  dateSlots?: DateSlotOption[]
+  preSelectedDateSlot?: number | null
   onClose: () => void
   onSuccess: () => void
+}
+
+/** Format dates as "15 may, 16 may o 17 may" (individual options, not ranges) */
+function fmtDatesAsOptions(dates: string[]): string {
+  if (!dates.length) return ''
+  const sorted = [...dates].sort()
+  const labels = sorted.map(d => {
+    const dt = new Date(d + 'T12:00:00')
+    return dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+  })
+  if (labels.length === 1) return labels[0]
+  if (labels.length === 2) return `${labels[0]} o ${labels[1]}`
+  return labels.slice(0, -1).join(', ') + ' o ' + labels[labels.length - 1]
 }
 
 export default function VisitBookingModal({
   proposalId, coupleName, primaryColor = '#C4975A',
   selectedSpaces = [], selectedMenus = [],
+  dateSlots = [], preSelectedDateSlot = null,
   onClose, onSuccess,
 }: Props) {
   const [slots, setSlots] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
-  const [step, setStep] = useState<'calendar' | 'time' | 'confirm'>('calendar')
+  const hasMultipleDateSlots = dateSlots.length > 1
+  const [step, setStep] = useState<'type' | 'date_pref' | 'calendar' | 'time' | 'confirm'>('type')
+  const [visitType, setVisitType] = useState<string | null>(null)
+  const [preferredDateSlot, setPreferredDateSlot] = useState<number | null>(preSelectedDateSlot)
   const [viewYear, setViewYear] = useState(new Date().getFullYear())
   const [viewMonth, setViewMonth] = useState(new Date().getMonth())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -75,8 +101,10 @@ export default function VisitBookingModal({
           date: selectedDate, time: selectedTime,
           message: message || null,
           couple_email: email || null,
+          visit_type: visitType,
           selected_spaces: selectedSpaces,
           selected_menus: selectedMenus,
+          preferred_date_slot: preferredDateSlot !== null ? dateSlots[preferredDateSlot] : null,
         }),
       })
       if (!res.ok) { const d = await res.json(); setError(d.error || 'Error al enviar'); setSubmitting(false); return }
@@ -102,15 +130,22 @@ export default function VisitBookingModal({
         {/* Header */}
         <div style={{ padding: '20px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            {step !== 'calendar' && (
-              <button onClick={() => setStep(step === 'confirm' ? 'time' : 'calendar')}
+            {step !== 'type' && (
+              <button onClick={() => {
+                if (step === 'confirm') setStep('time')
+                else if (step === 'time') setStep('calendar')
+                else if (step === 'calendar') setStep(hasMultipleDateSlots ? 'date_pref' : 'type')
+                else if (step === 'date_pref') setStep('type')
+              }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.5)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '0 0 8px' }}>
                 <ChevronLeft size={14} /> Atrás
               </button>
             )}
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: primaryColor }}>Solicitar visita</div>
             <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginTop: 2 }}>
-              {step === 'calendar' && 'Elige un día'}
+              {step === 'type' && '¿Cómo os gustaría conocernos?'}
+              {step === 'date_pref' && '¿Qué fecha de boda os gusta más?'}
+              {step === 'calendar' && 'Elige un día para la visita'}
               {step === 'time' && selectedDate && dateLabel(selectedDate)}
               {step === 'confirm' && 'Confirmar visita'}
             </div>
@@ -132,6 +167,97 @@ export default function VisitBookingModal({
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,.4)', fontSize: 14 }}>
               No hay disponibilidad configurada.<br />
               <span style={{ fontSize: 12, marginTop: 4, display: 'block' }}>Contacta directamente con el venue.</span>
+            </div>
+          )}
+
+          {/* ── STEP: VISIT TYPE ── */}
+          {step === 'type' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { id: 'presencial', icon: '🏛️', label: 'Visitar el venue', desc: 'Ven a conocer el espacio en persona' },
+                { id: 'videollamada', icon: '📹', label: 'Videollamada', desc: 'Conoced el venue desde casa' },
+                { id: 'llamada', icon: '📞', label: 'Llamada telefónica', desc: 'Hablad con nuestro equipo' },
+              ].map(opt => (
+                <button key={opt.id} type="button"
+                  onClick={() => {
+                    setVisitType(opt.id)
+                    setStep(hasMultipleDateSlots ? 'date_pref' : 'calendar')
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '16px 18px', borderRadius: 10,
+                    background: 'rgba(255,255,255,.04)',
+                    border: '1px solid rgba(255,255,255,.1)',
+                    cursor: 'pointer', color: '#fff', textAlign: 'left',
+                    transition: 'background .15s, border-color .15s',
+                  }}>
+                  <span style={{ fontSize: 22 }}>{opt.icon}</span>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{opt.label}</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', marginTop: 1 }}>{opt.desc}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ── STEP: WEDDING DATE PREFERENCE ── */}
+          {!loading && step === 'date_pref' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{
+                background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)',
+                borderRadius: 8, padding: '10px 14px', marginBottom: 4,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={primaryColor} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', lineHeight: 1.4 }}>
+                  Antes de agendar la visita, decidnos qué <strong style={{ color: '#fff' }}>fecha de boda</strong> os interesa más
+                </span>
+              </div>
+              {dateSlots.map((ds, i) => {
+                const isSel = preferredDateSlot === i
+                return (
+                  <button key={i} type="button"
+                    onClick={() => { setPreferredDateSlot(i); setStep('calendar') }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '14px 16px', borderRadius: 10,
+                      background: isSel ? `${primaryColor}22` : 'rgba(255,255,255,.04)',
+                      border: `1px solid ${isSel ? primaryColor : 'rgba(255,255,255,.1)'}`,
+                      cursor: 'pointer', color: '#fff', textAlign: 'left',
+                    }}>
+                    <div style={{
+                      width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                      border: `2px solid ${isSel ? primaryColor : 'rgba(255,255,255,.2)'}`,
+                      background: isSel ? primaryColor : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {isSel && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>{fmtDatesAsOptions(ds.dates)}</div>
+                      {ds.label && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 1 }}>{ds.label}</div>}
+                    </div>
+                    {(ds.price_rental || ds.price_per_person) && (
+                      <div style={{ fontSize: 15, fontWeight: 700, color: primaryColor, flexShrink: 0 }}>
+                        {ds.price_rental || ds.price_per_person}
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+              <button type="button"
+                onClick={() => { setPreferredDateSlot(null); setStep('calendar') }}
+                style={{
+                  padding: '11px 16px', borderRadius: 10,
+                  background: 'transparent', border: '1px dashed rgba(255,255,255,.12)',
+                  cursor: 'pointer', color: 'rgba(255,255,255,.35)', fontSize: 12,
+                  textAlign: 'center',
+                }}>
+                Aún no lo tengo claro
+              </button>
             </div>
           )}
 
@@ -218,10 +344,27 @@ export default function VisitBookingModal({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Summary */}
               <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {visitType && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Tipo de visita</div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,.7)' }}>
+                      {visitType === 'presencial' ? '🏛️ Visita al venue' : visitType === 'videollamada' ? '📹 Videollamada' : '📞 Llamada telefónica'}
+                    </div>
+                  </div>
+                )}
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Fecha y hora</div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>{dateLabel(selectedDate)} · {selectedTime}h</div>
                 </div>
+                {preferredDateSlot !== null && dateSlots[preferredDateSlot] && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Fecha de boda preferida</div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,.7)' }}>
+                      <strong style={{ color: '#fff' }}>{fmtDatesAsOptions(dateSlots[preferredDateSlot].dates)}</strong>
+                      {dateSlots[preferredDateSlot].price_rental && <span style={{ color: primaryColor, marginLeft: 8 }}>{dateSlots[preferredDateSlot].price_rental}</span>}
+                    </div>
+                  </div>
+                )}
                 {selectedSpaces.length > 0 && (
                   <div>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Espacios</div>

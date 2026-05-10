@@ -15,6 +15,7 @@ import {
 } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
+import DateSelector from './DateSelector'
 import VisitBookingModal from '@/components/VisitBookingModal'
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
@@ -577,7 +578,7 @@ function EmptySec({ label }: { label: string }) {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function T4SocialProof({ data }: { data: ProposalData }) {
-  const { sec, on, hasCatering, packagesShow, zonesShow, inclusionsShow, faqShow, expShow, testsShow, menuShow, menusStructured, menuExtras, appetizersBase, seasonsShow, collabsShow, extrasShow, accom } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, zonesShow, inclusionsShow, faqShow, expShow, testsShow, menuShow, menusStructured, menuExtras, appetizersBase, seasonsShow, collabsShow, extrasShow, accom, dateSlots } = extractData(data)
 
   const _preview = !!(data as any)._preview
   const branding  = data.branding
@@ -595,6 +596,12 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone,      setVisitDone]      = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
+
+  const selectedSlot = selectedDateSlotIdx !== null && dateSlots ? dateSlots[selectedDateSlotIdx] : null
+  const displayPrice = selectedSlot?.price_rental
+    ? parseInt(selectedSlot.price_rental.replace(/\D/g, '')) || data.price_estimate
+    : data.price_estimate
 
   useEffect(() => {
     const onScroll = () => {
@@ -662,8 +669,8 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
                 {data.guest_count && (
                   <span className="t4-hero-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IcoUsers width={12} height={12} /> {data.guest_count} invitados</span>
                 )}
-                {data.show_price_estimate && data.price_estimate && (
-                  <span className="t4-hero-pill pri-pill">Desde {formatPrice(data.price_estimate)}{ivaLabel(sec, true) ? ` · ${ivaLabel(sec, true)}` : ''}</span>
+                {data.show_price_estimate && displayPrice && (
+                  <span className="t4-hero-pill pri-pill">Desde {formatPrice(displayPrice)}{ivaLabel(sec, true) ? ` · ${ivaLabel(sec, true)}` : ''}</span>
                 )}
               </div>
             </FadeIn>
@@ -677,6 +684,18 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
         <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />
+      )}
+
+      {/* ── SELECTOR DE FECHAS ── */}
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+        <DateSelector
+          slots={dateSlots}
+          primary={primary}
+          onPrimary={darkPri ? '#fff' : '#111'}
+          font={font}
+          proposalId={data.id}
+          onSelect={setSelectedDateSlotIdx}
+        />
       )}
 
       {/* TESTIMONIALS — first content section */}
@@ -1105,6 +1124,8 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           coupleName={data.couple_name}
           primaryColor={primary}
           selectedSpaces={[]}
+          dateSlots={dateSlots ?? []}
+          preSelectedDateSlot={selectedDateSlotIdx}
           onClose={() => setVisitModalOpen(false)}
           onSuccess={() => { setVisitModalOpen(false); setVisitDone(true) }}
         />
