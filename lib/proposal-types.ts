@@ -128,7 +128,7 @@ export type SpaceGroup = {
   description?: string
   note?: string
   requires_selection?: boolean  // legacy
-  selection_mode?: 'pick_one' | 'pick_n' | 'pick_any' | 'pick_range' | 'optional' | 'optional_one' | 'optional_any' | 'none'
+  selection_mode?: 'pick_one' | 'pick_n' | 'pick_any' | 'pick_range' | 'optional' | 'optional_one' | 'optional_any' | 'none' | 'included_then_pick'
   pick_n_min?: number
   pick_n_max?: number
   pricing_mode?: 'group_base' | 'per_space'  // group_base: base + extras; per_space: each space has its own price
