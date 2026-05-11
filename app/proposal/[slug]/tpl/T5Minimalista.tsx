@@ -429,7 +429,14 @@ function EmptySec({ label }: { label: string }) {
 // ─── Main ──────────────────────────────────────────────────────────────────────
 export default function T5Minimalista({ data }: { data: ProposalData }) {
   const { sec, on, hasCatering, packagesShow, inclusionsShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, testsShow, collabsShow, extrasShow, accom, spaceGroups, techspecs, dateSlots } = extractData(data)
-  const [, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const guests = data.guest_count ? Number(data.guest_count) : undefined
+  const visibleSpaceGroups = (spaceGroups ?? []).filter(g => {
+    if (guests === undefined) return true
+    if (g.min_guests && guests < g.min_guests) return false
+    if (g.max_guests && guests > g.max_guests) return false
+    return true
+  })
   const displayMsg = replacePlaceholders(data.personal_message || (sec as any).welcome_default || null, data)
   const welcomeVariant = pickWelcomeVariant(sec)
 
@@ -752,15 +759,15 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
       {/* SPACE GROUPS */}
-      {on('space_groups') && spaceGroups && spaceGroups.length > 0 && (
+      {on('space_groups') && visibleSpaceGroups.length > 0 && (
         <section style={{ background: '#fff', padding: '40px 0' }}>
           <SpaceGroupSelector
-            groups={spaceGroups}
+            groups={visibleSpaceGroups}
             primary={primary}
             onPrimary={darkPri ? '#fff' : '#111'}
             dark={false}
             font={font}
-            guestCount={data.guest_count ? Number(data.guest_count) : undefined}
+            guestCount={guests}
             onSelectionChange={setSelectedSpaces}
           />
         </section>
@@ -1211,7 +1218,8 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
           proposalId={data.id}
           coupleName={data.couple_name}
           primaryColor={primary}
-          selectedSpaces={[]}
+          selectedSpaces={selectedSpaces}
+          spaceGroups={visibleSpaceGroups.length > 0 ? visibleSpaceGroups : undefined}
           dateSlots={dateSlots ?? []}
           preSelectedDateSlot={selectedDateSlotIdx}
           onClose={() => setVisitModalOpen(false)}

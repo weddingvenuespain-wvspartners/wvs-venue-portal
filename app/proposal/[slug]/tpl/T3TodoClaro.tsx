@@ -45,7 +45,14 @@ function EmptySec({ label }: { label: string }) {
 export default function T3TodoClaro({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
   const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow, expShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, testsShow, seasonsShow, collabsShow, accom, spaceGroups, techspecs, dateSlots } = extractData(data)
-  const [, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const guests = guest_count ? Number(guest_count) : undefined
+  const visibleSpaceGroups = (spaceGroups ?? []).filter(g => {
+    if (guests === undefined) return true
+    if (g.min_guests && guests < g.min_guests) return false
+    if (g.max_guests && guests > g.max_guests) return false
+    return true
+  })
   const displayMsg = replacePlaceholders(personal_message || (sec as any).welcome_default || null, data)
   const welcomeVariant = pickWelcomeVariant(sec)
 
@@ -451,15 +458,15 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
           {/* Space groups */}
-          {on('space_groups') && spaceGroups && spaceGroups.length > 0 && (
+          {on('space_groups') && visibleSpaceGroups.length > 0 && (
             <div className="sec">
               <SpaceGroupSelector
-                groups={spaceGroups}
+                groups={visibleSpaceGroups}
                 primary={primary}
                 onPrimary={onPri}
                 dark={false}
                 font={font}
-                guestCount={guest_count ? Number(guest_count) : undefined}
+                guestCount={guests}
                 onSelectionChange={setSelectedSpaces}
               />
             </div>
@@ -810,7 +817,8 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
               proposalId={data.id}
               coupleName={couple_name}
               primaryColor={primary}
-              selectedSpaces={[]}
+              selectedSpaces={selectedSpaces}
+              spaceGroups={visibleSpaceGroups.length > 0 ? visibleSpaceGroups : undefined}
               dateSlots={dateSlots ?? []}
               preSelectedDateSlot={selectedDateSlotIdx}
               onClose={() => setVisitModalOpen(false)}

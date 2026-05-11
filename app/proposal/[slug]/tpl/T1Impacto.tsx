@@ -89,6 +89,13 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const [ctaBar, setCtaBar]         = useState(false)
   const [openFaq, setOpenFaq]       = useState<number | null>(null)
   const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const guests = guest_count ? Number(guest_count) : undefined
+  const visibleSpaceGroups = (spaceGroups ?? []).filter(g => {
+    if (guests === undefined) return true
+    if (g.min_guests && guests < g.min_guests) return false
+    if (g.max_guests && guests > g.max_guests) return false
+    return true
+  })
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone, setVisitDone]           = useState(false)
   const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
@@ -226,7 +233,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
 
     /* ── Story section ── */
     .t1-story{display:grid;grid-template-columns:1fr 1fr;gap:0;align-items:stretch}
-    .t1-story-text{padding:80px 64px;background:${pal.surfaceAlt}}
+    .t1-story-text{padding:80px 64px;background:${pal.surfaceAlt};display:flex;flex-direction:column;justify-content:center}
     .t1-story-body{font-size:.97rem;color:${fg(.55)};line-height:1.9;white-space:pre-wrap;margin-top:4px;overflow-wrap:break-word}
     .t1-story-img{overflow:hidden;min-height:500px;position:relative;background:linear-gradient(135deg,rgba(${rgb},.25),${pal.surface} 70%,${pal.bg})}
     .t1-story-img img{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(${lightMode ? '.95' : '.8'})}
@@ -844,17 +851,17 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           GRUPOS DE ESPACIOS
       ════════════════════════════════════════════ */}
-      {on('space_groups') && (spaceGroups && spaceGroups.length > 0 ? (
+      {on('space_groups') && (visibleSpaceGroups.length > 0 ? (
         <SpaceGroupSelector
-          groups={spaceGroups}
+          groups={visibleSpaceGroups}
           primary={primary}
           onPrimary={onPri}
           dark={!lightMode}
           font={FONT}
-          guestCount={guest_count ? Number(guest_count) : undefined}
+          guestCount={guests}
           onSelectionChange={setSelectedSpaces}
         />
-      ) : _preview ? <EmptySec label="Grupos de espacios" /> : null)}
+      ) : spaceGroups && spaceGroups.length > 0 ? null : _preview ? <EmptySec label="Grupos de espacios" /> : null)}
 
       {/* ════════════════════════════════════════════
           PAQUETES
@@ -1217,6 +1224,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           coupleName={couple_name}
           primaryColor={primary}
           selectedSpaces={selectedSpaces}
+          spaceGroups={visibleSpaceGroups.length > 0 ? visibleSpaceGroups : undefined}
           dateSlots={dateSlots ?? []}
           preSelectedDateSlot={selectedDateSlotIdx}
           onClose={() => setVisitModalOpen(false)}

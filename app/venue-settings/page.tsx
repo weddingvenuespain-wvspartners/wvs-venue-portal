@@ -1,0 +1,2654 @@
+'use client'
+import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import Sidebar from '@/components/Sidebar'
+import Tabs from '@/components/Tabs'
+import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
+import { usePlanFeatures } from '@/lib/use-plan-features'
+import {
+  Plus, ChevronDown, ChevronUp, Pencil, Trash2, Copy,
+  X, Check, Sun, Moon, CalendarDays, Package, SlidersHorizontal,
+  Building2, Users, Layers, CreditCard, LayoutGrid, Settings2, ChevronRight, ChevronLeft,
+} from 'lucide-react'
+import FeatureGate from '@/components/FeatureGate'
+import { createClient } from '@/lib/supabase'
+import DatePicker, { fmtDate } from '@/components/DatePicker'
+import type { VisitAvailability, DaySchedule, BlockedDate, VenueSpaceGroup, VenueSpace, PricingSeason } from '@/lib/proposal-types'
+
+// ── Duration types ─────────────────────────────────────────────────────────────
+
+type DurationType = '1_day' | '1_day_morning' | '2_days' | 'package' | 'custom'
+
+const DURATION_TYPES = [
+  { key: '1_day'         as DurationType, label: '1 día',                  sublabel: 'Solo el día del evento',          detail: 'Ej: 12:00 → 00:00',           color: '#C4975A', bg: '#FDF8F0', Icon: Sun              },
+  { key: '1_day_morning' as DurationType, label: '1 día + noche + mañana', sublabel: 'Hasta mediodía del día siguiente', detail: 'Ej: Sáb. 12:00 → Dom. 14:00', color: '#7C3AED', bg: '#F5F3FF', Icon: Moon             },
+  { key: '2_days'        as DurationType, label: '2 días completos',        sublabel: 'Día 1 + noche + día 2 entero',    detail: 'Ej: Sáb. 12:00 → Dom. 23:59', color: '#2563EB', bg: '#EFF6FF', Icon: CalendarDays     },
+  { key: 'package'       as DurationType, label: 'Paquetes de días',        sublabel: 'Varios rangos que cubren la semana', detail: 'Ej: Lun-Mié, Mié-Vie, Vie-Dom', color: '#059669', bg: '#ECFDF5', Icon: Package      },
+  { key: 'custom'        as DurationType, label: 'Personalizado',           sublabel: 'Define tu propia duración',        detail: 'Descripción libre',            color: '#8A7F76', bg: '#F7F3EE', Icon: SlidersHorizontal },
+]
+
+function getDT(key: DurationType | string | undefined) {
+  return DURATION_TYPES.find(d => d.key === key) ?? DURATION_TYPES[4]
+}
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+type SpaceType  = 'single' | 'single_with_supplements' | 'multiple_independent'
+type PriceModel = 'rental' | 'per_person' | 'package'
+
+type CommercialConfig = {
+  space_type:          SpaceType
+  price_model:         PriceModel
+  menu_included?:      boolean   // per_person/package: ¿el precio incluye menú?
+  has_menu_types?:     boolean   // si menu_included: ¿hay varios tipos de menú?
+  catering_own?:       boolean   // si menú no incluido o rental: ¿catering propio?
+  catering_mandatory?: boolean   // si catering_own: ¿es obligatorio contratarlo?
+}
+
+type WizardQuestion = 'space_type' | 'price_model'
+type WizardConfig   = Partial<CommercialConfig>
+
+type ZoneItem       = { id: string; name: string }
+type SupplementItem = { id: string; name: string }
+
+type ZonePrice       = { zone_id: string; price: number }
+type SupplementPrice = { supplement_id: string; price: number }
+
+type GroupPrice = { group_id: string; base_price: number; space_supplements?: { space_id: string; price: number }[] }
+
+type ModalityPrice = {
+  id: string; modality_id: string; package_id: string | null
+  date_from: string; date_to: string; price: number; notes: string | null
+  price_per_person?: number | null
+  zone_prices?: ZonePrice[] | null
+  supplement_prices?: SupplementPrice[] | null
+  group_prices?: GroupPrice[] | null
+}
+
+type ModalityPackage = {
+  id: string; modality_id: string
+  day_from: number; day_to: number; label: string | null; sort_order: number
+  prices: ModalityPrice[]
+}
+
+type Modality = {
+  id: string; name: string; description: string | null; duration_label: string | null
+  duration_type: DurationType; sort_order: number; is_active: boolean
+  packages: ModalityPackage[]
+  prices: ModalityPrice[]      // direct prices (non-package type)
+}
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const DAY_SHORT = ['L','M','X','J','V','S','D']
+const DAY_FULL  = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function fmt(n: number) {
+  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
+}
+// Returns all days in a package range, handling cross-week wrap (day_to < day_from)
+function getPackageDays(from: number, to: number): number[] {
+  const days: number[] = []
+  let current = from
+  days.push(current)
+  while (current !== to) {
+    current = (current + 1) % 7
+    days.push(current)
+  }
+  return days
+}
+
+// Interior days = all days except the start and end (check-in/check-out)
+function getInteriorDays(from: number, to: number): number[] {
+  return getPackageDays(from, to).slice(1, -1)
+}
+
+// Two packages conflict if any interior day of one appears in any day of the other
+function packagesConflict(f1: number, t1: number, f2: number, t2: number): boolean {
+  const interior1 = new Set(getInteriorDays(f1, t1))
+  const interior2 = new Set(getInteriorDays(f2, t2))
+  const all2      = new Set(getPackageDays(f2, t2))
+  const all1      = new Set(getPackageDays(f1, t1))
+  for (const d of interior1) if (all2.has(d)) return true
+  for (const d of interior2) if (all1.has(d)) return true
+  return false
+}
+
+function pkgLabel(p: ModalityPackage): string {
+  if (p.label) return p.label
+  if (p.day_from === p.day_to) return DAY_FULL[p.day_from]
+  const wrap = p.day_to < p.day_from
+  return `${DAY_FULL[p.day_from]} → ${DAY_FULL[p.day_to]}${wrap ? ' (cruza semana)' : ''}`
+}
+
+function pkgShortLabel(from: number, to: number): string {
+  if (from === to) return DAY_SHORT[from]
+  const wrap = to < from
+  return `${DAY_SHORT[from]}→${DAY_SHORT[to]}${wrap ? '*' : ''}`
+}
+
+const emptyModalForm = { name: '', description: '', duration_type: 'custom' as DurationType }
+const emptyPriceForm = {
+  date_from: '', date_to: '', price: '', notes: '',
+  price_per_person: '',
+  zone_prices: {} as Record<string, string>,
+  supplement_prices: {} as Record<string, string>,
+  group_prices: {} as Record<string, string>,              // group_id → base_price
+  space_supplement_prices: {} as Record<string, string>,   // space_id → supplement
+}
+
+// ── Price helpers ──────────────────────────────────────────────────────────────
+
+function buildPricePayload(form: typeof emptyPriceForm, cfg: CommercialConfig | null) {
+  const base: Record<string, any> = { date_from: form.date_from, date_to: form.date_to, notes: form.notes }
+  const model = cfg?.price_model ?? 'rental'
+  const space = cfg?.space_type  ?? 'single'
+
+  if (space === 'multiple_independent' || space === 'single_with_supplements') {
+    base.price = 0
+    if (space === 'multiple_independent') {
+      base.zone_prices = Object.entries(form.zone_prices)
+        .filter(([, v]) => v !== '')
+        .map(([zone_id, price]) => ({ zone_id, price: parseFloat(price) }))
+    }
+    // Group-based pricing (both space types)
+    const gp = Object.entries(form.group_prices).filter(([, v]) => v !== '')
+    const sp = Object.entries(form.space_supplement_prices).filter(([, v]) => v !== '')
+    if (gp.length > 0) {
+      base.group_prices = gp.map(([group_id, price]) => {
+        const groupSupps = sp.filter(([sid]) => sid.startsWith(group_id + ':'))
+        return {
+          group_id,
+          base_price: parseFloat(price),
+          space_supplements: groupSupps.map(([sid, p]) => ({ space_id: sid.split(':')[1], price: parseFloat(p) })),
+        }
+      })
+    }
+  } else {
+    base.price = parseFloat(form.price) || 0
+    if (model === 'per_person' || model === 'package') {
+      base.price_per_person = form.price_per_person !== '' ? parseFloat(form.price_per_person) : null
+    }
+  }
+  return base
+}
+
+function initPriceForm(p: ModalityPrice): typeof emptyPriceForm {
+  const groupPrices: Record<string, string> = {}
+  const spaceSupps: Record<string, string> = {}
+  ;(p.group_prices ?? []).forEach(gp => {
+    groupPrices[gp.group_id] = String(gp.base_price)
+    ;(gp.space_supplements ?? []).forEach(ss => {
+      spaceSupps[`${gp.group_id}:${ss.space_id}`] = String(ss.price)
+    })
+  })
+  return {
+    date_from: p.date_from,
+    date_to:   p.date_to,
+    price:     String(p.price ?? ''),
+    notes:     p.notes ?? '',
+    price_per_person: p.price_per_person != null ? String(p.price_per_person) : '',
+    zone_prices: Object.fromEntries((p.zone_prices ?? []).map(z => [z.zone_id, String(z.price)])),
+    supplement_prices: Object.fromEntries((p.supplement_prices ?? []).map(s => [s.supplement_id, String(s.price)])),
+    group_prices: groupPrices,
+    space_supplement_prices: spaceSupps,
+  }
+}
+
+// ── WeekDayPicker ──────────────────────────────────────────────────────────────
+// First click = check-in day, second click = check-out day.
+// If check-out < check-in → wraps around week (e.g. Fri→Tue = Fri,Sat,Sun,Mon,Tue).
+// Conflict: two packages conflict when any interior day of one falls in any day of the other.
+
+type DayRange = { day_from: number; day_to: number }
+
+function WeekDayPicker({ dayFrom, dayTo, onChange, accent = '#059669', hint, blockedRanges = [] }: {
+  dayFrom: number | null; dayTo: number | null
+  onChange: (from: number | null, to: number | null) => void
+  accent?: string; hint?: string
+  blockedRanges?: DayRange[]
+}) {
+  // Interior days of existing packages: fully off-limits
+  const isInterior = (day: number): boolean =>
+    blockedRanges.some(r => getInteriorDays(r.day_from, r.day_to).includes(day))
+
+  // A day already used as check-in can't be a start again
+  const isUsedAsStart = (day: number): boolean =>
+    blockedRanges.some(r => r.day_from === day)
+
+  // A day already used as check-out can't be an end again
+  const isUsedAsEnd = (day: number): boolean =>
+    blockedRanges.some(r => r.day_to === day)
+
+  const wouldConflict = (f: number, t: number): boolean =>
+    blockedRanges.some(r => packagesConflict(f, t, r.day_from, r.day_to))
+
+  const endConflicts = (end: number): boolean => {
+    if (dayFrom === null) return false
+    if (end === dayFrom) {
+      // Single-day package: the day must not already be someone's checkout
+      return isUsedAsEnd(end)
+    }
+    return isInterior(end) || isUsedAsEnd(end) || wouldConflict(dayFrom, end)
+  }
+
+  const isBlockedAsStart = (i: number): boolean => isInterior(i) || isUsedAsStart(i)
+
+  const inRange = (i: number): boolean => {
+    if (dayFrom === null) return false
+    if (dayTo === null) return i === dayFrom
+    return getPackageDays(dayFrom, dayTo).includes(i)
+  }
+
+  const handleClick = (i: number) => {
+    if (dayFrom === null || dayTo !== null) {
+      if (isBlockedAsStart(i)) return
+      onChange(i, null)
+      return
+    }
+    if (i === dayFrom) {
+      // Second click = single-day package; always valid if the day passed isBlockedAsStart
+      onChange(dayFrom, i)
+      return
+    }
+    if (endConflicts(i)) return
+    onChange(dayFrom, i)
+  }
+
+  const picking = dayFrom !== null && dayTo === null
+
+  return (
+    <div>
+      {hint && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
+      <div style={{ display: 'flex', border: `1px solid ${picking ? `${accent}55` : 'var(--ivory)'}`, borderRadius: 9, overflow: 'hidden', transition: 'border-color 0.15s' }}>
+        {DAY_SHORT.map((d, i) => {
+          const active      = inRange(i)
+          const isCheckin   = i === dayFrom && dayTo !== null
+          const isCheckout  = i === dayTo   && dayTo !== null
+          const isSingleDay = isCheckin && isCheckout
+          const isPendingStart = i === dayFrom && picking
+          const blocked     = (!picking && !isSingleDay && isBlockedAsStart(i)) || (picking && i !== dayFrom && endConflicts(i))
+          const isPending   = picking && i !== dayFrom && !blocked
+
+          return (
+            <button key={i} onClick={() => handleClick(i)} title={DAY_FULL[i]}
+              style={{
+                flex: 1, padding: isSingleDay ? '4px 0' : isPendingStart ? '4px 0' : '9px 0',
+                fontSize: 12,
+                fontWeight: active || isPendingStart ? 700 : 500,
+                border: 'none',
+                borderRight: i < 6 ? `1px solid ${active ? `${accent}44` : picking ? `${accent}22` : 'var(--ivory)'}` : 'none',
+                cursor: blocked ? 'not-allowed' : 'pointer',
+                fontFamily: 'Manrope, sans-serif',
+                background: active ? accent : blocked ? '#F3F3F3' : isPending ? '#FAFAF9' : '#fff',
+                color: active ? '#fff' : blocked ? '#C8C8C8' : isPendingStart ? accent : 'var(--charcoal)',
+                transition: 'background 0.1s',
+                opacity: blocked ? 0.4 : 1,
+                outline: isPendingStart ? `2px dashed ${accent}` : 'none',
+                outlineOffset: -3,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+              }}>
+              {(isCheckin || isPendingStart) && (
+                <span style={{ fontSize: 7, lineHeight: 1, opacity: 0.85 }}>▼</span>
+              )}
+              <span>{d}</span>
+              {isCheckout && (
+                <span style={{ fontSize: 7, lineHeight: 1, opacity: 0.85 }}>▲</span>
+              )}
+              {!isCheckin && !isCheckout && !isPendingStart && (
+                <span style={{ fontSize: 7, lineHeight: 1, opacity: 0 }}>▲</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      <div style={{ fontSize: 11, minHeight: 18, marginTop: 5 }}>
+        {dayFrom !== null && dayTo !== null
+          ? <span style={{ color: accent, fontWeight: 600 }}>
+              {dayFrom === dayTo
+                ? <>{DAY_FULL[dayFrom]} <span style={{ fontWeight: 400, color: 'var(--warm-gray)' }}>(solo este día)</span></>
+                : <>{DAY_FULL[dayFrom]} → {DAY_FULL[dayTo]}{dayTo < dayFrom && <span style={{ fontWeight: 400, color: 'var(--warm-gray)' }}> (cruza semana)</span>}</>
+              }
+            </span>
+          : picking
+          ? <span style={{ color: 'var(--warm-gray)' }}>
+              Llegada <b style={{ color: accent }}>{DAY_FULL[dayFrom!]}</b> — selecciona salida o clic de nuevo para solo ese día
+            </span>
+          : <span style={{ color: 'var(--warm-gray)' }}>Selecciona el día de llegada</span>
+        }
+      </div>
+    </div>
+  )
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────────
+
+export default function EstructuraPage() {
+  const router = useRouter()
+  const { user, loading: authLoading, activeVenue } = useAuth()
+  const { isBlocked } = useRequireSubscription()
+  const features = usePlanFeatures()
+
+  const [activeTab, setActiveTab]             = useState<'modalidades' | 'visitas'>('modalidades')
+  const [modalities, setModalities]           = useState<Modality[]>([])
+  const [loading, setLoading]                 = useState(true)
+  const [expanded, setExpanded]               = useState<Set<string>>(new Set())
+  const [pricesCollapsed, setPricesCollapsed] = useState<Set<string>>(new Set())
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [editingGroupName, setEditingGroupName] = useState<string | null>(null)
+  const [zonesCollapsed, setZonesCollapsed]   = useState(false)
+  const [recentlySavedId, setRecentlySavedId] = useState<string | null>(null)
+  const [error, setError]                     = useState('')
+  const [commercialConfig, setCommercialConfig] = useState<CommercialConfig | null>(null)
+  const [configWizardOpen, setConfigWizardOpen]   = useState(false)
+  const [wizardQuestion, setWizardQuestion]       = useState<WizardQuestion>('space_type')
+  const [wizardHistory, setWizardHistory]         = useState<WizardQuestion[]>([])
+  const [wizardConfig, setWizardConfig]           = useState<WizardConfig>({})
+  const [configSaving, setConfigSaving]           = useState(false)
+
+  // Zones, supplements & space groups
+  const [zones, setZones]                   = useState<ZoneItem[]>([])
+  const [supplements, setSupplements]       = useState<SupplementItem[]>([])
+  const [newZoneName, setNewZoneName]       = useState('')
+  const [newSuppName, setNewSuppName]       = useState('')
+  const [savingZS, setSavingZS]             = useState(false)
+  const [spaceGroups, setSpaceGroups]       = useState<VenueSpaceGroup[]>([])
+  const [savingSG, setSavingSG]             = useState(false)
+  const [spaceGroupsDirty, setSpaceGroupsDirty] = useState(false)
+
+  // Visit availability
+  const DEFAULT_SCHEDULE: DaySchedule[] = [0,1,2,3,4].map(day => ({ day, enabled: true, from: '10:00', to: '19:00' }))
+    .concat([5,6].map(day => ({ day, enabled: false, from: '10:00', to: '14:00' })))
+  const [visitAvail, setVisitAvail]     = useState<VisitAvailability>({ slot_duration: 60, schedule: DEFAULT_SCHEDULE, block_booked_weddings: true, block_calendar_unavailable: false, blocked_dates: [] })
+  const [savingVisit, setSavingVisit]   = useState(false)
+  const [visitAvailOpen, setVisitAvailOpen] = useState(true)
+  const [visitAvailDirty, setVisitAvailDirty] = useState(false)
+  const [gcalConfig, setGcalConfig]     = useState<{ calendar_name: string; last_sync: string | null } | null>(null)
+  const [gcalSyncing, setGcalSyncing]   = useState(false)
+  const [gcalPushing, setGcalPushing]   = useState(false)
+  const [gcalMsg, setGcalMsg]           = useState<string | null>(null)
+  // Block calendar UI state
+  const [blockCalYear,  setBlockCalYear]  = useState(() => new Date().getFullYear())
+  const [blockCalMonth, setBlockCalMonth] = useState(() => new Date().getMonth())
+  const [blockView, setBlockView] = useState<'month' | 'week'>('month')
+  const [blockWeekStart, setBlockWeekStart] = useState<string>(() => {
+    const t = new Date(); const day = t.getDay(); const diff = day === 0 ? -6 : 1 - day; t.setDate(t.getDate() + diff)
+    return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
+  })
+  const [blockPickerDate, setBlockPickerDate] = useState<string | null>(null)
+  const [blockType, setBlockType] = useState<BlockedDate['type']>('full')
+  const [blockRanges, setBlockRanges] = useState<Array<{ from: string; to: string }>>([{ from: '09:00', to: '13:00' }])
+  // Range-select mode
+  const [blockRangeStart, setBlockRangeStart] = useState<string | null>(null)
+  const [blockRangeEnd,   setBlockRangeEnd]   = useState<string | null>(null)
+  const [blockRangeMode,  setBlockRangeMode]  = useState(false)
+  // Calendar entries overlaid on block calendar
+  const [blockCalEntries, setBlockCalEntries] = useState<Record<string, string>>({})
+
+  // Modality modal
+  const [modalOpen, setModalOpen]     = useState(false)
+  const [editing, setEditing]         = useState<Modality | null>(null)
+  const [modalForm, setModalForm]     = useState(emptyModalForm)
+  const [modalSaving, setModalSaving] = useState(false)
+  const [modalError, setModalError]   = useState('')
+
+  // Package slot state
+  const [addingPkg, setAddingPkg]         = useState<string | null>(null)         // modality id
+  const [pkgForm, setPkgForm]             = useState<{ day_from: number | null; day_to: number | null; label: string }>({ day_from: null, day_to: null, label: '' })
+  const [editingPkg, setEditingPkg]       = useState<string | null>(null)         // package id
+  const [editPkgForm, setEditPkgForm]     = useState<{ day_from: number | null; day_to: number | null; label: string }>({ day_from: null, day_to: null, label: '' })
+  const [pkgSaving, setPkgSaving]         = useState(false)
+  const [pkgError, setPkgError]           = useState('')
+
+  // Price state
+  type PriceAdding = { modalityId: string; packageId: string | null }
+  const [priceAdding, setPriceAdding]     = useState<PriceAdding | null>(null)
+  const [priceForm, setPriceForm]         = useState(emptyPriceForm)
+  const [editingPrice, setEditingPrice]   = useState<string | null>(null)
+  const [editPriceForm, setEditPriceForm] = useState(emptyPriceForm)
+  const [priceSaving, setPriceSaving]     = useState(false)
+  const [priceError, setPriceError]       = useState('')
+
+  useEffect(() => {
+    if (authLoading) return
+    if (!user) { router.push('/login'); return }
+    load()
+  }, [user, authLoading, activeVenue?.id]) // eslint-disable-line
+
+  // Load calendar_entries for the visible range (month or week view)
+  useEffect(() => {
+    if (!user) return
+    const supabase = createClient()
+    const p = (n: number) => String(n).padStart(2, '0')
+    let from: string, to: string
+    if (blockView === 'week') {
+      from = blockWeekStart
+      const end = new Date(blockWeekStart + 'T12:00:00'); end.setDate(end.getDate() + 6)
+      to = `${end.getFullYear()}-${p(end.getMonth()+1)}-${p(end.getDate())}`
+    } else {
+      from = `${blockCalYear}-${p(blockCalMonth + 1)}-01`
+      const lastDay = new Date(blockCalYear, blockCalMonth + 1, 0).getDate()
+      to = `${blockCalYear}-${p(blockCalMonth + 1)}-${p(lastDay)}`
+    }
+    supabase.from('calendar_entries').select('date,status').eq('user_id', user.id).eq('venue_id', activeVenue?.id ?? '').gte('date', from).lte('date', to)
+      .then(({ data }) => {
+        const map: Record<string, string> = {}
+        data?.forEach(e => { map[e.date] = e.status })
+        setBlockCalEntries(map)
+      })
+  }, [blockCalYear, blockCalMonth, blockView, blockWeekStart, user, activeVenue?.id]) // eslint-disable-line
+
+  const load = async () => {
+    if (!activeVenue) { setLoading(false); return }
+    const supabase = createClient()
+    const [res, { data: settingsRow }] = await Promise.all([
+      fetch(`/api/estructura/modalities?venue_id=${activeVenue.id}`),
+      supabase.from('venue_settings').select('commercial_config, zones, supplements, space_groups, visit_availability, google_calendar').eq('user_id', user!.id).eq('venue_id', activeVenue.id).maybeSingle(),
+    ])
+    const json = await res.json()
+    if (!res.ok) { setError(json.error ?? 'Error al cargar'); setLoading(false); return }
+    // Filter direct prices: only those with package_id === null
+    const mods = (json.modalities ?? []).map((m: any) => ({
+      ...m,
+      prices:   (m.prices   ?? []).filter((p: any) => !p.package_id),
+      packages: (m.packages ?? []).map((pkg: any) => ({
+        ...pkg,
+        prices: (pkg.prices ?? []).sort((a: any, b: any) => a.date_from.localeCompare(b.date_from)),
+      })),
+    }))
+    setModalities(mods)
+    if (settingsRow?.commercial_config) setCommercialConfig(settingsRow.commercial_config as CommercialConfig)
+    if (settingsRow?.zones)        setZones(settingsRow.zones as ZoneItem[])
+    if (settingsRow?.supplements)  setSupplements(settingsRow.supplements as SupplementItem[])
+    if (Array.isArray(settingsRow?.space_groups)) {
+      setSpaceGroups(settingsRow.space_groups as VenueSpaceGroup[])
+    }
+    if (settingsRow?.google_calendar) setGcalConfig(settingsRow.google_calendar as any)
+    if (settingsRow?.visit_availability) {
+      const va = settingsRow.visit_availability as VisitAvailability & { blocked_dates?: Array<BlockedDate | string> }
+      // Migrate legacy string[] blocked_dates → BlockedDate[]
+      const blocked: BlockedDate[] = (va.blocked_dates ?? []).map(b =>
+        typeof b === 'string' ? { date: b, type: 'full' as const } : b
+      )
+      setVisitAvail({ ...va, blocked_dates: blocked })
+    }
+    setLoading(false)
+  }
+
+  const saveSettings = async (patch: Record<string, unknown>) => {
+    const res = await fetch('/api/estructura/save-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...patch, venue_id: activeVenue?.id ?? null }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      console.error('[saveSettings]', json.error)
+      return false
+    }
+    return true
+  }
+
+  const saveCommercialConfig = async (cfg: CommercialConfig) => {
+    setConfigSaving(true)
+    await saveSettings({ commercial_config: cfg })
+    setCommercialConfig(cfg)
+    setConfigSaving(false)
+    setConfigWizardOpen(false)
+  }
+
+  const saveZonesSupplements = async (newZones: ZoneItem[], newSupps: SupplementItem[]) => {
+    setSavingZS(true)
+    await saveSettings({ zones: newZones, supplements: newSupps })
+    setSavingZS(false)
+  }
+
+  const saveSpaceGroups = async (groups: VenueSpaceGroup[]) => {
+    setSavingSG(true)
+    await saveSettings({ space_groups: groups })
+    setSavingSG(false)
+    setSpaceGroupsDirty(false)
+  }
+
+  const saveVisitAvail = async (va: VisitAvailability) => {
+    setSavingVisit(true)
+    const ok = await saveSettings({ visit_availability: va })
+    if (ok) setVisitAvailDirty(false)
+    setSavingVisit(false)
+  }
+
+  const addZone = async () => {
+    const name = newZoneName.trim()
+    if (!name) return
+    const next = [...zones, { id: crypto.randomUUID(), name }]
+    setZones(next); setNewZoneName('')
+    await saveZonesSupplements(next, supplements)
+  }
+
+  const removeZone = async (id: string) => {
+    const next = zones.filter(z => z.id !== id)
+    setZones(next)
+    await saveZonesSupplements(next, supplements)
+  }
+
+  const addSupplement = async () => {
+    const name = newSuppName.trim()
+    if (!name) return
+    const next = [...supplements, { id: crypto.randomUUID(), name }]
+    setSupplements(next); setNewSuppName('')
+    await saveZonesSupplements(zones, next)
+  }
+
+  const removeSupplement = async (id: string) => {
+    const next = supplements.filter(s => s.id !== id)
+    setSupplements(next)
+    await saveZonesSupplements(zones, next)
+  }
+
+  const openWizard = () => {
+    setWizardQuestion('space_type')
+    setWizardHistory([])
+    setWizardConfig(commercialConfig ?? {})
+    setConfigWizardOpen(true)
+  }
+
+  const wizardNext = (next: WizardQuestion) => {
+    setWizardHistory(h => [...h, wizardQuestion])
+    setWizardQuestion(next)
+  }
+
+  const wizardBack = () => {
+    const prev = wizardHistory[wizardHistory.length - 1]
+    if (!prev) return
+    setWizardHistory(h => h.slice(0, -1))
+    setWizardQuestion(prev)
+  }
+
+  const isWizardDone = (cfg: WizardConfig): cfg is CommercialConfig => {
+    return !!(cfg.space_type && cfg.price_model)
+  }
+
+  const toggle = (id: string) => setExpanded(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  // ── Modality CRUD ──────────────────────────────────────────────────────────
+
+  const openCreate = () => { setEditing(null); setModalForm(emptyModalForm); setModalError(''); setModalOpen(true) }
+
+  const openEdit = (m: Modality) => {
+    setEditing(m)
+    setModalForm({ name: m.name, description: m.description ?? '', duration_type: m.duration_type ?? 'custom' })
+    setModalError(''); setModalOpen(true)
+  }
+
+  const saveModality = async () => {
+    if (!modalForm.name.trim()) { setModalError('El nombre es obligatorio'); return }
+    setModalSaving(true); setModalError('')
+    try {
+      const url    = editing ? `/api/estructura/modalities/${editing.id}` : '/api/estructura/modalities'
+      const method = editing ? 'PATCH' : 'POST'
+      const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...modalForm, sort_order: editing?.sort_order ?? modalities.length, venue_id: activeVenue?.id ?? null }) })
+      const json   = await res.json()
+      if (!res.ok) { setModalError(json.error ?? 'Error al guardar'); setModalSaving(false); return }
+      if (editing) {
+        setModalities(prev => prev.map(m => m.id === editing.id ? { ...m, ...json.modality } : m))
+      } else {
+        setModalities(prev => [...prev, { ...json.modality, packages: [], prices: [] }])
+      }
+      setModalOpen(false)
+    } catch { setModalError('Error de red') }
+    setModalSaving(false)
+  }
+
+  const deleteModality = async (id: string) => {
+    if (!confirm('¿Eliminar esta modalidad y todos sus paquetes y precios?')) return
+    const res = await fetch(`/api/estructura/modalities/${id}`, { method: 'DELETE' })
+    if (!res.ok) { setError('Error al eliminar'); return }
+    setModalities(prev => prev.filter(m => m.id !== id))
+  }
+
+  const toggleActive = async (m: Modality) => {
+    const res  = await fetch(`/api/estructura/modalities/${m.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !m.is_active }) })
+    const json = await res.json()
+    if (res.ok) setModalities(prev => prev.map(x => x.id === m.id ? { ...x, is_active: json.modality.is_active } : x))
+  }
+
+  // ── Package CRUD ───────────────────────────────────────────────────────────
+
+  const startAddPkg = (modalityId: string) => {
+    setAddingPkg(modalityId); setPkgForm({ day_from: null, day_to: null, label: '' }); setPkgError('')
+    if (!expanded.has(modalityId)) toggle(modalityId)
+  }
+
+  const cancelAddPkg = () => { setAddingPkg(null); setPkgError('') }
+
+  const savePkg = async () => {
+    if (!addingPkg) return
+    if (pkgForm.day_from === null || pkgForm.day_to === null) { setPkgError('Selecciona los días del paquete'); return }
+    setPkgSaving(true); setPkgError('')
+    try {
+      const existingPkgs = modalities.find(m => m.id === addingPkg)?.packages ?? []
+      const sortOrder    = existingPkgs.length
+      const res  = await fetch(`/api/estructura/modalities/${addingPkg}/packages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...pkgForm, sort_order: sortOrder, venue_id: activeVenue?.id ?? null }) })
+      const json = await res.json()
+      if (!res.ok) { setPkgError(json.error ?? 'Error al guardar'); setPkgSaving(false); return }
+      setModalities(prev => prev.map(m => m.id === addingPkg
+        ? { ...m, packages: [...m.packages, json.package] }
+        : m
+      ))
+      setAddingPkg(null)
+    } catch { setPkgError('Error de red') }
+    setPkgSaving(false)
+  }
+
+  const startEditPkg = (pkg: ModalityPackage) => {
+    setEditingPkg(pkg.id); setEditPkgForm({ day_from: pkg.day_from, day_to: pkg.day_to, label: pkg.label ?? '' }); setPkgError('')
+  }
+
+  const saveEditPkg = async (modalityId: string, pkgId: string) => {
+    if (editPkgForm.day_from === null || editPkgForm.day_to === null) { setPkgError('Selecciona los días'); return }
+    setPkgSaving(true); setPkgError('')
+    try {
+      const res  = await fetch(`/api/estructura/packages/${pkgId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editPkgForm) })
+      const json = await res.json()
+      if (!res.ok) { setPkgError(json.error ?? 'Error'); setPkgSaving(false); return }
+      setModalities(prev => prev.map(m => m.id === modalityId
+        ? { ...m, packages: m.packages.map(p => p.id === pkgId ? { ...p, ...json.package } : p) }
+        : m
+      ))
+      setEditingPkg(null)
+    } catch { setPkgError('Error de red') }
+    setPkgSaving(false)
+  }
+
+  const deletePkg = async (modalityId: string, pkgId: string) => {
+    if (!confirm('¿Eliminar este paquete y todos sus períodos de precio?')) return
+    const res = await fetch(`/api/estructura/packages/${pkgId}`, { method: 'DELETE' })
+    if (res.ok) setModalities(prev => prev.map(m =>
+      m.id === modalityId ? { ...m, packages: m.packages.filter(p => p.id !== pkgId) } : m
+    ))
+  }
+
+  // ── Price CRUD ─────────────────────────────────────────────────────────────
+
+  const startAddPrice = (modalityId: string, packageId: string | null = null) => {
+    setPriceAdding({ modalityId, packageId }); setPriceForm(emptyPriceForm); setPriceError('')
+    if (!expanded.has(modalityId)) toggle(modalityId)
+  }
+
+  const cancelAddPrice = () => { setPriceAdding(null); setPriceForm(emptyPriceForm) }
+
+  const savePrice = async () => {
+    if (!priceAdding) return
+    if (!priceForm.date_from || !priceForm.date_to) { setPriceError('Las fechas son obligatorias'); return }
+    const isMulti = commercialConfig?.space_type === 'multiple_independent'
+    const isSupp2 = commercialConfig?.space_type === 'single_with_supplements'
+    if (!isMulti && !isSupp2 && !priceForm.price) { setPriceError('El precio es obligatorio'); return }
+    if (isMulti) {
+      const filledZones = Object.values(priceForm.zone_prices).filter(v => v !== '' && v !== '0')
+      const filledGroups = Object.values(priceForm.group_prices).filter(v => v !== '' && v !== '0')
+      if (filledZones.length === 0 && filledGroups.length === 0) { setPriceError('Indica el precio de al menos una zona o grupo'); return }
+    }
+    setPriceSaving(true); setPriceError('')
+    try {
+      const { modalityId, packageId } = priceAdding
+      const url = packageId
+        ? `/api/estructura/packages/${packageId}/prices`
+        : `/api/estructura/modalities/${modalityId}/prices`
+      const body = { ...buildPricePayload(priceForm, commercialConfig), venue_id: activeVenue?.id ?? null }
+      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const json = await res.json()
+      if (!res.ok) { setPriceError(json.error ?? 'Error al guardar'); setPriceSaving(false); return }
+
+      setModalities(prev => prev.map(m => {
+        if (m.id !== modalityId) return m
+        if (packageId) {
+          return {
+            ...m,
+            packages: m.packages.map(pkg => pkg.id === packageId
+              ? { ...pkg, prices: [...pkg.prices, json.price].sort((a, b) => a.date_from.localeCompare(b.date_from)) }
+              : pkg
+            ),
+          }
+        }
+        return { ...m, prices: [...m.prices, json.price].sort((a, b) => a.date_from.localeCompare(b.date_from)) }
+      }))
+      setPriceAdding(null); setPriceForm(emptyPriceForm)
+      setRecentlySavedId(json.price.id); setTimeout(() => setRecentlySavedId(null), 2000)
+    } catch { setPriceError('Error de red') }
+    setPriceSaving(false)
+  }
+
+  const startEditPrice = (p: ModalityPrice) => {
+    setEditingPrice(p.id)
+    setEditPriceForm(initPriceForm(p))
+    setPriceError('')
+  }
+
+  const saveEditPrice = async (modalityId: string, packageId: string | null, priceId: string) => {
+    if (!editPriceForm.date_from || !editPriceForm.date_to) { setPriceError('Las fechas son obligatorias'); return }
+    const isMulti = commercialConfig?.space_type === 'multiple_independent'
+    if (!isMulti && !editPriceForm.price) { setPriceError('El precio es obligatorio'); return }
+    if (isMulti) {
+      const filledZones = Object.values(editPriceForm.zone_prices).filter(v => v !== '' && v !== '0')
+      const filledGroups = Object.values(editPriceForm.group_prices).filter(v => v !== '' && v !== '0')
+      if (filledZones.length === 0 && filledGroups.length === 0) { setPriceError('Indica el precio de al menos una zona o grupo'); return }
+    }
+    setPriceSaving(true); setPriceError('')
+    try {
+      const body = buildPricePayload(editPriceForm, commercialConfig)
+      const res  = await fetch(`/api/estructura/prices/${priceId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const json = await res.json()
+      if (!res.ok) { setPriceError(json.error ?? 'Error'); setPriceSaving(false); return }
+
+      setModalities(prev => prev.map(m => {
+        if (m.id !== modalityId) return m
+        if (packageId) {
+          return {
+            ...m,
+            packages: m.packages.map(pkg => pkg.id === packageId
+              ? { ...pkg, prices: pkg.prices.map(p => p.id === priceId ? json.price : p).sort((a, b) => a.date_from.localeCompare(b.date_from)) }
+              : pkg
+            ),
+          }
+        }
+        return { ...m, prices: m.prices.map(p => p.id === priceId ? json.price : p).sort((a, b) => a.date_from.localeCompare(b.date_from)) }
+      }))
+      setEditingPrice(null)
+      setRecentlySavedId(priceId); setTimeout(() => setRecentlySavedId(null), 2000)
+    } catch { setPriceError('Error de red') }
+    setPriceSaving(false)
+  }
+
+  const deletePrice = async (modalityId: string, packageId: string | null, priceId: string) => {
+    if (!confirm('¿Eliminar este período de precio?')) return
+    const res = await fetch(`/api/estructura/prices/${priceId}`, { method: 'DELETE' })
+    if (res.ok) setModalities(prev => prev.map(m => {
+      if (m.id !== modalityId) return m
+      if (packageId) {
+        return { ...m, packages: m.packages.map(pkg => pkg.id === packageId ? { ...pkg, prices: pkg.prices.filter(p => p.id !== priceId) } : pkg) }
+      }
+      return { ...m, prices: m.prices.filter(p => p.id !== priceId) }
+    }))
+  }
+
+  const duplicatePrice = (modalityId: string, packageId: string | null, price: ModalityPrice) => {
+    const form = initPriceForm(price)
+    setPriceAdding({ modalityId, packageId })
+    setPriceForm({ ...form, date_from: '', date_to: '' })
+    setPriceError('')
+    if (!expanded.has(modalityId)) toggle(modalityId)
+  }
+
+  // ── Guards ─────────────────────────────────────────────────────────────────
+
+  if (isBlocked) return null
+
+  if (authLoading || loading) return (
+    <div style={{ display: 'flex' }}><Sidebar />
+      <div className="main-layout">
+        <div className="topbar"><div className="topbar-title">Configuración</div></div>
+        <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+          <div style={{ color: 'var(--warm-gray)', fontSize: 13 }}>Cargando...</div>
+        </div>
+      </div>
+    </div>
+  )
+
+  if (features.loading || !features.estructura) return (
+    <FeatureGate
+      feature="estructura"
+      title="Configuración — Plan Premium"
+      description="Configura el alquiler de tu venue y sus tarifas por periodo."
+    />
+  )
+
+  // Total prices across all modalities (package prices + direct prices)
+  const totalPrices = modalities.reduce((s, m) =>
+    s + m.prices.length + m.packages.reduce((ps, pkg) => ps + pkg.prices.length, 0), 0)
+
+  // ── Main render ────────────────────────────────────────────────────────────
+
+  return (
+    <div style={{ display: 'flex' }}>
+      <Sidebar />
+      <div className="main-layout">
+        <div className="topbar">
+          <div className="topbar-title">Configuración</div>
+          {activeTab === 'modalidades' && (
+            <button className="btn btn-primary btn-sm" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Plus size={14} /> Nueva modalidad
+            </button>
+          )}
+        </div>
+
+        <Tabs
+          activeKey={activeTab}
+          onChange={k => setActiveTab(k as 'modalidades' | 'visitas')}
+          tabs={[
+            { key: 'modalidades', label: 'Alquiler y tarifas', icon: LayoutGrid,   desc: 'Configuración de alquiler y precios por temporada' },
+            { key: 'visitas',     label: 'Visitas',               icon: CalendarDays, desc: 'Disponibilidad y bloqueos para visitas' },
+          ]}
+        />
+
+        <div className="page-content">
+          {error && <div className="alert alert-error" style={{ marginBottom: 20 }}>{error}</div>}
+
+
+          {/* ── TAB: MODALIDADES ─────────────────────────────────────────────── */}
+          {activeTab === 'modalidades' && <>
+
+          {/* Commercial config banner */}
+          {commercialConfig ? (
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Settings2 size={18} style={{ color: 'var(--gold)' }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 4 }}>Configuración comercial</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {[
+                      { single: 'Un espacio único', single_with_supplements: 'Un espacio + suplementos', multiple_independent: 'Varias zonas independientes' }[commercialConfig.space_type],
+                      { rental: 'Alquiler del espacio', per_person: 'Por persona', package: 'Paquetes' }[commercialConfig.price_model],
+                      commercialConfig.menu_included === true ? 'Menú incluido' : commercialConfig.menu_included === false ? 'Menú aparte' : null,
+                      commercialConfig.has_menu_types === true ? 'Varios menús' : null,
+                      commercialConfig.catering_own === true ? (commercialConfig.catering_mandatory ? 'Catering propio obligatorio' : 'Catering propio opcional') : commercialConfig.catering_own === false ? 'Sin catering propio' : null,
+                    ].filter(Boolean).map((tag, i) => (
+                      <span key={i} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--charcoal)', fontWeight: 500 }}>{tag}</span>
+                    ))}
+                  </div>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={openWizard} style={{ flexShrink: 0 }}>Editar</button>
+              </div>
+              {modalities.length > 0 && (
+                <div style={{ display: 'flex', gap: 20, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--ivory)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{modalities.filter(m => m.is_active).length}</strong> activas</span>
+                  <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{modalities.length}</strong> total</span>
+                  <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{totalPrices}</strong> tarifas</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FDF8F0', border: '1px dashed #C4975A66', borderRadius: 10, padding: '14px 16px', marginBottom: 24 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #C4975A44' }}>
+                <Settings2 size={18} style={{ color: '#C4975A' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>Configura tu modelo comercial</div>
+                <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Indica cómo trabajas para que las propuestas se adapten automáticamente</div>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={openWizard} style={{ flexShrink: 0 }}>Configurar</button>
+            </div>
+          )}
+
+          {/* Zones panel — multiple_independent or single_with_supplements */}
+          {(['multiple_independent', 'single_with_supplements'] as const).includes(commercialConfig?.space_type as any) && (
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
+              <button type="button" onClick={() => setZonesCollapsed(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: zonesCollapsed ? 'none' : '1px solid var(--ivory)', width: '100%', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: zonesCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', flexShrink: 0, color: 'var(--warm-gray)' }}>
+                  <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <LayoutGrid size={13} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)' }}>Zonas del venue</span>
+                {zones.length > 0 && (
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--warm-gray)' }}>{zones.length}</span>
+                )}
+              </button>
+              {!zonesCollapsed && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', maxHeight: 220, overflowY: 'auto' }}>
+                {zones.map((z, zi) => (
+                  <div key={z.id}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 14px', borderBottom: '1px solid var(--ivory)', borderRight: zi % 2 === 0 ? '1px solid var(--ivory)' : 'none', background: '#fff', minWidth: 0 }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--cream)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = '#fff'}>
+                    <span style={{ fontSize: 12.5, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{z.name}</span>
+                    <button onClick={() => removeZone(z.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: '2px 4px', display: 'flex', borderRadius: 4, opacity: 0.4, flexShrink: 0 }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#ef4444' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.4'; (e.currentTarget as HTMLElement).style.color = 'var(--warm-gray)' }}>
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px 6px 12px' }}>
+                  <Plus size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                  <input className="form-input" placeholder="Añadir zona…" value={newZoneName}
+                    onChange={e => setNewZoneName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addZone()}
+                    style={{ fontSize: 13, flex: 1, border: 'none', background: 'transparent', padding: '6px 0', boxShadow: 'none', outline: 'none' }} />
+                  {newZoneName.trim() && (
+                    <button className="btn btn-ghost btn-sm" onClick={addZone} disabled={savingZS}
+                      style={{ fontSize: 12, flexShrink: 0, padding: '3px 10px' }}>
+                      Añadir
+                    </button>
+                  )}
+                </div>
+              </div>}
+            </div>
+          )}
+
+          {/* Space groups panel — multiple_independent or single_with_supplements */}
+          {(['multiple_independent', 'single_with_supplements'] as const).includes(commercialConfig?.space_type as any) && zones.length >= 2 && (() => {
+            const isSuppType = commercialConfig?.space_type === 'single_with_supplements'
+            const assignedZoneIds = new Set(spaceGroups.flatMap(g => g.spaces.map(s => s.id)))
+            const unassignedZones = zones.filter(z => !assignedZoneIds.has(z.id))
+            return (
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, padding: '16px 20px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Layers size={14} style={{ color: 'var(--gold)' }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)' }}>Grupos de espacios</span>
+                  {spaceGroups.length > 0 && (
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--warm-gray)' }}>{spaceGroups.length}</span>
+                  )}
+                </div>
+                {unassignedZones.length > 0 && (
+                  <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#FEF9EC', border: '1px solid #FDE68A', color: '#92400E', fontWeight: 500 }}>
+                    {unassignedZones.length} zona{unassignedZones.length > 1 ? 's' : ''} sin grupo
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 16 }}>
+                Agrupa las zonas para que la pareja pueda elegir. Cada grupo tendrá su propio precio en las tarifas.
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                {spaceGroups.map((g, gi) => {
+                  const updateGroup = (patch: Partial<VenueSpaceGroup>) => {
+                    const next = [...spaceGroups]; next[gi] = { ...g, ...patch }; setSpaceGroups(next); setSpaceGroupsDirty(true)
+                  }
+                  const updateAndSaveGroup = (patch: Partial<VenueSpaceGroup>) => {
+                    const next = [...spaceGroups]; next[gi] = { ...g, ...patch }; setSpaceGroups(next); saveSpaceGroups(next)
+                  }
+                  const isIncludedThenPick = isSuppType || g.selection_mode === 'included_then_pick'
+                  const includedIds = new Set(g.included_zone_ids ?? [])
+
+                  // helpers for included_then_pick
+                  const selectableSpaces = g.spaces.filter(s => !includedIds.has(s.id))
+                  const pickCount = g.pick_n_min ?? 1
+                  const maxPick   = Math.max(selectableSpaces.length, 1)
+
+                  const toggleIncluded = (z: { id: string; name: string }) => {
+                    const alreadyIncluded = includedIds.has(z.id)
+                    if (alreadyIncluded) {
+                      // remove from included, keep in selectable pool
+                      updateAndSaveGroup({ included_zone_ids: (g.included_zone_ids ?? []).filter(id => id !== z.id) })
+                    } else {
+                      // add to included (also add to spaces if not already there), remove from selectable
+                      const newSpaces = g.spaces.some(s => s.id === z.id) ? g.spaces : [...g.spaces, { id: z.id, name: z.name }]
+                      updateAndSaveGroup({ spaces: newSpaces, included_zone_ids: [...(g.included_zone_ids ?? []), z.id] })
+                    }
+                  }
+
+                  const toggleSelectable = (z: { id: string; name: string }) => {
+                    const inSelectable = g.spaces.some(s => s.id === z.id) && !includedIds.has(z.id)
+                    if (inSelectable) {
+                      updateAndSaveGroup({ spaces: g.spaces.filter(s => s.id !== z.id) })
+                    } else {
+                      // add to selectable (remove from included if was there)
+                      const newSpaces = g.spaces.some(s => s.id === z.id) ? g.spaces : [...g.spaces, { id: z.id, name: z.name }]
+                      updateAndSaveGroup({ spaces: newSpaces, included_zone_ids: (g.included_zone_ids ?? []).filter(id => id !== z.id) })
+                    }
+                  }
+
+                  const isGroupCollapsed = collapsedGroups.has(g.id)
+                  const toggleGroupCollapse = () => setCollapsedGroups(prev => { const next = new Set(prev); next.has(g.id) ? next.delete(g.id) : next.add(g.id); return next })
+                  const zonesInGroup = g.spaces.length
+
+                  return (
+                  <div key={g.id} style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden' }}>
+                    {/* Header row: name + mode + collapse */}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 14px', background: 'var(--cream)', borderBottom: isGroupCollapsed ? 'none' : '1px solid var(--ivory)', flexWrap: 'wrap' }}>
+                      <button type="button" onClick={toggleGroupCollapse}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--warm-gray)', flexShrink: 0 }}>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: isGroupCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>
+                          <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+
+                      {editingGroupName === g.id ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '1 1 160px', minWidth: 120 }}>
+                          <input className="form-input" autoFocus placeholder="Nombre del grupo" value={g.name}
+                            onChange={e => updateGroup({ name: e.target.value })}
+                            onKeyDown={e => e.key === 'Enter' && setEditingGroupName(null)}
+                            style={{ fontSize: 13, flex: 1, minWidth: 0, background: '#fff' }} />
+                          <button type="button" onClick={() => setEditingGroupName(null)}
+                            style={{ background: 'rgba(90,138,85,0.1)', border: '1px solid rgba(90,138,85,0.3)', borderRadius: 6, cursor: 'pointer', color: '#5a8a55', padding: '4px 8px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                            <Check size={13} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 160px', minWidth: 0 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: g.name ? 'var(--charcoal)' : 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {g.name || 'Sin nombre'}
+                          </span>
+                          <button type="button" onClick={() => setEditingGroupName(g.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: '2px', display: 'flex', flexShrink: 0, opacity: 0.5 }}
+                            onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
+                            onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = '0.5'}>
+                            <Pencil size={12} />
+                          </button>
+                        </div>
+                      )}
+
+                      {isGroupCollapsed && zonesInGroup > 0 && (
+                        <span style={{ fontSize: 11, color: 'var(--warm-gray)', flexShrink: 0 }}>{zonesInGroup} zona{zonesInGroup !== 1 ? 's' : ''}</span>
+                      )}
+
+                      {isSuppType ? (
+                        <span style={{ fontSize: 12, padding: '5px 10px', border: '1px solid var(--ivory)', borderRadius: 6, background: 'var(--cream)', color: 'var(--warm-gray)', flexShrink: 0 }}>
+                          Incluidas + elegir
+                        </span>
+                      ) : (
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <select value={g.selection_mode}
+                            onChange={e => updateGroup({ selection_mode: e.target.value as any, pick_n_min: undefined, pick_n_max: undefined, included_zone_ids: undefined })}
+                            style={{ fontSize: 12, padding: '5px 28px 5px 10px', border: '1px solid var(--ivory)', borderRadius: 6, background: '#fff', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer', color: 'var(--charcoal)' }}>
+                            <option value="none">Todas incluidas</option>
+                            <option value="pick_one">Elegir 1</option>
+                            <option value="pick_n">Elegir X</option>
+                            <option value="included_then_pick">Incluidas + elegir</option>
+                          </select>
+                          <ChevronDown size={13} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--warm-gray)' }} />
+                        </div>
+                      )}
+
+                      {/* Optional checkbox */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', flexShrink: 0, userSelect: 'none' as const }}>
+                        <div
+                          onClick={() => updateAndSaveGroup({ optional: !g.optional })}
+                          style={{ width: 14, height: 14, border: `1.5px solid ${g.optional ? 'var(--gold)' : 'var(--ivory)'}`, borderRadius: 3, background: g.optional ? 'var(--gold)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }}>
+                          {g.optional && <Check size={9} color="#fff" strokeWidth={3} />}
+                        </div>
+                        <span onClick={() => updateAndSaveGroup({ optional: !g.optional })} style={{ fontSize: 12, color: g.optional ? 'var(--espresso)' : 'var(--warm-gray)', fontWeight: g.optional ? 600 : 400 }}>Opcional</span>
+                      </label>
+
+                      {/* pick_n: how many */}
+                      {g.selection_mode === 'pick_n' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Elegir</span>
+                          <div style={{ position: 'relative' }}>
+                            <select value={g.pick_n_min ?? 1}
+                              onChange={e => updateGroup({ pick_n_min: Number(e.target.value), pick_n_max: Number(e.target.value) })}
+                              style={{ fontSize: 12, padding: '5px 28px 5px 10px', border: '1px solid var(--ivory)', borderRadius: 6, background: '#fff', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer', color: 'var(--charcoal)' }}>
+                              {Array.from({ length: Math.max(g.spaces.length, 1) }, (_, i) => i + 1).map(n => (
+                                <option key={n} value={n}>{n}</option>
+                              ))}
+                            </select>
+                            <ChevronDown size={13} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--warm-gray)' }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Guest range row */}
+                    {!isGroupCollapsed && (
+                      <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--ivory)', background: '#fafaf9', display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 11, color: 'var(--warm-gray)', flexShrink: 0 }}>Mostrar para bodas de</span>
+                        <input type="number" min={0} placeholder="mín" value={g.min_guests ?? ''}
+                          onChange={e => updateGroup({ min_guests: e.target.value ? Number(e.target.value) : undefined })}
+                          onBlur={() => saveSpaceGroups(spaceGroups)}
+                          style={{ width: 60, fontSize: 12, padding: '4px 8px', border: '1px solid var(--ivory)', borderRadius: 6, background: '#fff', textAlign: 'center' }} />
+                        <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>–</span>
+                        <input type="number" min={0} placeholder="máx" value={g.max_guests ?? ''}
+                          onChange={e => updateGroup({ max_guests: e.target.value ? Number(e.target.value) : undefined })}
+                          onBlur={() => saveSpaceGroups(spaceGroups)}
+                          style={{ width: 60, fontSize: 12, padding: '4px 8px', border: '1px solid var(--ivory)', borderRadius: 6, background: '#fff', textAlign: 'center' }} />
+                        <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>invitados</span>
+                        {(g.min_guests || g.max_guests) && (
+                          <button type="button" onClick={() => updateAndSaveGroup({ min_guests: undefined, max_guests: undefined })}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', fontSize: 11, padding: '2px 4px', opacity: 0.5 }}
+                            onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
+                            onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = '0.5'}>
+                            <X size={11} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Zone area */}
+                    {!isGroupCollapsed && <>
+                    {isIncludedThenPick ? (
+                      /* ── included_then_pick: two labelled columns ── */
+                      <div style={{ padding: '12px 14px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          {/* Left: always included */}
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#5a8a55', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
+                              Siempre incluidas
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 160, overflowY: 'auto' }}>
+                              {zones.map(z => {
+                                const checked = includedIds.has(z.id)
+                                return (
+                                  <button key={z.id} type="button" onClick={() => toggleIncluded(z)}
+                                    title={z.name}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 6, cursor: 'pointer', border: 'none', background: checked ? 'rgba(90,138,85,0.07)' : 'transparent', textAlign: 'left', transition: 'background 0.1s', minWidth: 0, overflow: 'hidden' }}>
+                                    <div style={{ width: 14, height: 14, border: `1.5px solid ${checked ? '#5a8a55' : 'var(--ivory)'}`, borderRadius: 3, background: checked ? '#5a8a55' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                      {checked && <Check size={9} color="#fff" strokeWidth={3} />}
+                                    </div>
+                                    <span style={{ fontSize: 12, color: checked ? '#3a6a35' : 'var(--warm-gray)', fontWeight: checked ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{z.name}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Right: client selectable */}
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
+                              El cliente elige de
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 160, overflowY: 'auto' }}>
+                              {zones.map(z => {
+                                const inSelectable = g.spaces.some(s => s.id === z.id) && !includedIds.has(z.id)
+                                return (
+                                  <button key={z.id} type="button" onClick={() => toggleSelectable(z)}
+                                    title={z.name}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 6, cursor: 'pointer', border: 'none', background: inSelectable ? 'rgba(196,151,90,0.07)' : 'transparent', textAlign: 'left', transition: 'background 0.1s', minWidth: 0, overflow: 'hidden' }}>
+                                    <div style={{ width: 14, height: 14, border: `1.5px solid ${inSelectable ? 'var(--gold)' : 'var(--ivory)'}`, borderRadius: 3, background: inSelectable ? 'var(--gold)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                      {inSelectable && <Check size={9} color="#fff" strokeWidth={3} />}
+                                    </div>
+                                    <span style={{ fontSize: 12, color: inSelectable ? 'var(--espresso)' : 'var(--warm-gray)', fontWeight: inSelectable ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{z.name}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Pick count selector */}
+                        {selectableSpaces.length > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--ivory)' }}>
+                            <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>El cliente elige cuántas:</span>
+                            <div style={{ position: 'relative' }}>
+                              <select value={pickCount}
+                                onChange={e => updateAndSaveGroup({ pick_n_min: Number(e.target.value), pick_n_max: Number(e.target.value) })}
+                                style={{ fontSize: 12, padding: '5px 28px 5px 10px', border: '1px solid var(--ivory)', borderRadius: 6, background: '#fff', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer', color: 'var(--charcoal)' }}>
+                                {Array.from({ length: maxPick }, (_, i) => i + 1).map(n => (
+                                  <option key={n} value={n}>{n}</option>
+                                ))}
+                              </select>
+                              <ChevronDown size={13} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--warm-gray)' }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* ── Normal modes: 4-col checkbox grid ── */
+                      <div style={{ padding: '8px 14px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, maxHeight: 160, overflowY: 'auto' }}>
+                        {zones.map(z => {
+                          const inGroup = g.spaces.some(s => s.id === z.id)
+                          return (
+                            <button key={z.id} type="button"
+                              title={z.name}
+                              onClick={() => {
+                                const spaces = inGroup
+                                  ? g.spaces.filter(s => s.id !== z.id)
+                                  : [...g.spaces, { id: z.id, name: z.name }]
+                                updateAndSaveGroup({ spaces })
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 6, cursor: 'pointer', border: 'none', background: inGroup ? 'rgba(196,151,90,0.06)' : 'transparent', textAlign: 'left', transition: 'background 0.1s', minWidth: 0, overflow: 'hidden' }}>
+                              <div style={{ width: 14, height: 14, border: `1.5px solid ${inGroup ? 'var(--gold)' : 'var(--ivory)'}`, borderRadius: 3, background: inGroup ? 'var(--gold)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {inGroup && <Check size={9} color="#fff" strokeWidth={3} />}
+                              </div>
+                              <span style={{ fontSize: 12, color: inGroup ? 'var(--espresso)' : 'var(--warm-gray)', fontWeight: inGroup ? 500 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{z.name}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {g.spaces.length === 0 && (
+                      <div style={{ padding: '4px 14px 6px', fontSize: 11, color: '#ef4444', opacity: 0.7 }}>
+                        Selecciona al menos una zona para este grupo.
+                      </div>
+                    )}
+
+                    <div style={{ padding: '6px 14px 10px', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button type="button" onClick={() => { const next = spaceGroups.filter((_, j) => j !== gi); setSpaceGroups(next); saveSpaceGroups(next) }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 11, padding: '2px 4px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#fef2f2'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}>
+                        <X size={11} /> Eliminar grupo
+                      </button>
+                    </div>
+                    </>}
+                  </div>
+                  )
+                })}
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => {
+                  setSpaceGroups([...spaceGroups, { id: crypto.randomUUID(), name: '', selection_mode: isSuppType ? 'included_then_pick' : 'pick_one', spaces: [] }])
+                }} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Plus size={12} /> Añadir grupo
+                </button>
+                {spaceGroups.length > 0 && (
+                  <button
+                    onClick={() => saveSpaceGroups(spaceGroups)}
+                    disabled={savingSG || !spaceGroupsDirty}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '5px 12px', borderRadius: 6, border: 'none', cursor: spaceGroupsDirty ? 'pointer' : 'default', transition: 'background .15s, color .15s', background: spaceGroupsDirty ? 'var(--gold)' : '#e5e7eb', color: spaceGroupsDirty ? '#fff' : '#9ca3af', fontWeight: 600 }}>
+                    {savingSG ? 'Guardando…' : <><Check size={12} /> Guardar grupos</>}
+                  </button>
+                )}
+              </div>
+            </div>
+            )
+          })()}
+
+          {/* Supplements panel — removed: replaced by selectable zones in space groups */}
+          {false && commercialConfig?.space_type === 'single_with_supplements' && (
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, maxWidth: 'none' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Layers size={14} style={{ color: '#7C3AED' }} /> Extras / Suplementos
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: supplements.length > 0 ? 12 : 0 }}>
+                {supplements.map(s => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 20, padding: '4px 10px 4px 12px' }}>
+                    <span style={{ fontSize: 12, color: '#6D28D9', fontWeight: 500 }}>{s.name}</span>
+                    <button onClick={() => removeSupplement(s.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#C4B5FD', padding: 0, display: 'flex', lineHeight: 1 }}><X size={12} /></button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input className="form-input" placeholder="Nombre del suplemento (ej: Jardín, Piscina…)" value={newSuppName}
+                  onChange={e => setNewSuppName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addSupplement()}
+                  style={{ fontSize: 12, flex: 1 }} />
+                <button className="btn btn-ghost btn-sm" onClick={addSupplement} disabled={!newSuppName.trim() || savingZS} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Plus size={12} /> Añadir
+                </button>
+              </div>
+              {supplements.length === 0 && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 8 }}>Define los extras disponibles para poder fijar su precio en cada período.</div>}
+            </div>
+          )}
+
+          {/* Stats now inline in commercial config banner */}
+
+          {/* Empty state */}
+          {modalities.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '80px 24px' }}>
+              <div style={{ width: 64, height: 64, borderRadius: 16, background: '#fff', border: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                <CalendarDays size={28} style={{ color: 'var(--gold)' }} />
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 8 }}>Sin modalidades todavía</div>
+              <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 28, maxWidth: 380, margin: '0 auto 28px', lineHeight: 1.6 }}>
+                Define cómo alquilas tu venue: por días, fines de semana, paquetes... Cada modalidad puede tener tarifas distintas por temporada.
+              </div>
+              <button className="btn btn-primary" onClick={openCreate} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Plus size={14} /> Crear primera modalidad
+              </button>
+            </div>
+          )}
+
+          {/* Modality cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 'none' }}>
+            {modalities.map(m => {
+              const dt         = getDT(m.duration_type)
+              const isExpanded = expanded.has(m.id)
+              const isPkg      = m.duration_type === 'package'
+              const isAddingPkgHere = addingPkg === m.id
+
+              // Existing package day ranges for conflict detection
+              const existingRanges: DayRange[] = m.packages.map(pkg => ({
+                day_from: pkg.day_from, day_to: pkg.day_to,
+              }))
+
+              return (
+                <div key={m.id} style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden', opacity: m.is_active ? 1 : 0.6, boxShadow: isExpanded ? '0 4px 18px rgba(0,0,0,0.07)' : '0 1px 4px rgba(0,0,0,0.03)', transition: 'box-shadow 0.2s, opacity 0.2s' }}>
+                  <div style={{ display: 'flex' }}>
+                    <div style={{ width: 4, background: dt.color, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+
+                      {/* Header */}
+                      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => toggle(m.id)}>
+                          <div style={{ width: 40, height: 40, borderRadius: 10, background: dt.bg, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <dt.Icon size={18} style={{ color: dt.color }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--charcoal)' }}>{m.name}</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, background: dt.bg, color: dt.color, padding: '2px 9px', borderRadius: 20, border: `1px solid ${dt.color}33` }}>{dt.label}</span>
+                              {!m.is_active && <span style={{ fontSize: 10, background: 'var(--ivory)', color: 'var(--warm-gray)', padding: '2px 7px', borderRadius: 4, fontWeight: 600 }}>INACTIVA</span>}
+                            </div>
+                            {/* Package day range badges */}
+                            {isPkg && m.packages.length > 0 && (
+                              <div style={{ display: 'flex', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
+                                {m.packages.map(pkg => (
+                                  <span key={pkg.id} style={{ fontSize: 10, background: `${dt.color}18`, color: dt.color, padding: '2px 7px', borderRadius: 10, fontWeight: 600, border: `1px solid ${dt.color}33` }}>
+                                    {pkgShortLabel(pkg.day_from, pkg.day_to)}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {m.description && !isPkg && (
+                              <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 420 }}>{m.description}</div>
+                            )}
+                          </div>
+                        </div>
+                        {/* Right controls */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <span style={{ fontSize: 11, color: 'var(--warm-gray)', background: 'var(--cream)', padding: '3px 10px', borderRadius: 20, fontWeight: 500, border: '1px solid var(--ivory)', whiteSpace: 'nowrap' }}>
+                            {isPkg
+                              ? `${m.packages.length} ${m.packages.length === 1 ? 'paquete' : 'paquetes'}`
+                              : `${m.prices.length} ${m.prices.length === 1 ? 'tarifa' : 'tarifas'}`
+                            }
+                          </span>
+                          <button onClick={() => toggleActive(m)} title={m.is_active ? 'Desactivar' : 'Activar'}
+                            style={{ width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', background: m.is_active ? 'var(--gold)' : '#D1C9BF', position: 'relative', flexShrink: 0, transition: 'background 0.2s' }}>
+                            <span style={{ position: 'absolute', top: 2, left: m.is_active ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                          </button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => openEdit(m)} style={{ padding: '5px 7px' }}><Pencil size={13} /></button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => deleteModality(m.id)} style={{ padding: '5px 7px', color: 'var(--rose)' }}><Trash2 size={13} /></button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => toggle(m.id)} style={{ padding: '5px 7px' }}>
+                            {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expanded body */}
+                      {(isExpanded || isAddingPkgHere) && (
+                        <div style={{ borderTop: '1px solid var(--ivory)' }}>
+
+                          {/* ── PACKAGE TYPE ─────────────────────────────── */}
+                          {isPkg && (
+                            <div>
+                              {m.packages.map(pkg => {
+                                const isEditingThisPkg    = editingPkg === pkg.id
+                                const isAddingPriceHere   = priceAdding?.packageId === pkg.id
+                                const otherRanges         = existingRanges.filter(r => r.day_from !== pkg.day_from || r.day_to !== pkg.day_to)
+
+                                return (
+                                  <div key={pkg.id} style={{ borderBottom: '1px solid var(--ivory)' }}>
+
+                                    {/* Package slot header */}
+                                    {isEditingThisPkg ? (
+                                      <div style={{ padding: '12px 16px', background: '#FAFDF9' }}>
+                                        <div style={{ fontSize: 10, fontWeight: 700, color: dt.color, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Editar paquete</div>
+                                        <WeekDayPicker
+                                          dayFrom={editPkgForm.day_from}
+                                          dayTo={editPkgForm.day_to}
+                                          onChange={(f, t) => setEditPkgForm(v => ({ ...v, day_from: f, day_to: t }))}
+                                          accent={dt.color}
+                                          hint="El mismo día puede ser salida de un paquete y entrada del siguiente"
+                                          blockedRanges={otherRanges}
+                                        />
+                                        <div style={{ marginTop: 10 }}>
+                                          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Etiqueta (opcional)</div>
+                                          <input type="text" className="form-input" placeholder="Ej: Fin de semana largo" value={editPkgForm.label} onChange={e => setEditPkgForm(v => ({ ...v, label: e.target.value }))} style={{ fontSize: 12 }} />
+                                        </div>
+                                        {pkgError && <div style={{ fontSize: 11, color: 'var(--rose)', marginTop: 6 }}>{pkgError}</div>}
+                                        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                                          <button className="btn btn-primary btn-sm" disabled={pkgSaving} onClick={() => saveEditPkg(m.id, pkg.id)} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <Check size={12} /> {pkgSaving ? 'Guardando…' : 'Guardar'}
+                                          </button>
+                                          <button className="btn btn-ghost btn-sm" onClick={() => { setEditingPkg(null); setPkgError('') }}>Cancelar</button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div style={{ padding: '9px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F7FAF8' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                          <div style={{ width: 3, height: 16, background: dt.color, borderRadius: 2 }} />
+                                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)' }}>{pkgLabel(pkg)}</span>
+                                          <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{pkg.prices.length} {pkg.prices.length === 1 ? 'período' : 'períodos'}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                          {!isAddingPriceHere && (
+                                            <button className="btn btn-ghost btn-sm" onClick={() => startAddPrice(m.id, pkg.id)} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                              <Plus size={11} /> Añadir período
+                                            </button>
+                                          )}
+                                          <button className="btn btn-ghost btn-sm" onClick={() => startEditPkg(pkg)} style={{ padding: '3px 6px' }}><Pencil size={12} /></button>
+                                          <button className="btn btn-ghost btn-sm" onClick={() => deletePkg(m.id, pkg.id)} style={{ padding: '3px 6px', color: 'var(--rose)' }}><Trash2 size={12} /></button>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Package prices */}
+                                    {!isEditingThisPkg && (
+                                      <div style={{ padding: '4px 12px 8px' }}>
+                                        {isAddingPriceHere && (
+                                          <div style={{ marginBottom: 4 }}>
+                                            <PriceForm
+                                              form={priceForm}
+                                              onChange={setPriceForm}
+                                              accent={dt.color}
+                                              saving={priceSaving}
+                                              error={priceError}
+                                              onSave={savePrice}
+                                              onCancel={cancelAddPrice}
+                                              cfg={commercialConfig}
+                                              zones={zones}
+                                              supplements={supplements}
+                                              spaceGroups={spaceGroups}
+                                            />
+                                          </div>
+                                        )}
+                                        {pkg.prices.map(p => (
+                                          <div key={p.id} style={{ marginTop: 4 }}>
+                                            {editingPrice === p.id ? (
+                                              <PriceForm
+                                                form={editPriceForm}
+                                                onChange={setEditPriceForm}
+                                                accent={dt.color}
+                                                saving={priceSaving}
+                                                error={priceError}
+                                                onSave={() => saveEditPrice(m.id, pkg.id, p.id)}
+                                                onCancel={() => setEditingPrice(null)}
+                                                isEdit
+                                                cfg={commercialConfig}
+                                                zones={zones}
+                                                supplements={supplements}
+                                                spaceGroups={spaceGroups}
+                                              />
+                                            ) : (
+                                              <PriceRow
+                                                price={p}
+                                                accent={dt.color}
+                                                cfg={commercialConfig}
+                                                zones={zones}
+                                                supplements={supplements}
+                                                spaceGroups={spaceGroups}
+                                                onEdit={() => startEditPrice(p)}
+                                                onDelete={() => deletePrice(m.id, pkg.id, p.id)}
+                                                onDuplicate={() => duplicatePrice(m.id, pkg.id, p)}
+                                              />
+                                            )}
+                                          </div>
+                                        ))}
+                                        {pkg.prices.length === 0 && !isAddingPriceHere && (
+                                          <div style={{ padding: '10px 4px', color: 'var(--warm-gray)', fontSize: 12 }}>
+                                            Sin per�odos.{' '}
+                                            <button style={{ background: 'none', border: 'none', color: dt.color, cursor: 'pointer', fontSize: 12, fontWeight: 600 }} onClick={() => startAddPrice(m.id, pkg.id)}>+ A�adir</button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+
+                              {/* Add new package slot */}
+                              {isAddingPkgHere ? (
+                                <div style={{ padding: '14px 16px', background: '#FAFAF9' }}>
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: dt.color, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Nuevo paquete de días</div>
+                                  <WeekDayPicker
+                                    dayFrom={pkgForm.day_from}
+                                    dayTo={pkgForm.day_to}
+                                    onChange={(f, t) => setPkgForm(v => ({ ...v, day_from: f, day_to: t }))}
+                                    accent={dt.color}
+                                    hint="El mismo día puede ser salida de un paquete y entrada del siguiente. Los paquetes pueden cruzar la semana (ej: Vie → Mar)."
+                                    blockedRanges={existingRanges}
+                                  />
+                                  <div style={{ marginTop: 10 }}>
+                                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Etiqueta (opcional)</div>
+                                    <input type="text" className="form-input" placeholder="Ej: Fin de semana largo" value={pkgForm.label} onChange={e => setPkgForm(v => ({ ...v, label: e.target.value }))} style={{ fontSize: 12 }} />
+                                  </div>
+                                  {pkgError && <div style={{ fontSize: 11, color: 'var(--rose)', marginTop: 6 }}>{pkgError}</div>}
+                                  <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                                    <button className="btn btn-primary btn-sm" disabled={pkgSaving} onClick={savePkg} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                      <Check size={12} /> {pkgSaving ? 'Guardando…' : 'Crear paquete'}
+                                    </button>
+                                    <button className="btn btn-ghost btn-sm" onClick={cancelAddPkg}>Cancelar</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div style={{ padding: '10px 16px', background: '#FAFAF9' }}>
+                                  <button className="btn btn-ghost btn-sm" onClick={() => startAddPkg(m.id)} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5, color: dt.color, borderColor: `${dt.color}44` }}>
+                                    <Plus size={11} /> Nuevo paquete de días
+                                  </button>
+                                </div>
+                              )}
+
+                              {m.packages.length === 0 && !isAddingPkgHere && (
+                                <div style={{ padding: '0 16px 16px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 12 }}>
+                                  <span>Crea tu primer paquete para definir los rangos de días disponibles.</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* ── NON-PACKAGE TYPE ──────────────────────────── */}
+                          {!isPkg && (() => {
+                            const nonPkgPrices  = m.prices.filter(p => !p.package_id)
+                            const isPricesCollapsed = pricesCollapsed.has(m.id)
+                            const togglePricesCollapsed = () => setPricesCollapsed(prev => {
+                              const next = new Set(prev); next.has(m.id) ? next.delete(m.id) : next.add(m.id); return next
+                            })
+                            const existingRanges = nonPkgPrices.map(p => ({ from: p.date_from, to: p.date_to }))
+                            return (
+                            <div>
+                              {/* Section header */}
+                              <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, background: '#FAFAF9', borderTop: '1px solid var(--ivory)' }}>
+                                <button onClick={togglePricesCollapsed} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0, flex: 1 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Tarifas por temporada</span>
+                                  {nonPkgPrices.length > 0 && (
+                                    <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--warm-gray)' }}>{nonPkgPrices.length}</span>
+                                  )}
+                                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--warm-gray)" strokeWidth="1.8" strokeLinecap="round" style={{ marginLeft: 2, transition: 'transform 0.2s', transform: isPricesCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
+                                    <path d="M2 4l4 4 4-4"/>
+                                  </svg>
+                                </button>
+                                {!priceAdding && !isPricesCollapsed && (
+                                  <button className="btn btn-ghost btn-sm" onClick={() => startAddPrice(m.id)} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                                    <Plus size={11} /> Añadir período
+                                  </button>
+                                )}
+                              </div>
+
+                              {!isPricesCollapsed && (
+                                <>
+                                  {priceAdding?.modalityId === m.id && !priceAdding.packageId && (
+                                    <div style={{ padding: '8px 12px 4px' }}>
+                                      <PriceForm
+                                        form={priceForm}
+                                        onChange={setPriceForm}
+                                        accent={dt.color}
+                                        saving={priceSaving}
+                                        error={priceError}
+                                        onSave={savePrice}
+                                        onCancel={cancelAddPrice}
+                                        cfg={commercialConfig}
+                                        zones={zones}
+                                        supplements={supplements}
+                                        spaceGroups={spaceGroups}
+                                        existingRanges={existingRanges}
+                                      />
+                                    </div>
+                                  )}
+                                  {nonPkgPrices.length > 0 && (
+                                    <div style={{ padding: '4px 12px 12px' }}>
+                                      {nonPkgPrices.map(p => (
+                                        <div key={p.id} style={{ marginTop: 4 }}>
+                                          {editingPrice === p.id ? (
+                                            <PriceForm
+                                              form={editPriceForm}
+                                              onChange={setEditPriceForm}
+                                              accent={dt.color}
+                                              saving={priceSaving}
+                                              error={priceError}
+                                              onSave={() => saveEditPrice(m.id, null, p.id)}
+                                              onCancel={() => setEditingPrice(null)}
+                                              isEdit
+                                              cfg={commercialConfig}
+                                              zones={zones}
+                                              supplements={supplements}
+                                              spaceGroups={spaceGroups}
+                                              existingRanges={existingRanges.filter(r => r.from !== p.date_from)}
+                                            />
+                                          ) : (
+                                            <PriceRow
+                                              price={p}
+                                              accent={dt.color}
+                                              cfg={commercialConfig}
+                                              zones={zones}
+                                              supplements={supplements}
+                                              spaceGroups={spaceGroups}
+                                              onEdit={() => startEditPrice(p)}
+                                              onDelete={() => deletePrice(m.id, null, p.id)}
+                                              onDuplicate={() => duplicatePrice(m.id, null, p)}
+                                              recentlySaved={recentlySavedId === p.id}
+                                            />
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {nonPkgPrices.length === 0 && !priceAdding && (
+                                    <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 12 }}>
+                                      Sin tarifas definidas.{' '}
+                                      <button style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }} onClick={() => startAddPrice(m.id)}>+ Añadir período</button>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                            )
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          </>}
+
+          {/* ── TAB: VISITAS ─────────────────────────────────────────────────── */}
+          {activeTab === 'visitas' && (() => {
+            const DAY_NAMES = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
+            const DURATIONS: Array<{ value: 30|45|60|90|120; label: string }> = [
+              { value: 30, label: '30 min' }, { value: 45, label: '45 min' },
+              { value: 60, label: '1 hora' }, { value: 90, label: '1,5 h' }, { value: 120, label: '2 h' },
+            ]
+            const updateDay = (day: number, patch: Partial<DaySchedule>) => {
+              const next: VisitAvailability = { ...visitAvail, schedule: visitAvail.schedule.map(s => s.day === day ? { ...s, ...patch } : s) }
+              setVisitAvail(next); setVisitAvailDirty(true)
+            }
+            const updateAvail = (patch: Partial<VisitAvailability>) => {
+              const next = { ...visitAvail, ...patch }; setVisitAvail(next); setVisitAvailDirty(true)
+            }
+            const upsertBlockedDates = (dates: string[], block: Omit<BlockedDate, 'date'>) => {
+              const newEntries: BlockedDate[] = dates.map(d => ({ date: d, ...block }))
+              const newDates = new Set(dates)
+              const rest = visitAvail.blocked_dates.filter(x => !newDates.has(x.date))
+              const next = { ...visitAvail, blocked_dates: [...rest, ...newEntries].sort((a, z) => a.date.localeCompare(z.date)) }
+              setVisitAvail(next); setVisitAvailDirty(true)
+            }
+            const removeBlockedDate = (date: string) => {
+              const next = { ...visitAvail, blocked_dates: visitAvail.blocked_dates.filter(x => x.date !== date) }
+              setVisitAvail(next); setVisitAvailDirty(true)
+              if (blockPickerDate === date) setBlockPickerDate(null)
+            }
+            // Calendar helpers
+            const CAL_MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+            const CAL_DAYS = ['L','M','X','J','V','S','D']
+            const pad2 = (n: number) => String(n).padStart(2, '0')
+            const daysInMonth = new Date(blockCalYear, blockCalMonth + 1, 0).getDate()
+            const firstDow = (() => { const d = new Date(blockCalYear, blockCalMonth, 1).getDay(); return d === 0 ? 6 : d - 1 })()
+            const todayIso = (() => { const t = new Date(); return `${t.getFullYear()}-${pad2(t.getMonth()+1)}-${pad2(t.getDate())}` })()
+            const blockedMap: Record<string, BlockedDate> = {}
+            visitAvail.blocked_dates.forEach(b => { blockedMap[b.date] = b })
+            // Auto-blocked from main calendar
+            const getAutoBlock = (iso: string): 'wedding' | 'unavailable' | null => {
+              const s = blockCalEntries[iso]
+              if (!s || s === 'libre') return null
+              if (visitAvail.block_booked_weddings && (s === 'reservado' || s === 'ganado')) return 'wedding'
+              if (visitAvail.block_calendar_unavailable && s !== 'libre') return 'unavailable'
+              return null
+            }
+            const blockTypeLabel = (t: BlockedDate['type']) => ({ full: 'Día completo', morning: 'Solo mañana', afternoon: 'Solo tarde', hours: 'Horas concretas' })[t]
+            const blockColor = (t: BlockedDate['type']) => ({ full: '#f87171', morning: '#fb923c', afternoon: '#fbbf24', hours: '#a78bfa' })[t]
+            // Range helpers
+            const rangeMin = blockRangeStart && blockPickerDate ? [blockRangeStart, blockPickerDate].sort()[0] : null
+            const rangeMax = blockRangeStart && blockPickerDate ? [blockRangeStart, blockPickerDate].sort()[1] : null
+            const isInRange = (iso: string) => !!(rangeMin && rangeMax && iso >= rangeMin && iso <= rangeMax)
+            // Build list of all dates currently selected (range or single)
+            const getSelectedDates = (): string[] => {
+              if (blockRangeMode && blockRangeStart && blockPickerDate) {
+                const [s, e] = [blockRangeStart, blockPickerDate].sort()
+                const out: string[] = []
+                const cur = new Date(s + 'T12:00:00')
+                const end = new Date(e + 'T12:00:00')
+                while (cur <= end) {
+                  out.push(`${cur.getFullYear()}-${pad2(cur.getMonth()+1)}-${pad2(cur.getDate())}`)
+                  cur.setDate(cur.getDate() + 1)
+                }
+                return out
+              }
+              return blockPickerDate ? [blockPickerDate] : []
+            }
+            const selectedDates = getSelectedDates()
+            const pickerLabel = blockRangeMode && blockRangeStart && blockPickerDate && blockRangeStart !== blockPickerDate
+              ? `${new Date(rangeMin!+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${new Date(rangeMax!+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})} (${selectedDates.length} días)`
+              : blockPickerDate
+                ? new Date(blockPickerDate+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})
+                : blockRangeMode && blockRangeStart
+                  ? `Desde ${new Date(blockRangeStart+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})} — elige el día final`
+                  : null
+            const confirmBlock = () => {
+              if (!selectedDates.length) return
+              const block: Omit<BlockedDate,'date'> = blockType === 'hours'
+                ? { type: 'hours', ranges: blockRanges.filter(r => r.from && r.to) }
+                : { type: blockType }
+              upsertBlockedDates(selectedDates, block)
+              setBlockPickerDate(null)
+              setBlockRangeStart(null)
+              setBlockRangeEnd(null)
+            }
+            return (
+              <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, marginBottom: 16, maxWidth: 'none', overflow: 'hidden' }}>
+                {/* Header */}
+                <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <CalendarDays size={14} style={{ color: '#059669', flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', flex: 1 }}>Disponibilidad para visitas</span>
+                  {visitAvailDirty && (
+                    <span style={{ fontSize: 10, color: '#d97706' }}>Cambios pendientes</span>
+                  )}
+                </div>
+
+                <div style={{ padding: '0 20px 20px', borderTop: '1px solid var(--ivory)' }}>
+                <div style={{ height: 16 }} />
+
+                {/* Duration */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 6 }}>Duración de cada visita</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {DURATIONS.map(({ value, label }) => (
+                      <button key={value} type="button" onClick={() => updateAvail({ slot_duration: value })}
+                        style={{ fontSize: 11, padding: '4px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600,
+                          background: visitAvail.slot_duration === value ? '#059669' : '#D1FAE5',
+                          color: visitAvail.slot_duration === value ? '#fff' : '#065F46' }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Weekly schedule */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8 }}>Horario disponible</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {visitAvail.schedule.map(ds => (
+                      <div key={ds.day} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <button type="button" onClick={() => updateDay(ds.day, { enabled: !ds.enabled })}
+                          style={{ width: 72, fontSize: 11, padding: '4px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, textAlign: 'center',
+                            background: ds.enabled ? '#059669' : '#F3F4F6', color: ds.enabled ? '#fff' : '#9CA3AF' }}>
+                          {DAY_NAMES[ds.day].slice(0, 3)}
+                        </button>
+                        {ds.enabled && (
+                          <>
+                            <input type="time" value={ds.from} onChange={e => updateDay(ds.day, { from: e.target.value })}
+                              className="form-input" style={{ fontSize: 12, width: 90 }} />
+                            <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>—</span>
+                            <input type="time" value={ds.to} onChange={e => updateDay(ds.day, { to: e.target.value })}
+                              className="form-input" style={{ fontSize: 12, width: 90 }} />
+                          </>
+                        )}
+                        {!ds.enabled && <span style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic' }}>No disponible</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* What blocks a slot */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8 }}>Qué bloquea un hueco automáticamente</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--charcoal)', cursor: 'default' }}>
+                      <input type="checkbox" checked disabled style={{ width: 14, height: 14 }} />
+                      Visitas ya agendadas <span style={{ fontSize: 10, color: 'var(--warm-gray)', marginLeft: 4 }}>(siempre activo)</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--charcoal)', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={visitAvail.block_booked_weddings}
+                        onChange={e => updateAvail({ block_booked_weddings: e.target.checked })} style={{ width: 14, height: 14 }} />
+                      Días con boda reservada / contratada en el calendario
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--charcoal)', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={visitAvail.block_calendar_unavailable}
+                        onChange={e => updateAvail({ block_calendar_unavailable: e.target.checked })} style={{ width: 14, height: 14 }} />
+                      Cualquier día marcado como no libre en el calendario
+                    </label>
+                  </div>
+                </div>
+
+                {/* Google Calendar sync */}
+                <div style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: gcalConfig ? 'rgba(90,138,85,0.05)' : 'var(--cream)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <rect x="3" y="4" width="18" height="17" rx="2" stroke="#4285F4" strokeWidth="1.8"/>
+                        <path d="M3 9h18" stroke="#4285F4" strokeWidth="1.8"/>
+                        <path d="M8 2v4M16 2v4" stroke="#4285F4" strokeWidth="1.8" strokeLinecap="round"/>
+                        <rect x="7" y="13" width="4" height="3" rx="0.5" fill="#EA4335"/>
+                      </svg>
+                      <div>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--charcoal)' }}>Google Calendar</div>
+                        {gcalConfig ? (
+                          <div style={{ fontSize: 11, color: '#5a8a55', marginTop: 1 }}>
+                            Conectado · {gcalConfig.calendar_name}
+                            {gcalConfig.last_sync && <span style={{ color: 'var(--warm-gray)', marginLeft: 6 }}>Sync: {new Date(gcalConfig.last_sync).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>Sincroniza tu calendario para bloquear fechas automáticamente</div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {gcalConfig ? (
+                        <>
+                          <button type="button" disabled={gcalSyncing}
+                            onClick={async () => {
+                              setGcalSyncing(true); setGcalMsg(null)
+                              const res = await fetch('/api/calendar/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venue_id: activeVenue?.id }) })
+                              const json = await res.json()
+                              if (res.ok) {
+                                setGcalConfig(prev => prev ? { ...prev, last_sync: json.last_sync } : prev)
+                                setGcalMsg(`${json.blocked_count} fechas importadas`)
+                              } else { setGcalMsg('Error al sincronizar') }
+                              setGcalSyncing(false)
+                              setTimeout(() => setGcalMsg(null), 3000)
+                            }}
+                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#fff', cursor: gcalSyncing ? 'wait' : 'pointer', color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {gcalSyncing ? 'Importando…' : '↓ Importar bloqueos'}
+                          </button>
+                          <button type="button" disabled={gcalPushing}
+                            onClick={async () => {
+                              setGcalPushing(true); setGcalMsg(null)
+                              const res = await fetch('/api/calendar/push-all', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venue_id: activeVenue?.id }) })
+                              const json = await res.json()
+                              if (res.ok) { setGcalMsg(`${json.pushed} eventos enviados a Google`) }
+                              else { setGcalMsg('Error al exportar') }
+                              setGcalPushing(false)
+                              setTimeout(() => setGcalMsg(null), 3000)
+                            }}
+                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#fff', cursor: gcalPushing ? 'wait' : 'pointer', color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {gcalPushing ? 'Exportando…' : '↑ Exportar bodas/visitas'}
+                          </button>
+                          <button type="button"
+                            onClick={async () => {
+                              if (!confirm('¿Desconectar Google Calendar?')) return
+                              await fetch('/api/calendar/disconnect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venue_id: activeVenue?.id }) })
+                              setGcalConfig(null)
+                            }}
+                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', color: '#ef4444' }}>
+                            Desconectar
+                          </button>
+                        </>
+                      ) : (
+                        <a href={`/api/auth/google/start?venue_id=${activeVenue?.id}`}
+                          style={{ fontSize: 12, padding: '5px 14px', borderRadius: 6, border: '1px solid #4285F4', background: '#fff', color: '#4285F4', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          Conectar
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  {gcalMsg && (
+                    <div style={{ padding: '6px 14px', fontSize: 11, background: gcalMsg.startsWith('Error') ? '#fef2f2' : '#f0fdf4', color: gcalMsg.startsWith('Error') ? '#ef4444' : '#15803d', borderTop: '1px solid var(--ivory)' }}>
+                      {gcalMsg}
+                    </div>
+                  )}
+                </div>
+
+                {/* Manual blocked dates — calendar views */}
+                <div>
+                  {/* Toolbar: view toggle + navigation */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginRight: 4 }}>Bloquear fechas manualmente</div>
+                    <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
+                      {(['month','week'] as const).map(v => (
+                        <button key={v} type="button" onClick={() => setBlockView(v)}
+                          style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
+                            background: blockView === v ? '#fff' : 'transparent',
+                            color: blockView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
+                            boxShadow: blockView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
+                          {v === 'month' ? 'Mes' : 'Semana'}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+                      <button type="button" onClick={() => {
+                        if (blockView === 'month') { if (blockCalMonth === 0) { setBlockCalMonth(11); setBlockCalYear(y => y-1) } else setBlockCalMonth(m => m-1) }
+                        else { const d = new Date(blockWeekStart+'T12:00:00'); d.setDate(d.getDate()-7); const p=(n:number)=>String(n).padStart(2,'0'); setBlockWeekStart(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
+                      }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 4 }}><ChevronLeft size={15} /></button>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', minWidth: 120, textAlign: 'center' }}>
+                        {blockView === 'month' ? `${CAL_MONTHS[blockCalMonth]} ${blockCalYear}` : (() => {
+                          const end = new Date(blockWeekStart+'T12:00:00'); end.setDate(end.getDate()+6)
+                          const p=(n:number)=>String(n).padStart(2,'0')
+                          const s = new Date(blockWeekStart+'T12:00:00')
+                          return `${p(s.getDate())} ${CAL_MONTHS[s.getMonth()].slice(0,3)} – ${p(end.getDate())} ${CAL_MONTHS[end.getMonth()].slice(0,3)}`
+                        })()}
+                      </span>
+                      <button type="button" onClick={() => {
+                        if (blockView === 'month') { if (blockCalMonth === 11) { setBlockCalMonth(0); setBlockCalYear(y => y+1) } else setBlockCalMonth(m => m+1) }
+                        else { const d = new Date(blockWeekStart+'T12:00:00'); d.setDate(d.getDate()+7); const p=(n:number)=>String(n).padStart(2,'0'); setBlockWeekStart(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
+                      }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 4 }}><ChevronRight size={15} /></button>
+                    </div>
+                    {blockView === 'month' && (
+                      <button type="button"
+                        onClick={() => { const next = !blockRangeMode; setBlockRangeMode(next); if (!next) { setBlockRangeStart(null); setBlockRangeEnd(null); setBlockPickerDate(null) } }}
+                        style={{ fontSize: 11, padding: '3px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600,
+                          background: blockRangeMode ? '#1e3a5f' : '#ede9e4',
+                          color: blockRangeMode ? '#fff' : 'var(--charcoal)' }}>
+                        {blockRangeMode ? '✕ Cancelar rango' : '↔ Rango'}
+                      </button>
+                    )}
+                  </div>
+                  {blockRangeMode && blockView === 'month' && (
+                    <div style={{ fontSize: 11, color: '#1e3a5f', background: '#e8f0fe', borderRadius: 7, padding: '6px 12px', marginBottom: 8 }}>
+                      {!blockRangeStart ? 'Haz click en el primer día del rango' : !blockPickerDate || blockPickerDate === blockRangeStart ? 'Ahora haz click en el último día del rango' : `Rango seleccionado: ${selectedDates.length} días`}
+                    </div>
+                  )}
+                  <div style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden' }}>
+                    {/* Day headers — month view only */}
+                    {blockView === 'month' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', background: '#faf8f5', borderBottom: '1px solid var(--ivory)' }}>
+                      {CAL_DAYS.map((d, i) => (
+                        <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '.08em', padding: '6px 0' }}>{d}</div>
+                      ))}
+                    </div>
+                    )}
+                    {/* Day cells — month view */}
+                    {blockView === 'month' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
+                      {Array.from({ length: firstDow }).map((_, i) => (
+                        <div key={`e${i}`} style={{ minHeight: 44, borderRight: '1px solid var(--ivory)', borderBottom: '1px solid var(--ivory)' }} />
+                      ))}
+                      {Array.from({ length: daysInMonth }).map((_, idx) => {
+                        const day = idx + 1
+                        const iso = `${blockCalYear}-${pad2(blockCalMonth + 1)}-${pad2(day)}`
+                        const b = blockedMap[iso]
+                        const autoBlock = getAutoBlock(iso)
+                        const isToday = iso === todayIso
+                        const isPast = iso < todayIso
+                        const isRangeStart = blockRangeStart === iso
+                        const inRange = isInRange(iso)
+                        const isSelected = !blockRangeMode && blockPickerDate === iso
+                        const col = (firstDow + idx) % 7
+                        const cellBg = isSelected || isRangeStart ? '#1e3a5f'
+                          : inRange ? '#dbeafe'
+                          : b ? `${blockColor(b.type)}22`
+                          : autoBlock === 'wedding' ? '#d1fae5'
+                          : autoBlock === 'unavailable' ? '#f3f4f6'
+                          : '#fff'
+                        return (
+                          <button key={day} type="button"
+                            disabled={isPast}
+                            onClick={() => {
+                              if (isPast) return
+                              if (blockRangeMode) {
+                                if (!blockRangeStart) {
+                                  setBlockRangeStart(iso); setBlockPickerDate(null)
+                                } else if (iso === blockRangeStart) {
+                                  setBlockRangeStart(null); setBlockPickerDate(null)
+                                } else {
+                                  setBlockPickerDate(iso)
+                                  const b2 = blockedMap[iso]
+                                  if (b2) { setBlockType(b2.type); setBlockRanges(b2.ranges ?? (b2.from ? [{ from: b2.from, to: b2.to ?? '13:00' }] : [{ from: '09:00', to: '13:00' }])) }
+                                  else { setBlockType('full'); setBlockRanges([{ from: '09:00', to: '13:00' }]) }
+                                }
+                              } else {
+                                if (isSelected) { setBlockPickerDate(null); return }
+                                setBlockPickerDate(iso)
+                                if (b) { setBlockType(b.type); setBlockRanges(b.ranges ?? (b.from ? [{ from: b.from, to: b.to ?? '13:00' }] : [{ from: '09:00', to: '13:00' }])) }
+                                else { setBlockType('full'); setBlockRanges([{ from: '09:00', to: '13:00' }]) }
+                              }
+                            }}
+                            style={{
+                              minHeight: 48, border: 'none',
+                              borderRight: col !== 6 ? '1px solid var(--ivory)' : 'none',
+                              borderBottom: '1px solid var(--ivory)',
+                              background: isPast ? '#f9f8f7' : cellBg,
+                              cursor: isPast ? 'default' : 'pointer',
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, padding: '4px 2px',
+                              opacity: isPast ? 0.4 : 1,
+                              boxShadow: isToday ? 'inset 0 0 0 2px var(--gold)' : 'none',
+                              transition: 'background .1s', position: 'relative',
+                            }}
+                          >
+                            <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 500, color: (isSelected || isRangeStart) ? '#fff' : inRange ? '#1e3a5f' : isToday ? 'var(--gold)' : 'var(--charcoal)' }}>{day}</span>
+                            {/* Manual block label */}
+                            {b && !inRange && !isSelected && !isRangeStart && (
+                              <span style={{ fontSize: 7, fontWeight: 700, color: blockColor(b.type), letterSpacing: '.04em', textTransform: 'uppercase', lineHeight: 1, textAlign: 'center' }}>
+                                {b.type === 'hours' ? b.ranges?.map(r => r.from.slice(0,5)).join(' ') : blockTypeLabel(b.type).slice(0, 4)}
+                              </span>
+                            )}
+                            {/* Auto-block indicator (no manual block on this day) */}
+                            {!b && autoBlock && !inRange && !isSelected && !isRangeStart && (
+                              <span style={{ fontSize: 7, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', lineHeight: 1, color: autoBlock === 'wedding' ? '#047857' : '#6b7280' }}>
+                                {autoBlock === 'wedding' ? 'Boda' : 'Ocup.'}
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>}
+
+                    {/* ── Week view ─────────────────────────────────────────── */}
+                    {blockView === 'week' && (() => {
+                      const PX_PER_HOUR = 50
+                      const TIME_START = 8
+                      const TIME_END = 21
+                      const HOURS = Array.from({ length: TIME_END - TIME_START }, (_, i) => TIME_START + i)
+                      const timeToY = (t: string) => {
+                        const [h, m] = t.split(':').map(Number)
+                        return ((h * 60 + m) - TIME_START * 60) / 60 * PX_PER_HOUR
+                      }
+                      // Build week dates
+                      const weekDates: string[] = []
+                      for (let i = 0; i < 7; i++) {
+                        const d = new Date(blockWeekStart + 'T12:00:00'); d.setDate(d.getDate() + i)
+                        weekDates.push(`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`)
+                      }
+                      const weekDayNames = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+                      const COL_W = 80
+                      const TIME_COL_W = 36
+                      const totalH = (TIME_END - TIME_START) * PX_PER_HOUR
+
+                      const renderBlockRects = (iso: string) => {
+                        const b = blockedMap[iso]
+                        const auto = getAutoBlock(iso)
+                        const rects: React.ReactNode[] = []
+
+                        if (auto === 'wedding') rects.push(
+                          <div key="auto-w" style={{ position:'absolute', inset: 0, background: '#d1fae588', borderRadius: 3, pointerEvents: 'none' }}>
+                            <span style={{ fontSize: 8, fontWeight: 700, color: '#047857', padding: '2px 4px', display: 'block' }}>Boda</span>
+                          </div>
+                        )
+                        else if (auto === 'unavailable') rects.push(
+                          <div key="auto-u" style={{ position:'absolute', inset: 0, background: '#f3f4f688', borderRadius: 3, pointerEvents: 'none' }}>
+                            <span style={{ fontSize: 8, fontWeight: 700, color: '#6b7280', padding: '2px 4px', display: 'block' }}>Ocup.</span>
+                          </div>
+                        )
+
+                        if (!b) return rects
+
+                        const addRect = (from: string, to: string, color: string, label: string) => {
+                          const top = Math.max(0, timeToY(from))
+                          const bot = Math.min(totalH, timeToY(to))
+                          if (bot <= top) return
+                          rects.push(
+                            <div key={`${from}-${to}`} style={{
+                              position: 'absolute', left: 2, right: 2, top, height: bot - top,
+                              background: `${color}44`, border: `1.5px solid ${color}88`, borderRadius: 4,
+                              overflow: 'hidden', fontSize: 8, fontWeight: 700, color, padding: '1px 3px', lineHeight: 1.3,
+                            }}>{label}</div>
+                          )
+                        }
+
+                        if (b.type === 'full') addRect('08:00', `${TIME_END}:00`, blockColor('full'), 'Bloqueado')
+                        else if (b.type === 'morning') addRect('08:00', '13:00', blockColor('morning'), 'Mañana')
+                        else if (b.type === 'afternoon') addRect('13:00', `${TIME_END}:00`, blockColor('afternoon'), 'Tarde')
+                        else if (b.type === 'hours' && b.ranges?.length)
+                          b.ranges.forEach(r => addRect(r.from, r.to, blockColor('hours'), `${r.from}–${r.to}`))
+
+                        return rects
+                      }
+
+                      return (
+                        <div style={{ overflowX: 'auto' }}>
+                          <div style={{ minWidth: TIME_COL_W + COL_W * 7 }}>
+                            {/* Day headers */}
+                            <div style={{ display: 'flex', borderBottom: '1px solid var(--ivory)', background: '#faf8f5' }}>
+                              <div style={{ width: TIME_COL_W, flexShrink: 0 }} />
+                              {weekDates.map((iso, wi) => {
+                                const d = new Date(iso + 'T12:00:00')
+                                const isPast = iso < todayIso
+                                const isToday = iso === todayIso
+                                return (
+                                  <div key={iso} style={{ width: COL_W, flexShrink: 0, textAlign: 'center', padding: '6px 4px', borderLeft: '1px solid var(--ivory)', opacity: isPast ? 0.45 : 1 }}>
+                                    <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{weekDayNames[wi]}</div>
+                                    <div style={{ fontSize: 14, fontWeight: isToday ? 700 : 500, color: isToday ? '#059669' : 'var(--charcoal)', width: 24, height: 24, borderRadius: '50%', background: isToday ? '#d1fae5' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0' }}>{d.getDate()}</div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            {/* Time grid */}
+                            <div style={{ display: 'flex', position: 'relative', height: totalH }}>
+                              {/* Hour labels */}
+                              <div style={{ width: TIME_COL_W, flexShrink: 0, position: 'relative' }}>
+                                {HOURS.map(h => (
+                                  <div key={h} style={{ position: 'absolute', top: (h - TIME_START) * PX_PER_HOUR - 6, left: 0, right: 0, textAlign: 'right', paddingRight: 6, fontSize: 9, color: 'var(--warm-gray)', fontWeight: 500 }}>{h}:00</div>
+                                ))}
+                              </div>
+                              {/* Day columns */}
+                              {weekDates.map((iso, wi) => {
+                                const isPast = iso < todayIso
+                                const isToday = iso === todayIso
+                                const isPickerOpen = blockPickerDate === iso
+                                return (
+                                  <div key={iso} style={{ width: COL_W, flexShrink: 0, borderLeft: '1px solid var(--ivory)', position: 'relative', opacity: isPast ? 0.4 : 1, cursor: isPast ? 'default' : 'pointer', background: isToday ? '#f9fffe' : '#fff' }}
+                                    onClick={e => {
+                                      if (isPast) return
+                                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                                      const y = e.clientY - rect.top
+                                      const clickedMin = Math.floor((y / PX_PER_HOUR + TIME_START) * 60 / 30) * 30
+                                      const fromH = Math.floor(clickedMin / 60), fromM = clickedMin % 60
+                                      const toH = Math.floor((clickedMin + 60) / 60), toM = (clickedMin + 60) % 60
+                                      const fmt = (h: number, m: number) => `${pad2(h)}:${pad2(m)}`
+                                      setBlockPickerDate(isPickerOpen ? null : iso)
+                                      const b = blockedMap[iso]
+                                      if (b) { setBlockType(b.type); setBlockRanges(b.ranges ?? (b.from ? [{from: b.from, to: b.to??'13:00'}] : [{from:'09:00',to:'13:00'}])) }
+                                      else { setBlockType('hours'); setBlockRanges([{ from: fmt(fromH, fromM), to: fmt(Math.min(toH, TIME_END), toM) }]) }
+                                    }}>
+                                    {/* Hour lines */}
+                                    {HOURS.map(h => (
+                                      <div key={h} style={{ position: 'absolute', top: (h - TIME_START) * PX_PER_HOUR, left: 0, right: 0, borderTop: '1px solid var(--ivory)', pointerEvents: 'none' }} />
+                                    ))}
+                                    {/* Schedule available background */}
+                                    {visitAvail.schedule.filter(s => s.enabled && s.day === (new Date(iso+'T12:00:00').getDay() === 0 ? 6 : new Date(iso+'T12:00:00').getDay() - 1)).map(s => {
+                                      const top = timeToY(s.from); const bot = timeToY(s.to)
+                                      return <div key="avail" style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0,top), height: Math.max(0, bot - top), background: '#f0fdf4', pointerEvents: 'none' }} />
+                                    })}
+                                    {/* Blocks */}
+                                    {renderBlockRects(iso)}
+                                    {/* Today indicator */}
+                                    {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0, timeToY(`${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`)), height: 2, background: '#059669', pointerEvents: 'none' }} />}
+                                    {/* Selected column highlight */}
+                                    {isPickerOpen && <div style={{ position: 'absolute', inset: 0, background: 'rgba(30,58,95,.06)', pointerEvents: 'none' }} />}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+
+                  </div>
+
+                  {/* Picker panel — always below the calendar, regardless of view height */}
+                  {pickerLabel && blockPickerDate && (
+                    <div style={{ marginTop: 10, border: '1px solid var(--ivory)', borderRadius: 10, padding: '14px 16px', background: '#f9f7f4' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ flex: 1 }}>{pickerLabel}</span>
+                        {!blockRangeMode && blockPickerDate && blockedMap[blockPickerDate] && (
+                          <button type="button" onClick={() => removeBlockedDate(blockPickerDate)}
+                            style={{ fontSize: 10, fontWeight: 600, color: '#dc2626', background: '#fee2e2', border: 'none', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>
+                            Quitar bloqueo
+                          </button>
+                        )}
+                        <button type="button" onClick={() => { setBlockPickerDate(null); setBlockRangeStart(null); setBlockRangeEnd(null) }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 2 }}><X size={14} /></button>
+                      </div>
+                      {/* Block type pills */}
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                        {(['full','morning','afternoon','hours'] as BlockedDate['type'][]).map(t => (
+                          <button key={t} type="button" onClick={() => setBlockType(t)}
+                            style={{ fontSize: 11, padding: '4px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600,
+                              background: blockType === t ? blockColor(t) : '#ede9e4',
+                              color: blockType === t ? '#fff' : 'var(--charcoal)' }}>
+                            {blockTypeLabel(t)}
+                          </button>
+                        ))}
+                      </div>
+                      {/* Multiple hour ranges */}
+                      {blockType === 'hours' && (
+                        <div style={{ marginBottom: 10 }}>
+                          {blockRanges.map((r, ri) => (
+                            <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                              <input type="time" className="form-input" value={r.from}
+                                onChange={e => setBlockRanges(prev => prev.map((x, i) => i === ri ? { ...x, from: e.target.value } : x))}
+                                style={{ fontSize: 12, width: 90 }} />
+                              <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>—</span>
+                              <input type="time" className="form-input" value={r.to}
+                                onChange={e => setBlockRanges(prev => prev.map((x, i) => i === ri ? { ...x, to: e.target.value } : x))}
+                                style={{ fontSize: 12, width: 90 }} />
+                              {blockRanges.length > 1 && (
+                                <button type="button" onClick={() => setBlockRanges(prev => prev.filter((_, i) => i !== ri))}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 2 }}><X size={13} /></button>
+                              )}
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => setBlockRanges(prev => [...prev, { from: '15:00', to: '18:00' }])}
+                            style={{ fontSize: 11, padding: '3px 10px', borderRadius: 7, border: '1px dashed #a78bfa', background: 'transparent', color: '#7c3aed', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Plus size={11} /> Añadir otro rango
+                          </button>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button type="button" onClick={confirmBlock}
+                          style={{ fontSize: 12, fontWeight: 700, padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Check size={13} /> Confirmar bloqueo{selectedDates.length > 1 ? ` (${selectedDates.length} días)` : ''}
+                        </button>
+                        <button type="button" onClick={() => { setBlockPickerDate(null); setBlockRangeStart(null); setBlockRangeEnd(null) }}
+                          style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--ivory)', cursor: 'pointer', background: '#fff', color: 'var(--warm-gray)', fontWeight: 500 }}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Legend */}
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+                    {(['full','morning','afternoon','hours'] as BlockedDate['type'][]).map(t => (
+                      <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 2, background: blockColor(t), flexShrink: 0 }} />
+                        <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{blockTypeLabel(t)}</span>
+                      </div>
+                    ))}
+                    {(visitAvail.block_booked_weddings || visitAvail.block_calendar_unavailable) && (
+                      <>
+                        {visitAvail.block_booked_weddings && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: '#d1fae5', border: '1px solid #059669', flexShrink: 0 }} />
+                            <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Boda reservada</span>
+                          </div>
+                        )}
+                        {visitAvail.block_calendar_unavailable && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: '#f3f4f6', border: '1px solid #d1d5db', flexShrink: 0 }} />
+                            <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>No libre</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Save button */}
+                  <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <button type="button" onClick={() => saveVisitAvail(visitAvail)} disabled={savingVisit || !visitAvailDirty}
+                      style={{ fontSize: 12, fontWeight: 700, padding: '7px 20px', borderRadius: 8, border: 'none', cursor: visitAvailDirty ? 'pointer' : 'default',
+                        background: visitAvailDirty ? '#059669' : '#e5e7eb', color: visitAvailDirty ? '#fff' : '#9ca3af',
+                        display: 'flex', alignItems: 'center', gap: 6, transition: 'background .15s' }}>
+                      <Check size={13} /> {savingVisit ? 'Guardando…' : 'Guardar cambios'}
+                    </button>
+                    {visitAvailDirty && !savingVisit && (
+                      <span style={{ fontSize: 11, color: '#d97706' }}>Tienes cambios sin guardar</span>
+                    )}
+                  </div>
+                </div>
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+      </div>
+
+      {/* ── Commercial config wizard ───────────────────────────────────────── */}
+      {configWizardOpen && (() => {
+        const QUESTION_LABELS: Record<WizardQuestion, string> = {
+          space_type:  '¿Cómo está organizado tu espacio?',
+          price_model: '¿Cómo cobras el espacio?',
+        }
+
+        const cardOpts = (q: WizardQuestion) => {
+          if (q === 'space_type') return [
+            { key: 'single',               icon: Building2, label: 'Un único espacio',                   sub: 'Solo un evento a la vez, sin posibilidad de reservar zonas adicionales',                          color: '#C4975A', bg: '#FDF8F0' },
+            { key: 'single_with_supplements', icon: Layers, label: 'Espacio principal + zonas opcionales', sub: 'El cliente contrata el espacio base y puede añadir zonas extra con suplemento (jardín, terraza…)', color: '#7C3AED', bg: '#F5F3FF' },
+            { key: 'multiple_independent', icon: LayoutGrid, label: 'Varias zonas del venue',              sub: 'El cliente puede escoger una zona o combinar varias. Cada zona tiene su propio precio',            color: '#2563EB', bg: '#EFF6FF' },
+          ] as { key: string; icon: any; label: string; sub: string; color: string; bg: string }[]
+          if (q === 'price_model') return [
+            { key: 'rental',     icon: CreditCard, label: 'Alquiler del espacio', sub: 'Precio fijo por el alquiler del espacio',                        color: '#059669', bg: '#ECFDF5' },
+            { key: 'per_person', icon: Users,      label: 'Precio por persona',   sub: 'El total depende de cuántos asistentes hay',                     color: '#DC2626', bg: '#FEF2F2' },
+            { key: 'package',    icon: Package,    label: 'Paquetes cerrados',    sub: 'Precio todo incluido (espacio + servicios) por persona o evento', color: '#C4975A', bg: '#FDF8F0' },
+          ] as { key: string; icon: any; label: string; sub: string; color: string; bg: string }[]
+          return null
+        }
+
+
+        const currentVal = (() => {
+          if (wizardQuestion === 'space_type')  return wizardConfig.space_type
+          if (wizardQuestion === 'price_model') return wizardConfig.price_model
+        })()
+
+        const handleAnswer = (val: any) => {
+          let next: WizardConfig = { ...wizardConfig }
+          if (wizardQuestion === 'space_type') {
+            next = { space_type: val }
+          } else if (wizardQuestion === 'price_model') {
+            next = { ...next, price_model: val }
+          }
+          setWizardConfig(next)
+
+          if (wizardQuestion === 'space_type') {
+            wizardNext('price_model')
+          } else {
+            if (isWizardDone(next)) saveCommercialConfig(next)
+          }
+        }
+
+        const cards = cardOpts(wizardQuestion)
+        const stepNum = wizardHistory.length + 1
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setConfigWizardOpen(false)}>
+            <div style={{ background: '#ffffff', borderRadius: 14, width: '100%', maxWidth: 520, boxShadow: '0 24px 80px rgba(0,0,0,0.25)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)' }}>Configuración comercial</div>
+                  <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2 }}>Pregunta {stepNum}</div>
+                </div>
+                <button onClick={() => setConfigWizardOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4, display: 'flex' }}><X size={18} /></button>
+              </div>
+
+              <div style={{ padding: '20px 24px 24px' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 16 }}>
+                  {QUESTION_LABELS[wizardQuestion]}
+                </div>
+
+                {/* Card options (space_type, price_model) */}
+                {cards && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {cards.map(opt => {
+                      const sel = currentVal === opt.key
+                      const Icon = opt.icon
+                      return (
+                        <button key={String(opt.key)} onClick={() => handleAnswer(opt.key)}
+                          style={{ padding: '14px 16px', border: `2px solid ${sel ? opt.color : 'var(--ivory)'}`, borderRadius: 10, background: sel ? opt.bg : '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s', outline: 'none', display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 10, background: sel ? `${opt.color}22` : 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Icon size={20} style={{ color: sel ? opt.color : 'var(--warm-gray)' }} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: sel ? opt.color : 'var(--charcoal)', marginBottom: 2 }}>{opt.label}</div>
+                            <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{opt.sub}</div>
+                          </div>
+                          {sel && <div style={{ width: 20, height: 20, borderRadius: '50%', background: opt.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Check size={12} style={{ color: '#fff' }} /></div>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+
+                {/* Back button */}
+                {wizardHistory.length > 0 && (
+                  <div style={{ marginTop: 20 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={wizardBack}>← Atrás</button>
+                  </div>
+                )}
+
+                {configSaving && (
+                  <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'var(--warm-gray)' }}>Guardando…</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Modality modal ─────────────────────────────────────────────────── */}
+      {modalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setModalOpen(false)}>
+          <div style={{ background: '#ffffff', borderRadius: 14, width: '100%', maxWidth: 540, boxShadow: '0 24px 80px rgba(0,0,0,0.25)', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)' }}>{editing ? 'Editar modalidad' : 'Nueva modalidad'}</div>
+              <button onClick={() => setModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4, display: 'flex' }}><X size={18} /></button>
+            </div>
+            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>Nombre *</div>
+                <input className="form-input" placeholder="Ej: Fin de semana, Día único, Paquetes semanales…" value={modalForm.name} onChange={e => setModalForm(f => ({ ...f, name: e.target.value }))} autoFocus style={{ fontSize: 13 }} />
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 10 }}>Tipo de duración / regla</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {DURATION_TYPES.map(dt => {
+                    const sel = modalForm.duration_type === dt.key
+                    return (
+                      <button key={dt.key} onClick={() => setModalForm(f => ({ ...f, duration_type: dt.key }))}
+                        style={{ padding: '11px 13px', border: `2px solid ${sel ? dt.color : 'var(--ivory)'}`, borderRadius: 10, background: sel ? dt.bg : '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s', outline: 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+                          <dt.Icon size={13} style={{ color: sel ? dt.color : 'var(--warm-gray)', flexShrink: 0 }} />
+                          <span style={{ fontSize: 12, fontWeight: 600, color: sel ? dt.color : 'var(--charcoal)' }}>{dt.label}</span>
+                          {sel && <span style={{ marginLeft: 'auto', width: 14, height: 14, borderRadius: '50%', background: dt.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Check size={9} style={{ color: '#fff' }} /></span>}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{dt.sublabel}</div>
+                        {sel && <div style={{ fontSize: 10, color: dt.color, marginTop: 4, fontStyle: 'italic' }}>{dt.detail}</div>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>Descripción (opcional)</div>
+                <textarea className="form-input" placeholder="Qué incluye esta modalidad, horas exactas, condiciones especiales…" value={modalForm.description} onChange={e => setModalForm(f => ({ ...f, description: e.target.value }))} rows={3} style={{ resize: 'vertical', fontSize: 12 }} />
+              </div>
+              {modalError && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', borderRadius: 8, padding: '8px 12px', fontSize: 12, marginTop: 14 }}>{modalError}</div>}
+            </div>
+            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--ivory)', display: 'flex', gap: 8, justifyContent: 'flex-end', background: '#FAFAF9', flexShrink: 0 }}>
+              <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
+              <button className="btn btn-primary" disabled={modalSaving} onClick={saveModality}>
+                {modalSaving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear modalidad'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function PriceRow({ price, accent, cfg, zones, supplements, spaceGroups = [], onEdit, onDelete, onDuplicate, recentlySaved = false }: {
+  price: ModalityPrice; accent: string
+  cfg: CommercialConfig | null
+  zones: ZoneItem[]; supplements: SupplementItem[]
+  spaceGroups?: VenueSpaceGroup[]
+  onEdit: () => void; onDelete: () => void; onDuplicate: () => void
+  recentlySaved?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const model = cfg?.price_model ?? 'rental'
+  const space = cfg?.space_type  ?? 'single'
+
+  const renderAmount = () => {
+    if (space === 'multiple_independent' || space === 'single_with_supplements') {
+      const gp = (price.group_prices ?? []).filter(g => spaceGroups.some(sg => sg.id === g.group_id))
+      const zp = space === 'multiple_independent' ? (price.zone_prices ?? []).filter(z => zones.some(zo => zo.id === z.zone_id)) : []
+      if (gp.length === 0 && zp.length === 0) return <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin precios configurados</span>
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {gp.map(g => {
+            const grp = spaceGroups.find(sg => sg.id === g.group_id)!
+            const suppCount = (g.space_supplements ?? []).filter(s => s.price > 0).length
+            return (
+              <span key={g.group_id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.3)', borderRadius: 20, padding: '3px 10px', color: 'var(--espresso)', fontWeight: 500 }}>
+                <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>{grp.name}</span>
+                <span style={{ width: 1, height: 10, background: 'rgba(196,151,90,0.3)', display: 'inline-block' }} />
+                <strong style={{ fontWeight: 700 }}>{fmt(g.base_price)}</strong>
+                {suppCount > 0 && <span style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 400 }}>+{suppCount} supl.</span>}
+              </span>
+            )
+          })}
+          {zp.map(z => {
+            const zone = zones.find(zo => zo.id === z.zone_id)!
+            return (
+              <span key={z.zone_id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.3)', borderRadius: 20, padding: '3px 10px', color: 'var(--espresso)', fontWeight: 500 }}>
+                <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>{zone.name}</span>
+                <span style={{ width: 1, height: 10, background: 'rgba(196,151,90,0.3)', display: 'inline-block' }} />
+                <strong style={{ fontWeight: 700 }}>{fmt(z.price)}</strong>
+              </span>
+            )
+          })}
+        </div>
+      )
+    }
+    return (
+      <span style={{ fontSize: 14, fontWeight: 700, color: accent }}>
+        {fmt(price.price)}{(model === 'per_person' || model === 'package') && <span style={{ fontSize: 11, fontWeight: 400 }}>/pers.</span>}
+      </span>
+    )
+  }
+
+  return (
+    <div style={{ borderRadius: 8, border: `1px solid ${recentlySaved ? 'rgba(90,138,85,0.4)' : 'var(--ivory)'}`, background: recentlySaved ? 'rgba(90,138,85,0.08)' : '#fff', transition: 'background 0.4s, border-color 0.4s', overflow: 'hidden' }}>
+      {/* Header row — fully clickable for expand/collapse */}
+      <div
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', cursor: 'pointer', userSelect: 'none' as const }}
+      >
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="var(--stone)" strokeWidth="2" strokeLinecap="round" style={{ transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', flexShrink: 0 }}>
+          <path d="M2 4l4 4 4-4"/>
+        </svg>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+          <span style={{ fontSize: 12, color: 'var(--charcoal)', fontWeight: 600 }}>{fmtDate(price.date_from)}</span>
+          <span style={{ fontSize: 10, color: 'var(--stone)' }}>—</span>
+          <span style={{ fontSize: 12, color: 'var(--charcoal)', fontWeight: 600 }}>{fmtDate(price.date_to)}</span>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>{renderAmount()}</div>
+        {/* Buttons — stop propagation so clicks don't toggle the row */}
+        <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+          <button className="btn btn-ghost btn-sm" onClick={onEdit} style={{ padding: '3px 6px', opacity: 0.6 }} title="Editar"><Pencil size={11} /></button>
+          <button className="btn btn-ghost btn-sm" onClick={onDuplicate} style={{ padding: '3px 6px', opacity: 0.6 }} title="Duplicar"><Copy size={11} /></button>
+          <button className="btn btn-ghost btn-sm" onClick={onDelete} style={{ padding: '3px 6px', color: 'var(--rose)', opacity: 0.7 }} title="Eliminar"><Trash2 size={11} /></button>
+        </div>
+      </div>
+      {/* Expanded content */}
+      {open && (
+        <div style={{ borderTop: '1px solid var(--ivory)', padding: '8px 12px 10px 24px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {/* Group prices detail */}
+          {(space === 'multiple_independent' || space === 'single_with_supplements') && (price.group_prices ?? []).length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {(price.group_prices ?? []).filter(g => spaceGroups.some(sg => sg.id === g.group_id)).map(g => {
+                const grp = spaceGroups.find(sg => sg.id === g.group_id)!
+                const supps = (g.space_supplements ?? []).filter(s => s.price > 0)
+                return (
+                  <div key={g.group_id}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--espresso)' }}>{grp.name}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: accent }}>{fmt(g.base_price)}</span>
+                    </div>
+                    {supps.map(s => {
+                      const spName = grp.spaces.find(sp => sp.id === s.space_id)?.name ?? s.space_id
+                      return (
+                        <div key={s.space_id} style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 10, marginTop: 2 }}>
+                          <span style={{ fontSize: 10, color: 'var(--stone)' }}>+</span>
+                          <span style={{ fontSize: 11, color: 'var(--charcoal)' }}>{spName}</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--espresso)' }}>{fmt(s.price)}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {/* Zone prices detail (multiple_independent) */}
+          {space === 'multiple_independent' && (price.zone_prices ?? []).length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {(price.zone_prices ?? []).filter(z => zones.some(zo => zo.id === z.zone_id)).map(z => {
+                const zone = zones.find(zo => zo.id === z.zone_id)!
+                return (
+                  <span key={z.zone_id} style={{ fontSize: 11, color: 'var(--charcoal)' }}>
+                    <span style={{ color: 'var(--warm-gray)' }}>{zone.name}</span>{' '}<strong>{fmt(z.price)}</strong>
+                  </span>
+                )
+              })}
+            </div>
+          )}
+          {/* Simple price (single) */}
+          {space === 'single' && (
+            <span style={{ fontSize: 13, fontWeight: 700, color: accent }}>
+              {fmt(price.price)}{(model === 'per_person' || model === 'package') && <span style={{ fontSize: 11, fontWeight: 400 }}> /pers.</span>}
+            </span>
+          )}
+          {/* Notes */}
+          {price.notes && (
+            <span style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic' }}>{price.notes}</span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, isEdit = false, cfg, zones, supplements, spaceGroups = [], existingRanges = [] }: {
+  form: typeof emptyPriceForm; onChange: (f: typeof emptyPriceForm) => void
+  accent: string; saving: boolean; error: string
+  onSave: () => void; onCancel: () => void
+  isEdit?: boolean
+  cfg: CommercialConfig | null
+  zones: ZoneItem[]; supplements: SupplementItem[]
+  spaceGroups?: VenueSpaceGroup[]
+  existingRanges?: { from: string; to: string }[]
+}) {
+  const model = cfg?.price_model ?? 'rental'
+  const space = cfg?.space_type  ?? 'single'
+  const isMulti = space === 'multiple_independent'
+  const isSupp  = space === 'single_with_supplements'
+  const showPerPerson = model === 'per_person' || model === 'package'
+  const showBase = model === 'rental'
+
+  const labelBase = model === 'per_person' ? 'PRECIO/PERSONA €' : model === 'package' ? 'PRECIO PAQUETE €' : 'PRECIO €'
+
+  return (
+    <div style={{ background: '#fff', border: `2px ${isEdit ? 'solid' : 'dashed'} ${accent}${isEdit ? '' : '55'}`, borderRadius: 10, padding: '14px' }}>
+      {!isEdit && (
+        <div style={{ fontSize: 10, fontWeight: 700, color: accent, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>
+          Nuevo período de precio
+        </div>
+      )}
+
+      {/* Date pickers row */}
+      <div style={{ display: 'grid', gridTemplateColumns: (isMulti || isSupp) ? '1fr 1fr' : '1fr 1fr 120px', gap: 10, marginBottom: 10 }}>
+        <DatePicker label="DESDE" value={form.date_from} onChange={v => onChange({ ...form, date_from: v })} accent={accent} disabledRanges={existingRanges} />
+        <DatePicker label="HASTA" value={form.date_to}   onChange={v => onChange({ ...form, date_to: v })}   accent={accent} minDate={form.date_from || undefined} disabledRanges={existingRanges} />
+        {!isMulti && !isSupp && (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{labelBase}</div>
+            <input type="number" className="form-input" placeholder="0" value={form.price} onChange={e => onChange({ ...form, price: e.target.value })} style={{ fontSize: 12 }} />
+          </div>
+        )}
+      </div>
+
+      {/* Zone prices — multiple_independent */}
+      {isMulti && zones.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Precio por zona €</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+            {zones.map(z => (
+              <div key={z.id}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#1D4ED8', marginBottom: 4 }}>{z.name}</div>
+                <input type="number" className="form-input" placeholder="0"
+                  value={form.zone_prices[z.id] ?? ''}
+                  onChange={e => onChange({ ...form, zone_prices: { ...form.zone_prices, [z.id]: e.target.value } })}
+                  style={{ fontSize: 12 }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {isMulti && zones.length === 0 && spaceGroups.length === 0 && (
+        <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>
+          Define primero las zonas del venue para poder asignar precios por zona.
+        </div>
+      )}
+
+      {/* Group pricing — multiple_independent or single_with_supplements */}
+      {(isMulti || isSupp) && spaceGroups.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Precio base por grupo €</div>
+          {spaceGroups.map(grp => {
+            const includedIds = new Set(isSupp ? (grp.included_zone_ids ?? []) : [])
+            const supplementSpaces = isSupp
+              ? grp.spaces.filter(s => !includedIds.has(s.id))
+              : grp.spaces
+            return (
+              <div key={grp.id} style={{ border: '1px solid var(--ivory)', borderRadius: 8, padding: '10px 12px', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: supplementSpaces.length > 0 ? 8 : 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#1D4ED8', flex: 1 }}>{grp.name || 'Grupo sin nombre'}</span>
+                  <input type="number" className="form-input" placeholder="Precio base €"
+                    value={form.group_prices[grp.id] ?? ''}
+                    onChange={e => onChange({ ...form, group_prices: { ...form.group_prices, [grp.id]: e.target.value } })}
+                    style={{ fontSize: 12, width: 130 }} />
+                </div>
+                {supplementSpaces.length > 0 && (
+                  <div style={{ paddingLeft: 12, borderLeft: '2px solid #DBEAFE' }}>
+                    <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                      {isSupp ? 'Suplemento por zona opcional' : 'Suplemento por espacio'}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6 }}>
+                      {supplementSpaces.map(sp => (
+                        <div key={sp.id}>
+                          <div style={{ fontSize: 10, color: 'var(--charcoal)', marginBottom: 2 }}>{sp.name}</div>
+                          <input type="number" className="form-input" placeholder="+€ (0 = incluido)"
+                            value={form.space_supplement_prices[`${grp.id}:${sp.id}`] ?? ''}
+                            onChange={e => onChange({ ...form, space_supplement_prices: { ...form.space_supplement_prices, [`${grp.id}:${sp.id}`]: e.target.value } })}
+                            style={{ fontSize: 11 }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+
+      {/* per_person: price field already in header row, no extra UI needed */}
+      {(model === 'per_person' || model === 'package') && !isMulti && (
+        <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 10, fontStyle: 'italic' }}>
+          {model === 'package' ? 'Precio por persona todo incluido' : 'Precio por comensal/asistente'}
+        </div>
+      )}
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>NOTA (opcional)</div>
+        <input type="text" className="form-input" placeholder="Ej: Temporada alta, Navidades..." value={form.notes} onChange={e => onChange({ ...form, notes: e.target.value })} style={{ fontSize: 12 }} />
+      </div>
+      {error && <div style={{ fontSize: 11, color: 'var(--rose)', marginBottom: 8 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button className="btn btn-primary btn-sm" disabled={saving} onClick={onSave} style={{ flex: isEdit ? 0 : 1, justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 5 }}>
+          {saving ? 'Guardando…' : <><Check size={13} /> {isEdit ? 'Guardar' : 'Guardar período'}</>}
+        </button>
+        <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancelar</button>
+      </div>
+    </div>
+  )
+}

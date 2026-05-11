@@ -25,6 +25,7 @@ type Props = {
   primaryColor?: string
   selectedSpaces?: Array<{ group_name: string; space_name: string }>
   selectedMenus?: string[]
+  spaceGroups?: Array<{ name: string; selection_mode?: string; optional?: boolean; requires_selection?: boolean }>
   dateSlots?: DateSlotOption[]
   preSelectedDateSlot?: number | null
   onClose: () => void
@@ -44,8 +45,8 @@ function fmtDatesAsOptions(dates: string[]): string {
 
 export default function VisitBookingModal({
   proposalId, coupleName, primaryColor = '#C4975A',
-  selectedSpaces = [], selectedMenus = [], dateSlots = [],
-  preSelectedDateSlot = null,
+  selectedSpaces = [], selectedMenus = [], spaceGroups,
+  dateSlots = [], preSelectedDateSlot = null,
   onClose, onSuccess,
 }: Props) {
   const [slots, setSlots] = useState<Record<string, string[]>>({})
@@ -91,10 +92,20 @@ export default function VisitBookingModal({
 
   const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
 
+  const missingRequiredGroups = (spaceGroups ?? []).filter(g => {
+    const isOptional = g.optional || g.selection_mode === 'optional' || g.selection_mode === 'none' || g.requires_selection === false
+    if (isOptional) return false
+    return !selectedSpaces.some(s => s.group_name === g.name)
+  })
+
   const submit = async () => {
     if (!selectedDate || !selectedTime) return
     if (!email.trim()) { setError('Indica tu email'); return }
     if (!isValidEmail(email)) { setError('Email no válido'); return }
+    if (missingRequiredGroups.length > 0) {
+      setError(`Selecciona una opción en: ${missingRequiredGroups.map(g => g.name).join(', ')}`)
+      return
+    }
     setSubmitting(true); setError('')
     try {
       const res = await fetch(`/api/proposals/${proposalId}/visit-request`, {
