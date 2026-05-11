@@ -340,6 +340,10 @@ export default function EstructuraPage() {
   const [modalities, setModalities]           = useState<Modality[]>([])
   const [loading, setLoading]                 = useState(true)
   const [expanded, setExpanded]               = useState<Set<string>>(new Set())
+  const [pricesCollapsed, setPricesCollapsed] = useState<Set<string>>(new Set())
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [zonesCollapsed, setZonesCollapsed]   = useState(false)
+  const [recentlySavedId, setRecentlySavedId] = useState<string | null>(null)
   const [error, setError]                     = useState('')
   const [commercialConfig, setCommercialConfig] = useState<CommercialConfig | null>(null)
   const [configWizardOpen, setConfigWizardOpen]   = useState(false)
@@ -364,6 +368,9 @@ export default function EstructuraPage() {
   const [savingVisit, setSavingVisit]   = useState(false)
   const [visitAvailOpen, setVisitAvailOpen] = useState(true)
   const [visitAvailDirty, setVisitAvailDirty] = useState(false)
+  const [gcalConfig, setGcalConfig]     = useState<{ calendar_name: string; last_sync: string | null } | null>(null)
+  const [gcalSyncing, setGcalSyncing]   = useState(false)
+  const [gcalMsg, setGcalMsg]           = useState<string | null>(null)
   // Block calendar UI state
   const [blockCalYear,  setBlockCalYear]  = useState(() => new Date().getFullYear())
   const [blockCalMonth, setBlockCalMonth] = useState(() => new Date().getMonth())
@@ -440,7 +447,7 @@ export default function EstructuraPage() {
     const supabase = createClient()
     const [res, { data: settingsRow }] = await Promise.all([
       fetch(`/api/estructura/modalities?venue_id=${activeVenue.id}`),
-      supabase.from('venue_settings').select('commercial_config, zones, supplements, space_groups, visit_availability').eq('user_id', user!.id).eq('venue_id', activeVenue.id).maybeSingle(),
+      supabase.from('venue_settings').select('commercial_config, zones, supplements, space_groups, visit_availability, google_calendar').eq('user_id', user!.id).eq('venue_id', activeVenue.id).maybeSingle(),
     ])
     const json = await res.json()
     if (!res.ok) { setError(json.error ?? 'Error al cargar'); setLoading(false); return }
@@ -460,6 +467,7 @@ export default function EstructuraPage() {
     if (Array.isArray(settingsRow?.space_groups)) {
       setSpaceGroups(settingsRow.space_groups as VenueSpaceGroup[])
     }
+    if (settingsRow?.google_calendar) setGcalConfig(settingsRow.google_calendar as any)
     if (settingsRow?.visit_availability) {
       const va = settingsRow.visit_availability as VisitAvailability & { blocked_dates?: Array<BlockedDate | string> }
       // Migrate legacy string[] blocked_dates → BlockedDate[]
@@ -711,6 +719,7 @@ export default function EstructuraPage() {
         return { ...m, prices: [...m.prices, json.price].sort((a, b) => a.date_from.localeCompare(b.date_from)) }
       }))
       setPriceAdding(null); setPriceForm(emptyPriceForm)
+      setRecentlySavedId(json.price.id); setTimeout(() => setRecentlySavedId(null), 2000)
     } catch { setPriceError('Error de red') }
     setPriceSaving(false)
   }
@@ -751,6 +760,7 @@ export default function EstructuraPage() {
         return { ...m, prices: m.prices.map(p => p.id === priceId ? json.price : p).sort((a, b) => a.date_from.localeCompare(b.date_from)) }
       }))
       setEditingPrice(null)
+      setRecentlySavedId(priceId); setTimeout(() => setRecentlySavedId(null), 2000)
     } catch { setPriceError('Error de red') }
     setPriceSaving(false)
   }
@@ -827,34 +837,37 @@ export default function EstructuraPage() {
 
           {/* Commercial config banner */}
           {commercialConfig ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: modalities.length > 0 ? '12px 16px 36px' : '12px 16px', marginBottom: 24, maxWidth: 'none', position: 'relative' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Settings2 size={18} style={{ color: 'var(--gold)' }} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 2 }}>Configuración comercial</div>
-                <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.6 }}>
-                  {({ single: 'Un espacio único', single_with_supplements: 'Un espacio + suplementos', multiple_independent: 'Varias zonas independientes' } as Record<SpaceType, string>)[commercialConfig.space_type]}
-                  {' · '}
-                  {({ rental: 'Alquiler del espacio', per_person: 'Por persona', package: 'Paquetes' } as Record<PriceModel, string>)[commercialConfig.price_model]}
-                  {commercialConfig.menu_included === true && ' · Menú incluido'}
-                  {commercialConfig.menu_included === false && ' · Menú aparte'}
-                  {commercialConfig.has_menu_types === true && ' · Varios tipos de menú'}
-                  {commercialConfig.catering_own === true && (commercialConfig.catering_mandatory ? ' · Catering propio obligatorio' : ' · Catering propio opcional')}
-                  {commercialConfig.catering_own === false && ' · Sin catering propio'}
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Settings2 size={18} style={{ color: 'var(--gold)' }} />
                 </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 4 }}>Configuración comercial</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {[
+                      { single: 'Un espacio único', single_with_supplements: 'Un espacio + suplementos', multiple_independent: 'Varias zonas independientes' }[commercialConfig.space_type],
+                      { rental: 'Alquiler del espacio', per_person: 'Por persona', package: 'Paquetes' }[commercialConfig.price_model],
+                      commercialConfig.menu_included === true ? 'Menú incluido' : commercialConfig.menu_included === false ? 'Menú aparte' : null,
+                      commercialConfig.has_menu_types === true ? 'Varios menús' : null,
+                      commercialConfig.catering_own === true ? (commercialConfig.catering_mandatory ? 'Catering propio obligatorio' : 'Catering propio opcional') : commercialConfig.catering_own === false ? 'Sin catering propio' : null,
+                    ].filter(Boolean).map((tag, i) => (
+                      <span key={i} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--charcoal)', fontWeight: 500 }}>{tag}</span>
+                    ))}
+                  </div>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={openWizard} style={{ flexShrink: 0 }}>Editar</button>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={openWizard} style={{ flexShrink: 0 }}>Editar</button>
               {modalities.length > 0 && (
-                <div style={{ position: 'absolute', bottom: 0, left: 16, right: 16, borderTop: '1px solid var(--ivory)', padding: '8px 0', display: 'flex', gap: 16 }}>
-                  <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{modalities.filter(m => m.is_active).length}</strong> activas</span>
-                  <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{modalities.length}</strong> total</span>
-                  <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{totalPrices}</strong> tarifas</span>
+                <div style={{ display: 'flex', gap: 20, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--ivory)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{modalities.filter(m => m.is_active).length}</strong> activas</span>
+                  <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{modalities.length}</strong> total</span>
+                  <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{totalPrices}</strong> tarifas</span>
                 </div>
               )}
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FDF8F0', border: '1px dashed #C4975A66', borderRadius: 10, padding: '14px 16px', marginBottom: 24, maxWidth: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FDF8F0', border: '1px dashed #C4975A66', borderRadius: 10, padding: '14px 16px', marginBottom: 24 }}>
               <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #C4975A44' }}>
                 <Settings2 size={18} style={{ color: '#C4975A' }} />
               </div>
@@ -868,84 +881,267 @@ export default function EstructuraPage() {
 
           {/* Zones panel — only for multiple_independent */}
           {commercialConfig?.space_type === 'multiple_independent' && (
-            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, maxWidth: 'none' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <LayoutGrid size={14} style={{ color: '#2563EB' }} /> Zonas del venue
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: zones.length > 0 ? 12 : 0 }}>
-                {zones.map(z => (
-                  <div key={z.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 20, padding: '4px 10px 4px 12px' }}>
-                    <span style={{ fontSize: 12, color: '#1D4ED8', fontWeight: 500 }}>{z.name}</span>
-                    <button onClick={() => removeZone(z.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#93C5FD', padding: 0, display: 'flex', lineHeight: 1 }}><X size={12} /></button>
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
+              <button type="button" onClick={() => setZonesCollapsed(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: zonesCollapsed ? 'none' : '1px solid var(--ivory)', width: '100%', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: zonesCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', flexShrink: 0, color: 'var(--warm-gray)' }}>
+                  <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <LayoutGrid size={13} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)' }}>Zonas del venue</span>
+                {zones.length > 0 && (
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--warm-gray)' }}>{zones.length}</span>
+                )}
+              </button>
+              {!zonesCollapsed && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', maxHeight: 220, overflowY: 'auto' }}>
+                {zones.map((z, zi) => (
+                  <div key={z.id}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 14px', borderBottom: '1px solid var(--ivory)', borderRight: zi % 2 === 0 ? '1px solid var(--ivory)' : 'none', background: '#fff', minWidth: 0 }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--cream)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = '#fff'}>
+                    <span style={{ fontSize: 12.5, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{z.name}</span>
+                    <button onClick={() => removeZone(z.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: '2px 4px', display: 'flex', borderRadius: 4, opacity: 0.4, flexShrink: 0 }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#ef4444' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.4'; (e.currentTarget as HTMLElement).style.color = 'var(--warm-gray)' }}>
+                      <X size={12} />
+                    </button>
                   </div>
                 ))}
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input className="form-input" placeholder="Nombre de la zona (ej: Salón, Jardín…)" value={newZoneName}
-                  onChange={e => setNewZoneName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addZone()}
-                  style={{ fontSize: 12, flex: 1 }} />
-                <button className="btn btn-ghost btn-sm" onClick={addZone} disabled={!newZoneName.trim() || savingZS} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Plus size={12} /> Añadir
-                </button>
-              </div>
-              {zones.length === 0 && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 8 }}>Define las zonas para poder asignar precios por separado en cada modalidad.</div>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px 6px 12px' }}>
+                  <Plus size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                  <input className="form-input" placeholder="Añadir zona…" value={newZoneName}
+                    onChange={e => setNewZoneName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addZone()}
+                    style={{ fontSize: 13, flex: 1, border: 'none', background: 'transparent', padding: '6px 0', boxShadow: 'none', outline: 'none' }} />
+                  {newZoneName.trim() && (
+                    <button className="btn btn-ghost btn-sm" onClick={addZone} disabled={savingZS}
+                      style={{ fontSize: 12, flexShrink: 0, padding: '3px 10px' }}>
+                      Añadir
+                    </button>
+                  )}
+                </div>
+              </div>}
             </div>
           )}
 
           {/* Space groups panel — only for multiple_independent with zones */}
-          {commercialConfig?.space_type === 'multiple_independent' && zones.length >= 2 && (
-            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, maxWidth: 'none' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Layers size={14} style={{ color: '#2563EB' }} /> Grupos de espacios
+          {commercialConfig?.space_type === 'multiple_independent' && zones.length >= 2 && (() => {
+            const assignedZoneIds = new Set(spaceGroups.flatMap(g => g.spaces.map(s => s.id)))
+            const unassignedZones = zones.filter(z => !assignedZoneIds.has(z.id))
+            return (
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, padding: '16px 20px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Layers size={14} style={{ color: 'var(--gold)' }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)' }}>Grupos de espacios</span>
+                  {spaceGroups.length > 0 && (
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--warm-gray)' }}>{spaceGroups.length}</span>
+                  )}
+                </div>
+                {unassignedZones.length > 0 && (
+                  <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#FEF9EC', border: '1px solid #FDE68A', color: '#92400E', fontWeight: 500 }}>
+                    {unassignedZones.length} zona{unassignedZones.length > 1 ? 's' : ''} sin grupo
+                  </span>
+                )}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 16 }}>
                 Agrupa las zonas para que la pareja pueda elegir. Cada grupo tendrá su propio precio en las tarifas.
               </div>
 
-              {spaceGroups.map((g, gi) => {
-                const updateGroup = (patch: Partial<VenueSpaceGroup>) => {
-                  const next = [...spaceGroups]; next[gi] = { ...g, ...patch }; setSpaceGroups(next)
-                }
-                return (
-                <div key={g.id} style={{ border: '1px solid var(--ivory)', borderRadius: 8, padding: '12px 14px', marginBottom: 10 }}>
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                    <input className="form-input" placeholder="Nombre del grupo (ej: Boda completa)" value={g.name}
-                      onChange={e => updateGroup({ name: e.target.value })}
-                      style={{ fontSize: 12, flex: 1 }} />
-                    <select className="form-input" value={g.selection_mode} style={{ fontSize: 11, width: 130 }}
-                      onChange={e => updateGroup({ selection_mode: e.target.value as any })}>
-                      <option value="pick_one">Elegir 1</option>
-                      <option value="optional">Opcional</option>
-                    </select>
-                    <button type="button" onClick={() => { const next = spaceGroups.filter((_, j) => j !== gi); setSpaceGroups(next); saveSpaceGroups(next) }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 2, display: 'flex' }}><X size={14} /></button>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {zones.map(z => {
-                      const checked = g.spaces.some(s => s.id === z.id)
-                      return (
-                        <label key={z.id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', padding: '3px 8px', borderRadius: 6, background: checked ? '#DBEAFE' : '#f5f5f5', border: `1px solid ${checked ? '#93C5FD' : 'var(--ivory)'}`, color: checked ? '#1D4ED8' : 'var(--warm-gray)', fontWeight: checked ? 600 : 400 }}>
-                          <input type="checkbox" checked={checked} style={{ display: 'none' }}
-                            onChange={() => {
-                              const spaces = checked
-                                ? g.spaces.filter(s => s.id !== z.id)
-                                : [...g.spaces, { id: z.id, name: z.name }]
-                              updateGroup({ spaces })
-                            }} />
-                          {checked && <Check size={10} />} {z.name}
-                        </label>
-                      )
-                    })}
-                  </div>
-                  {g.spaces.length > 0 && (
-                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 6 }}>
-                      Los precios base y suplementos por espacio se configuran en las tarifas de cada modalidad.
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                {spaceGroups.map((g, gi) => {
+                  const updateGroup = (patch: Partial<VenueSpaceGroup>) => {
+                    const next = [...spaceGroups]; next[gi] = { ...g, ...patch }; setSpaceGroups(next)
+                  }
+                  const updateAndSaveGroup = (patch: Partial<VenueSpaceGroup>) => {
+                    const next = [...spaceGroups]; next[gi] = { ...g, ...patch }; setSpaceGroups(next); saveSpaceGroups(next)
+                  }
+                  const isIncludedThenPick = g.selection_mode === 'included_then_pick'
+                  const includedIds = new Set(g.included_zone_ids ?? [])
+
+                  // helpers for included_then_pick
+                  const selectableSpaces = g.spaces.filter(s => !includedIds.has(s.id))
+                  const pickCount = g.pick_n_min ?? 1
+                  const maxPick   = Math.max(selectableSpaces.length, 1)
+
+                  const toggleIncluded = (z: { id: string; name: string }) => {
+                    const alreadyIncluded = includedIds.has(z.id)
+                    if (alreadyIncluded) {
+                      // remove from included, keep in selectable pool
+                      updateAndSaveGroup({ included_zone_ids: (g.included_zone_ids ?? []).filter(id => id !== z.id) })
+                    } else {
+                      // add to included (also add to spaces if not already there), remove from selectable
+                      const newSpaces = g.spaces.some(s => s.id === z.id) ? g.spaces : [...g.spaces, { id: z.id, name: z.name }]
+                      updateAndSaveGroup({ spaces: newSpaces, included_zone_ids: [...(g.included_zone_ids ?? []), z.id] })
+                    }
+                  }
+
+                  const toggleSelectable = (z: { id: string; name: string }) => {
+                    const inSelectable = g.spaces.some(s => s.id === z.id) && !includedIds.has(z.id)
+                    if (inSelectable) {
+                      updateAndSaveGroup({ spaces: g.spaces.filter(s => s.id !== z.id) })
+                    } else {
+                      // add to selectable (remove from included if was there)
+                      const newSpaces = g.spaces.some(s => s.id === z.id) ? g.spaces : [...g.spaces, { id: z.id, name: z.name }]
+                      updateAndSaveGroup({ spaces: newSpaces, included_zone_ids: (g.included_zone_ids ?? []).filter(id => id !== z.id) })
+                    }
+                  }
+
+                  const isGroupCollapsed = collapsedGroups.has(g.id)
+                  const toggleGroupCollapse = () => setCollapsedGroups(prev => { const next = new Set(prev); next.has(g.id) ? next.delete(g.id) : next.add(g.id); return next })
+                  const zonesInGroup = g.spaces.length
+
+                  return (
+                  <div key={g.id} style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden' }}>
+                    {/* Header row: name + mode + collapse */}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 14px', background: 'var(--cream)', borderBottom: isGroupCollapsed ? 'none' : '1px solid var(--ivory)', flexWrap: 'wrap' }}>
+                      <button type="button" onClick={toggleGroupCollapse}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--warm-gray)', flexShrink: 0 }}>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: isGroupCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>
+                          <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+
+                      <input className="form-input" placeholder="Nombre del grupo (ej: Zonas boda)" value={g.name}
+                        onChange={e => updateGroup({ name: e.target.value })}
+                        style={{ fontSize: 13, flex: '1 1 160px', minWidth: 120, background: '#fff' }} />
+
+                      {isGroupCollapsed && zonesInGroup > 0 && (
+                        <span style={{ fontSize: 11, color: 'var(--warm-gray)', flexShrink: 0 }}>{zonesInGroup} zona{zonesInGroup !== 1 ? 's' : ''}</span>
+                      )}
+
+                      <select className="form-input" value={g.selection_mode} style={{ fontSize: 12, width: 'auto', background: '#fff', flexShrink: 0 }}
+                        onChange={e => updateGroup({ selection_mode: e.target.value as any, pick_n_min: undefined, pick_n_max: undefined, included_zone_ids: undefined })}>
+                        <option value="none">Todas incluidas</option>
+                        <option value="pick_one">Elegir 1</option>
+                        <option value="pick_n">Elegir X</option>
+                        <option value="included_then_pick">Incluidas + elegir</option>
+                        <option value="optional">Opcional ›</option>
+                      </select>
+
+                      {/* pick_n: how many */}
+                      {g.selection_mode === 'pick_n' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Elegir</span>
+                          <select className="form-input" value={g.pick_n_min ?? 1}
+                            onChange={e => updateGroup({ pick_n_min: Number(e.target.value), pick_n_max: Number(e.target.value) })}
+                            style={{ fontSize: 12, width: 'auto', background: '#fff', padding: '3px 8px' }}>
+                            {Array.from({ length: Math.max(zones.length, 1) }, (_, i) => i + 1).map(n => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                )
-              })}
+
+                    {/* Zone area */}
+                    {!isGroupCollapsed && <>
+                    {isIncludedThenPick ? (
+                      /* ── included_then_pick: two labelled columns ── */
+                      <div style={{ padding: '12px 14px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          {/* Left: always included */}
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#5a8a55', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
+                              Siempre incluidas
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 160, overflowY: 'auto' }}>
+                              {zones.map(z => {
+                                const checked = includedIds.has(z.id)
+                                return (
+                                  <button key={z.id} type="button" onClick={() => toggleIncluded(z)}
+                                    title={z.name}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 6, cursor: 'pointer', border: 'none', background: checked ? 'rgba(90,138,85,0.07)' : 'transparent', textAlign: 'left', transition: 'background 0.1s', minWidth: 0, overflow: 'hidden' }}>
+                                    <div style={{ width: 14, height: 14, border: `1.5px solid ${checked ? '#5a8a55' : 'var(--ivory)'}`, borderRadius: 3, background: checked ? '#5a8a55' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                      {checked && <Check size={9} color="#fff" strokeWidth={3} />}
+                                    </div>
+                                    <span style={{ fontSize: 12, color: checked ? '#3a6a35' : 'var(--warm-gray)', fontWeight: checked ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{z.name}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Right: client selectable */}
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
+                              El cliente elige de
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 160, overflowY: 'auto' }}>
+                              {zones.map(z => {
+                                const inSelectable = g.spaces.some(s => s.id === z.id) && !includedIds.has(z.id)
+                                return (
+                                  <button key={z.id} type="button" onClick={() => toggleSelectable(z)}
+                                    title={z.name}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 6, cursor: 'pointer', border: 'none', background: inSelectable ? 'rgba(196,151,90,0.07)' : 'transparent', textAlign: 'left', transition: 'background 0.1s', minWidth: 0, overflow: 'hidden' }}>
+                                    <div style={{ width: 14, height: 14, border: `1.5px solid ${inSelectable ? 'var(--gold)' : 'var(--ivory)'}`, borderRadius: 3, background: inSelectable ? 'var(--gold)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                      {inSelectable && <Check size={9} color="#fff" strokeWidth={3} />}
+                                    </div>
+                                    <span style={{ fontSize: 12, color: inSelectable ? 'var(--espresso)' : 'var(--warm-gray)', fontWeight: inSelectable ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{z.name}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Pick count selector */}
+                        {selectableSpaces.length > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--ivory)' }}>
+                            <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>El cliente elige cuántas:</span>
+                            {Array.from({ length: maxPick }, (_, i) => i + 1).map(n => (
+                              <button key={n} type="button" onClick={() => updateAndSaveGroup({ pick_n_min: n, pick_n_max: n })}
+                                style={{ width: 28, height: 28, borderRadius: 6, border: `1.5px solid ${pickCount === n ? 'var(--gold)' : 'var(--ivory)'}`, background: pickCount === n ? 'rgba(196,151,90,0.12)' : '#fff', color: pickCount === n ? 'var(--espresso)' : 'var(--warm-gray)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* ── Normal modes: 4-col checkbox grid ── */
+                      <div style={{ padding: '8px 14px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, maxHeight: 160, overflowY: 'auto' }}>
+                        {zones.map(z => {
+                          const inGroup = g.spaces.some(s => s.id === z.id)
+                          return (
+                            <button key={z.id} type="button"
+                              title={z.name}
+                              onClick={() => {
+                                const spaces = inGroup
+                                  ? g.spaces.filter(s => s.id !== z.id)
+                                  : [...g.spaces, { id: z.id, name: z.name }]
+                                updateAndSaveGroup({ spaces })
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 6, cursor: 'pointer', border: 'none', background: inGroup ? 'rgba(196,151,90,0.06)' : 'transparent', textAlign: 'left', transition: 'background 0.1s', minWidth: 0, overflow: 'hidden' }}>
+                              <div style={{ width: 14, height: 14, border: `1.5px solid ${inGroup ? 'var(--gold)' : 'var(--ivory)'}`, borderRadius: 3, background: inGroup ? 'var(--gold)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {inGroup && <Check size={9} color="#fff" strokeWidth={3} />}
+                              </div>
+                              <span style={{ fontSize: 12, color: inGroup ? 'var(--espresso)' : 'var(--warm-gray)', fontWeight: inGroup ? 500 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{z.name}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {g.spaces.length === 0 && (
+                      <div style={{ padding: '4px 14px 6px', fontSize: 11, color: '#ef4444', opacity: 0.7 }}>
+                        Selecciona al menos una zona para este grupo.
+                      </div>
+                    )}
+
+                    <div style={{ padding: '6px 14px 10px', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button type="button" onClick={() => { const next = spaceGroups.filter((_, j) => j !== gi); setSpaceGroups(next); saveSpaceGroups(next) }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 11, padding: '2px 4px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#fef2f2'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}>
+                        <X size={11} /> Eliminar grupo
+                      </button>
+                    </div>
+                    </>}
+                  </div>
+                  )
+                })}
+              </div>
 
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => {
@@ -961,7 +1157,8 @@ export default function EstructuraPage() {
                 )}
               </div>
             </div>
-          )}
+            )
+          })()}
 
           {/* Supplements panel — only for single_with_supplements */}
           {commercialConfig?.space_type === 'single_with_supplements' && (
@@ -1238,76 +1435,101 @@ export default function EstructuraPage() {
                           )}
 
                           {/* ── NON-PACKAGE TYPE ──────────────────────────── */}
-                          {!isPkg && (
+                          {!isPkg && (() => {
+                            const nonPkgPrices  = m.prices.filter(p => !p.package_id)
+                            const isPricesCollapsed = pricesCollapsed.has(m.id)
+                            const togglePricesCollapsed = () => setPricesCollapsed(prev => {
+                              const next = new Set(prev); next.has(m.id) ? next.delete(m.id) : next.add(m.id); return next
+                            })
+                            const existingRanges = nonPkgPrices.map(p => ({ from: p.date_from, to: p.date_to }))
+                            return (
                             <div>
-                              <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#FAFAF9' }}>
-                                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Tarifas por temporada</span>
-                                {!priceAdding && (
-                                  <button className="btn btn-ghost btn-sm" onClick={() => startAddPrice(m.id)} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              {/* Section header */}
+                              <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, background: '#FAFAF9', borderTop: '1px solid var(--ivory)' }}>
+                                <button onClick={togglePricesCollapsed} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0, flex: 1 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Tarifas por temporada</span>
+                                  {nonPkgPrices.length > 0 && (
+                                    <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--warm-gray)' }}>{nonPkgPrices.length}</span>
+                                  )}
+                                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--warm-gray)" strokeWidth="1.8" strokeLinecap="round" style={{ marginLeft: 2, transition: 'transform 0.2s', transform: isPricesCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
+                                    <path d="M2 4l4 4 4-4"/>
+                                  </svg>
+                                </button>
+                                {!priceAdding && !isPricesCollapsed && (
+                                  <button className="btn btn-ghost btn-sm" onClick={() => startAddPrice(m.id)} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                                     <Plus size={11} /> Añadir período
                                   </button>
                                 )}
                               </div>
-                              {m.prices.length > 0 && (
-                                <div style={{ padding: '4px 12px 12px' }}>
-                                  {m.prices.filter(p => !p.package_id).map(p => (
-                                    <div key={p.id} style={{ marginTop: 4 }}>
-                                      {editingPrice === p.id ? (
-                                        <PriceForm
-                                          form={editPriceForm}
-                                          onChange={setEditPriceForm}
-                                          accent={dt.color}
-                                          saving={priceSaving}
-                                          error={priceError}
-                                          onSave={() => saveEditPrice(m.id, null, p.id)}
-                                          onCancel={() => setEditingPrice(null)}
-                                          isEdit
-                                          cfg={commercialConfig}
-                                          zones={zones}
-                                          supplements={supplements}
-                                          spaceGroups={spaceGroups}
-                                        />
-                                      ) : (
-                                        <PriceRow
-                                          price={p}
-                                          accent={dt.color}
-                                          cfg={commercialConfig}
-                                          zones={zones}
-                                          supplements={supplements}
-                                          spaceGroups={spaceGroups}
-                                          onEdit={() => startEditPrice(p)}
-                                          onDelete={() => deletePrice(m.id, null, p.id)}
-                                        />
-                                      )}
+
+                              {!isPricesCollapsed && (
+                                <>
+                                  {nonPkgPrices.length > 0 && (
+                                    <div style={{ padding: '4px 12px 12px' }}>
+                                      {nonPkgPrices.map(p => (
+                                        <div key={p.id} style={{ marginTop: 4 }}>
+                                          {editingPrice === p.id ? (
+                                            <PriceForm
+                                              form={editPriceForm}
+                                              onChange={setEditPriceForm}
+                                              accent={dt.color}
+                                              saving={priceSaving}
+                                              error={priceError}
+                                              onSave={() => saveEditPrice(m.id, null, p.id)}
+                                              onCancel={() => setEditingPrice(null)}
+                                              isEdit
+                                              cfg={commercialConfig}
+                                              zones={zones}
+                                              supplements={supplements}
+                                              spaceGroups={spaceGroups}
+                                              existingRanges={existingRanges.filter(r => r.from !== p.date_from)}
+                                            />
+                                          ) : (
+                                            <PriceRow
+                                              price={p}
+                                              accent={dt.color}
+                                              cfg={commercialConfig}
+                                              zones={zones}
+                                              supplements={supplements}
+                                              spaceGroups={spaceGroups}
+                                              onEdit={() => startEditPrice(p)}
+                                              onDelete={() => deletePrice(m.id, null, p.id)}
+                                              recentlySaved={recentlySavedId === p.id}
+                                            />
+                                          )}
+                                        </div>
+                                      ))}
                                     </div>
-                                  ))}
-                                </div>
-                              )}
-                              {m.prices.filter(p => !p.package_id).length === 0 && !priceAdding && (
-                                <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 12 }}>
-                                  Sin tarifas definidas.{' '}
-                                  <button style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }} onClick={() => startAddPrice(m.id)}>+ Añadir período</button>
-                                </div>
-                              )}
-                              {priceAdding?.modalityId === m.id && !priceAdding.packageId && (
-                                <div style={{ padding: '0 12px 12px' }}>
-                                  <PriceForm
-                                    form={priceForm}
-                                    onChange={setPriceForm}
-                                    accent={dt.color}
-                                    saving={priceSaving}
-                                    error={priceError}
-                                    onSave={savePrice}
-                                    onCancel={cancelAddPrice}
-                                    cfg={commercialConfig}
-                                    zones={zones}
-                                    supplements={supplements}
-                                    spaceGroups={spaceGroups}
-                                  />
-                                </div>
+                                  )}
+                                  {nonPkgPrices.length === 0 && !priceAdding && (
+                                    <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 12 }}>
+                                      Sin tarifas definidas.{' '}
+                                      <button style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }} onClick={() => startAddPrice(m.id)}>+ Añadir período</button>
+                                    </div>
+                                  )}
+                                  {priceAdding?.modalityId === m.id && !priceAdding.packageId && (
+                                    <div style={{ padding: '0 12px 12px' }}>
+                                      <PriceForm
+                                        form={priceForm}
+                                        onChange={setPriceForm}
+                                        accent={dt.color}
+                                        saving={priceSaving}
+                                        error={priceError}
+                                        onSave={savePrice}
+                                        onCancel={cancelAddPrice}
+                                        cfg={commercialConfig}
+                                        zones={zones}
+                                        supplements={supplements}
+                                        spaceGroups={spaceGroups}
+                                        existingRanges={existingRanges}
+                                      />
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </div>
-                          )}
+                            )
+                          })()}
                         </div>
                       )}
                     </div>
@@ -1475,6 +1697,71 @@ export default function EstructuraPage() {
                       Cualquier día marcado como no libre en el calendario
                     </label>
                   </div>
+                </div>
+
+                {/* Google Calendar sync */}
+                <div style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: gcalConfig ? 'rgba(90,138,85,0.05)' : 'var(--cream)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <rect x="3" y="4" width="18" height="17" rx="2" stroke="#4285F4" strokeWidth="1.8"/>
+                        <path d="M3 9h18" stroke="#4285F4" strokeWidth="1.8"/>
+                        <path d="M8 2v4M16 2v4" stroke="#4285F4" strokeWidth="1.8" strokeLinecap="round"/>
+                        <rect x="7" y="13" width="4" height="3" rx="0.5" fill="#EA4335"/>
+                      </svg>
+                      <div>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--charcoal)' }}>Google Calendar</div>
+                        {gcalConfig ? (
+                          <div style={{ fontSize: 11, color: '#5a8a55', marginTop: 1 }}>
+                            Conectado · {gcalConfig.calendar_name}
+                            {gcalConfig.last_sync && <span style={{ color: 'var(--warm-gray)', marginLeft: 6 }}>Sync: {new Date(gcalConfig.last_sync).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>Sincroniza tu calendario para bloquear fechas automáticamente</div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {gcalConfig ? (
+                        <>
+                          <button type="button" disabled={gcalSyncing}
+                            onClick={async () => {
+                              setGcalSyncing(true); setGcalMsg(null)
+                              const res = await fetch('/api/calendar/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venue_id: activeVenue?.id }) })
+                              const json = await res.json()
+                              if (res.ok) {
+                                setGcalConfig(prev => prev ? { ...prev, last_sync: json.last_sync } : prev)
+                                setGcalMsg(`${json.blocked_count} fechas bloqueadas`)
+                              } else { setGcalMsg('Error al sincronizar') }
+                              setGcalSyncing(false)
+                              setTimeout(() => setGcalMsg(null), 3000)
+                            }}
+                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#fff', cursor: gcalSyncing ? 'wait' : 'pointer', color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {gcalSyncing ? 'Sincronizando…' : '↻ Sincronizar'}
+                          </button>
+                          <button type="button"
+                            onClick={async () => {
+                              if (!confirm('¿Desconectar Google Calendar?')) return
+                              await fetch('/api/calendar/disconnect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venue_id: activeVenue?.id }) })
+                              setGcalConfig(null)
+                            }}
+                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', color: '#ef4444' }}>
+                            Desconectar
+                          </button>
+                        </>
+                      ) : (
+                        <a href={`/api/auth/google/start?venue_id=${activeVenue?.id}`}
+                          style={{ fontSize: 12, padding: '5px 14px', borderRadius: 6, border: '1px solid #4285F4', background: '#fff', color: '#4285F4', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          Conectar
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  {gcalMsg && (
+                    <div style={{ padding: '6px 14px', fontSize: 11, background: gcalMsg.startsWith('Error') ? '#fef2f2' : '#f0fdf4', color: gcalMsg.startsWith('Error') ? '#ef4444' : '#15803d', borderTop: '1px solid var(--ivory)' }}>
+                      {gcalMsg}
+                    </div>
+                  )}
                 </div>
 
                 {/* Manual blocked dates — calendar views */}
@@ -2008,40 +2295,45 @@ export default function EstructuraPage() {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function PriceRow({ price, accent, cfg, zones, supplements, spaceGroups = [], onEdit, onDelete }: {
+function PriceRow({ price, accent, cfg, zones, supplements, spaceGroups = [], onEdit, onDelete, recentlySaved = false }: {
   price: ModalityPrice; accent: string
   cfg: CommercialConfig | null
   zones: ZoneItem[]; supplements: SupplementItem[]
   spaceGroups?: VenueSpaceGroup[]
   onEdit: () => void; onDelete: () => void
+  recentlySaved?: boolean
 }) {
   const model = cfg?.price_model ?? 'rental'
   const space = cfg?.space_type  ?? 'single'
 
   const renderAmount = () => {
     if (space === 'multiple_independent') {
-      const gp = price.group_prices ?? []
-      const zp = price.zone_prices ?? []
-      if (gp.length === 0 && zp.length === 0) return <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin precios</span>
+      const gp = (price.group_prices ?? []).filter(g => spaceGroups.some(sg => sg.id === g.group_id))
+      const zp = (price.zone_prices ?? []).filter(z => zones.some(zo => zo.id === z.zone_id))
+      if (gp.length === 0 && zp.length === 0) return <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin precios configurados</span>
       return (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {gp.map(g => {
-            const grp = spaceGroups.find(sg => sg.id === g.group_id)
+            const grp = spaceGroups.find(sg => sg.id === g.group_id)!
             const suppCount = (g.space_supplements ?? []).filter(s => s.price > 0).length
             return (
-              <span key={g.group_id} style={{ fontSize: 12, background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6, padding: '2px 8px', color: '#1D4ED8' }}>
-                {grp?.name ?? '?'}: <strong>{fmt(g.base_price)}</strong>
-                {suppCount > 0 && <span style={{ fontSize: 10, color: '#6B7280' }}> +{suppCount} supl.</span>}
+              <span key={g.group_id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.3)', borderRadius: 20, padding: '3px 10px', color: 'var(--espresso)', fontWeight: 500 }}>
+                <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>{grp.name}</span>
+                <span style={{ width: 1, height: 10, background: 'rgba(196,151,90,0.3)', display: 'inline-block' }} />
+                <strong style={{ fontWeight: 700 }}>{fmt(g.base_price)}</strong>
+                {suppCount > 0 && <span style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 400 }}>+{suppCount} supl.</span>}
               </span>
             )
           })}
           {zp.map(z => {
-            const zone = zones.find(zo => zo.id === z.zone_id)
-            return zone ? (
-              <span key={z.zone_id} style={{ fontSize: 12, background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6, padding: '2px 8px', color: '#1D4ED8' }}>
-                {zone.name}: <strong>{fmt(z.price)}</strong>
+            const zone = zones.find(zo => zo.id === z.zone_id)!
+            return (
+              <span key={z.zone_id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.3)', borderRadius: 20, padding: '3px 10px', color: 'var(--espresso)', fontWeight: 500 }}>
+                <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>{zone.name}</span>
+                <span style={{ width: 1, height: 10, background: 'rgba(196,151,90,0.3)', display: 'inline-block' }} />
+                <strong style={{ fontWeight: 700 }}>{fmt(z.price)}</strong>
               </span>
-            ) : null
+            )
           })}
         </div>
       )
@@ -2067,7 +2359,7 @@ function PriceRow({ price, accent, cfg, zones, supplements, spaceGroups = [], on
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--ivory)', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: recentlySaved ? 'rgba(90,138,85,0.08)' : 'var(--cream)', borderRadius: 8, border: `1px solid ${recentlySaved ? 'rgba(90,138,85,0.4)' : 'var(--ivory)'}`, flexWrap: 'wrap', transition: 'background 0.4s, border-color 0.4s' }}>
       <div style={{ minWidth: 185, display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
         <span style={{ fontSize: 12, color: 'var(--charcoal)', fontWeight: 500 }}>{fmtDate(price.date_from)}</span>
         <span style={{ fontSize: 10, color: 'var(--stone)' }}>→</span>
@@ -2083,7 +2375,7 @@ function PriceRow({ price, accent, cfg, zones, supplements, spaceGroups = [], on
   )
 }
 
-function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, isEdit = false, cfg, zones, supplements, spaceGroups = [] }: {
+function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, isEdit = false, cfg, zones, supplements, spaceGroups = [], existingRanges = [] }: {
   form: typeof emptyPriceForm; onChange: (f: typeof emptyPriceForm) => void
   accent: string; saving: boolean; error: string
   onSave: () => void; onCancel: () => void
@@ -2091,6 +2383,7 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
   cfg: CommercialConfig | null
   zones: ZoneItem[]; supplements: SupplementItem[]
   spaceGroups?: VenueSpaceGroup[]
+  existingRanges?: { from: string; to: string }[]
 }) {
   const model = cfg?.price_model ?? 'rental'
   const space = cfg?.space_type  ?? 'single'
@@ -2111,8 +2404,8 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
 
       {/* Date pickers row */}
       <div style={{ display: 'grid', gridTemplateColumns: isMulti ? '1fr 1fr' : '1fr 1fr 120px', gap: 10, marginBottom: 10 }}>
-        <DatePicker label="DESDE" value={form.date_from} onChange={v => onChange({ ...form, date_from: v })} accent={accent} />
-        <DatePicker label="HASTA" value={form.date_to}   onChange={v => onChange({ ...form, date_to: v })}   accent={accent} minDate={form.date_from || undefined} />
+        <DatePicker label="DESDE" value={form.date_from} onChange={v => onChange({ ...form, date_from: v })} accent={accent} disabledRanges={existingRanges} />
+        <DatePicker label="HASTA" value={form.date_to}   onChange={v => onChange({ ...form, date_to: v })}   accent={accent} minDate={form.date_from || undefined} disabledRanges={existingRanges} />
         {!isMulti && (
           <div>
             <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{labelBase}</div>

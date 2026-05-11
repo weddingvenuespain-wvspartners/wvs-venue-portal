@@ -72,6 +72,9 @@ export async function GET(
       else blockedMap[b.date] = b
     }
 
+    // Also block dates synced from Google Calendar
+    for (const d of config.google_blocked_dates ?? []) blockedMap[d] = { date: d, type: 'full' }
+
     const blockedDates = new Set<string>(Object.keys(blockedMap))
     if (config.block_booked_weddings || config.block_calendar_unavailable) {
       const { data: calEntries } = await supabase

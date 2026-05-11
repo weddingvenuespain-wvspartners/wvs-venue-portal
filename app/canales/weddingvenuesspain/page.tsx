@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
@@ -821,7 +822,14 @@ export default function FichaPage() {
       <Sidebar />
       <div className="main-layout">
         <div className="topbar">
-          <div className="topbar-title">Mi ficha</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Link href="/canales" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--warm-gray)', textDecoration: 'none', fontFamily: 'Manrope, sans-serif' }}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13L5 8l5-5"/></svg>
+              Canales de venta
+            </Link>
+            <span style={{ color: 'var(--ivory)', fontSize: 16 }}>/</span>
+            <div className="topbar-title">WeddingVenuesSpain.com</div>
+          </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {venue && (
               <a href={venue.link} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">

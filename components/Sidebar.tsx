@@ -134,7 +134,7 @@ export default function Sidebar() {
   // ── Nav item definitions ──────────────────────────────────────────────────────
 
   const venueItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/ficha',        label: 'Mi ficha',                                       icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
+    { href: '/canales',      label: 'Canales de venta',                               icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
     { href: '/calendario',   label: isMultiVenue ? 'Calendarios'    : 'Calendario',  icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
     { href: '/leads',        label: 'Leads',                                          icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', feature: 'leads'        },
     { href: '/proposals',    label: isMultiVenue ? 'Mis dosieres'   : 'Dosieres',    icon: 'M2 2h12v10H2zM14 8l2 4M5 6h6M5 9h4',                feature: 'propuestas'   },
