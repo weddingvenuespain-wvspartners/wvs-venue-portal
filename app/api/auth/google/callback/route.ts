@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   const error = searchParams.get('error')
 
   if (error || !code || !state) {
-    return NextResponse.redirect(`${APP_URL}/estructura?gcal=error`)
+    return NextResponse.redirect(`${APP_URL}/venue-settings?gcal=error`)
   }
 
   let userId: string, venueId: string
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     venueId = decoded.venue_id
     if (!userId || !venueId) throw new Error()
   } catch {
-    return NextResponse.redirect(`${APP_URL}/estructura?gcal=error`)
+    return NextResponse.redirect(`${APP_URL}/venue-settings?gcal=error`)
   }
 
   // Exchange authorization code for tokens
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 
   if (!tokenRes.ok) {
     console.error('[gcal callback] token exchange failed', await tokenRes.text())
-    return NextResponse.redirect(`${APP_URL}/estructura?gcal=error`)
+    return NextResponse.redirect(`${APP_URL}/venue-settings?gcal=error`)
   }
 
   const tokens = await tokenRes.json()
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
 
   if (!existing) {
     console.error('[gcal callback] venue_settings row not found')
-    return NextResponse.redirect(`${APP_URL}/estructura?gcal=error`)
+    return NextResponse.redirect(`${APP_URL}/venue-settings?gcal=error`)
   }
 
   await db
@@ -125,5 +125,5 @@ export async function GET(req: NextRequest) {
     // Non-fatal — connection still succeeded
   }
 
-  return NextResponse.redirect(`${APP_URL}/estructura?gcal=connected`)
+  return NextResponse.redirect(`${APP_URL}/venue-settings?gcal=connected`)
 }
