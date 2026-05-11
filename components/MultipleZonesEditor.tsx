@@ -1,7 +1,7 @@
 'use client'
 import { X, Check, RefreshCw, AlertCircle, Users, ChevronDown, ChevronRight } from 'lucide-react'
 import type { VenueSpaceGroup, SpaceGroup, VenueSpaceItem } from '@/lib/proposal-types'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ImageUploader } from './ImageUploader'
 
 type Props = {
@@ -28,6 +28,7 @@ function capacityOk(space: { capacity_min?: number; capacity_max?: number }, gue
 
 export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange, uploadImage, guestCount, isTemplate }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(venueSpaceGroups.map(g => g.id)))
+  const didAutoSync = useRef(false)
 
   if (venueSpaceGroups.length === 0) {
     return (
@@ -86,6 +87,15 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
     })
     onChange(next)
   }
+
+  // Auto-sync on mount when venue has groups but proposal/template has none yet
+  useEffect(() => {
+    if (!didAutoSync.current && venueSpaceGroups.length > 0 && groups.length === 0) {
+      didAutoSync.current = true
+      syncAll()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venueSpaceGroups.length])
 
   // ── Mutation helpers ──────────────────────────────────────────────────────────
 

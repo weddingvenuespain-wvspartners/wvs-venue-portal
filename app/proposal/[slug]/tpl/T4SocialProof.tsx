@@ -611,6 +611,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone,      setVisitDone]      = useState(false)
   const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
+  const [selectedExtraSvcs, setSelectedExtraSvcs] = useState<Record<string, boolean>>({})
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -897,7 +898,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       )}
 
       {/* SINGLE SPACE */}
-      {on('single_space') && (
+      {on('single_space') && !(spaceGroups?.length) && (
         <TplSingleSpace
           data={(sec as any).single_space}
           fallbackImage={heroPhoto}
@@ -1109,17 +1110,25 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
               <div className="t4-divider" />
             </FadeUp>
             <div style={{ marginTop: 40, background: '#fff', borderRadius: 4, overflow: 'hidden' }}>
-              {extrasShow.map((svc: any, i: number) => (
-                <FadeUp key={i} delay={i * .04}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: i < extrasShow.length - 1 ? `1px solid ${SAND}` : 'none', gap: 20 }}>
-                    <div>
-                      <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 15, fontWeight: 500, color: INK }}>{svc.name}</div>
-                      {svc.description && <div style={{ fontSize: 13, color: MUTED, marginTop: 3 }}>{svc.description}</div>}
+              {extrasShow.map((svc: any, i: number) => {
+                const isSel = !!selectedExtraSvcs[svc.name]
+                const toggle = () => setSelectedExtraSvcs(p => ({ ...p, [svc.name]: !p[svc.name] }))
+                return (
+                  <FadeUp key={i} delay={i * .04}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: i < extrasShow.length - 1 ? `1px solid ${SAND}` : 'none', gap: 20, cursor: 'pointer' }} onClick={toggle}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 15, fontWeight: 500, color: INK }}>{svc.name}</div>
+                        {svc.description && <div style={{ fontSize: 13, color: MUTED, marginTop: 3 }}>{svc.description}</div>}
+                      </div>
+                      {svc.price && <span style={{ fontFamily: font, fontSize: 20, fontWeight: 600, color: primary, whiteSpace: 'nowrap' }}>{svc.price}</span>}
+                      <button type="button" onClick={e => { e.stopPropagation(); toggle() }}
+                        style={{ flexShrink: 0, width: 28, height: 28, borderRadius: '50%', border: `1.5px solid ${isSel ? primary : MUTED}`, background: isSel ? primary : 'transparent', color: isSel ? '#fff' : MUTED, fontSize: isSel ? '.65rem' : '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all .15s' }}>
+                        {isSel ? '✓' : '+'}
+                      </button>
                     </div>
-                    {svc.price && <span style={{ fontFamily: font, fontSize: 20, fontWeight: 600, color: primary, whiteSpace: 'nowrap' }}>{svc.price}</span>}
-                  </div>
-                </FadeUp>
-              ))}
+                  </FadeUp>
+                )
+              })}
             </div>
           </div>
         </section>
@@ -1189,6 +1198,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         if (variant === 'cta') {
           const svUrl = sv.url
           const svCta = sv.cta_label || 'Reservar visita gratuita →'
+          const svTextColor = sv.cta_text_color || (darkPri ? '#fff' : '#111')
           return (
             <section className="t4-section" style={{ background: WARM, textAlign: 'center' }}>
               <div className="t4-inner">
@@ -1209,16 +1219,19 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
                       </div>
                     ) : svUrl ? (
                       <a href={svUrl} target="_blank" rel="noopener"
-                        style={{ display: 'inline-block', background: primary, color: darkPri ? '#fff' : '#111', padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 700, textDecoration: 'none', letterSpacing: '.04em' }}>
+                        style={{ display: 'inline-block', background: primary, color: svTextColor, padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 700, textDecoration: 'none', letterSpacing: '.04em' }}>
                         {svCta}
                       </a>
                     ) : (
                       <button onClick={() => setVisitModalOpen(true)}
-                        style={{ background: primary, color: darkPri ? '#fff' : '#111', padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 700, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
+                        style={{ background: primary, color: svTextColor, padding: '14px 36px', borderRadius: 6, fontSize: '.9rem', fontWeight: 700, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
                         {svCta}
                       </button>
                     )}
                     {sv.note && <p style={{ fontSize: '.8rem', color: MUTED, marginTop: 16 }}>{sv.note}</p>}
+                    <p style={{ fontSize: '.78rem', color: MUTED, marginTop: 18, lineHeight: 1.7, maxWidth: 400, margin: '18px auto 0' }}>
+                      Al reservar la visita, vuestras selecciones se incluyen en la solicitud para que preparemos un presupuesto personalizado.
+                    </p>
                   </div>
                 </FadeUp>
               </div>
@@ -1251,6 +1264,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           coupleName={data.couple_name}
           primaryColor={primary}
           selectedSpaces={selectedSpaces}
+          selectedExtraSvcs={Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k)}
           spaceGroups={visibleSpaceGroups.length > 0 ? visibleSpaceGroups : undefined}
           dateSlots={dateSlots ?? []}
           preSelectedDateSlot={selectedDateSlotIdx}

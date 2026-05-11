@@ -67,6 +67,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone,      setVisitDone]      = useState(false)
   const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
+  const [selectedExtraSvcs, setSelectedExtraSvcs] = useState<Record<string, boolean>>({})
   const [heroLoaded, setHeroLoaded] = useState(false)
   const [openFaq, setOpenFaq] = useState<number|null>(null)
   const [activeSection, setActiveSection] = useState('')
@@ -396,7 +397,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           )}
 
           {/* Single space */}
-          {on('single_space') && (
+          {on('single_space') && !(spaceGroups?.length) && (
             <div className="sec">
               <TplSingleSpace
                 data={(sec as any).single_space}
@@ -651,17 +652,25 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 <div className="sec-n">{secLbl('extras', 'Servicios adicionales')}</div>
                 <h2 className="sec-h">Personaliza tu celebración</h2>
               </FadeUp>
-              {extrasShow.map((svc:any, i:number) => (
-                <FadeUp key={i} delay={i*.04}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid #F0EDE9', gap: 20 }}>
-                    <div>
-                      <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 14, fontWeight: 500, color: '#2a2420' }}>{svc.name}</div>
-                      {svc.description && <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, color: '#9a9590', marginTop: 2 }}>{svc.description}</div>}
+              {extrasShow.map((svc:any, i:number) => {
+                const isSel = !!selectedExtraSvcs[svc.name]
+                const toggle = () => setSelectedExtraSvcs(p => ({ ...p, [svc.name]: !p[svc.name] }))
+                return (
+                  <FadeUp key={i} delay={i*.04}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid #F0EDE9', gap: 20, cursor: 'pointer' }} onClick={toggle}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 14, fontWeight: 500, color: '#2a2420' }}>{svc.name}</div>
+                        {svc.description && <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, color: '#9a9590', marginTop: 2 }}>{svc.description}</div>}
+                      </div>
+                      {svc.price && <span style={{ fontFamily: font, fontSize: 20, fontWeight: 300, color: primary, whiteSpace: 'nowrap' }}>{svc.price}</span>}
+                      <button type="button" onClick={e => { e.stopPropagation(); toggle() }}
+                        style={{ flexShrink: 0, width: 28, height: 28, borderRadius: '50%', border: `1.5px solid ${isSel ? primary : '#ccc'}`, background: isSel ? primary : 'transparent', color: isSel ? '#fff' : '#aaa', fontSize: isSel ? '.65rem' : '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all .15s' }}>
+                        {isSel ? '✓' : '+'}
+                      </button>
                     </div>
-                    {svc.price && <span style={{ fontFamily: font, fontSize: 20, fontWeight: 300, color: primary, whiteSpace: 'nowrap' }}>{svc.price}</span>}
-                  </div>
-                </FadeUp>
-              ))}
+                  </FadeUp>
+                )
+              })}
             </div>
           ) : _preview ? <EmptySec label="Servicios adicionales" /> : null)}
 
@@ -760,6 +769,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
             if (variant === 'cta') {
               const svUrl = sv.url
               const svCta = sv.cta_label || 'Reservar visita gratuita →'
+              const svTextColor = sv.cta_text_color || onPri
               return (
                 <div className="sec" style={{ textAlign: 'center' }}>
                   <FadeUp>
@@ -779,16 +789,19 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                         </div>
                       ) : svUrl ? (
                         <a href={svUrl} target="_blank" rel="noopener"
-                          style={{ display: 'inline-block', background: primary, color: onPri, padding: '13px 32px', borderRadius: 6, fontSize: '.88rem', fontWeight: 600, textDecoration: 'none', letterSpacing: '.04em' }}>
+                          style={{ display: 'inline-block', background: primary, color: svTextColor, padding: '13px 32px', borderRadius: 6, fontSize: '.88rem', fontWeight: 600, textDecoration: 'none', letterSpacing: '.04em' }}>
                           {svCta}
                         </a>
                       ) : (
                         <button onClick={() => setVisitModalOpen(true)}
-                          style={{ background: primary, color: onPri, padding: '13px 32px', borderRadius: 6, fontSize: '.88rem', fontWeight: 600, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
+                          style={{ background: primary, color: svTextColor, padding: '13px 32px', borderRadius: 6, fontSize: '.88rem', fontWeight: 600, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
                           {svCta}
                         </button>
                       )}
                       {sv.note && <p style={{ fontSize: '.78rem', color: '#9A9A9A', marginTop: 14 }}>{sv.note}</p>}
+                      <p style={{ fontSize: '.78rem', color: '#9A9A9A', marginTop: 18, lineHeight: 1.7, maxWidth: 400, margin: '18px auto 0' }}>
+                        Al reservar la visita, vuestras selecciones se incluyen en la solicitud para que preparemos un presupuesto personalizado.
+                      </p>
                     </div>
                   </FadeUp>
                 </div>
@@ -818,6 +831,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
               coupleName={couple_name}
               primaryColor={primary}
               selectedSpaces={selectedSpaces}
+              selectedExtraSvcs={Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k)}
               spaceGroups={visibleSpaceGroups.length > 0 ? visibleSpaceGroups : undefined}
               dateSlots={dateSlots ?? []}
               preSelectedDateSlot={selectedDateSlotIdx}

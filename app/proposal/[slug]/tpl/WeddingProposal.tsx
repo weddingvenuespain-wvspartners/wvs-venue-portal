@@ -416,15 +416,18 @@ export function WeddingProposal({
                         <div className={styles.wpXgrid}>
                           {extrasByCategory![cat]!.map(({ extra, key }) => {
                             const isSel = !!selectedExtras[key]
+                            const toggle = () => setSelectedExtras(p => ({ ...p, [key]: !p[key] }))
                             return (
-                              <div key={key} className={cx(styles.wpX, isSel && styles.wpXsel)} onClick={() => setSelectedExtras(p => ({ ...p, [key]: !p[key] }))}>
-                                <div className={styles.wpXcheck}>{isSel ? '✓' : ''}</div>
+                              <div key={key} className={cx(styles.wpX, isSel && styles.wpXsel)} onClick={toggle}>
                                 {extra.photo_url && <img src={extra.photo_url} alt="" className={styles.wpXphoto} />}
                                 <div className={styles.wpXbody}>
                                   <div className={styles.wpXname}>{extra.name}</div>
                                   {extra.description && <div className={styles.wpXdesc}>{extra.description}</div>}
                                   <div className={styles.wpXprice}>{extra.price} <small>{extra.price_type === 'per_person' ? '/persona' : 'total'}</small></div>
                                 </div>
+                                <button type="button" className={cx(styles.wpXadd, isSel && styles.wpXaddSel)} onClick={e => { e.stopPropagation(); toggle() }}>
+                                  {isSel ? '✓' : '+'}
+                                </button>
                               </div>
                             )
                           })}
@@ -576,9 +579,9 @@ export function WeddingProposal({
                     <div className={styles.wpXgrid}>
                       {resoponItems.map(({ extra, key }) => {
                         const isSel = !!selectedExtras[key]
+                        const toggle = () => setSelectedExtras(p => ({ ...p, [key]: !p[key] }))
                         return (
-                          <div key={key} className={cx(styles.wpX, isSel && styles.wpXsel)} onClick={() => setSelectedExtras(p => ({ ...p, [key]: !p[key] }))}>
-                            <div className={styles.wpXcheck}>{isSel ? '✓' : ''}</div>
+                          <div key={key} className={cx(styles.wpX, isSel && styles.wpXsel)} onClick={toggle}>
                             {extra.photo_url && <img src={extra.photo_url} alt="" className={styles.wpXphoto} />}
                             <div className={styles.wpXbody}>
                               <div className={styles.wpXname}>{extra.name}</div>
@@ -593,6 +596,9 @@ export function WeddingProposal({
                                 </div>
                               )}
                             </div>
+                            <button type="button" className={cx(styles.wpXadd, isSel && styles.wpXaddSel)} onClick={e => { e.stopPropagation(); toggle() }}>
+                              {isSel ? '✓' : '+'}
+                            </button>
                           </div>
                         )
                       })}
@@ -605,10 +611,10 @@ export function WeddingProposal({
                     <div className={styles.wpXgrid}>
                       {openBarItems.map(({ extra, key }) => {
                         const isSel = !!selectedExtras[key]
+                        const toggle = () => setSelectedExtras(p => ({ ...p, [key]: !p[key] }))
                         return (
                           <div key={key}>
-                            <div className={cx(styles.wpX, isSel && styles.wpXsel)} onClick={() => setSelectedExtras(p => ({ ...p, [key]: !p[key] }))}>
-                              <div className={styles.wpXcheck}>{isSel ? '✓' : ''}</div>
+                            <div className={cx(styles.wpX, isSel && styles.wpXsel)} onClick={toggle}>
                               {extra.photo_url && <img src={extra.photo_url} alt="" className={styles.wpXphoto} />}
                               <div className={styles.wpXbody}>
                                 <div className={styles.wpXname}>{extra.name}</div>
@@ -627,6 +633,9 @@ export function WeddingProposal({
                                   </div>
                                 )}
                               </div>
+                              <button type="button" className={cx(styles.wpXadd, isSel && styles.wpXaddSel)} onClick={e => { e.stopPropagation(); toggle() }}>
+                                {isSel ? '✓' : '+'}
+                              </button>
                             </div>
                             {/* Per-option extra hours config */}
                             {isSel && extra.extra_hour_price && (
@@ -694,13 +703,15 @@ export function WeddingProposal({
                       })
                       return (
                         <div key={key} className={cx(styles.wpX, isSel && styles.wpXsel)} onClick={handleToggle}>
-                          <div className={styles.wpXcheck}>{isSel ? '✓' : ''}</div>
                           {extra.photo_url && <img src={extra.photo_url} alt="" className={styles.wpXphoto} />}
                           <div className={styles.wpXbody}>
                             <div className={styles.wpXname}>{extra.name}</div>
                             {extra.description && <div className={styles.wpXdesc}>{extra.description}</div>}
                             <div className={styles.wpXprice}>{extra.price} <small>{extra.price_type === 'per_person' ? '/persona' : 'total'}</small></div>
                           </div>
+                          <button type="button" className={cx(styles.wpXadd, isSel && styles.wpXaddSel)} onClick={e => { e.stopPropagation(); handleToggle() }}>
+                            {isSel ? '✓' : '+'}
+                          </button>
                         </div>
                       )
                     })}
@@ -716,7 +727,6 @@ export function WeddingProposal({
           <FadeUp>
             <div className={styles.wpSection}>
               <div className={styles.wpSectionN}>{menus.length > 0 ? 'Paso 3 · Detalles finales' : 'Detalles finales'}</div>
-              <h3 className={styles.wpSectionH}>Vuestros datos</h3>
               {dateIsFlexible && (
                 <div style={{ marginBottom: 24 }}>
                   <DatePicker
@@ -825,18 +835,6 @@ export function WeddingProposal({
               </div>
               <div className={styles.wpSumNote}>* Estimación orientativa. El precio final puede variar según disponibilidad y condiciones.</div>
             </div>
-            {!previewOnly && (
-              <div className={styles.wpFootAction}>
-                <button className={styles.wpBtn} onClick={handleSubmit}
-                  disabled={sending || (menus.length > 1 && totalAllocated === 0) || missingChoices.length > 0 || menuViolations.length > 0}>
-                  {sending ? 'Enviando…' : 'Enviar nuestra selección →'}
-                </button>
-                {menus.length > 1 && totalAllocated === 0 && !error && <div className={styles.wpErr}>Asigna invitados a al menos un menú</div>}
-                {menuViolations.length > 0 && !error && <div className={styles.wpErr}>{menuViolations.map(v => v.type === 'min' ? `${v.menuName}: mínimo ${v.limit} comensales` : `${v.menuName}: máximo ${v.limit} comensales`).join(' · ')}</div>}
-                {missingChoices.length > 0 && !error && <div className={styles.wpErr}>Faltan opciones en: {missingChoices.join(', ')}</div>}
-                {error && <div className={styles.wpErr}>{error}</div>}
-              </div>
-            )}
           </div>
         </FadeUp>
 

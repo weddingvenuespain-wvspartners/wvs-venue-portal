@@ -202,18 +202,19 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
         supabase.from('leads').select('id, name, guests, email').eq('user_id', user.id).order('created_at', { ascending: false }),
         supabase.from('proposal_web_templates').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('venue_onboarding').select('name, city, region, contact_email, contact_phone, website, photo_urls').eq('user_id', user.id).maybeSingle(),
-        supabase.from('venue_settings').select('commercial_config, menu_catalog, space_groups').eq('user_id', user.id).maybeSingle(),
+        supabase.from('venue_settings').select('commercial_config, menu_catalog, space_groups').eq('user_id', user.id).limit(1),
         fetch('/api/estructura/modalities'),
         fetch('/api/proposal-templates'),
       ])
       if (leadsData) setLeads(leadsData)
       if (tplData) setTemplates(tplData as ProposalTemplate[])
       if (venueRow) setVenue(venueRow)
-      const cfg = settingsRow?.commercial_config as { space_type: string; price_model: string } | null
+      const settingsRow0 = Array.isArray(settingsRow) ? settingsRow[0] : settingsRow
+      const cfg = settingsRow0?.commercial_config as { space_type: string; price_model: string } | null
       if (cfg) setCommercialConfig(cfg)
-      if (settingsRow?.menu_catalog) setMenuCatalog(settingsRow.menu_catalog as SectionsData)
+      if (settingsRow0?.menu_catalog) setMenuCatalog(settingsRow0.menu_catalog as SectionsData)
 
-      const spaceGroups = Array.isArray(settingsRow?.space_groups) ? settingsRow.space_groups as VenueSpaceGroup[] : []
+      const spaceGroups = Array.isArray(settingsRow0?.space_groups) ? settingsRow0.space_groups as VenueSpaceGroup[] : []
       if (spaceGroups.length) setVenueSpaceGroups(spaceGroups)
 
       let loadedModalities: any[] = []
@@ -1493,7 +1494,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
                           {/* SPACE GROUPS */}
                           {secId === 'space_groups' && (
-                            commercialConfig?.space_type === 'multiple_independent' ? (
+                            (venueSpaceGroups.length > 0 || commercialConfig?.space_type === 'multiple_independent') ? (
                               <MultipleZonesEditor
                                 venueSpaceGroups={venueSpaceGroups}
                                 groups={(sections as any).space_groups ?? []}
@@ -1726,6 +1727,17 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                 <div className="form-group">
                                   <label className="form-label">Texto del botón</label>
                                   <input className="form-input" placeholder="Reservar visita gratuita →" value={sv.cta_label ?? ''} onChange={e => setSv({ cta_label: e.target.value })} />
+                                </div>
+                                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 0 }}>
+                                  <label className="form-label" style={{ flex: 1, marginBottom: 0 }}>Color del texto del botón</label>
+                                  <input type="color" value={sv.cta_text_color || '#ffffff'} onChange={e => setSv({ cta_text_color: e.target.value })}
+                                    style={{ width: 32, height: 28, padding: 2, border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', background: 'none' }} />
+                                  {sv.cta_text_color && (
+                                    <button type="button" onClick={() => setSv({ cta_text_color: '' })}
+                                      style={{ fontSize: 10, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px' }}>
+                                      Reset
+                                    </button>
+                                  )}
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                   <label className="form-label">Nota pequeña (opcional)</label>

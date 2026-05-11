@@ -202,6 +202,14 @@
 .wpXdesc { font-size: .76rem; color: var(--wp-text-dim); line-height: 1.5; margin-bottom: 6px }
 .wpXprice { font-size: .82rem; font-weight: 600; color: var(--wp-primary) }
 .wpXprice small { font-size: .68rem; font-weight: 400; color: var(--wp-text-dim) }
+.wpXadd {
+  flex-shrink: 0; align-self: center; width: 28px; height: 28px; border-radius: 50%;
+  border: 1.5px solid var(--wp-border); background: transparent; cursor: pointer;
+  font-size: 1rem; font-weight: 600; color: var(--wp-text-dim); display: flex; align-items: center; justify-content: center;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.wpXadd:hover { border-color: var(--wp-primary); color: var(--wp-primary) }
+.wpXaddSel { background: var(--wp-primary); border-color: var(--wp-primary); color: #fff; font-size: .75rem }
 
 /* Inputs */
 .wpInput {

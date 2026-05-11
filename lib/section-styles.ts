@@ -99,10 +99,10 @@ export const SECTION_STYLES: Record<string, SectionStyleConfig> = {
   },
   schedule_visit: {
     sectionId: 'schedule_visit',
-    defaultVariant: 'form',
+    defaultVariant: 'cta',
     variants: [
-      { id: 'form', label: 'Formulario',  description: 'Visita + llamada + más opciones (configurables)' },
       { id: 'cta',  label: 'CTA simple',  description: 'Solo botón "Reservar visita gratuita"' },
+      { id: 'form', label: 'Formulario',  description: 'Visita + llamada + más opciones (configurables)' },
     ],
   },
 }

@@ -458,6 +458,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone,      setVisitDone]      = useState(false)
   const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
+  const [selectedExtraSvcs, setSelectedExtraSvcs] = useState<Record<string, boolean>>({})
   const [scrolled, setScrolled]     = useState(false)
   const [progress, setProgress]     = useState(0)
 
@@ -697,7 +698,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       )}
 
       {/* SINGLE SPACE */}
-      {on('single_space') && (
+      {on('single_space') && !(spaceGroups?.length) && (
         <TplSingleSpace
           data={(sec as any).single_space}
           fallbackImage={heroPhoto}
@@ -1067,17 +1068,25 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
               <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Personaliza tu celebración</h2>
             </FadeUp>
             <div>
-              {extrasShow.map((svc: any, i: number) => (
-                <FadeUp key={i} delay={i * .04}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: `1px solid ${LINE}`, gap: 20 }}>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 500, color: INK }}>{svc.name}</div>
-                      {svc.description && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 3 }}>{svc.description}</div>}
+              {extrasShow.map((svc: any, i: number) => {
+                const isSel = !!selectedExtraSvcs[svc.name]
+                const toggle = () => setSelectedExtraSvcs(p => ({ ...p, [svc.name]: !p[svc.name] }))
+                return (
+                  <FadeUp key={i} delay={i * .04}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: `1px solid ${LINE}`, gap: 20, cursor: 'pointer' }} onClick={toggle}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 15, fontWeight: 500, color: INK }}>{svc.name}</div>
+                        {svc.description && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 3 }}>{svc.description}</div>}
+                      </div>
+                      {svc.price && <span style={{ fontFamily: font, fontSize: 20, color: primary, whiteSpace: 'nowrap' }}>{svc.price}</span>}
+                      <button type="button" onClick={e => { e.stopPropagation(); toggle() }}
+                        style={{ flexShrink: 0, width: 28, height: 28, borderRadius: '50%', border: `1.5px solid ${isSel ? primary : LINE}`, background: isSel ? primary : 'transparent', color: isSel ? '#fff' : MUTED, fontSize: isSel ? '.65rem' : '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all .15s' }}>
+                        {isSel ? '✓' : '+'}
+                      </button>
                     </div>
-                    {svc.price && <span style={{ fontFamily: font, fontSize: 20, color: primary, whiteSpace: 'nowrap' }}>{svc.price}</span>}
-                  </div>
-                </FadeUp>
-              ))}
+                  </FadeUp>
+                )
+              })}
             </div>
           </div>
         </section>
@@ -1159,6 +1168,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         if (variant === 'cta') {
           const svUrl = sv.url
           const svCta = sv.cta_label || 'Reservar visita gratuita →'
+          const svTextColor = sv.cta_text_color || (darkPri ? '#fff' : '#111')
           return (
             <section style={{ padding: '96px 0', background: GRAY, textAlign: 'center' }}>
               <FadeUp>
@@ -1178,16 +1188,19 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
                     </div>
                   ) : svUrl ? (
                     <a href={svUrl} target="_blank" rel="noopener"
-                      style={{ display: 'inline-block', background: primary, color: darkPri ? '#fff' : '#111', padding: '16px 40px', borderRadius: 4, fontSize: '.9rem', fontWeight: 700, textDecoration: 'none', letterSpacing: '.06em', textTransform: 'uppercase' }}>
+                      style={{ display: 'inline-block', background: primary, color: svTextColor, padding: '16px 40px', borderRadius: 4, fontSize: '.9rem', fontWeight: 700, textDecoration: 'none', letterSpacing: '.06em', textTransform: 'uppercase' }}>
                       {svCta}
                     </a>
                   ) : (
                     <button onClick={() => setVisitModalOpen(true)}
-                      style={{ background: primary, color: darkPri ? '#fff' : '#111', padding: '16px 40px', borderRadius: 4, fontSize: '.9rem', fontWeight: 700, border: 'none', cursor: 'pointer', letterSpacing: '.06em', textTransform: 'uppercase' }}>
+                      style={{ background: primary, color: svTextColor, padding: '16px 40px', borderRadius: 4, fontSize: '.9rem', fontWeight: 700, border: 'none', cursor: 'pointer', letterSpacing: '.06em', textTransform: 'uppercase' }}>
                       {svCta}
                     </button>
                   )}
                   {sv.note && <p style={{ fontSize: '.78rem', color: MUTED, marginTop: 16 }}>{sv.note}</p>}
+                  <p style={{ fontSize: '.78rem', color: MUTED, marginTop: 20, lineHeight: 1.7, maxWidth: 400, margin: '20px auto 0' }}>
+                    Al reservar la visita, vuestras selecciones se incluyen en la solicitud para que preparemos un presupuesto personalizado.
+                  </p>
                 </div>
               </FadeUp>
             </section>
@@ -1219,6 +1232,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
           coupleName={data.couple_name}
           primaryColor={primary}
           selectedSpaces={selectedSpaces}
+          selectedExtraSvcs={Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k)}
           spaceGroups={visibleSpaceGroups.length > 0 ? visibleSpaceGroups : undefined}
           dateSlots={dateSlots ?? []}
           preSelectedDateSlot={selectedDateSlotIdx}

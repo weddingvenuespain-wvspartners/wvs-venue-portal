@@ -25,7 +25,7 @@ import {
   toggleSectionGroup,
 } from '@/lib/section-styles'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
-import { getSectionLabel, SECTION_SPACE_TYPES, SPACE_TYPE_LABELS } from '@/lib/section-visibility'
+import { getSectionLabel, isSectionAllowed, SECTION_SPACE_TYPES, SPACE_TYPE_LABELS } from '@/lib/section-visibility'
 
 // ─── Section catalogue ────────────────────────────────────────────────────────
 
@@ -122,11 +122,12 @@ export default function TemplateEditor({
     if (!user) return
     const supabase = createClient()
     ;(async () => {
-      const { data } = await supabase
+      const { data: rows } = await supabase
         .from('venue_settings')
         .select('commercial_config, space_groups')
         .eq('user_id', user.id)
-        .maybeSingle()
+        .limit(1)
+      const data = Array.isArray(rows) ? rows[0] : null
       if (data?.commercial_config) setCommercialConfig(data.commercial_config as any)
       if (Array.isArray(data?.space_groups)) setVenueSpaceGroups(data.space_groups as VenueSpaceGroup[])
     })()
@@ -634,7 +635,7 @@ export default function TemplateEditor({
     )
 
     if (secId === 'space_groups') {
-      if (commercialConfig?.space_type === 'multiple_independent') {
+      if (venueSpaceGroups.length > 0 || commercialConfig?.space_type === 'multiple_independent') {
         return (
           <MultipleZonesEditor
             venueSpaceGroups={venueSpaceGroups}
@@ -1271,6 +1272,17 @@ export default function TemplateEditor({
             <>
               <input className="form-input" placeholder="URL Calendly / Cal.com (opcional)" style={{ fontSize: 12 }} value={sv.url ?? ''} onChange={e => p({ url: e.target.value })} />
               <input className="form-input" placeholder="Texto del botón (ej. Reservar visita →)" style={{ fontSize: 12 }} value={sv.cta_label ?? ''} onChange={e => p({ cta_label: e.target.value })} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontSize: 11, color: 'var(--warm-gray)', flex: 1 }}>Color del texto del botón</label>
+                <input type="color" value={sv.cta_text_color || '#ffffff'} onChange={e => p({ cta_text_color: e.target.value })}
+                  style={{ width: 32, height: 28, padding: 2, border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', background: 'none' }} />
+                {sv.cta_text_color && (
+                  <button type="button" onClick={() => p({ cta_text_color: '' })}
+                    style={{ fontSize: 10, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px' }}>
+                    Reset
+                  </button>
+                )}
+              </div>
               <input className="form-input" placeholder="Nota pequeña (horarios, duración…)" style={{ fontSize: 12 }} value={sv.note ?? ''} onChange={e => p({ note: e.target.value })} />
               <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.5, marginTop: 2 }}>
                 Si dejas la URL vacía, el botón abre el calendario con horarios disponibles configurados en el venue.
@@ -1421,8 +1433,9 @@ export default function TemplateEditor({
                 <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
                   {(() => {
                     const SPACE_GROUP_IDS = ['single_space', 'zones', 'space_groups', 'venue_rental']
+                    const visibleSpaceSubs = SPACE_GROUP_IDS.filter(id => isSectionAllowed(id, commercialConfig?.space_type as any))
                     const isSpaceGroupOpen = openSecs.has('__space_group')
-                    const activeSpaceIds = SPACE_GROUP_IDS.filter(id => isSectionOn(id))
+                    const activeSpaceIds = visibleSpaceSubs.filter(id => isSectionOn(id))
                     const activeSpaceLabel = activeSpaceIds.length === 0
                       ? 'Ninguna activa'
                       : activeSpaceIds.map(id => getSectionLabel(id, commercialConfig?.space_type as any, SECTION_LABELS[id as SectionId])).join(' · ')
@@ -1435,7 +1448,7 @@ export default function TemplateEditor({
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--charcoal)' }}>Espacios y precios</span>
-                              <span style={{ fontSize: 10, color: activeSpaceIds.length > 0 ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 7px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600 }}>{activeSpaceIds.length}/{SPACE_GROUP_IDS.length}</span>
+                              <span style={{ fontSize: 10, color: activeSpaceIds.length > 0 ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 7px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600 }}>{activeSpaceIds.length}/{visibleSpaceSubs.length}</span>
                             </div>
                             <div style={{ fontSize: 11, color: activeSpaceIds.length === 0 ? 'var(--warm-gray)' : '#999', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeSpaceLabel}</div>
                           </div>
@@ -1446,9 +1459,10 @@ export default function TemplateEditor({
 
                     return ALL_SECTION_IDS.map((secId, i) => {
                     if (['welcome_light', 'welcome_split', 'welcome_editorial'].includes(secId)) return null
+                    if (!isSectionAllowed(secId, commercialConfig?.space_type as any)) return null
 
                     const isInSpaceGroup = SPACE_GROUP_IDS.includes(secId)
-                    const isFirstSpaceVisible = isInSpaceGroup && SPACE_GROUP_IDS[0] === secId
+                    const isFirstSpaceVisible = isInSpaceGroup && visibleSpaceSubs[0] === secId
                     if (isInSpaceGroup && !isSpaceGroupOpen) {
                       return isFirstSpaceVisible ? renderSpaceGroupHeader() : null
                     }

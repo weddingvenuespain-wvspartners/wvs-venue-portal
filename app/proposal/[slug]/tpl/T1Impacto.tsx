@@ -99,6 +99,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone, setVisitDone]           = useState(false)
   const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
+  const [selectedExtraSvcs, setSelectedExtraSvcs] = useState<Record<string, boolean>>({})
 
   // Dynamic price: updates when couple selects a date slot
   const selectedSlot = selectedDateSlotIdx !== null && dateSlots ? dateSlots[selectedDateSlotIdx] : null
@@ -233,7 +234,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
 
     /* ── Story section ── */
     .t1-story{display:grid;grid-template-columns:1fr 1fr;gap:0;align-items:stretch}
-    .t1-story-text{padding:80px 64px;background:${pal.surfaceAlt};display:flex;flex-direction:column;justify-content:center}
+    .t1-story>*{display:flex;flex-direction:column}
+    .t1-story-text{padding:80px 64px;background:${pal.surfaceAlt};display:flex;flex-direction:column;justify-content:center;flex:1;box-sizing:border-box}
     .t1-story-body{font-size:.97rem;color:${fg(.55)};line-height:1.9;white-space:pre-wrap;margin-top:4px;overflow-wrap:break-word}
     .t1-story-img{overflow:hidden;min-height:500px;position:relative;background:linear-gradient(135deg,rgba(${rgb},.25),${pal.surface} 70%,${pal.bg})}
     .t1-story-img img{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(${lightMode ? '.95' : '.8'})}
@@ -749,7 +751,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           SINGLE SPACE (un único espacio)
       ════════════════════════════════════════════ */}
-      {on('single_space') && (sec as any).single_space && (() => {
+      {on('single_space') && !(spaceGroups?.length) && (sec as any).single_space && (() => {
         const ss: any = (sec as any).single_space
         const features: string[] = Array.isArray(ss.features) ? ss.features : []
         const heroImg = ss.image_url || (sec as any).hero_image_url
@@ -1122,17 +1124,35 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               <span className="t1-label">Personaliza</span>
               <h2 className="t1-h2">Servicios adicionales</h2>
             </FadeUp>
-            {extrasShow.map((svc: any, i: number) => (
-              <FadeUp key={i} delay={i * .05}>
-                <div className="t1-extra-row">
-                  <div>
-                    <div className="t1-extra-name">{svc.name}</div>
-                    {svc.description && <div className="t1-extra-desc">{svc.description}</div>}
+            {extrasShow.map((svc: any, i: number) => {
+              const isSel = !!selectedExtraSvcs[svc.name]
+              return (
+                <FadeUp key={i} delay={i * .05}>
+                  <div className="t1-extra-row" style={{ cursor: 'pointer' }} onClick={() => setSelectedExtraSvcs(p => ({ ...p, [svc.name]: !p[svc.name] }))}>
+                    <div style={{ flex: 1 }}>
+                      <div className="t1-extra-name">{svc.name}</div>
+                      {svc.description && <div className="t1-extra-desc">{svc.description}</div>}
+                    </div>
+                    {svc.price && <span className="t1-extra-price">{svc.price}</span>}
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); setSelectedExtraSvcs(p => ({ ...p, [svc.name]: !p[svc.name] })) }}
+                      style={{
+                        flexShrink: 0, width: 30, height: 30, borderRadius: '50%',
+                        border: `1.5px solid ${isSel ? primary : `${fg(.25)}`}`,
+                        background: isSel ? primary : 'transparent',
+                        color: isSel ? onPri : fg(.5),
+                        fontSize: isSel ? '.75rem' : '1.1rem', fontWeight: 600,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', transition: 'all .15s', marginLeft: 12,
+                      }}
+                    >
+                      {isSel ? '✓' : '+'}
+                    </button>
                   </div>
-                  {svc.price && <span className="t1-extra-price">{svc.price}</span>}
-                </div>
-              </FadeUp>
-            ))}
+                </FadeUp>
+              )
+            })}
           </div>
         </section>
       ) : _preview ? <EmptySec label="Servicios adicionales" /> : null)}
@@ -1172,6 +1192,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         if (variant === 'cta') {
           const svUrl = sv.url
           const svCta = sv.cta_label || 'Reservar visita gratuita →'
+          const svTextColor = sv.cta_text_color || undefined
           return (
             <section id="sec-schedule" className="t1-sv">
               <FadeUp>
@@ -1189,11 +1210,14 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                       ¡Solicitud enviada! Os confirmaremos la visita pronto.
                     </div>
                   ) : svUrl ? (
-                    <a className="t1-sv-btn" href={svUrl} target="_blank" rel="noopener">{svCta}</a>
+                    <a className="t1-sv-btn" style={svTextColor ? { color: svTextColor } : undefined} href={svUrl} target="_blank" rel="noopener">{svCta}</a>
                   ) : (
-                    <button className="t1-sv-btn" onClick={() => setVisitModalOpen(true)}>{svCta}</button>
+                    <button className="t1-sv-btn" style={svTextColor ? { color: svTextColor } : undefined} onClick={() => setVisitModalOpen(true)}>{svCta}</button>
                   )}
                   {sv.note && <div className="t1-sv-note">{sv.note}</div>}
+                  <p style={{ marginTop: 20, fontSize: '.76rem', color: `${fg(.4)}`, lineHeight: 1.7, maxWidth: 400 }}>
+                    Al reservar la visita, vuestras selecciones se incluyen en la solicitud para que preparemos un presupuesto personalizado.
+                  </p>
                 </div>
               </FadeUp>
             </section>
@@ -1224,6 +1248,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           coupleName={couple_name}
           primaryColor={primary}
           selectedSpaces={selectedSpaces}
+          selectedExtraSvcs={Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k)}
           spaceGroups={visibleSpaceGroups.length > 0 ? visibleSpaceGroups : undefined}
           dateSlots={dateSlots ?? []}
           preSelectedDateSlot={selectedDateSlotIdx}

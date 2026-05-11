@@ -25,6 +25,7 @@ type Props = {
   primaryColor?: string
   selectedSpaces?: Array<{ group_name: string; space_name: string }>
   selectedMenus?: string[]
+  selectedExtraSvcs?: string[]
   spaceGroups?: Array<{ name: string; selection_mode?: string; optional?: boolean; requires_selection?: boolean }>
   dateSlots?: DateSlotOption[]
   preSelectedDateSlot?: number | null
@@ -45,7 +46,7 @@ function fmtDatesAsOptions(dates: string[]): string {
 
 export default function VisitBookingModal({
   proposalId, coupleName, primaryColor = '#C4975A',
-  selectedSpaces = [], selectedMenus = [], spaceGroups,
+  selectedSpaces = [], selectedMenus = [], selectedExtraSvcs = [], spaceGroups,
   dateSlots = [], preSelectedDateSlot = null,
   onClose, onSuccess,
 }: Props) {
@@ -118,6 +119,7 @@ export default function VisitBookingModal({
           couple_email: email.trim(),
           selected_spaces: selectedSpaces,
           selected_menus: selectedMenus,
+          selected_extra_svcs: selectedExtraSvcs.length > 0 ? selectedExtraSvcs : undefined,
           preferred_date_slot: preferredDateSlot !== null && dateSlots[preferredDateSlot] ? dateSlots[preferredDateSlot] : null,
           preferred_wedding_date: preferredWeddingDate || null,
         }),
