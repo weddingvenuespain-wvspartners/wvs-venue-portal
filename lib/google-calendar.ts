@@ -82,6 +82,51 @@ export async function fetchCalendarEvents(
   return (data.items ?? []) as GCalEvent[]
 }
 
+/** Create an event in Google Calendar. Returns the created event id. */
+export async function createCalendarEvent(
+  token: string,
+  calendarId: string,
+  event: {
+    summary: string
+    description?: string
+    startDate?: string       // "YYYY-MM-DD" for all-day
+    endDate?: string         // "YYYY-MM-DD" exclusive end for all-day
+    startDateTime?: string   // ISO for timed events
+    endDateTime?: string     // ISO for timed events
+    timeZone?: string
+  }
+): Promise<string | null> {
+  const tz = event.timeZone ?? 'Europe/Madrid'
+  const body: Record<string, any> = {
+    summary: event.summary,
+    description: event.description ?? 'WeddingVenuesSpain',
+  }
+
+  if (event.startDate) {
+    body.start = { date: event.startDate }
+    body.end   = { date: event.endDate ?? event.startDate }
+  } else {
+    body.start = { dateTime: event.startDateTime, timeZone: tz }
+    body.end   = { dateTime: event.endDateTime,   timeZone: tz }
+  }
+
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  )
+
+  if (!res.ok) {
+    console.error('[createCalendarEvent]', await res.text())
+    return null
+  }
+  const data = await res.json()
+  return data.id ?? null
+}
+
 /** Convert Google Calendar events to a set of blocked ISO date strings (full-day only for now). */
 export function eventsToBlockedDates(events: GCalEvent[]): string[] {
   const dates = new Set<string>()

@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { sendVisitRequestEmail } from '@/lib/mailer'
+import { getValidAccessToken, createCalendarEvent } from '@/lib/google-calendar'
+import type { GCalConfig } from '@/lib/google-calendar'
 
 function getServiceClient() {
   return createClient(
@@ -44,7 +46,7 @@ export async function POST(
     // 1. Get proposal
     const { data: proposal } = await supabase
       .from('proposals')
-      .select('id, user_id, lead_id, couple_name')
+      .select('id, user_id, venue_id, lead_id, couple_name')
       .eq('id', id)
       .maybeSingle()
 
@@ -106,6 +108,40 @@ export async function POST(
       if (inqInsErr) console.error('[visit-request] inquiries insert error', inqInsErr.message)
     } catch (inqErr: any) {
       console.error('[visit-request] inquiries mirror error', inqErr?.message)
+    }
+
+    // 3c. Push visit to Google Calendar (non-fatal)
+    try {
+      const svc2 = getServiceClient()
+      const { data: vsRow } = await svc2
+        .from('venue_settings')
+        .select('google_calendar, visit_availability')
+        .eq('user_id', proposal.user_id)
+        .eq('venue_id', proposal.venue_id ?? '')
+        .maybeSingle()
+
+      const gcal: GCalConfig | null = vsRow?.google_calendar ?? null
+      if (gcal?.refresh_token) {
+        const { token, updated } = await getValidAccessToken(gcal)
+        if (updated) {
+          await svc2.from('venue_settings').update({ google_calendar: updated })
+            .eq('user_id', proposal.user_id).eq('venue_id', proposal.venue_id ?? '')
+        }
+        const slotDuration = vsRow?.visit_availability?.slot_duration ?? 60
+        const [h, m] = time.split(':').map(Number)
+        const startDT = new Date(`${date}T${time.padStart(5, '0')}:00`)
+        const endDT   = new Date(startDT.getTime() + slotDuration * 60_000)
+        const pad = (n: number) => String(n).padStart(2, '0')
+        const fmtDT = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`
+        await createCalendarEvent(token, gcal.calendar_id, {
+          summary: `Visita — ${proposal.couple_name || 'Pareja'}`,
+          description: 'Visita agendada desde WeddingVenuesSpain',
+          startDateTime: fmtDT(startDT),
+          endDateTime:   fmtDT(endDT),
+        })
+      }
+    } catch (gcalErr: any) {
+      console.error('[visit-request] gcal push error', gcalErr?.message)
     }
 
     // 4. Send email notification to venue

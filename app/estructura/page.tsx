@@ -370,6 +370,7 @@ export default function EstructuraPage() {
   const [visitAvailDirty, setVisitAvailDirty] = useState(false)
   const [gcalConfig, setGcalConfig]     = useState<{ calendar_name: string; last_sync: string | null } | null>(null)
   const [gcalSyncing, setGcalSyncing]   = useState(false)
+  const [gcalPushing, setGcalPushing]   = useState(false)
   const [gcalMsg, setGcalMsg]           = useState<string | null>(null)
   // Block calendar UI state
   const [blockCalYear,  setBlockCalYear]  = useState(() => new Date().getFullYear())
@@ -1731,13 +1732,26 @@ export default function EstructuraPage() {
                               const json = await res.json()
                               if (res.ok) {
                                 setGcalConfig(prev => prev ? { ...prev, last_sync: json.last_sync } : prev)
-                                setGcalMsg(`${json.blocked_count} fechas bloqueadas`)
+                                setGcalMsg(`${json.blocked_count} fechas importadas`)
                               } else { setGcalMsg('Error al sincronizar') }
                               setGcalSyncing(false)
                               setTimeout(() => setGcalMsg(null), 3000)
                             }}
                             style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#fff', cursor: gcalSyncing ? 'wait' : 'pointer', color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            {gcalSyncing ? 'Sincronizando…' : '↻ Sincronizar'}
+                            {gcalSyncing ? 'Importando…' : '↓ Importar bloqueos'}
+                          </button>
+                          <button type="button" disabled={gcalPushing}
+                            onClick={async () => {
+                              setGcalPushing(true); setGcalMsg(null)
+                              const res = await fetch('/api/calendar/push-all', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venue_id: activeVenue?.id }) })
+                              const json = await res.json()
+                              if (res.ok) { setGcalMsg(`${json.pushed} eventos enviados a Google`) }
+                              else { setGcalMsg('Error al exportar') }
+                              setGcalPushing(false)
+                              setTimeout(() => setGcalMsg(null), 3000)
+                            }}
+                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#fff', cursor: gcalPushing ? 'wait' : 'pointer', color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {gcalPushing ? 'Exportando…' : '↑ Exportar bodas/visitas'}
                           </button>
                           <button type="button"
                             onClick={async () => {
