@@ -710,7 +710,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       )}
 
       {/* ZONES */}
-      {on('zones') && (zonesShow.length > 0 ? (
+      {on('zones') && !(spaceGroups?.length) && (zonesShow.length > 0 ? (
         <section style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
@@ -759,7 +759,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
       {/* SPACE GROUPS */}
-      {on('space_groups') && visibleSpaceGroups.length > 0 && (
+      {visibleSpaceGroups.length > 0 && (
         <section style={{ background: '#fff', padding: '40px 0' }}>
           <SpaceGroupSelector
             groups={visibleSpaceGroups}

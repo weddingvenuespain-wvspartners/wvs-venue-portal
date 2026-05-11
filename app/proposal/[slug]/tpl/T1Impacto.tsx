@@ -798,7 +798,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           ESPACIOS / ZONES
       ════════════════════════════════════════════ */}
-      {on('zones') && (zonesShow.length > 0 ? (
+      {on('zones') && !(spaceGroups?.length) && (zonesShow.length > 0 ? (
         <section id="sec-zones" className="t1-sec">
           <div className="w">
             <FadeUp>
@@ -851,7 +851,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           GRUPOS DE ESPACIOS
       ════════════════════════════════════════════ */}
-      {on('space_groups') && (visibleSpaceGroups.length > 0 ? (
+      {visibleSpaceGroups.length > 0 ? (
         <SpaceGroupSelector
           groups={visibleSpaceGroups}
           primary={primary}
@@ -861,7 +861,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           guestCount={guests}
           onSelectionChange={setSelectedSpaces}
         />
-      ) : spaceGroups && spaceGroups.length > 0 ? null : _preview ? <EmptySec label="Grupos de espacios" /> : null)}
+      ) : spaceGroups && spaceGroups.length > 0 ? null : on('space_groups') && _preview ? <EmptySec label="Grupos de espacios" /> : null}
 
       {/* ════════════════════════════════════════════
           PAQUETES

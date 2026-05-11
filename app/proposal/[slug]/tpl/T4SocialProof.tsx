@@ -910,7 +910,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       )}
 
       {/* ZONES */}
-      {on('zones') && (zonesShow.length > 0 ? (
+      {on('zones') && !(spaceGroups?.length) && (zonesShow.length > 0 ? (
         <section className="t4-section" style={{ background: WARM }}>
           <div className="t4-inner">
             <FadeUp>
@@ -962,7 +962,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
       {/* SPACE GROUPS */}
-      {on('space_groups') && visibleSpaceGroups.length > 0 && (
+      {visibleSpaceGroups.length > 0 && (
         <section className="t4-section" style={{ background: CREAM }}>
           <SpaceGroupSelector
             groups={visibleSpaceGroups}

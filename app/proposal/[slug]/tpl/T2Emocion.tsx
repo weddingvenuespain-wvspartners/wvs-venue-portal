@@ -330,7 +330,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       {/* ══════════════════════════════════════════
           ZONES
       ══════════════════════════════════════════ */}
-      {on('zones') && (zonesShow.length > 0 ? (
+      {on('zones') && !(spaceGroups?.length) && (zonesShow.length > 0 ? (
         <section id="sec-zones" style={{ background: CREAM, padding: '100px 0' }}>
           <div className="w-full">
             <FadeUp>
@@ -381,7 +381,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
       {/* ── SPACE GROUPS ── */}
-      {on('space_groups') && visibleSpaceGroups.length > 0 && (
+      {visibleSpaceGroups.length > 0 ? (
         <SpaceGroupSelector
           groups={visibleSpaceGroups}
           primary={primary}
@@ -391,7 +391,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           guestCount={guests}
           onSelectionChange={setSelectedSpaces}
         />
-      )}
+      ) : null}
 
       {/* ══════════════════════════════════════════
           VENUE RENTAL — grid temporada × día

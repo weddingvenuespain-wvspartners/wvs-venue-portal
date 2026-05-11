@@ -411,7 +411,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           )}
 
           {/* Zones */}
-          {on('zones') && (zonesShow.length > 0 ? (
+          {on('zones') && !(spaceGroups?.length) && (zonesShow.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['zones'] = el }}>
               <FadeUp>
                 <div className="sec-n">{secLbl('zones', 'Los espacios')}</div>
@@ -458,7 +458,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
           {/* Space groups */}
-          {on('space_groups') && visibleSpaceGroups.length > 0 && (
+          {visibleSpaceGroups.length > 0 && (
             <div className="sec">
               <SpaceGroupSelector
                 groups={visibleSpaceGroups}
