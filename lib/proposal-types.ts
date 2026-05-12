@@ -24,6 +24,7 @@ export type VisitAvailability = {
   block_booked_weddings: boolean            // block days with reservado/ganado calendar entries
   block_calendar_unavailable: boolean       // block any day that is not 'libre' in calendar
   blocked_dates: BlockedDate[]              // manual blocks
+  google_blocked_dates?: string[]           // synced from Google Calendar (full-day blocks)
 }
 
 // ── Visit request (stored in proposals.visit_request) ────────────────────────
@@ -127,9 +128,13 @@ export type SpaceGroup = {
   description?: string
   note?: string
   requires_selection?: boolean  // legacy
-  selection_mode?: 'pick_one' | 'pick_n' | 'pick_any' | 'pick_range' | 'optional' | 'optional_one' | 'optional_any' | 'none'
+  selection_mode?: 'pick_one' | 'pick_n' | 'pick_any' | 'pick_range' | 'optional' | 'optional_one' | 'optional_any' | 'none' | 'included_then_pick'
+  optional?: boolean
+  min_guests?: number
+  max_guests?: number
   pick_n_min?: number
   pick_n_max?: number
+  included_zone_ids?: string[]
   pricing_mode?: 'group_base' | 'per_space'  // group_base: base + extras; per_space: each space has its own price
   base_price?: string  // when pricing_mode === 'group_base'
   spaces: VenueSpaceItem[]
@@ -159,9 +164,13 @@ export type PricingSeason = {
 export type VenueSpaceGroup = {
   id: string
   name: string
-  selection_mode: 'pick_one' | 'pick_n' | 'pick_any' | 'pick_range' | 'optional' | 'optional_one' | 'optional_any' | 'none'
+  selection_mode: 'pick_one' | 'pick_n' | 'pick_any' | 'pick_range' | 'optional' | 'optional_one' | 'optional_any' | 'none' | 'included_then_pick'
+  optional?: boolean
+  min_guests?: number
+  max_guests?: number
   pick_n_min?: number
   pick_n_max?: number
+  included_zone_ids?: string[]  // for included_then_pick: zone IDs always included; remaining spaces are selectable by client
   pricing_mode?: 'group_base' | 'per_space'  // default: per_space
   base_price?: string  // legacy flat base price
   // Seasonal pricing grid
