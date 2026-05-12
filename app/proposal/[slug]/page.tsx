@@ -154,7 +154,14 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     .eq('proposal_id', proposal.id)
     .single()
 
-  // 4. Obtener venue_content (contenido de propuesta — completamente independiente de la ficha)
+  // 4. Obtener venue_settings (space_groups para fallback cuando la propuesta no los tiene)
+  const { data: venueSettings } = await supabase
+    .from('venue_settings')
+    .select('space_groups')
+    .eq('user_id', proposal.user_id)
+    .maybeSingle()
+
+  // 5. Obtener venue_content (contenido de propuesta — completamente independiente de la ficha)
   const { data: vcRows } = await supabase
     .from('venue_content')
     .select('*')
@@ -184,10 +191,17 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     countdown:          findOne('countdown'),
   }
 
-  const sectionsSecondary = (proposal as any)?.sections_data?.secondary_color as string | undefined
+  // Merge venue_settings.space_groups as fallback when proposal has none configured
+  const sectionsData: any = { ...(proposal.sections_data as any ?? {}) }
+  if (!sectionsData.space_groups?.length && venueSettings?.space_groups?.length) {
+    sectionsData.space_groups = venueSettings.space_groups
+  }
+
+  const sectionsSecondary = sectionsData?.secondary_color as string | undefined
   const baseBranding = brandingData ?? { logo_url: null, primary_color: '#2d4a7a' }
   const proposalData: ProposalData = {
     ...proposal,
+    sections_data: sectionsData,
     venue: venueData ?? null,
     branding: { ...baseBranding, secondary_color: sectionsSecondary ?? null },
     venueContent,
