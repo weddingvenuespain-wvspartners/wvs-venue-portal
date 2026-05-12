@@ -279,7 +279,7 @@ export default function SpaceGroupSelector({ groups, primary, onPrimary, dark = 
                     </div>
 
                     {/* Selection feedback */}
-                    {interactive && !isNone && (() => {
+                    {baseInteractive && !isNone && (() => {
                       if (mode === 'pick_one') {
                         const sel = singleSel[gi]
                         if (sel === undefined || sel < 0) return null
