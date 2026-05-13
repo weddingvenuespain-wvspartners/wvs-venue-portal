@@ -46,6 +46,7 @@ export type ProposalData = {
   sections_data?: SectionsData | null
   _preview?: boolean
   venueContent: VenueContent
+  commercialConfig?: { space_type?: string; price_model?: string } | null
   // venue — used only for hero name/city and contact
   venue: {
     name: string | null
@@ -154,10 +155,10 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     .eq('proposal_id', proposal.id)
     .single()
 
-  // 4. Obtener venue_settings (space_groups para fallback cuando la propuesta no los tiene)
+  // 4. Obtener venue_settings (space_groups + commercial_config para secciones y tarifas)
   const { data: venueSettings } = await supabase
     .from('venue_settings')
-    .select('space_groups')
+    .select('space_groups, commercial_config')
     .eq('user_id', proposal.user_id)
     .maybeSingle()
 
@@ -195,6 +196,23 @@ export default async function ProposalPage({ params, searchParams }: { params: P
   const sectionsData: any = { ...(proposal.sections_data as any ?? {}) }
   if (!sectionsData.space_groups?.length && venueSettings?.space_groups?.length) {
     sectionsData.space_groups = venueSettings.space_groups
+  } else if (sectionsData.space_groups?.length && venueSettings?.space_groups?.length) {
+    // Sync live fields from venue_settings (source of truth) into sections_data groups
+    sectionsData.space_groups = sectionsData.space_groups.map((sg: any) => {
+      const live = (venueSettings.space_groups as any[]).find((v: any) => v.id === sg.id)
+      if (!live) return sg
+      const synced: any = { ...sg }
+      if ('included_zone_ids' in live) synced.included_zone_ids = live.included_zone_ids
+      if ('pricing_display' in live) synced.pricing_display = live.pricing_display
+      if (Array.isArray(live.spaces) && Array.isArray(sg.spaces)) {
+        synced.spaces = sg.spaces.map((sp: any) => {
+          const liveSp = live.spaces.find((ls: any) => ls.id === (sp.id ?? sp.zone_id))
+          if (liveSp && Array.isArray(liveSp.price_tiers)) return { ...sp, price_tiers: liveSp.price_tiers }
+          return sp
+        })
+      }
+      return synced
+    })
   }
 
   const sectionsSecondary = sectionsData?.secondary_color as string | undefined
@@ -205,6 +223,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     venue: venueData ?? null,
     branding: { ...baseBranding, secondary_color: sectionsSecondary ?? null },
     venueContent,
+    commercialConfig: (venueSettings as any)?.commercial_config ?? null,
   }
 
   return <ProposalLanding data={proposalData} preview={preview} />

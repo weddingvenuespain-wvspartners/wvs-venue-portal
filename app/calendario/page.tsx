@@ -165,6 +165,14 @@ export default function CalendarioPage() {
   const today  = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
+  const [calView, setCalView] = useState<'month' | 'week' | 'day' | 'agenda'>('month')
+  const [weekStart, setWeekStart] = useState<string>(() => {
+    const t = new Date(); const day = t.getDay(); const diff = day === 0 ? -6 : 1 - day; t.setDate(t.getDate() + diff)
+    return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
+  })
+  const [dayDate, setDayDate] = useState<string>(() => {
+    const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
+  })
 
   // Modal state
   const [modalDate, setModalDate] = useState<string | null>(null)
@@ -202,7 +210,7 @@ export default function CalendarioPage() {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
     load()
-  }, [user, authLoading, year, month, activeVenue?.id])
+  }, [user, authLoading, year, month, calView, weekStart, dayDate, activeVenue?.id])
 
   // Deep-link: reabrir modal de fecha al volver desde ?openDate=YYYY-MM-DD
   useEffect(() => {
@@ -218,9 +226,23 @@ export default function CalendarioPage() {
     if (!activeVenue) { setLoading(false); return }
     setLoading(true)
     const supabase = createClient()
-    const lastDay  = new Date(year, month + 1, 0).getDate()
-    const from     = dateStr(year, month, 1)
-    const to       = dateStr(year, month, lastDay)
+    const pad2 = (n: number) => String(n).padStart(2, '0')
+    let from: string, to: string
+    if (calView === 'week') {
+      from = weekStart
+      const endD = new Date(weekStart + 'T12:00:00'); endD.setDate(endD.getDate() + 6)
+      to = `${endD.getFullYear()}-${pad2(endD.getMonth()+1)}-${pad2(endD.getDate())}`
+    } else if (calView === 'day') {
+      from = dayDate; to = dayDate
+    } else if (calView === 'agenda') {
+      from = dayDate
+      const endD = new Date(dayDate + 'T12:00:00'); endD.setDate(endD.getDate() + 29)
+      to = `${endD.getFullYear()}-${pad2(endD.getMonth()+1)}-${pad2(endD.getDate())}`
+    } else {
+      const lastDay = new Date(year, month + 1, 0).getDate()
+      from = dateStr(year, month, 1)
+      to   = dateStr(year, month, lastDay)
+    }
 
     const [entriesRes, leadsRes, modalitiesRes, inquiriesRes] = await Promise.all([
       supabase.from('calendar_entries').select('*').eq('venue_id', activeVenue.id).gte('date', from).lte('date', to),
@@ -688,6 +710,30 @@ export default function CalendarioPage() {
 
   const prevMonth = () => { if (month === 0) { setYear(y => y-1); setMonth(11) } else setMonth(m => m-1) }
   const nextMonth = () => { if (month === 11) { setYear(y => y+1); setMonth(0) } else setMonth(m => m+1) }
+  const pad2cal = (n: number) => String(n).padStart(2,'0')
+  const prevPeriod = () => {
+    if (calView === 'month') prevMonth()
+    else if (calView === 'week') { const d = new Date(weekStart+'T12:00:00'); d.setDate(d.getDate()-7); setWeekStart(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+    else if (calView === 'day') { const d = new Date(dayDate+'T12:00:00'); d.setDate(d.getDate()-1); setDayDate(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+    else { const d = new Date(dayDate+'T12:00:00'); d.setDate(d.getDate()-7); setDayDate(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+  }
+  const nextPeriod = () => {
+    if (calView === 'month') nextMonth()
+    else if (calView === 'week') { const d = new Date(weekStart+'T12:00:00'); d.setDate(d.getDate()+7); setWeekStart(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+    else if (calView === 'day') { const d = new Date(dayDate+'T12:00:00'); d.setDate(d.getDate()+1); setDayDate(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+    else { const d = new Date(dayDate+'T12:00:00'); d.setDate(d.getDate()+7); setDayDate(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+  }
+  const periodLabel = (() => {
+    if (calView === 'month') return `${MONTHS[month]} ${year}`
+    if (calView === 'week') {
+      const s = new Date(weekStart+'T12:00:00'); const e = new Date(weekStart+'T12:00:00'); e.setDate(e.getDate()+6)
+      return `${pad2cal(s.getDate())} ${MONTHS[s.getMonth()].slice(0,3)} – ${pad2cal(e.getDate())} ${MONTHS[e.getMonth()].slice(0,3)} ${e.getFullYear()}`
+    }
+    if (calView === 'day') { const d = new Date(dayDate+'T12:00:00'); return `${pad2cal(d.getDate())} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` }
+    // agenda
+    const s = new Date(dayDate+'T12:00:00'); const e = new Date(dayDate+'T12:00:00'); e.setDate(e.getDate()+29)
+    return `${pad2cal(s.getDate())} ${MONTHS[s.getMonth()].slice(0,3)} – ${pad2cal(e.getDate())} ${MONTHS[e.getMonth()].slice(0,3)} ${e.getFullYear()}`
+  })()
 
   // Upcoming events for sidebar (next 60 days)
   const upcomingEntries = useMemo(() => {
@@ -853,22 +899,34 @@ export default function CalendarioPage() {
             {/* Calendar */}
             <div className="card" style={{ overflow: 'hidden', gridColumn: 'span 3' }}>
               {/* Calendar header */}
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, color: 'var(--espresso)', fontWeight: 500, letterSpacing: '0.01em' }}>
-                    {MONTHS[month]} {year}
+                    {periodLabel}
                   </span>
-                  <button onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()) }}
+                  <button onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); const t = new Date(); const dy = t.getDay(); const df = dy === 0 ? -6 : 1 - dy; t.setDate(t.getDate() + df); const p2=(n:number)=>String(n).padStart(2,'0'); setWeekStart(`${t.getFullYear()}-${p2(t.getMonth()+1)}-${p2(t.getDate())}`); setDayDate(dateStr(today.getFullYear(), today.getMonth(), today.getDate())) }}
                     style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'Manrope, sans-serif' }}>
                     Hoy
                   </button>
                 </div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <button onClick={prevMonth}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {/* View tabs */}
+                  <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
+                    {(['month','week','day','agenda'] as const).map(v => (
+                      <button key={v} type="button" onClick={() => setCalView(v)}
+                        style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
+                          background: calView === v ? '#fff' : 'transparent',
+                          color: calView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
+                          boxShadow: calView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
+                        {v === 'month' ? 'Mes' : v === 'week' ? 'Semana' : v === 'day' ? 'Día' : 'Agenda'}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={prevPeriod}
                     style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
                     <ChevronLeft size={15} />
                   </button>
-                  <button onClick={nextMonth}
+                  <button onClick={nextPeriod}
                     style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
                     <ChevronRight size={15} />
                   </button>
@@ -898,18 +956,18 @@ export default function CalendarioPage() {
                 })}
               </div>
 
-              {/* Day headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid var(--ivory)' }}>
+              {/* Day headers — month view only */}
+              {calView === 'month' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid var(--ivory)' }}>
                 {DAYS_SHORT.map((d, i) => (
                   <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '0.08em', padding: '12px 0' }}>
                     {d}
                   </div>
                 ))}
-              </div>
+              </div>}
 
                 {loading ? (
                   <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Spinner /></div>
-                ) : (
+                ) : calView !== 'month' ? null : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
                     {cells.map((day, i) => {
                       if (!day) return <div key={`e-${i}`} style={{ minHeight: 90, borderBottom: '1px solid var(--ivory)', borderRight: i % 7 !== 6 ? '1px solid var(--ivory)' : 'none' }} />
@@ -1157,6 +1215,193 @@ export default function CalendarioPage() {
                     })}
                   </div>
                 )}
+
+              {/* ── Week view ─────────────────────────────────────────────── */}
+              {!loading && calView === 'week' && (() => {
+                const weekDates: string[] = []
+                for (let i = 0; i < 7; i++) {
+                  const d = new Date(weekStart + 'T12:00:00'); d.setDate(d.getDate() + i)
+                  weekDates.push(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`)
+                }
+                const DOW_SHORT = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+                return (
+                  <div style={{ overflowX: 'auto' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', minWidth: 560, borderBottom: '1px solid var(--ivory)', background: '#faf8f5' }}>
+                      {weekDates.map((iso, wi) => {
+                        const d = new Date(iso + 'T12:00:00')
+                        const isToday = iso === todayIso
+                        const isPast = iso < todayIso
+                        return (
+                          <div key={iso} style={{ textAlign: 'center', padding: '10px 4px', borderLeft: wi > 0 ? '1px solid var(--ivory)' : 'none', opacity: isPast ? 0.5 : 1 }}>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: wi >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '.07em', textTransform: 'uppercase' }}>{DOW_SHORT[wi]}</div>
+                            <div style={{ fontSize: 18, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--gold)' : 'var(--charcoal)', width: 30, height: 30, borderRadius: '50%', background: isToday ? '#fef3c7' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0', fontFamily: 'Manrope, sans-serif' }}>{d.getDate()}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', minWidth: 560 }}>
+                      {weekDates.map((iso, wi) => {
+                        const entry = entries[iso]
+                        const isPast = iso < todayIso
+                        const cfg = entry?.status ? STATUS_CFG[entry.status as Status] ?? STATUS_CFG['libre'] : STATUS_CFG['libre']
+                        const dayLeads = (leadsByDate[iso] || []).filter(l => (filterAll || (calendarFilters.has('leads') || calendarFilters.has('bodas') && l.status === 'won')))
+                        const visitLeads = leads.filter(l => l.visit_date === iso)
+                        const dayInqs = pendingInquiries.filter(i => { const ev = i.event_at ? i.event_at.slice(0,10) : null; return ev === iso })
+                        return (
+                          <div key={iso} onClick={() => !isPast && setModalDate(iso)}
+                            style={{ minHeight: 120, borderLeft: wi > 0 ? '1px solid var(--ivory)' : 'none', borderTop: '1px solid var(--ivory)', padding: '8px 8px', background: entry?.status && entry.status !== 'libre' ? cfg.bg : '#fff', cursor: isPast ? 'default' : 'pointer', opacity: isPast ? 0.45 : 1, transition: 'background .15s', position: 'relative', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {entry?.status && entry.status !== 'libre' && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                                <span style={{ fontSize: 9, fontWeight: 700, color: cfg.color, textTransform: 'uppercase', letterSpacing: '.05em' }}>{cfg.label}</span>
+                              </div>
+                            )}
+                            {entry?.lead_id && leadsById[entry.lead_id] && (
+                              <span style={{ fontSize: 10, fontWeight: 600, color: cfg.color, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{leadsById[entry.lead_id].name}</span>
+                            )}
+                            {visitLeads.slice(0,2).map(vl => (
+                              <div key={vl.id} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
+                                <span style={{ fontSize: 9, fontWeight: 600, color: '#059669', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{vl.name}{(vl as any).visit_time ? ` · ${(vl as any).visit_time}` : ''}</span>
+                              </div>
+                            ))}
+                            {dayInqs.length > 0 && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
+                                <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--gold)' }}>{dayInqs.length === 1 ? dayInqs[0].kind === 'visit' ? 'Visita' : 'Solicitud' : `${dayInqs.length} solicitudes`}</span>
+                              </div>
+                            )}
+                            {dayLeads.filter(l => !visitLeads.some(v => v.id === l.id)).slice(0,2).map(l => (
+                              <span key={l.id} style={{ fontSize: 9, color: '#3b82f6', fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{l.name}</span>
+                            ))}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* ── Day view ──────────────────────────────────────────────── */}
+              {!loading && calView === 'day' && (() => {
+                const iso = dayDate
+                const entry = entries[iso]
+                const isPast = iso < todayIso
+                const isToday = iso === todayIso
+                const cfg = entry?.status ? STATUS_CFG[entry.status as Status] ?? STATUS_CFG['libre'] : STATUS_CFG['libre']
+                const dLeads = (leadsByDate[iso] || [])
+                const vLeads = leads.filter(l => l.visit_date === iso)
+                const dInqs = pendingInquiries.filter(i => i.event_at?.slice(0,10) === iso)
+                const d = new Date(iso + 'T12:00:00')
+                const DOW = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
+                return (
+                  <div style={{ padding: '20px 24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap' }}>
+                      {/* Date stamp */}
+                      <div style={{ textAlign: 'center', minWidth: 64 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: d.getDay() >= 6 ? 'var(--gold)' : 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.07em' }}>{DOW[d.getDay()]}</div>
+                        <div style={{ fontSize: 48, fontWeight: 700, color: isToday ? 'var(--gold)' : 'var(--charcoal)', lineHeight: 1, fontFamily: 'Manrope, sans-serif' }}>{d.getDate()}</div>
+                        <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginTop: 2 }}>{MONTHS[d.getMonth()]} {d.getFullYear()}</div>
+                      </div>
+                      {/* Details */}
+                      <div style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 10, opacity: isPast ? 0.55 : 1 }}>
+                        {/* Status */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: entry?.status && entry.status !== 'libre' ? cfg.bg : '#f9f8f6', border: `1px solid ${entry?.status && entry.status !== 'libre' ? cfg.border : 'var(--ivory)'}` }}>
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: cfg.color, textTransform: 'uppercase', letterSpacing: '.06em' }}>{cfg.label}</div>
+                            {entry?.lead_id && leadsById[entry.lead_id] && <div style={{ fontSize: 11, color: 'var(--charcoal)', marginTop: 2 }}>{leadsById[entry.lead_id].name}</div>}
+                            {entry?.note && <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 2 }}>{entry.note}</div>}
+                          </div>
+                          {!isPast && <button onClick={() => setModalDate(iso)} style={{ marginLeft: 'auto', fontSize: 11, padding: '4px 12px', borderRadius: 7, border: '1px solid var(--ivory)', background: '#fff', color: 'var(--charcoal)', cursor: 'pointer', fontWeight: 600 }}>Editar</button>}
+                        </div>
+                        {/* Visits */}
+                        {vLeads.length > 0 && <div style={{ borderRadius: 10, border: '1px solid #d1fae5', background: '#f0fdf4', padding: '10px 14px' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#047857', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 6 }}>Visitas agendadas</div>
+                          {vLeads.map(vl => <div key={vl.id} style={{ fontSize: 12, color: '#064e3b' }}>{vl.name}{(vl as any).visit_time ? ` · ${(vl as any).visit_time}` : ''}</div>)}
+                        </div>}
+                        {/* Inquiries */}
+                        {dInqs.length > 0 && <div style={{ borderRadius: 10, border: '1px solid #fde68a', background: '#fffbeb', padding: '10px 14px' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 6 }}>Solicitudes pendientes</div>
+                          {dInqs.map(inq => <div key={inq.id} style={{ fontSize: 12, color: '#78350f' }}>{inq.name} · {inq.kind === 'visit' ? 'Visita' : inq.kind === 'video' ? 'Videollamada' : 'Llamada'}{typeof inq.payload?.time === 'string' ? ` · ${inq.payload.time}` : ''}</div>)}
+                        </div>}
+                        {/* Leads */}
+                        {dLeads.filter(l => !vLeads.some(v => v.id === l.id)).length > 0 && <div style={{ borderRadius: 10, border: '1px solid #bfdbfe', background: '#eff6ff', padding: '10px 14px' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 6 }}>Leads</div>
+                          {dLeads.filter(l => !vLeads.some(v => v.id === l.id)).map(l => <div key={l.id} style={{ fontSize: 12, color: '#1e40af' }}>{l.name}</div>)}
+                        </div>}
+                        {!entry && vLeads.length === 0 && dInqs.length === 0 && dLeads.length === 0 && (
+                          <div style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin eventos</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* ── Agenda view ───────────────────────────────────────────── */}
+              {!loading && calView === 'agenda' && (() => {
+                const agendaDates: string[] = []
+                for (let i = 0; i < 30; i++) {
+                  const d = new Date(dayDate + 'T12:00:00'); d.setDate(d.getDate() + i)
+                  agendaDates.push(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`)
+                }
+                const DOW_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+                return (
+                  <div style={{ maxHeight: 520, overflowY: 'auto' }}>
+                    {agendaDates.map(iso => {
+                      const d = new Date(iso + 'T12:00:00')
+                      const entry = entries[iso]
+                      const isPast = iso < todayIso
+                      const isToday = iso === todayIso
+                      const cfg = entry?.status ? STATUS_CFG[entry.status as Status] ?? STATUS_CFG['libre'] : STATUS_CFG['libre']
+                      const dLeads = (leadsByDate[iso] || [])
+                      const vLeads = leads.filter(l => l.visit_date === iso)
+                      const dInqs = pendingInquiries.filter(i => i.event_at?.slice(0,10) === iso)
+                      const hasContent = (entry && entry.status !== 'libre') || vLeads.length > 0 || dInqs.length > 0 || dLeads.length > 0
+                      return (
+                        <div key={iso} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--ivory)', background: isToday ? '#fffbf0' : 'transparent', opacity: isPast ? 0.45 : 1 }}>
+                          {/* Date */}
+                          <div style={{ minWidth: 52, textAlign: 'center', paddingTop: 2 }}>
+                            <div style={{ fontSize: 9, fontWeight: 600, color: d.getDay() >= 6 ? 'var(--gold)' : 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{DOW_SHORT[d.getDay()]}</div>
+                            <div style={{ fontSize: 17, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--gold)' : 'var(--charcoal)', fontFamily: 'Manrope, sans-serif', lineHeight: 1.1 }}>{d.getDate()}</div>
+                            <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{MONTHS[d.getMonth()].slice(0,3)}</div>
+                          </div>
+                          {/* Events */}
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 2 }}>
+                            {!hasContent && <span style={{ fontSize: 11, color: '#c0bbB4', fontStyle: 'italic' }}>Libre</span>}
+                            {entry && entry.status !== 'libre' && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, fontWeight: 600, color: cfg.color }}>{cfg.label}{entry.lead_id && leadsById[entry.lead_id] ? ` · ${leadsById[entry.lead_id].name}` : ''}</span>
+                              </div>
+                            )}
+                            {vLeads.map(vl => (
+                              <div key={vl.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#059669' }}>Visita · {vl.name}{(vl as any).visit_time ? ` · ${(vl as any).visit_time}` : ''}</span>
+                              </div>
+                            ))}
+                            {dInqs.map(inq => (
+                              <div key={inq.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)' }}>{inq.kind === 'visit' ? 'Visita' : inq.kind === 'video' ? 'Videollamada' : 'Llamada'} · {inq.name}</span>
+                              </div>
+                            ))}
+                            {dLeads.filter(l => !vLeads.some(v => v.id === l.id)).map(l => (
+                              <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, color: '#1d4ed8' }}>{l.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {!isPast && <button onClick={() => setModalDate(iso)} style={{ fontSize: 10, padding: '3px 9px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#faf8f5', color: 'var(--warm-gray)', cursor: 'pointer', flexShrink: 0 }}>Editar</button>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
 
               {/* Legend */}
               <div style={{ padding: '12px 20px', borderTop: '1px solid var(--ivory)', display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>

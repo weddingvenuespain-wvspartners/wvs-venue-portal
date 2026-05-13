@@ -14,7 +14,7 @@ import {
 import FeatureGate from '@/components/FeatureGate'
 import { createClient } from '@/lib/supabase'
 import DatePicker, { fmtDate } from '@/components/DatePicker'
-import type { VisitAvailability, DaySchedule, BlockedDate, VenueSpaceGroup, VenueSpace, PricingSeason } from '@/lib/proposal-types'
+import type { VisitAvailability, DaySchedule, BlockedDate, VenueSpaceGroup, VenueSpace, PricingSeason, PriceTier } from '@/lib/proposal-types'
 
 // ── Duration types ─────────────────────────────────────────────────────────────
 
@@ -52,15 +52,16 @@ type WizardConfig   = Partial<CommercialConfig>
 type ZoneItem       = { id: string; name: string }
 type SupplementItem = { id: string; name: string }
 
-type ZonePrice       = { zone_id: string; price: number }
+type ZonePrice       = { zone_id: string; price: number; price_tiers?: PriceTier[] }
 type SupplementPrice = { supplement_id: string; price: number }
 
-type GroupPrice = { group_id: string; base_price: number; space_supplements?: { space_id: string; price: number }[] }
+type GroupPrice = { group_id: string; base_price: number; space_supplements?: { space_id: string; price: number; price_tiers?: PriceTier[] }[]; price_tiers?: PriceTier[] }
 
 type ModalityPrice = {
   id: string; modality_id: string; package_id: string | null
   date_from: string; date_to: string; price: number; notes: string | null
   price_per_person?: number | null
+  price_tiers?: PriceTier[] | null
   zone_prices?: ZonePrice[] | null
   supplement_prices?: SupplementPrice[] | null
   group_prices?: GroupPrice[] | null
@@ -134,10 +135,14 @@ const emptyModalForm = { name: '', description: '', duration_type: 'custom' as D
 const emptyPriceForm = {
   date_from: '', date_to: '', price: '', notes: '',
   price_per_person: '',
+  price_tiers: null as PriceTier[] | null,               // null = flat mode; array = tier mode
   zone_prices: {} as Record<string, string>,
+  zone_tier_prices: {} as Record<string, PriceTier[]>,   // zone_id → tiers (overrides flat price)
   supplement_prices: {} as Record<string, string>,
   group_prices: {} as Record<string, string>,              // group_id → base_price
-  space_supplement_prices: {} as Record<string, string>,   // space_id → supplement
+  group_tier_prices: {} as Record<string, PriceTier[]>,  // group_id → tiers (overrides base_price)
+  space_supplement_prices: {} as Record<string, string>,   // "group_id:space_id" → supplement / per-space price
+  space_tier_prices: {} as Record<string, PriceTier[]>,   // "group_id:space_id" → tiers (per_space mode or supplement tiers)
 }
 
 // ── Price helpers ──────────────────────────────────────────────────────────────
@@ -150,25 +155,53 @@ function buildPricePayload(form: typeof emptyPriceForm, cfg: CommercialConfig | 
   if (space === 'multiple_independent' || space === 'single_with_supplements') {
     base.price = 0
     if (space === 'multiple_independent') {
-      base.zone_prices = Object.entries(form.zone_prices)
-        .filter(([, v]) => v !== '')
+      // flat zones (those not in tier mode)
+      const flatEntries = Object.entries(form.zone_prices)
+        .filter(([zone_id, v]) => v !== '' && !(form.zone_tier_prices[zone_id]?.length > 0))
         .map(([zone_id, price]) => ({ zone_id, price: parseFloat(price) }))
+      // tier zones
+      const tierEntries = Object.entries(form.zone_tier_prices)
+        .filter(([, tiers]) => tiers.length > 0)
+        .map(([zone_id, tiers]) => ({ zone_id, price: 0, price_tiers: tiers }))
+      base.zone_prices = [...flatEntries, ...tierEntries]
     }
     // Group-based pricing (both space types)
-    const gp = Object.entries(form.group_prices).filter(([, v]) => v !== '')
-    const sp = Object.entries(form.space_supplement_prices).filter(([, v]) => v !== '')
-    if (gp.length > 0) {
-      base.group_prices = gp.map(([group_id, price]) => {
-        const groupSupps = sp.filter(([sid]) => sid.startsWith(group_id + ':'))
-        return {
+    // Collect all group IDs that have any price data
+    const allGroupIds = new Set([
+      ...Object.keys(form.group_prices).filter(id => form.group_prices[id] !== ''),
+      ...Object.keys(form.group_tier_prices).filter(id => form.group_tier_prices[id].length > 0),
+      ...Object.keys(form.space_supplement_prices).filter(k => form.space_supplement_prices[k] !== '').map(k => k.split(':')[0]),
+      ...Object.keys(form.space_tier_prices).filter(k => form.space_tier_prices[k].length > 0).map(k => k.split(':')[0]),
+    ])
+    if (allGroupIds.size > 0) {
+      base.group_prices = [...allGroupIds].map(group_id => {
+        const groupTiers = form.group_tier_prices[group_id]
+        // Collect all space IDs for this group (from flat prices + tier prices)
+        const spaceIds = new Set([
+          ...Object.keys(form.space_supplement_prices).filter(k => k.startsWith(group_id + ':') && form.space_supplement_prices[k] !== '').map(k => k.split(':')[1]),
+          ...Object.keys(form.space_tier_prices).filter(k => k.startsWith(group_id + ':') && form.space_tier_prices[k].length > 0).map(k => k.split(':')[1]),
+        ])
+        const entry: GroupPrice = {
           group_id,
-          base_price: parseFloat(price),
-          space_supplements: groupSupps.map(([sid, p]) => ({ space_id: sid.split(':')[1], price: parseFloat(p) })),
+          base_price: groupTiers?.length > 0 ? 0 : (parseFloat(form.group_prices[group_id]) || 0),
+          space_supplements: [...spaceIds].map(space_id => {
+            const key = `${group_id}:${space_id}`
+            const tiers = form.space_tier_prices[key]
+            if (tiers?.length > 0) return { space_id, price: 0, price_tiers: tiers }
+            return { space_id, price: parseFloat(form.space_supplement_prices[key] || '0') }
+          }),
         }
+        if (groupTiers?.length > 0) entry.price_tiers = groupTiers
+        return entry
       })
     }
   } else {
-    base.price = parseFloat(form.price) || 0
+    if (form.price_tiers && form.price_tiers.length > 0) {
+      base.price = 0
+      base.price_tiers = form.price_tiers
+    } else {
+      base.price = parseFloat(form.price) || 0
+    }
     if (model === 'per_person' || model === 'package') {
       base.price_per_person = form.price_per_person !== '' ? parseFloat(form.price_per_person) : null
     }
@@ -178,11 +211,22 @@ function buildPricePayload(form: typeof emptyPriceForm, cfg: CommercialConfig | 
 
 function initPriceForm(p: ModalityPrice): typeof emptyPriceForm {
   const groupPrices: Record<string, string> = {}
+  const groupTierPrices: Record<string, PriceTier[]> = {}
   const spaceSupps: Record<string, string> = {}
+  const spaceTierPrices: Record<string, PriceTier[]> = {}
   ;(p.group_prices ?? []).forEach(gp => {
-    groupPrices[gp.group_id] = String(gp.base_price)
+    if (Array.isArray(gp.price_tiers) && gp.price_tiers.length > 0) {
+      groupTierPrices[gp.group_id] = gp.price_tiers
+    } else {
+      groupPrices[gp.group_id] = String(gp.base_price)
+    }
     ;(gp.space_supplements ?? []).forEach(ss => {
-      spaceSupps[`${gp.group_id}:${ss.space_id}`] = String(ss.price)
+      const key = `${gp.group_id}:${ss.space_id}`
+      if (Array.isArray((ss as any).price_tiers) && (ss as any).price_tiers.length > 0) {
+        spaceTierPrices[key] = (ss as any).price_tiers as PriceTier[]
+      } else {
+        spaceSupps[key] = String(ss.price)
+      }
     })
   })
   return {
@@ -191,10 +235,24 @@ function initPriceForm(p: ModalityPrice): typeof emptyPriceForm {
     price:     String(p.price ?? ''),
     notes:     p.notes ?? '',
     price_per_person: p.price_per_person != null ? String(p.price_per_person) : '',
-    zone_prices: Object.fromEntries((p.zone_prices ?? []).map(z => [z.zone_id, String(z.price)])),
+    price_tiers: Array.isArray(p.price_tiers) && p.price_tiers.length > 0 ? p.price_tiers : null,
+    // flat zone prices (exclude tier zones)
+    zone_prices: Object.fromEntries(
+      (p.zone_prices ?? [])
+        .filter((z: any) => !(Array.isArray(z.price_tiers) && z.price_tiers.length > 0))
+        .map((z: any) => [z.zone_id, String(z.price)])
+    ),
+    // tier zone prices
+    zone_tier_prices: Object.fromEntries(
+      (p.zone_prices ?? [])
+        .filter((z: any) => Array.isArray(z.price_tiers) && z.price_tiers.length > 0)
+        .map((z: any) => [z.zone_id, z.price_tiers as PriceTier[]])
+    ),
     supplement_prices: Object.fromEntries((p.supplement_prices ?? []).map(s => [s.supplement_id, String(s.price)])),
     group_prices: groupPrices,
+    group_tier_prices: groupTierPrices,
     space_supplement_prices: spaceSupps,
+    space_tier_prices: spaceTierPrices,
   }
 }
 
@@ -374,10 +432,13 @@ export default function EstructuraPage() {
   // Block calendar UI state
   const [blockCalYear,  setBlockCalYear]  = useState(() => new Date().getFullYear())
   const [blockCalMonth, setBlockCalMonth] = useState(() => new Date().getMonth())
-  const [blockView, setBlockView] = useState<'month' | 'week'>('month')
+  const [blockView, setBlockView] = useState<'month' | 'week' | 'day' | 'agenda'>('month')
   const [blockWeekStart, setBlockWeekStart] = useState<string>(() => {
     const t = new Date(); const day = t.getDay(); const diff = day === 0 ? -6 : 1 - day; t.setDate(t.getDate() + diff)
     return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
+  })
+  const [blockDayDate, setBlockDayDate] = useState<string>(() => {
+    const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
   })
   const [blockPickerDate, setBlockPickerDate] = useState<string | null>(null)
   const [blockType, setBlockType] = useState<BlockedDate['type']>('full')
@@ -419,7 +480,7 @@ export default function EstructuraPage() {
     load()
   }, [user, authLoading, activeVenue?.id]) // eslint-disable-line
 
-  // Load calendar_entries for the visible range (month or week view)
+  // Load calendar_entries for the visible range (month / week / day / agenda)
   useEffect(() => {
     if (!user) return
     const supabase = createClient()
@@ -428,6 +489,12 @@ export default function EstructuraPage() {
     if (blockView === 'week') {
       from = blockWeekStart
       const end = new Date(blockWeekStart + 'T12:00:00'); end.setDate(end.getDate() + 6)
+      to = `${end.getFullYear()}-${p(end.getMonth()+1)}-${p(end.getDate())}`
+    } else if (blockView === 'day') {
+      from = blockDayDate; to = blockDayDate
+    } else if (blockView === 'agenda') {
+      from = blockDayDate
+      const end = new Date(blockDayDate + 'T12:00:00'); end.setDate(end.getDate() + 29)
       to = `${end.getFullYear()}-${p(end.getMonth()+1)}-${p(end.getDate())}`
     } else {
       from = `${blockCalYear}-${p(blockCalMonth + 1)}-01`
@@ -440,7 +507,7 @@ export default function EstructuraPage() {
         data?.forEach(e => { map[e.date] = e.status })
         setBlockCalEntries(map)
       })
-  }, [blockCalYear, blockCalMonth, blockView, blockWeekStart, user, activeVenue?.id]) // eslint-disable-line
+  }, [blockCalYear, blockCalMonth, blockView, blockWeekStart, blockDayDate, user, activeVenue?.id]) // eslint-disable-line
 
   const load = async () => {
     if (!activeVenue) { setLoading(false); return }
@@ -676,6 +743,45 @@ export default function EstructuraPage() {
     ))
   }
 
+  // Change pricing_mode on a group and persist
+  const handlePricingModeChange = (groupId: string, mode: 'group_base' | 'per_space') => {
+    const updated = spaceGroups.map(g => g.id === groupId ? { ...g, pricing_mode: mode } : g)
+    setSpaceGroups(updated)
+    saveSpaceGroups(updated)
+  }
+
+  // Sync prices → venue_settings.space_groups so proposal can read them
+  const syncPricesToSpaceGroups = (form: typeof emptyPriceForm) => {
+    if (spaceGroups.length === 0) return
+    const updatedGroups = spaceGroups.map(grp => ({
+      ...grp,
+      spaces: grp.spaces.map(sp => {
+        let updated = { ...sp }
+        // Zone-level tiers (flat zone list matching by id)
+        const zoneTiers = form.zone_tier_prices[sp.id]
+        if (zoneTiers !== undefined) updated = { ...updated, price_tiers: zoneTiers.length > 0 ? zoneTiers : undefined }
+        // Space-level tiers (inside a group, keyed by group_id:space_id)
+        const spKey = `${grp.id}:${sp.id}`
+        const spaceTiers = form.space_tier_prices[spKey]
+        if (spaceTiers?.length > 0) {
+          updated = { ...updated, price_tiers: spaceTiers }
+        } else if (spKey in form.space_tier_prices) {
+          updated = { ...updated, price_tiers: undefined }
+        }
+        // Per-space flat price (per_space mode)
+        if (grp.pricing_mode === 'per_space') {
+          const flatPrice = form.space_supplement_prices[spKey]
+          if (flatPrice) updated = { ...updated, price: flatPrice }
+        }
+        return updated
+      })
+    }))
+    if (JSON.stringify(updatedGroups) !== JSON.stringify(spaceGroups)) {
+      setSpaceGroups(updatedGroups)
+      saveSpaceGroups(updatedGroups)
+    }
+  }
+
   // ── Price CRUD ─────────────────────────────────────────────────────────────
 
   const startAddPrice = (modalityId: string, packageId: string | null = null) => {
@@ -692,9 +798,10 @@ export default function EstructuraPage() {
     const isSupp2 = commercialConfig?.space_type === 'single_with_supplements'
     if (!isMulti && !isSupp2 && !priceForm.price) { setPriceError('El precio es obligatorio'); return }
     if (isMulti) {
-      const filledZones = Object.values(priceForm.zone_prices).filter(v => v !== '' && v !== '0')
+      const filledZones = Object.entries(priceForm.zone_prices).filter(([zid, v]) => (v !== '' && v !== '0') || (priceForm.zone_tier_prices[zid]?.length ?? 0) > 0)
+      const filledTierZones = Object.values(priceForm.zone_tier_prices).filter(t => t.length > 0)
       const filledGroups = Object.values(priceForm.group_prices).filter(v => v !== '' && v !== '0')
-      if (filledZones.length === 0 && filledGroups.length === 0) { setPriceError('Indica el precio de al menos una zona o grupo'); return }
+      if (filledZones.length === 0 && filledTierZones.length === 0 && filledGroups.length === 0) { setPriceError('Indica el precio de al menos una zona o grupo'); return }
     }
     setPriceSaving(true); setPriceError('')
     try {
@@ -720,6 +827,7 @@ export default function EstructuraPage() {
         }
         return { ...m, prices: [...m.prices, json.price].sort((a, b) => a.date_from.localeCompare(b.date_from)) }
       }))
+      syncPricesToSpaceGroups(priceForm)
       setPriceAdding(null); setPriceForm(emptyPriceForm)
       setRecentlySavedId(json.price.id); setTimeout(() => setRecentlySavedId(null), 2000)
     } catch { setPriceError('Error de red') }
@@ -737,9 +845,10 @@ export default function EstructuraPage() {
     const isMulti = commercialConfig?.space_type === 'multiple_independent'
     if (!isMulti && !editPriceForm.price) { setPriceError('El precio es obligatorio'); return }
     if (isMulti) {
-      const filledZones = Object.values(editPriceForm.zone_prices).filter(v => v !== '' && v !== '0')
+      const filledZones = Object.entries(editPriceForm.zone_prices).filter(([zid, v]) => (v !== '' && v !== '0') || (editPriceForm.zone_tier_prices[zid]?.length ?? 0) > 0)
+      const filledTierZones = Object.values(editPriceForm.zone_tier_prices).filter(t => t.length > 0)
       const filledGroups = Object.values(editPriceForm.group_prices).filter(v => v !== '' && v !== '0')
-      if (filledZones.length === 0 && filledGroups.length === 0) { setPriceError('Indica el precio de al menos una zona o grupo'); return }
+      if (filledZones.length === 0 && filledTierZones.length === 0 && filledGroups.length === 0) { setPriceError('Indica el precio de al menos una zona o grupo'); return }
     }
     setPriceSaving(true); setPriceError('')
     try {
@@ -761,6 +870,7 @@ export default function EstructuraPage() {
         }
         return { ...m, prices: m.prices.map(p => p.id === priceId ? json.price : p).sort((a, b) => a.date_from.localeCompare(b.date_from)) }
       }))
+      syncPricesToSpaceGroups(editPriceForm)
       setEditingPrice(null)
       setRecentlySavedId(priceId); setTimeout(() => setRecentlySavedId(null), 2000)
     } catch { setPriceError('Error de red') }
@@ -1431,6 +1541,7 @@ export default function EstructuraPage() {
                                               zones={zones}
                                               supplements={supplements}
                                               spaceGroups={spaceGroups}
+                                              onPricingModeChange={handlePricingModeChange}
                                             />
                                           </div>
                                         )}
@@ -1450,6 +1561,7 @@ export default function EstructuraPage() {
                                                 zones={zones}
                                                 supplements={supplements}
                                                 spaceGroups={spaceGroups}
+                                                onPricingModeChange={handlePricingModeChange}
                                               />
                                             ) : (
                                               <PriceRow
@@ -1563,6 +1675,7 @@ export default function EstructuraPage() {
                                         supplements={supplements}
                                         spaceGroups={spaceGroups}
                                         existingRanges={existingRanges}
+                                        onPricingModeChange={handlePricingModeChange}
                                       />
                                     </div>
                                   )}
@@ -1585,6 +1698,7 @@ export default function EstructuraPage() {
                                               supplements={supplements}
                                               spaceGroups={spaceGroups}
                                               existingRanges={existingRanges.filter(r => r.from !== p.date_from)}
+                                              onPricingModeChange={handlePricingModeChange}
                                             />
                                           ) : (
                                             <PriceRow
@@ -1868,32 +1982,58 @@ export default function EstructuraPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', marginRight: 4 }}>Bloquear fechas manualmente</div>
                     <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
-                      {(['month','week'] as const).map(v => (
-                        <button key={v} type="button" onClick={() => setBlockView(v)}
+                      {(['month','week','day','agenda'] as const).map(v => (
+                        <button key={v} type="button" onClick={() => {
+                          if (v === 'day' || v === 'agenda') {
+                            // sync day date to currently visible date when switching
+                            if (blockView === 'week') setBlockDayDate(blockWeekStart)
+                            else if (blockView === 'month') { const p=(n:number)=>String(n).padStart(2,'0'); setBlockDayDate(`${blockCalYear}-${p(blockCalMonth+1)}-01`) }
+                          }
+                          setBlockView(v)
+                        }}
                           style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
                             background: blockView === v ? '#fff' : 'transparent',
                             color: blockView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
                             boxShadow: blockView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
-                          {v === 'month' ? 'Mes' : 'Semana'}
+                          {v === 'month' ? 'Mes' : v === 'week' ? 'Semana' : v === 'day' ? 'Día' : 'Agenda'}
                         </button>
                       ))}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
                       <button type="button" onClick={() => {
+                        const p=(n:number)=>String(n).padStart(2,'0')
                         if (blockView === 'month') { if (blockCalMonth === 0) { setBlockCalMonth(11); setBlockCalYear(y => y-1) } else setBlockCalMonth(m => m-1) }
-                        else { const d = new Date(blockWeekStart+'T12:00:00'); d.setDate(d.getDate()-7); const p=(n:number)=>String(n).padStart(2,'0'); setBlockWeekStart(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
+                        else if (blockView === 'week') { const d = new Date(blockWeekStart+'T12:00:00'); d.setDate(d.getDate()-7); setBlockWeekStart(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
+                        else if (blockView === 'day') { const d = new Date(blockDayDate+'T12:00:00'); d.setDate(d.getDate()-1); setBlockDayDate(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
+                        else { const d = new Date(blockDayDate+'T12:00:00'); d.setDate(d.getDate()-7); setBlockDayDate(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
                       }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 4 }}><ChevronLeft size={15} /></button>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', minWidth: 120, textAlign: 'center' }}>
-                        {blockView === 'month' ? `${CAL_MONTHS[blockCalMonth]} ${blockCalYear}` : (() => {
+                        {blockView === 'month' ? `${CAL_MONTHS[blockCalMonth]} ${blockCalYear}` :
+                         blockView === 'week' ? (() => {
                           const end = new Date(blockWeekStart+'T12:00:00'); end.setDate(end.getDate()+6)
                           const p=(n:number)=>String(n).padStart(2,'0')
                           const s = new Date(blockWeekStart+'T12:00:00')
                           return `${p(s.getDate())} ${CAL_MONTHS[s.getMonth()].slice(0,3)} – ${p(end.getDate())} ${CAL_MONTHS[end.getMonth()].slice(0,3)}`
-                        })()}
+                        })() :
+                         blockView === 'day' ? (() => {
+                          const d = new Date(blockDayDate+'T12:00:00')
+                          const p=(n:number)=>String(n).padStart(2,'0')
+                          return `${p(d.getDate())} ${CAL_MONTHS[d.getMonth()]} ${d.getFullYear()}`
+                        })() :
+                         (() => {
+                          const d = new Date(blockDayDate+'T12:00:00')
+                          const end = new Date(blockDayDate+'T12:00:00'); end.setDate(end.getDate()+29)
+                          const p=(n:number)=>String(n).padStart(2,'0')
+                          return `${p(d.getDate())} ${CAL_MONTHS[d.getMonth()].slice(0,3)} – ${p(end.getDate())} ${CAL_MONTHS[end.getMonth()].slice(0,3)}`
+                        })()
+                        }
                       </span>
                       <button type="button" onClick={() => {
+                        const p=(n:number)=>String(n).padStart(2,'0')
                         if (blockView === 'month') { if (blockCalMonth === 11) { setBlockCalMonth(0); setBlockCalYear(y => y+1) } else setBlockCalMonth(m => m+1) }
-                        else { const d = new Date(blockWeekStart+'T12:00:00'); d.setDate(d.getDate()+7); const p=(n:number)=>String(n).padStart(2,'0'); setBlockWeekStart(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
+                        else if (blockView === 'week') { const d = new Date(blockWeekStart+'T12:00:00'); d.setDate(d.getDate()+7); setBlockWeekStart(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
+                        else if (blockView === 'day') { const d = new Date(blockDayDate+'T12:00:00'); d.setDate(d.getDate()+1); setBlockDayDate(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
+                        else { const d = new Date(blockDayDate+'T12:00:00'); d.setDate(d.getDate()+7); setBlockDayDate(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`) }
                       }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', padding: 4 }}><ChevronRight size={15} /></button>
                     </div>
                     {blockView === 'month' && (
@@ -2122,6 +2262,144 @@ export default function EstructuraPage() {
                               })}
                             </div>
                           </div>
+                        </div>
+                      )
+                    })()}
+
+                    {/* ── Day view ──────────────────────────────────────────── */}
+                    {blockView === 'day' && (() => {
+                      const PX_PER_HOUR = 50
+                      const TIME_START = 8
+                      const TIME_END = 21
+                      const HOURS = Array.from({ length: TIME_END - TIME_START }, (_, i) => TIME_START + i)
+                      const timeToY = (t: string) => { const [h, m] = t.split(':').map(Number); return ((h * 60 + m) - TIME_START * 60) / 60 * PX_PER_HOUR }
+                      const totalH = (TIME_END - TIME_START) * PX_PER_HOUR
+                      const iso = blockDayDate
+                      const isPast = iso < todayIso
+                      const isToday = iso === todayIso
+                      const isPickerOpen = blockPickerDate === iso
+                      const COL_W = 260
+                      const TIME_COL_W = 36
+                      const weekDayNames = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+                      const d = new Date(iso + 'T12:00:00')
+
+                      const renderBlockRects = (isoD: string) => {
+                        const b = blockedMap[isoD]
+                        const auto = getAutoBlock(isoD)
+                        const rects: React.ReactNode[] = []
+                        if (auto === 'wedding') rects.push(<div key="auto-w" style={{ position:'absolute', inset: 0, background: '#d1fae588', borderRadius: 3, pointerEvents: 'none' }}><span style={{ fontSize: 9, fontWeight: 700, color: '#047857', padding: '3px 6px', display: 'block' }}>Boda</span></div>)
+                        else if (auto === 'unavailable') rects.push(<div key="auto-u" style={{ position:'absolute', inset: 0, background: '#f3f4f688', borderRadius: 3, pointerEvents: 'none' }}><span style={{ fontSize: 9, fontWeight: 700, color: '#6b7280', padding: '3px 6px', display: 'block' }}>Ocupado</span></div>)
+                        if (!b) return rects
+                        const addRect = (from: string, to: string, color: string, label: string) => {
+                          const top = Math.max(0, timeToY(from)); const bot = Math.min(totalH, timeToY(to))
+                          if (bot <= top) return
+                          rects.push(<div key={`${from}-${to}`} style={{ position: 'absolute', left: 4, right: 4, top, height: bot - top, background: `${color}44`, border: `1.5px solid ${color}88`, borderRadius: 5, overflow: 'hidden', fontSize: 10, fontWeight: 700, color, padding: '2px 5px', lineHeight: 1.4 }}>{label}</div>)
+                        }
+                        if (b.type === 'full') addRect('08:00', `${TIME_END}:00`, blockColor('full'), 'Bloqueado')
+                        else if (b.type === 'morning') addRect('08:00', '13:00', blockColor('morning'), 'Mañana')
+                        else if (b.type === 'afternoon') addRect('13:00', `${TIME_END}:00`, blockColor('afternoon'), 'Tarde')
+                        else if (b.type === 'hours' && b.ranges?.length) b.ranges.forEach(r => addRect(r.from, r.to, blockColor('hours'), `${r.from}–${r.to}`))
+                        return rects
+                      }
+
+                      return (
+                        <div>
+                          {/* Day header */}
+                          <div style={{ display: 'flex', borderBottom: '1px solid var(--ivory)', background: '#faf8f5' }}>
+                            <div style={{ width: TIME_COL_W, flexShrink: 0 }} />
+                            <div style={{ flex: 1, textAlign: 'center', padding: '8px 4px', borderLeft: '1px solid var(--ivory)', opacity: isPast ? 0.45 : 1 }}>
+                              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{weekDayNames[d.getDay()]}</div>
+                              <div style={{ fontSize: 22, fontWeight: isToday ? 700 : 500, color: isToday ? '#059669' : 'var(--charcoal)', width: 36, height: 36, borderRadius: '50%', background: isToday ? '#d1fae5' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0' }}>{d.getDate()}</div>
+                            </div>
+                          </div>
+                          {/* Time grid */}
+                          <div style={{ display: 'flex', position: 'relative', height: totalH }}>
+                            <div style={{ width: TIME_COL_W, flexShrink: 0, position: 'relative' }}>
+                              {HOURS.map(h => <div key={h} style={{ position: 'absolute', top: (h - TIME_START) * PX_PER_HOUR - 6, left: 0, right: 0, textAlign: 'right', paddingRight: 6, fontSize: 9, color: 'var(--warm-gray)', fontWeight: 500 }}>{h}:00</div>)}
+                            </div>
+                            <div style={{ flex: 1, borderLeft: '1px solid var(--ivory)', position: 'relative', opacity: isPast ? 0.4 : 1, cursor: isPast ? 'default' : 'pointer', background: isToday ? '#f9fffe' : '#fff' }}
+                              onClick={e => {
+                                if (isPast) return
+                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                                const y = e.clientY - rect.top
+                                const clickedMin = Math.floor((y / PX_PER_HOUR + TIME_START) * 60 / 30) * 30
+                                const fromH = Math.floor(clickedMin / 60), fromM = clickedMin % 60
+                                const toH = Math.floor((clickedMin + 60) / 60), toM = (clickedMin + 60) % 60
+                                const fmt = (h: number, m: number) => `${pad2(h)}:${pad2(m)}`
+                                setBlockPickerDate(isPickerOpen ? null : iso)
+                                const bk = blockedMap[iso]
+                                if (bk) { setBlockType(bk.type); setBlockRanges(bk.ranges ?? (bk.from ? [{from: bk.from, to: bk.to??'13:00'}] : [{from:'09:00',to:'13:00'}])) }
+                                else { setBlockType('hours'); setBlockRanges([{ from: fmt(fromH, fromM), to: fmt(Math.min(toH, TIME_END), toM) }]) }
+                              }}>
+                              {HOURS.map(h => <div key={h} style={{ position: 'absolute', top: (h - TIME_START) * PX_PER_HOUR, left: 0, right: 0, borderTop: '1px solid var(--ivory)', pointerEvents: 'none' }} />)}
+                              {visitAvail.schedule.filter(s => s.enabled && s.day === (d.getDay() === 0 ? 6 : d.getDay() - 1)).map(s => {
+                                const top = timeToY(s.from); const bot = timeToY(s.to)
+                                return <div key="avail" style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0,top), height: Math.max(0, bot - top), background: '#f0fdf4', pointerEvents: 'none' }} />
+                              })}
+                              {renderBlockRects(iso)}
+                              {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0, timeToY(`${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`)), height: 2, background: '#059669', pointerEvents: 'none' }} />}
+                              {isPickerOpen && <div style={{ position: 'absolute', inset: 0, background: 'rgba(30,58,95,.06)', pointerEvents: 'none' }} />}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+
+                    {/* ── Agenda view ───────────────────────────────────────── */}
+                    {blockView === 'agenda' && (() => {
+                      const agendaDates: string[] = []
+                      for (let i = 0; i < 30; i++) {
+                        const d = new Date(blockDayDate + 'T12:00:00'); d.setDate(d.getDate() + i)
+                        agendaDates.push(`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`)
+                      }
+                      const weekDayNames = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+                      return (
+                        <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+                          {agendaDates.map(iso => {
+                            const d = new Date(iso + 'T12:00:00')
+                            const b = blockedMap[iso]
+                            const auto = getAutoBlock(iso)
+                            const isPast = iso < todayIso
+                            const isToday = iso === todayIso
+                            const isSelected = blockPickerDate === iso
+                            const hasSomething = b || auto
+                            return (
+                              <div key={iso} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '7px 10px', borderBottom: '1px solid var(--ivory)', background: isSelected ? 'rgba(30,58,95,.04)' : 'transparent', opacity: isPast ? 0.45 : 1 }}>
+                                {/* Date stamp */}
+                                <div style={{ minWidth: 52, textAlign: 'center', paddingTop: 1 }}>
+                                  <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{weekDayNames[d.getDay()]}</div>
+                                  <div style={{ fontSize: 16, fontWeight: isToday ? 700 : 500, color: isToday ? '#059669' : 'var(--charcoal)', width: 28, height: 28, borderRadius: '50%', background: isToday ? '#d1fae5' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '1px auto 0' }}>{d.getDate()}</div>
+                                  <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{CAL_MONTHS[d.getMonth()].slice(0,3)}</div>
+                                </div>
+                                {/* Events */}
+                                <div style={{ flex: 1, paddingTop: 2 }}>
+                                  {auto === 'wedding' && <div style={{ fontSize: 11, fontWeight: 600, color: '#047857', background: '#d1fae5', borderRadius: 5, padding: '2px 8px', display: 'inline-block', marginBottom: 3 }}>Boda reservada</div>}
+                                  {auto === 'unavailable' && <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', background: '#f3f4f6', borderRadius: 5, padding: '2px 8px', display: 'inline-block', marginBottom: 3 }}>Ocupado</div>}
+                                  {b && (
+                                    <div style={{ fontSize: 11, fontWeight: 600, color: blockColor(b.type), background: `${blockColor(b.type)}18`, borderRadius: 5, padding: '2px 8px', display: 'inline-block', marginBottom: 3, marginLeft: auto ? 4 : 0 }}>
+                                      {b.type === 'full' ? 'Bloqueado (todo el día)'
+                                        : b.type === 'morning' ? 'Bloqueado mañana'
+                                        : b.type === 'afternoon' ? 'Bloqueado tarde'
+                                        : b.ranges?.map(r => `${r.from}–${r.to}`).join(', ')}
+                                    </div>
+                                  )}
+                                  {!hasSomething && <span style={{ fontSize: 11, color: '#b0aca6', fontStyle: 'italic' }}>Libre</span>}
+                                </div>
+                                {/* Quick block button */}
+                                {!isPast && (
+                                  <button type="button" onClick={() => {
+                                    setBlockPickerDate(isSelected ? null : iso)
+                                    if (!isSelected) {
+                                      if (b) { setBlockType(b.type); setBlockRanges(b.ranges ?? (b.from ? [{from:b.from,to:b.to??'13:00'}] : [{from:'09:00',to:'13:00'}])) }
+                                      else { setBlockType('full'); setBlockRanges([{from:'09:00',to:'13:00'}]) }
+                                    }
+                                  }} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, border: '1px solid var(--ivory)', background: isSelected ? '#1e3a5f' : '#faf8f5', color: isSelected ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', flexShrink: 0 }}>
+                                    {isSelected ? 'Cerrar' : b ? 'Editar' : '+ Bloquear'}
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
                       )
                     })()}
@@ -2526,7 +2804,41 @@ function PriceRow({ price, accent, cfg, zones, supplements, spaceGroups = [], on
   )
 }
 
-function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, isEdit = false, cfg, zones, supplements, spaceGroups = [], existingRanges = [] }: {
+function TierRows({ tiers, accent, onChange }: { tiers: PriceTier[]; accent: string; onChange: (t: PriceTier[]) => void }) {
+  return (
+    <div>
+      {tiers.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 80px 24px', gap: 4, marginBottom: 4, paddingBottom: 4, borderBottom: '1px solid var(--ivory)' }}>
+          {['Etiqueta', 'Mín pax', 'Máx pax', '€', ''].map((h, i) => (
+            <div key={i} style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{h}</div>
+          ))}
+        </div>
+      )}
+      {tiers.map((tier, ti) => (
+        <div key={ti} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 80px 24px', gap: 4, marginBottom: 4, alignItems: 'center' }}>
+          <input type="text" className="form-input" placeholder="ej: Hasta 100 pax" value={tier.label} style={{ fontSize: 11 }}
+            onChange={e => { const n = [...tiers]; n[ti] = { ...tier, label: e.target.value }; onChange(n) }} />
+          <input type="number" className="form-input" placeholder="—" value={tier.min_guests ?? ''} style={{ fontSize: 11 }}
+            onChange={e => { const n = [...tiers]; n[ti] = { ...tier, min_guests: e.target.value ? Number(e.target.value) : undefined }; onChange(n) }} />
+          <input type="number" className="form-input" placeholder="—" value={tier.max_guests ?? ''} style={{ fontSize: 11 }}
+            onChange={e => { const n = [...tiers]; n[ti] = { ...tier, max_guests: e.target.value ? Number(e.target.value) : undefined }; onChange(n) }} />
+          <input type="number" className="form-input" placeholder="€" value={tier.price} style={{ fontSize: 11 }}
+            onChange={e => { const n = [...tiers]; n[ti] = { ...tier, price: e.target.value }; onChange(n) }} />
+          <button type="button" onClick={() => onChange(tiers.filter((_, i) => i !== ti))}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 2, display: 'flex', alignItems: 'center' }}>
+            <X size={12} />
+          </button>
+        </div>
+      ))}
+      <button type="button" onClick={() => onChange([...tiers, { label: '', price: '' }])}
+        style={{ fontSize: 10, color: accent, background: 'none', border: `1px dashed ${accent}55`, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', marginTop: 2 }}>
+        + Añadir tramo
+      </button>
+    </div>
+  )
+}
+
+function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, isEdit = false, cfg, zones, supplements, spaceGroups = [], existingRanges = [], onPricingModeChange }: {
   form: typeof emptyPriceForm; onChange: (f: typeof emptyPriceForm) => void
   accent: string; saving: boolean; error: string
   onSave: () => void; onCancel: () => void
@@ -2535,6 +2847,7 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
   zones: ZoneItem[]; supplements: SupplementItem[]
   spaceGroups?: VenueSpaceGroup[]
   existingRanges?: { from: string; to: string }[]
+  onPricingModeChange?: (groupId: string, mode: 'group_base' | 'per_space') => void
 }) {
   const model = cfg?.price_model ?? 'rental'
   const space = cfg?.space_type  ?? 'single'
@@ -2554,31 +2867,70 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
       )}
 
       {/* Date pickers row */}
-      <div style={{ display: 'grid', gridTemplateColumns: (isMulti || isSupp) ? '1fr 1fr' : '1fr 1fr 120px', gap: 10, marginBottom: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <DatePicker label="DESDE" value={form.date_from} onChange={v => onChange({ ...form, date_from: v })} accent={accent} disabledRanges={existingRanges} />
         <DatePicker label="HASTA" value={form.date_to}   onChange={v => onChange({ ...form, date_to: v })}   accent={accent} minDate={form.date_from || undefined} disabledRanges={existingRanges} />
-        {!isMulti && !isSupp && (
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{labelBase}</div>
-            <input type="number" className="form-input" placeholder="0" value={form.price} onChange={e => onChange({ ...form, price: e.target.value })} style={{ fontSize: 12 }} />
-          </div>
-        )}
       </div>
 
+      {/* Flat price (single / per_person / package) */}
+      {!isMulti && !isSupp && (() => {
+        const isTierMode = form.price_tiers !== null
+        return (
+          <div style={{ border: '1px solid var(--ivory)', borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isTierMode ? 8 : 0 }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '0.05em', textTransform: 'uppercase', flex: 1 }}>{labelBase}</span>
+              <button type="button"
+                onClick={() => onChange({ ...form, price_tiers: isTierMode ? null : [] })}
+                style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, border: `1px solid ${isTierMode ? accent : '#d1d5db'}`, background: isTierMode ? accent : 'transparent', color: isTierMode ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}>
+                {isTierMode ? 'Tramos ×' : '+ Tramos por aforo'}
+              </button>
+              {!isTierMode && (
+                <input type="number" className="form-input" placeholder="0" value={form.price} onChange={e => onChange({ ...form, price: e.target.value })} style={{ fontSize: 12, width: 100 }} />
+              )}
+            </div>
+            {isTierMode && <TierRows tiers={form.price_tiers!} accent={accent} onChange={tiers => onChange({ ...form, price_tiers: tiers })} />}
+          </div>
+        )
+      })()}
+
       {/* Zone prices — multiple_independent */}
-      {isMulti && zones.length > 0 && (
+      {isMulti && zones.length > 0 && spaceGroups.length === 0 && (
         <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Precio por zona €</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
-            {zones.map(z => (
-              <div key={z.id}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#1D4ED8', marginBottom: 4 }}>{z.name}</div>
-                <input type="number" className="form-input" placeholder="0"
-                  value={form.zone_prices[z.id] ?? ''}
-                  onChange={e => onChange({ ...form, zone_prices: { ...form.zone_prices, [z.id]: e.target.value } })}
-                  style={{ fontSize: 12 }} />
-              </div>
-            ))}
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Precio por zona</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {zones.map(z => {
+              const tiers = form.zone_tier_prices[z.id] ?? null
+              const isTierMode = tiers !== null
+              return (
+                <div key={z.id} style={{ border: '1px solid var(--ivory)', borderRadius: 8, padding: '8px 10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isTierMode ? 8 : 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#1D4ED8', flex: 1 }}>{z.name}</span>
+                    <button type="button"
+                      onClick={() => {
+                        if (isTierMode) {
+                          const next = { ...form.zone_tier_prices }; delete next[z.id]
+                          onChange({ ...form, zone_tier_prices: next })
+                        } else {
+                          onChange({ ...form, zone_tier_prices: { ...form.zone_tier_prices, [z.id]: [] } })
+                        }
+                      }}
+                      style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, border: `1px solid ${isTierMode ? accent : '#d1d5db'}`, background: isTierMode ? accent : 'transparent', color: isTierMode ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}>
+                      {isTierMode ? 'Tramos ×' : '+ Tramos por aforo'}
+                    </button>
+                    {!isTierMode && (
+                      <input type="number" className="form-input" placeholder="€"
+                        value={form.zone_prices[z.id] ?? ''}
+                        onChange={e => onChange({ ...form, zone_prices: { ...form.zone_prices, [z.id]: e.target.value } })}
+                        style={{ fontSize: 12, width: 100 }} />
+                    )}
+                  </div>
+                  {isTierMode && (
+                    <TierRows tiers={tiers!} accent={accent}
+                      onChange={next => onChange({ ...form, zone_tier_prices: { ...form.zone_tier_prices, [z.id]: next } })} />
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -2591,50 +2943,202 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
       {/* Group pricing — multiple_independent or single_with_supplements */}
       {(isMulti || isSupp) && spaceGroups.length > 0 && (
         <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Precio base por grupo €</div>
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 8, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Precio base por grupo</div>
           {spaceGroups.map(grp => {
-            const includedIds = new Set(isSupp ? (grp.included_zone_ids ?? []) : [])
-            const supplementSpaces = isSupp
+            const isITP = grp.selection_mode === 'included_then_pick'
+            const includedIds = new Set((isSupp || (isMulti && isITP)) ? (grp.included_zone_ids ?? []) : [])
+            const supplementSpaces = (isSupp || (isMulti && isITP))
               ? grp.spaces.filter(s => !includedIds.has(s.id))
               : grp.spaces
+            const includedSpaces = (isMulti && isITP)
+              ? grp.spaces.filter(s => includedIds.has(s.id))
+              : []
+            const isTierMode = grp.id in form.group_tier_prices
+            const isPerSpace = (grp.pricing_mode ?? 'per_space') === 'per_space' && isMulti
             return (
               <div key={grp.id} style={{ border: '1px solid var(--ivory)', borderRadius: 8, padding: '10px 12px', marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: supplementSpaces.length > 0 ? 8 : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: '#1D4ED8', flex: 1 }}>{grp.name || 'Grupo sin nombre'}</span>
-                  <input type="number" className="form-input" placeholder="Precio base €"
-                    value={form.group_prices[grp.id] ?? ''}
-                    onChange={e => onChange({ ...form, group_prices: { ...form.group_prices, [grp.id]: e.target.value } })}
-                    style={{ fontSize: 12, width: 130 }} />
+                  {isMulti && onPricingModeChange && (
+                    <>
+                      {(['per_space', 'group_base'] as const).map(mode => {
+                        const active = (grp.pricing_mode ?? 'per_space') === mode
+                        return (
+                          <button key={mode} type="button"
+                            onClick={() => onPricingModeChange(grp.id, mode)}
+                            style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, border: `1px solid ${active ? accent : '#d1d5db'}`, background: active ? accent : 'transparent', color: active ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: active ? 600 : 400, flexShrink: 0 }}>
+                            {mode === 'per_space' ? 'Por espacio' : 'Base + suplemento'}
+                          </button>
+                        )
+                      })}
+                    </>
+                  )}
                 </div>
-                {supplementSpaces.length > 0 && (
-                  <div style={{ paddingLeft: 12, borderLeft: '2px solid #DBEAFE' }}>
-                    <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                      {isSupp ? 'Suplemento por zona opcional' : 'Suplemento por espacio'}
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6 }}>
-                      {supplementSpaces.map(sp => (
-                        <div key={sp.id}>
-                          <div style={{ fontSize: 10, color: 'var(--charcoal)', marginBottom: 2 }}>{sp.name}</div>
-                          <input type="number" className="form-input" placeholder="+€ (0 = incluido)"
-                            value={form.space_supplement_prices[`${grp.id}:${sp.id}`] ?? ''}
-                            onChange={e => onChange({ ...form, space_supplement_prices: { ...form.space_supplement_prices, [`${grp.id}:${sp.id}`]: e.target.value } })}
-                            style={{ fontSize: 11 }} />
+
+                {/* per_space: price per space directly */}
+                {isPerSpace ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {/* included_then_pick: split into "Incluidas" (base price) and "Elegibles" (supplement) */}
+                    {isITP && includedSpaces.length > 0 && (
+                      <div style={{ marginBottom: 4 }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: '#2e7d32', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                          Incluidas — precio base
                         </div>
-                      ))}
-                    </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {includedSpaces.map(sp => {
+                            const key = `${grp.id}:${sp.id}`
+                            const spTiers = form.space_tier_prices[key] ?? null
+                            const spTierMode = spTiers !== null
+                            return (
+                              <div key={sp.id} style={{ border: '1px solid #a5d6a7', borderRadius: 6, padding: '6px 8px', background: '#f1f8f1' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: spTierMode ? 6 : 0 }}>
+                                  <span style={{ fontSize: 11, color: 'var(--charcoal)', flex: 1 }}>{sp.name}</span>
+                                  <button type="button"
+                                    onClick={() => {
+                                      if (spTierMode) { const next = { ...form.space_tier_prices }; delete next[key]; onChange({ ...form, space_tier_prices: next }) }
+                                      else onChange({ ...form, space_tier_prices: { ...form.space_tier_prices, [key]: [] } })
+                                    }}
+                                    style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, border: `1px solid ${spTierMode ? accent : '#d1d5db'}`, background: spTierMode ? accent : 'transparent', color: spTierMode ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}>
+                                    {spTierMode ? 'Tramos ×' : '+ Tramos'}
+                                  </button>
+                                  {!spTierMode && (
+                                    <input type="number" className="form-input" placeholder="Precio base €"
+                                      value={form.space_supplement_prices[key] ?? ''}
+                                      onChange={e => onChange({ ...form, space_supplement_prices: { ...form.space_supplement_prices, [key]: e.target.value } })}
+                                      style={{ fontSize: 11, width: 110 }} />
+                                  )}
+                                </div>
+                                {spTierMode && (
+                                  <TierRows tiers={spTiers!} accent={accent}
+                                    onChange={t => onChange({ ...form, space_tier_prices: { ...form.space_tier_prices, [key]: t } })} />
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {/* Pick spaces (or all spaces when not ITP) */}
+                    {(isITP ? supplementSpaces : grp.spaces).length > 0 && (
+                      <div>
+                        {isITP && (
+                          <div style={{ fontSize: 9, fontWeight: 600, color: grp.pick_n_min ? accent : 'var(--warm-gray)', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                            {grp.pick_n_min ? `Elegibles — obligatorio (mín. ${grp.pick_n_min})` : 'Elegibles — opcionales'} — suplemento
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {(isITP ? supplementSpaces : grp.spaces).map(sp => {
+                            const key = `${grp.id}:${sp.id}`
+                            const spTiers = form.space_tier_prices[key] ?? null
+                            const spTierMode = spTiers !== null
+                            return (
+                              <div key={sp.id} style={{ border: '1px solid var(--ivory)', borderRadius: 6, padding: '6px 8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: spTierMode ? 6 : 0 }}>
+                                  <span style={{ fontSize: 11, color: 'var(--charcoal)', flex: 1 }}>{sp.name}</span>
+                                  <button type="button"
+                                    onClick={() => {
+                                      if (spTierMode) { const next = { ...form.space_tier_prices }; delete next[key]; onChange({ ...form, space_tier_prices: next }) }
+                                      else onChange({ ...form, space_tier_prices: { ...form.space_tier_prices, [key]: [] } })
+                                    }}
+                                    style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, border: `1px solid ${spTierMode ? accent : '#d1d5db'}`, background: spTierMode ? accent : 'transparent', color: spTierMode ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}>
+                                    {spTierMode ? 'Tramos ×' : '+ Tramos'}
+                                  </button>
+                                  {!spTierMode && (
+                                    <input type="number" className="form-input" placeholder={isITP ? '+€ suplemento' : '€'}
+                                      value={form.space_supplement_prices[key] ?? ''}
+                                      onChange={e => onChange({ ...form, space_supplement_prices: { ...form.space_supplement_prices, [key]: e.target.value } })}
+                                      style={{ fontSize: 11, width: 90 }} />
+                                  )}
+                                </div>
+                                {spTierMode && (
+                                  <TierRows tiers={spTiers!} accent={accent}
+                                    onChange={t => onChange({ ...form, space_tier_prices: { ...form.space_tier_prices, [key]: t } })} />
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
+                ) : (
+                  /* group_base: base price + tiers toggle + supplements */
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: (isTierMode || supplementSpaces.length > 0) ? 8 : 0 }}>
+                      <span style={{ fontSize: 11, color: 'var(--warm-gray)', flex: 1 }}>Precio base</span>
+                      <button type="button"
+                        onClick={() => {
+                          if (isTierMode) {
+                            const next = { ...form.group_tier_prices }; delete next[grp.id]
+                            onChange({ ...form, group_tier_prices: next })
+                          } else {
+                            onChange({ ...form, group_tier_prices: { ...form.group_tier_prices, [grp.id]: [] } })
+                          }
+                        }}
+                        style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, border: `1px solid ${isTierMode ? accent : '#d1d5db'}`, background: isTierMode ? accent : 'transparent', color: isTierMode ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}>
+                        {isTierMode ? 'Tramos ×' : '+ Tramos por aforo'}
+                      </button>
+                      {!isTierMode && (
+                        <input type="number" className="form-input" placeholder="Precio base €"
+                          value={form.group_prices[grp.id] ?? ''}
+                          onChange={e => onChange({ ...form, group_prices: { ...form.group_prices, [grp.id]: e.target.value } })}
+                          style={{ fontSize: 12, width: 120 }} />
+                      )}
+                    </div>
+                    {isTierMode && (
+                      <div style={{ marginBottom: supplementSpaces.length > 0 ? 8 : 0 }}>
+                        <TierRows tiers={form.group_tier_prices[grp.id]} accent={accent}
+                          onChange={tiers => onChange({ ...form, group_tier_prices: { ...form.group_tier_prices, [grp.id]: tiers } })} />
+                      </div>
+                    )}
+                    {supplementSpaces.length > 0 && (
+                      <div style={{ paddingLeft: 12, borderLeft: '2px solid #DBEAFE' }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                          {isSupp ? 'Suplemento por zona opcional' : 'Suplemento por espacio'}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {supplementSpaces.map(sp => {
+                            const key = `${grp.id}:${sp.id}`
+                            const spTiers = form.space_tier_prices[key] ?? null
+                            const spTierMode = spTiers !== null
+                            return (
+                              <div key={sp.id} style={{ border: '1px solid var(--ivory)', borderRadius: 6, padding: '6px 8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: spTierMode ? 6 : 0 }}>
+                                  <span style={{ fontSize: 11, color: 'var(--charcoal)', flex: 1 }}>{sp.name}</span>
+                                  <button type="button"
+                                    onClick={() => {
+                                      if (spTierMode) {
+                                        const next = { ...form.space_tier_prices }; delete next[key]
+                                        onChange({ ...form, space_tier_prices: next })
+                                      } else {
+                                        onChange({ ...form, space_tier_prices: { ...form.space_tier_prices, [key]: [] } })
+                                      }
+                                    }}
+                                    style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, border: `1px solid ${spTierMode ? accent : '#d1d5db'}`, background: spTierMode ? accent : 'transparent', color: spTierMode ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}>
+                                    {spTierMode ? 'Tramos ×' : '+ Tramos'}
+                                  </button>
+                                  {!spTierMode && (
+                                    <input type="number" className="form-input" placeholder="+€"
+                                      value={form.space_supplement_prices[key] ?? ''}
+                                      onChange={e => onChange({ ...form, space_supplement_prices: { ...form.space_supplement_prices, [key]: e.target.value } })}
+                                      style={{ fontSize: 11, width: 90 }} />
+                                  )}
+                                </div>
+                                {spTierMode && (
+                                  <TierRows tiers={spTiers!} accent={accent}
+                                    onChange={t => onChange({ ...form, space_tier_prices: { ...form.space_tier_prices, [key]: t } })} />
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )
           })}
-        </div>
-      )}
-
-
-      {/* per_person: price field already in header row, no extra UI needed */}
-      {(model === 'per_person' || model === 'package') && !isMulti && (
-        <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 10, fontStyle: 'italic' }}>
-          {model === 'package' ? 'Precio por persona todo incluido' : 'Precio por comensal/asistente'}
         </div>
       )}
 

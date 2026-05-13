@@ -109,6 +109,13 @@ export type DateSlot = {
   notes?: string           // "Sábados · IVA no incluido"
 }
 
+export type PriceTier = {
+  label: string       // e.g. "100–150 pax"
+  min_guests?: number // lower bound (inclusive)
+  max_guests?: number // upper bound (inclusive, undefined = no limit)
+  price: string       // e.g. "3000"
+}
+
 export type VenueSpaceItem = {
   id?: string
   zone_id?: string  // link to VenueSpace.id in venue_settings.space_groups
@@ -119,6 +126,9 @@ export type VenueSpaceItem = {
   capacity_max?: number
   price?: string
   price_label?: string
+  price_tiers?: PriceTier[]
+  tags?: string[]        // small info pills shown on the card (e.g. "Exterior", "Climatizado")
+  recommended?: boolean  // "Recomendado" badge — set per-proposal by the venue
 }
 
 export type SpaceGroup = {
@@ -137,6 +147,7 @@ export type SpaceGroup = {
   included_zone_ids?: string[]
   pricing_mode?: 'group_base' | 'per_space'  // group_base: base + extras; per_space: each space has its own price
   base_price?: string  // when pricing_mode === 'group_base'
+  pricing_display?: 'tiers_table' | 'by_guest_count'
   spaces: VenueSpaceItem[]
 }
 
@@ -149,6 +160,7 @@ export type VenueSpace = {
   capacity_max?: number
   price?: string          // legacy flat price
   photo_url?: string
+  price_tiers?: PriceTier[]
   // Supplement pricing
   supplement_mode?: 'none' | 'flat' | 'seasonal'
   supplement_flat?: string
@@ -173,6 +185,7 @@ export type VenueSpaceGroup = {
   included_zone_ids?: string[]  // for included_then_pick: zone IDs always included; remaining spaces are selectable by client
   pricing_mode?: 'group_base' | 'per_space'  // default: per_space
   base_price?: string  // legacy flat base price
+  pricing_display?: 'tiers_table' | 'by_guest_count'
   // Seasonal pricing grid
   day_tiers?: string[]              // columns: ["Viernes", "Sábados y festivos", "Domingo"]
   seasons?: PricingSeason[]         // rows: season definitions

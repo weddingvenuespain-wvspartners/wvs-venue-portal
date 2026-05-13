@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import { ChevronDown, X } from 'lucide-react'
 import type { SpaceGroup, VenueSpaceItem } from '@/lib/proposal-types'
 import { ImageUploader } from './ImageUploader'
@@ -26,6 +27,40 @@ function newGroup(): SpaceGroup {
 }
 function newSpace(): VenueSpaceItem {
   return { name: '', description: '', price: '', price_label: '' }
+}
+
+function TagsInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) => void }) {
+  const [input, setInput] = useState('')
+  const add = () => {
+    const t = input.trim()
+    if (!t || tags.includes(t)) { setInput(''); return }
+    onChange([...tags, t]); setInput('')
+  }
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Pills de info</div>
+      {tags.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 5 }}>
+          {tags.map((tag, ti) => (
+            <span key={ti} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, padding: '2px 7px', borderRadius: 999, background: '#f0e9dc', border: '1px solid var(--ivory)', color: 'var(--charcoal)' }}>
+              {tag}
+              <button type="button" onClick={() => onChange(tags.filter((_, j) => j !== ti))}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 0, lineHeight: 1, fontSize: 13 }}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 5 }}>
+        <input className="form-input" placeholder="Ej: Exterior, Climatizado…" style={{ fontSize: 11, flex: 1 }}
+          value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }} />
+        <button type="button" onClick={add}
+          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--cream)', cursor: 'pointer', color: 'var(--charcoal)', fontWeight: 600, flexShrink: 0 }}>
+          + Añadir
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export default function SpaceGroupEditor({ groups, onChange, uploadImage, isTemplate }: Props) {
@@ -113,6 +148,23 @@ export default function SpaceGroupEditor({ groups, onChange, uploadImage, isTemp
                         <input className="form-input" type="number" placeholder="Máx. pax" style={{ fontSize: 12, width: 90, flexShrink: 0 }}
                           value={s.capacity_max ?? ''} onChange={e => updateSpace(gi, si, { capacity_max: e.target.value ? Number(e.target.value) : undefined })} />
                       </div>
+                    )}
+
+                    {/* Tags */}
+                    <TagsInput
+                      tags={s.tags ?? []}
+                      onChange={tags => updateSpace(gi, si, { tags })}
+                    />
+
+                    {/* Recommended toggle — proposal level only */}
+                    {!isTemplate && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--charcoal)', cursor: 'pointer', userSelect: 'none' }}>
+                        <div onClick={() => updateSpace(gi, si, { recommended: !s.recommended })}
+                          style={{ width: 28, height: 16, borderRadius: 8, background: s.recommended ? '#a17522' : '#d1c9b8', position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0 }}>
+                          <div style={{ position: 'absolute', top: 2, left: s.recommended ? 12 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+                        </div>
+                        ⭐ Marcar como recomendado para esta pareja
+                      </label>
                     )}
 
                     {/* Photos */}
