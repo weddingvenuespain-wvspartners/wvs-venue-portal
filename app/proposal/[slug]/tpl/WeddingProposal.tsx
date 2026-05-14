@@ -3,7 +3,7 @@
 // menú (con cursos variables), estaciones/ceremonia/AV, invitados y comentarios.
 // Muestra total en vivo. Submit registra la selección y notifica al venue.
 
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { ProposalData } from '../page'
 import type { Menu, MenuCourse, MenuExtra, AppetizerGroup } from './shared'
 import { toRgb, FadeUp, ivaLabel } from './shared'
@@ -76,7 +76,7 @@ const EVENT_CATS:    MenuExtra['category'][] = ['ceremony', 'music', 'audiovisua
 
 export function WeddingProposal({
   data, menus: menusInput, extras, appetizers, legacyMenus,
-  primary, onPrimary, dark = false, previewOnly = false,
+  primary, onPrimary, dark = false, previewOnly = false, onMenusChange,
 }: {
   data: ProposalData
   menus: Menu[] | null
@@ -84,6 +84,7 @@ export function WeddingProposal({
   appetizers: AppetizerGroup[] | null
   legacyMenus?: Array<{ name: string; price_per_person: string; description?: string; min_guests?: number }>
   primary: string; onPrimary: string; dark?: boolean; previewOnly?: boolean
+  onMenusChange?: (names: string[]) => void
 }) {
   const rgb = toRgb(primary)
   const sd = data.sections_data ?? null
@@ -111,6 +112,15 @@ export function WeddingProposal({
     if (menus.length === 1) return { [menuId(menus[0], 0)]: guestTarget }
     return menuAllocations
   }, [menus, guestTarget, menuAllocations])
+
+  // Notify parent of selected menu names whenever allocation changes
+  useEffect(() => {
+    if (!onMenusChange) return
+    const names = menus
+      .filter((m, i) => (effectiveAllocations[menuId(m, i)] ?? 0) > 0)
+      .map(m => m.name)
+    onMenusChange(names)
+  }, [effectiveAllocations]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Which menu is shown in the right panel (multi-menu)
   const [selectedMenuIdx, setSelectedMenuIdx] = useState(0)

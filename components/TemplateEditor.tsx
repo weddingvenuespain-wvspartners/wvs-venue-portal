@@ -26,6 +26,7 @@ import {
 } from '@/lib/section-styles'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 import { getSectionLabel, isSectionAllowed, SECTION_SPACE_TYPES, SPACE_TYPE_LABELS } from '@/lib/section-visibility'
+import { DEFAULT_TEMPLATES } from '@/lib/proposal-starter-templates'
 
 // ─── Section catalogue ────────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ export default function TemplateEditor({
   onBack?: () => void
   onSave?: (updated: ContentTemplate) => void
 }) {
-  const { user } = useAuth()
+  const { user, activeVenue } = useAuth()
 
   const [name, setName]               = useState(template.name)
   const [description, setDescription] = useState(template.description ?? '')
@@ -111,6 +112,12 @@ export default function TemplateEditor({
   const [device, setDevice]           = useState<'desktop' | 'mobile'>('desktop')
 
 
+  const [wizardStep, setWizardStep] = useState<'style' | 'catering' | null>(() => {
+    if (template.id !== 'new') return null
+    if ((template.sections_data as any)?.visual_template_id) return null
+    return 'style'
+  })
+
   // Open/close section content cards
   const [openSecs, setOpenSecs] = useState<Set<string>>(new Set())
 
@@ -119,19 +126,20 @@ export default function TemplateEditor({
   const [commercialConfig, setCommercialConfig] = useState<{ space_type: string; price_model: string } | null>(null)
   const [venueSpaceGroups, setVenueSpaceGroups] = useState<VenueSpaceGroup[]>([])
   useEffect(() => {
-    if (!user) return
+    if (!user || !activeVenue) return
     const supabase = createClient()
     ;(async () => {
       const { data: rows } = await supabase
         .from('venue_settings')
         .select('commercial_config, space_groups')
         .eq('user_id', user.id)
+        .eq('venue_id', activeVenue.id)
         .limit(1)
       const data = Array.isArray(rows) ? rows[0] : null
       if (data?.commercial_config) setCommercialConfig(data.commercial_config as any)
       if (Array.isArray(data?.space_groups)) setVenueSpaceGroups(data.space_groups as VenueSpaceGroup[])
     })()
-  }, [user])
+  }, [user, activeVenue])
 
   // En modo borrador (id === 'new') el preview apunta a la muestra cuyo
   // visual_template_id coincide con el del borrador, para que el iframe inicial
@@ -223,6 +231,13 @@ export default function TemplateEditor({
   }
   const removeItem  = (key: string, i: number) => setOverride(key, getOverride(key).filter((_: any, j: number) => j !== i))
   const addItem     = (key: string, tpl: any) => setOverride(key, [...getOverride(key), tpl])
+  const moveItem    = (key: string, i: number, dir: -1 | 1) => {
+    const arr = [...getOverride(key)]
+    const j = i + dir
+    if (j < 0 || j >= arr.length) return
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    setOverride(key, arr)
+  }
 
   // ── Image upload ─────────────────────────────────────────────────────────
   const uploadImage = async (file: File, folder: string): Promise<string | null> => {
@@ -548,11 +563,13 @@ export default function TemplateEditor({
       const setFeatures = (next: string[]) => setSs({ features: next })
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input className="form-input" placeholder="Subtítulo (ej. Vuestro espacio)" style={{ fontSize: 12 }} value={ss.subtitle ?? ''} onChange={e => setSs({ subtitle: e.target.value })} />
           <input className="form-input" placeholder="Título (ej. El Salón Principal)" style={{ fontSize: 12 }} value={ss.title ?? ''} onChange={e => setSs({ title: e.target.value })} />
           <textarea className="form-textarea" style={{ minHeight: 70, fontSize: 12 }} placeholder="Descripción del espacio…" value={ss.description ?? ''} onChange={e => setSs({ description: e.target.value })} />
           <div style={{ display: 'flex', gap: 6 }}>
             <input className="form-input" style={{ fontSize: 12 }} placeholder="m² (ej. 500)" value={ss.sqm ?? ''} onChange={e => setSs({ sqm: e.target.value })} />
-            <input className="form-input" style={{ fontSize: 12 }} placeholder="Capacidad máx. (ej. 200)" value={ss.max_guests ?? ''} onChange={e => setSs({ max_guests: e.target.value })} />
+            <input className="form-input" style={{ fontSize: 12 }} placeholder="Cap. mín." value={ss.min_guests ?? ''} onChange={e => setSs({ min_guests: e.target.value })} />
+            <input className="form-input" style={{ fontSize: 12 }} placeholder="Cap. máx." value={ss.max_guests ?? ''} onChange={e => setSs({ max_guests: e.target.value })} />
           </div>
           <div>
             <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Fotos del espacio</div>
@@ -589,50 +606,156 @@ export default function TemplateEditor({
             ))}
             <button type="button" style={addBtn} onClick={() => setFeatures([...features, ''])}>+ Añadir característica</button>
           </div>
+          <div style={{ padding: '10px 12px', background: 'var(--ivory)', border: '1.5px dashed var(--border)', borderRadius: 8, opacity: 0.7, pointerEvents: 'none', userSelect: 'none' }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 6 }}>Precio por fecha del lead</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {['Fecha 1', 'Fecha 2'].map((label, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11, color: 'var(--warm-gray)', flex: 1 }}>{label}</span>
+                  <div style={{ width: 80, height: 28, background: 'var(--cream)', borderRadius: 6, border: '1px solid var(--border)' }} />
+                  <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>€</span>
+                  <span style={{ fontSize: 9, color: 'var(--warm-gray)', background: 'var(--cream)', padding: '1px 6px', borderRadius: 8 }}>auto</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 9, color: 'var(--warm-gray)', marginTop: 6 }}>Se completará automáticamente al asociar un lead con fechas y tarifa.</div>
+          </div>
         </div>
       )
     }
 
-    if (secId === 'zones') return (
-      <div>
-        {getOverride(overrideKey).map((z: any, i: number) => (
-          <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 7, marginBottom: 7, overflow: 'hidden' }}>
-            <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
-              <ChevronDown size={11} color="var(--warm-gray)" />
-              <span style={{ flex: 1 }}>{z.name || <em style={{ color: 'var(--warm-gray)' }}>Nueva zona</em>}</span>
-              <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeItem(overrideKey, i) }}><X size={12} /></button>
-            </summary>
-            <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <input className="form-input" placeholder="Nombre *" style={{ fontSize: 12 }} value={z.name ?? ''} onChange={e => updateItem(overrideKey, i, 'name', e.target.value)} />
-                <input className="form-input" style={{ width: 75, flexShrink: 0, fontSize: 12 }} type="number" placeholder="m²" value={z.sqm ?? ''} onChange={e => updateItem(overrideKey, i, 'sqm', e.target.value ? Number(e.target.value) : undefined)} />
-              </div>
-              <input className="form-input" placeholder="Descripción" style={{ fontSize: 12 }} value={z.description ?? ''} onChange={e => updateItem(overrideKey, i, 'description', e.target.value)} />
-              <div style={{ fontSize: 11, color: 'var(--warm-gray)', padding: '6px 10px', background: '#faf8f5', border: '1px solid var(--ivory)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Info size={12} style={{ flexShrink: 0, color: 'var(--gold)' }} />
-                {commercialConfig?.space_type === 'single_with_supplements'
-                  ? 'El suplemento se añadirá automáticamente desde tus tarifas al crear una propuesta'
-                  : 'El precio se añadirá automáticamente desde tus tarifas al crear una propuesta'}
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Fotos de la zona</div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {(z.photos ?? []).map((url: string, pi: number) => (
-                    <div key={pi} style={{ position: 'relative', width: 56, height: 56 }}>
-                      <img src={url} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover' }} />
-                      <button type="button" onClick={() => { const next = [...(z.photos ?? [])]; next.splice(pi, 1); updateItem(overrideKey, i, 'photos', next) }}
-                        style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+    if (secId === 'zones') {
+      const zh: any = (sections as any).zones_header ?? {}
+      const setZh = (patch: any) => { setSections((s: any) => ({ ...s, zones_header: { ...((s as any).zones_header ?? {}), ...patch } })); markDirty() }
+      const zhMode: 'single' | 'zones' = zh.mode ?? 'zones'
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input className="form-input" placeholder="Etiqueta sección (ej. Los espacios)" style={{ fontSize: 12 }} value={zh.label ?? ''} onChange={e => setZh({ label: e.target.value })} />
+          <input className="form-input" placeholder="Título sección (ej. Cada rincón, un escenario)" style={{ fontSize: 12 }} value={zh.title ?? ''} onChange={e => setZh({ title: e.target.value })} />
+          {/* Mode toggle */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['single', 'zones'] as const).map(m => (
+              <button key={m} type="button"
+                onClick={() => setZh({ mode: m })}
+                style={{ flex: 1, padding: '6px 0', fontSize: 11, fontWeight: 600, borderRadius: 6, border: `1px solid ${zhMode === m ? 'var(--gold)' : 'var(--border)'}`, background: zhMode === m ? '#fdf6ea' : '#fff', color: zhMode === m ? '#8a6020' : 'var(--warm-gray)', cursor: 'pointer' }}>
+                {m === 'single' ? 'Espacio único' : 'Con suplementos'}
+              </button>
+            ))}
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 2 }}>
+            {getOverride(overrideKey).map((z: any, i: number) => {
+              const caps: any[] = Array.isArray(z.capacities) ? z.capacities : []
+              const updateCaps = (newCaps: any[]) => updateItem(overrideKey, i, 'capacities', newCaps)
+              const feats: string[] = Array.isArray(z.features) ? z.features : []
+              return (
+                <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 7, marginBottom: 7, overflow: 'hidden' }}>
+                  <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
+                    <ChevronDown size={11} color="var(--warm-gray)" />
+                    <span style={{ flex: 1 }}>{z.name || <em style={{ color: 'var(--warm-gray)' }}>Nueva zona</em>}</span>
+                    <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); moveItem(overrideKey, i, -1) }} title="Subir" disabled={i === 0}>▲</button>
+                    <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); moveItem(overrideKey, i, 1) }} title="Bajar" disabled={i === getOverride(overrideKey).length - 1}>▼</button>
+                    <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeItem(overrideKey, i) }}><X size={12} /></button>
+                  </summary>
+                  <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <input className="form-input" placeholder="Subtítulo zona (ej. Espacio 01)" style={{ fontSize: 12 }} value={z.subtitle ?? ''} onChange={e => updateItem(overrideKey, i, 'subtitle', e.target.value)} />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input className="form-input" placeholder="Nombre *" style={{ fontSize: 12 }} value={z.name ?? ''} onChange={e => updateItem(overrideKey, i, 'name', e.target.value)} />
+                      <input className="form-input" style={{ width: 75, flexShrink: 0, fontSize: 12 }} type="number" placeholder="m²" value={z.sqm ?? ''} onChange={e => updateItem(overrideKey, i, 'sqm', e.target.value ? Number(e.target.value) : undefined)} />
                     </div>
-                  ))}
-                  <ImageUploader label="+" height={48} onUpload={async (f) => { const url = await uploadImage(f, 'zones'); if (url) updateItem(overrideKey, i, 'photos', [...(z.photos ?? []), url]) }} />
-                </div>
-              </div>
-            </div>
-          </details>
-        ))}
-        <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { name: '', description: '', capacities: [] })}>+ Añadir zona</button>
-      </div>
-    )
+                    <input className="form-input" placeholder="Descripción" style={{ fontSize: 12 }} value={z.description ?? ''} onChange={e => updateItem(overrideKey, i, 'description', e.target.value)} />
+                    {/* Price/supplement — only when mode is 'zones' */}
+                    {zhMode === 'zones' && (
+                      <input className="form-input" style={{ fontSize: 12 }} placeholder="Suplemento (opcional, ej. +500€)" value={z.price ?? ''} onChange={e => updateItem(overrideKey, i, 'price', e.target.value)} />
+                    )}
+                    {/* Photos */}
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Fotos de la zona</div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                        {(z.photos ?? []).map((url: string, pi: number) => (
+                          <div key={pi} style={{ position: 'relative', width: 56, height: 56 }}>
+                            <img src={url} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover' }} />
+                            <button type="button" onClick={() => { const next = [...(z.photos ?? [])]; next.splice(pi, 1); updateItem(overrideKey, i, 'photos', next) }}
+                              style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                          </div>
+                        ))}
+                        <ImageUploader label="+" height={48} onUpload={async (f) => { const url = await uploadImage(f, 'zones'); if (url) updateItem(overrideKey, i, 'photos', [...(z.photos ?? []), url]) }} />
+                      </div>
+                    </div>
+                    {/* Capacidades */}
+                    <div style={{ background: 'var(--cream)', borderRadius: 6, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>Capacidades</div>
+                      {caps.map((c: any, ci: number) => (
+                        <div key={ci} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                          <div style={{ flex: 1 }}>
+                            <Select value={c.type ?? 'other'} onValueChange={(v) => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, type: v } : x))}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ceremony">Ceremonia</SelectItem>
+                                <SelectItem value="cocktail">Coctel</SelectItem>
+                                <SelectItem value="banquet">Banquete</SelectItem>
+                                <SelectItem value="party">Fiesta</SelectItem>
+                                <SelectItem value="other">Otro</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <input className="form-input" type="number" placeholder="pax" style={{ width: 72, fontSize: 12 }} value={c.count ?? ''}
+                            onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, count: e.target.value ? Number(e.target.value) : undefined } : x))} />
+                          <input className="form-input" placeholder="Etiqueta (opc.)" style={{ flex: 1, fontSize: 12 }} value={c.label ?? ''}
+                            onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, label: e.target.value } : x))} />
+                          <button type="button" style={{ ...removeBtn, width: 22, height: 22 }} onClick={() => updateCaps(caps.filter((_: any, j: number) => j !== ci))}><X size={11} /></button>
+                        </div>
+                      ))}
+                      <button type="button" style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 0' }}
+                        onClick={() => updateCaps([...caps, { type: 'banquet', count: undefined }])}>
+                        + Añadir capacidad
+                      </button>
+                    </div>
+                    {/* Tipo (interior/exterior) + características libres */}
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <div style={{ flex: 1 }}>
+                        <Select value={z.covered || '__none__'} onValueChange={(v) => updateItem(overrideKey, i, 'covered', v === '__none__' ? undefined : v)}>
+                          <SelectTrigger><SelectValue placeholder="— tipo —" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— tipo —</SelectItem>
+                            <SelectItem value="indoor">Interior</SelectItem>
+                            <SelectItem value="outdoor">Exterior</SelectItem>
+                            <SelectItem value="covered-outdoor">Exterior cubierto</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {/* Features — free text chips */}
+                    <div style={{ background: 'var(--cream)', borderRadius: 6, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>Características</div>
+                      {feats.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {feats.map((f: string, fi: number) => (
+                            <span key={fi} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#fdf6ea', border: '1px solid var(--gold, #C4975A)', color: '#8a6020' }}>
+                              {f}
+                              <button type="button" onClick={() => updateItem(overrideKey, i, 'features', feats.filter((_: string, j: number) => j !== fi))}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, lineHeight: 1, fontSize: 12 }}>×</button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <input className="form-input" style={{ fontSize: 11 }} placeholder="Añadir característica (Enter)" onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ',') {
+                          e.preventDefault()
+                          const val = (e.target as HTMLInputElement).value.trim().replace(/,$/, '')
+                          if (val) { updateItem(overrideKey, i, 'features', [...feats, val]);(e.target as HTMLInputElement).value = '' }
+                        }
+                      }} />
+                    </div>
+                    <input className="form-input" style={{ fontSize: 12 }} placeholder="Notas adicionales (ej. *Opción haima +coste)" value={z.notes ?? ''} onChange={e => updateItem(overrideKey, i, 'notes', e.target.value)} />
+                  </div>
+                </details>
+              )
+            })}
+            <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { name: '', description: '', capacities: [] })}>+ Añadir zona</button>
+          </div>
+        </div>
+      )
+    }
 
     if (secId === 'space_groups') {
       if (venueSpaceGroups.length > 0 || commercialConfig?.space_type === 'multiple_independent') {
@@ -1335,6 +1458,117 @@ export default function TemplateEditor({
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
+
+  if (wizardStep !== null) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', flexDirection: 'column' }}>
+        {/* Wizard top bar */}
+        <div style={{ height: 52, flexShrink: 0, background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12 }}>
+          {onBack && (
+            <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ gap: 5, color: 'var(--warm-gray)' }}>
+              <ChevronLeft size={15} /> Plantillas
+            </button>
+          )}
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)' }}>
+            {wizardStep === 'style' ? 'Nueva plantilla · Paso 1 de 2' : 'Nueva plantilla · Paso 2 de 2'}
+          </span>
+        </div>
+
+        {/* Wizard body */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px' }}>
+
+          {wizardStep === 'style' && (
+            <div style={{ maxWidth: 680, width: '100%' }}>
+              <div style={{ textAlign: 'center', marginBottom: 36 }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 8 }}>¿Qué diseño base quieres usar?</div>
+                <div style={{ fontSize: 14, color: 'var(--warm-gray)' }}>Puedes cambiarlo en cualquier momento desde el editor</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                {DEFAULT_TEMPLATES.map(tpl => {
+                  const color = (tpl.sections_data as any).primary_color ?? '#C4975A'
+                  return (
+                    <button key={tpl.id} type="button"
+                      onClick={() => {
+                        setSections(s => ({
+                          ...s,
+                          visual_template_id: (tpl.sections_data as any).visual_template_id,
+                          primary_color: (tpl.sections_data as any).primary_color,
+                          secondary_color: (tpl.sections_data as any).secondary_color,
+                          font_family: (tpl.sections_data as any).font_family,
+                        }))
+                        setWizardStep('catering')
+                      }}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10,
+                        padding: '16px 16px 14px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+                        border: '2px solid var(--border)', background: 'var(--surface)',
+                        transition: 'border-color .15s, box-shadow .15s',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = color; (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 0 3px ${color}22` }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none' }}
+                    >
+                      <div style={{ width: '100%', height: 40, borderRadius: 6, background: `linear-gradient(135deg, ${color}22, ${color}44)`, border: `1.5px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: 20, height: 20, borderRadius: '50%', background: color }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 3 }}>{tpl.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{tpl.description}</div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {wizardStep === 'catering' && (
+            <div style={{ maxWidth: 440, width: '100%' }}>
+              <div style={{ textAlign: 'center', marginBottom: 36 }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 8 }}>¿Incluye menús y catering?</div>
+                <div style={{ fontSize: 14, color: 'var(--warm-gray)' }}>Esto activa la pestaña de Menús en el editor. Puedes cambiarlo después.</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <button type="button"
+                  onClick={() => { setSections(s => ({ ...s, has_catering: true })); markDirty(); setWizardStep(null) }}
+                  style={{
+                    padding: '20px 24px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+                    border: '2px solid var(--border)', background: 'var(--surface)',
+                    display: 'flex', alignItems: 'center', gap: 16,
+                  }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(196,151,90,0.12)', border: '1.5px solid rgba(196,151,90,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <ChefHat size={18} style={{ color: 'var(--gold)' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 3 }}>Sí, incluye menú y catering</div>
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Configura cóctel, menús principales, noche y madrugada</div>
+                  </div>
+                </button>
+                <button type="button"
+                  onClick={() => { setSections(s => ({ ...s, has_catering: false })); markDirty(); setWizardStep(null) }}
+                  style={{
+                    padding: '20px 24px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+                    border: '2px solid var(--border)', background: 'var(--surface)',
+                    display: 'flex', alignItems: 'center', gap: 16,
+                  }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--cream)', border: '1.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <LayoutTemplate size={18} style={{ color: 'var(--warm-gray)' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 3 }}>No, solo información del venue</div>
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Sin sección de menús ni selección de platos</div>
+                  </div>
+                </button>
+              </div>
+              <button type="button" onClick={() => setWizardStep('style')}
+                style={{ marginTop: 20, width: '100%', padding: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                <ChevronLeft size={13} /> Volver al diseño
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: 'var(--cream)' }}>

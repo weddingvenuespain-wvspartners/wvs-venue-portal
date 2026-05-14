@@ -434,7 +434,7 @@ function LeadsPageInner() {
         table: 'leads',
         filter: `venue_id=eq.${activeVenue.id}`,
       }, (payload) => {
-        setLeads(prev => [payload.new as any, ...prev])
+        setLeads(prev => prev.some(l => l.id === (payload.new as any).id) ? prev : [payload.new as any, ...prev])
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }

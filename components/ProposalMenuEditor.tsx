@@ -73,6 +73,28 @@ const extraCard: React.CSSProperties = {
   border: '1px solid var(--border)', borderLeft: '3px solid var(--gold)',
   marginBottom: 8,
 }
+const subBlock: React.CSSProperties = {
+  border: '1px solid var(--border)',
+  borderRadius: 8,
+  overflow: 'hidden',
+  marginBottom: 0,
+}
+const subBlockHeader: React.CSSProperties = {
+  padding: '8px 12px',
+  background: 'var(--cream)',
+  borderBottom: '1px solid var(--border)',
+}
+const subBlockTitle: React.CSSProperties = {
+  fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const,
+  letterSpacing: '.07em', color: 'var(--charcoal)',
+}
+const subBlockHint: React.CSSProperties = {
+  fontSize: 11, color: 'var(--warm-gray)', marginTop: 3, lineHeight: 1.4,
+}
+const subBlockBody: React.CSSProperties = {
+  padding: '12px 14px',
+  background: '#fff',
+}
 
 export default function ProposalMenuEditor({
   sections,
@@ -360,34 +382,42 @@ export default function ProposalMenuEditor({
             </div>
 
             {openSections.has('cocktail') && (
-              <div>
-                <div style={subLabel}>Aperitivos incluidos</div>
-                <div style={hint}>
-                  Los que acompañan siempre al menú (fríos, calientes, buffets…). Se muestran sin opción de elegir.
-                </div>
-                {appetizers.map((g, i) => (
-                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <input className="form-input" placeholder="Etiqueta (ej. Aperitivos fríos)" value={g.label}
-                        onChange={e => updateGroup(i, { label: e.target.value })} style={{ flex: 1 }} />
-                      <button type="button" style={removeBtn} onClick={() => removeGroup(i)}><X size={13} /></button>
-                    </div>
-                    <textarea className="form-textarea" style={{ minHeight: 80, fontFamily: 'inherit', fontSize: 12 }}
-                      placeholder="Un item por línea&#10;Crema de melón · Crema de ceps&#10;Airbag con jamón ibérico"
-                      value={g.items.join('\n')}
-                      onChange={e => setGroupItemsText(i, e.target.value)} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
+                {/* Sub-block: Aperitivos incluidos */}
+                <div style={subBlock}>
+                  <div style={subBlockHeader}>
+                    <div style={subBlockTitle}>Aperitivos incluidos</div>
+                    <div style={subBlockHint}>Los que acompañan siempre al menú (fríos, calientes, buffets…). Se muestran sin opción de elegir.</div>
                   </div>
-                ))}
-                <button type="button" style={addBtn} onClick={addGroup}>+ Añadir grupo de aperitivos</button>
-
-                <div style={{ borderTop: '1px solid var(--border)', margin: '16px 0' }} />
-
-                <div style={subLabel}>Estaciones opcionales</div>
-                <div style={hint}>
-                  Añadidos que los invitados pueden contratar: ostras, foie, quesos, buffet de jamón…
+                  <div style={subBlockBody}>
+                    {appetizers.map((g, i) => (
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 8 }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input className="form-input" placeholder="Etiqueta (ej. Aperitivos fríos)" value={g.label}
+                            onChange={e => updateGroup(i, { label: e.target.value })} style={{ flex: 1 }} />
+                          <button type="button" style={removeBtn} onClick={() => removeGroup(i)}><X size={13} /></button>
+                        </div>
+                        <textarea className="form-textarea" style={{ minHeight: 80, fontFamily: 'inherit', fontSize: 12 }}
+                          placeholder="Un item por línea&#10;Crema de melón · Crema de ceps&#10;Airbag con jamón ibérico"
+                          value={g.items.join('\n')}
+                          onChange={e => setGroupItemsText(i, e.target.value)} />
+                      </div>
+                    ))}
+                    <button type="button" style={addBtn} onClick={addGroup}>+ Añadir grupo de aperitivos</button>
+                  </div>
                 </div>
-                {cocktailExtras.map(e => renderExtraCard(e, extras.indexOf(e), COCKTAIL_EXTRA_OPTIONS, false))}
-                <button type="button" style={addBtn} onClick={() => addExtra('station')}>+ Añadir estación</button>
+
+                {/* Sub-block: Estaciones opcionales */}
+                <div style={subBlock}>
+                  <div style={subBlockHeader}>
+                    <div style={subBlockTitle}>Estaciones opcionales</div>
+                    <div style={subBlockHint}>Añadidos que los invitados pueden contratar: ostras, foie, quesos, buffet de jamón…</div>
+                  </div>
+                  <div style={subBlockBody}>
+                    {cocktailExtras.map(e => renderExtraCard(e, extras.indexOf(e), COCKTAIL_EXTRA_OPTIONS, false))}
+                    <button type="button" style={addBtn} onClick={() => addExtra('station')}>+ Añadir estación</button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -407,9 +437,9 @@ export default function ProposalMenuEditor({
         </div>
 
         {openSections.has('menus') && (
-          <div>
-            {/* Toggle mostrar precios */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
+            {/* Config row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 8 }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Mostrar precios al cliente</div>
                 <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>
@@ -417,201 +447,182 @@ export default function ProposalMenuEditor({
                 </div>
               </div>
               <button
-                type="button"
-                role="switch"
-                aria-checked={sections.show_menu_prices !== false}
+                type="button" role="switch" aria-checked={sections.show_menu_prices !== false}
                 onClick={() => setSections(s => ({ ...s, show_menu_prices: s.show_menu_prices === false ? true : false }))}
-                style={{
-                  width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', flexShrink: 0,
-                  background: sections.show_menu_prices !== false ? 'var(--gold)' : 'var(--warm-gray)',
-                  position: 'relative', transition: 'background .2s',
-                }}
-              >
-                <span style={{
-                  position: 'absolute', top: 3,
-                  left: sections.show_menu_prices !== false ? 21 : 3,
-                  width: 16, height: 16, borderRadius: 8, background: '#fff', transition: 'left .2s',
-                }} />
+                style={{ width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', flexShrink: 0, background: sections.show_menu_prices !== false ? 'var(--gold)' : 'var(--warm-gray)', position: 'relative', transition: 'background .2s' }}>
+                <span style={{ position: 'absolute', top: 3, left: sections.show_menu_prices !== false ? 21 : 3, width: 16, height: 16, borderRadius: 8, background: '#fff', transition: 'left .2s' }} />
               </button>
             </div>
 
-            <div style={hint}>
-              Crea cada menú con sus platos. Para platos que la pareja debe elegir, usa <strong>"Escoger 1"</strong> o <strong>"Escoger N"</strong>.
-            </div>
+            <div style={subBlock}>
+              <div style={subBlockHeader}>
+                <div style={subBlockTitle}>Menús ({menus.length})</div>
+                <div style={subBlockHint}>Crea cada menú con sus platos. Para platos que la pareja debe elegir, usa <strong>"Escoger 1"</strong> o <strong>"Escoger N"</strong>.</div>
+              </div>
+              <div style={subBlockBody}>
+                {menus.map((m, mi) => (
+                  <div key={mi} style={{ background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+                    {/* Nombre del menú */}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
+                      <input className="form-input" placeholder="Nombre del menú (ej. Menú Bosque)"
+                        value={m.name} onChange={e => updateMenu(mi, { name: e.target.value })}
+                        style={{ flex: 1, fontWeight: 600 }} />
+                      <button type="button" style={removeBtn} onClick={() => removeMenu(mi)} title="Eliminar menú"><X size={13} /></button>
+                    </div>
 
-            {menus.map((m, mi) => (
-              <div key={mi} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+                    {/* PRECIOS */}
+                    <div style={fieldLabel}>Precios</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <input className="form-input" placeholder="€/persona (ej. 85€ +IVA)"
+                        value={m.price_per_person} onChange={e => updateMenu(mi, { price_per_person: e.target.value })}
+                        style={{ fontSize: 12 }} />
+                      <input className="form-input" placeholder="Gasto mínimo (ej. 10.000€)"
+                        value={m.min_spend ?? ''} onChange={e => updateMenu(mi, { min_spend: e.target.value || undefined })}
+                        style={{ fontSize: 12 }} />
+                    </div>
 
-                {/* Nombre del menú */}
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
-                  <input className="form-input" placeholder="Nombre del menú (ej. Menú Bosque)"
-                    value={m.name}
-                    onChange={e => updateMenu(mi, { name: e.target.value })}
-                    style={{ flex: 1, fontWeight: 600 }} />
-                  <button type="button" style={removeBtn} onClick={() => removeMenu(mi)} title="Eliminar menú"><X size={13} /></button>
-                </div>
+                    {/* Precios por temporada */}
+                    <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', marginTop: 6 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>Precios por temporada</span>
+                        <button type="button"
+                          onClick={() => updateMenu(mi, { season_prices: [...(m.season_prices ?? []), { date_from: '', date_to: '', price_per_person: '', season: '' }] })}
+                          style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}>
+                          + Añadir
+                        </button>
+                      </div>
+                      {(m.season_prices ?? []).length === 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin variaciones — se usa siempre el precio base</div>
+                      )}
+                      {(m.season_prices ?? []).map((sp, si) => {
+                        const updateSp = (patch: Partial<MenuSeasonPrice>) => {
+                          const s = [...(m.season_prices ?? [])]
+                          s[si] = { ...s[si], ...patch }
+                          updateMenu(mi, { season_prices: s })
+                        }
+                        const invalid = sp.date_from && sp.date_to && sp.date_from > sp.date_to
+                        return (
+                          <div key={si} style={{ background: 'var(--cream)', border: `1px solid ${invalid ? '#fca5a5' : 'var(--border)'}`, borderRadius: 8, padding: '10px 10px 8px', marginBottom: 8 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                              <DatePicker label="Desde" value={sp.date_from} onChange={v => updateSp({ date_from: v })} allowPast />
+                              <DatePicker label="Hasta" value={sp.date_to} onChange={v => updateSp({ date_to: v })} allowPast minDate={sp.date_from || undefined} />
+                            </div>
+                            {invalid && <div style={{ fontSize: 10, color: '#dc2626', marginBottom: 6 }}>La fecha de inicio debe ser anterior a la de fin</div>}
+                            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 24px', gap: 8, alignItems: 'center' }}>
+                              <input className="form-input" placeholder="Precio (ej. 95€)" value={sp.price_per_person}
+                                onChange={e => updateSp({ price_per_person: e.target.value })} style={{ fontSize: 12 }} />
+                              <input className="form-input" placeholder="Etiqueta (ej. Temporada alta)" value={sp.season ?? ''}
+                                onChange={e => updateSp({ season: e.target.value })} style={{ fontSize: 12 }} />
+                              <button type="button"
+                                onClick={() => updateMenu(mi, { season_prices: (m.season_prices ?? []).filter((_, i) => i !== si) })}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <X size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
 
-                {/* PRECIOS */}
-                <div style={fieldLabel}>Precios</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  <input className="form-input" placeholder="€/persona (ej. 85€ +IVA)"
-                    value={m.price_per_person}
-                    onChange={e => updateMenu(mi, { price_per_person: e.target.value })}
-                    style={{ fontSize: 12 }} />
-                  <input className="form-input" placeholder="Gasto mínimo (ej. 10.000€)"
-                    value={m.min_spend ?? ''}
-                    onChange={e => updateMenu(mi, { min_spend: e.target.value || undefined })}
-                    style={{ fontSize: 12 }} />
-                </div>
+                    {/* CAPACIDAD */}
+                    <div style={fieldLabel}>Capacidad</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <input className="form-input" type="number" min={0} placeholder="Mín. invitados (opc.)"
+                        value={m.min_guests ?? ''} onChange={e => updateMenu(mi, { min_guests: e.target.value ? parseInt(e.target.value) : undefined })}
+                        style={{ fontSize: 12 }} />
+                      <input className="form-input" type="number" min={0} placeholder="Máx. invitados (opc.)"
+                        value={(m as any).max_guests ?? ''} onChange={e => updateMenu(mi, { max_guests: e.target.value ? parseInt(e.target.value) : undefined } as any)}
+                        style={{ fontSize: 12 }} />
+                    </div>
 
-                {/* Precios por temporada */}
-                <div style={{ background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', marginTop: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>Precios por temporada</span>
-                    <button type="button"
-                      onClick={() => updateMenu(mi, { season_prices: [...(m.season_prices ?? []), { date_from: '', date_to: '', price_per_person: '', season: '' }] })}
-                      style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}>
-                      + Añadir
-                    </button>
-                  </div>
-                  {(m.season_prices ?? []).length === 0 && (
-                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin variaciones — se usa siempre el precio base</div>
-                  )}
-                  {(m.season_prices ?? []).map((sp, si) => {
-                    const updateSp = (patch: Partial<MenuSeasonPrice>) => {
-                      const s = [...(m.season_prices ?? [])]
-                      s[si] = { ...s[si], ...patch }
-                      updateMenu(mi, { season_prices: s })
-                    }
-                    const invalid = sp.date_from && sp.date_to && sp.date_from > sp.date_to
-                    return (
-                      <div key={si} style={{ background: '#fff', border: `1px solid ${invalid ? '#fca5a5' : 'var(--border)'}`, borderRadius: 8, padding: '10px 10px 8px', marginBottom: 8 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                          <DatePicker label="Desde" value={sp.date_from} onChange={v => updateSp({ date_from: v })} allowPast />
-                          <DatePicker label="Hasta" value={sp.date_to} onChange={v => updateSp({ date_to: v })} allowPast minDate={sp.date_from || undefined} />
-                        </div>
-                        {invalid && <div style={{ fontSize: 10, color: '#dc2626', marginBottom: 6 }}>La fecha de inicio debe ser anterior a la de fin</div>}
-                        <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 24px', gap: 8, alignItems: 'center' }}>
-                          <input className="form-input" placeholder="Precio (ej. 95€)" value={sp.price_per_person}
-                            onChange={e => updateSp({ price_per_person: e.target.value })} style={{ fontSize: 12 }} />
-                          <input className="form-input" placeholder="Etiqueta (ej. Temporada alta)" value={sp.season ?? ''}
-                            onChange={e => updateSp({ season: e.target.value })} style={{ fontSize: 12 }} />
-                          <button type="button"
-                            onClick={() => updateMenu(mi, { season_prices: (m.season_prices ?? []).filter((_, i) => i !== si) })}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <X size={13} />
+                    {/* DESCRIPCIÓN */}
+                    <div style={fieldLabel}>Descripción</div>
+                    <input className="form-input" placeholder="Subtítulo / descripción corta (opcional)"
+                      value={m.subtitle ?? ''} onChange={e => updateMenu(mi, { subtitle: e.target.value })}
+                      style={{ marginBottom: 6, fontSize: 12 }} />
+                    <textarea className="form-textarea"
+                      style={{ minHeight: 60, fontFamily: 'inherit', fontSize: 12 }}
+                      placeholder="Descripción del menú (se muestra si no hay platos estructurados)"
+                      value={m.description ?? ''} onChange={e => updateMenu(mi, { description: e.target.value || undefined })} />
+
+                    {/* PDF adjunto */}
+                    <div style={{ marginTop: 6 }}>
+                      {m.pdf_url ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 6 }}>
+                          <FileText size={13} style={{ color: 'var(--gold)' }} />
+                          <a href={m.pdf_url} target="_blank" rel="noopener noreferrer"
+                            style={{ fontSize: 11, color: 'var(--charcoal)', textDecoration: 'none', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            PDF adjunto
+                          </a>
+                          <button type="button" onClick={() => updateMenu(mi, { pdf_url: undefined })}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 2 }}>
+                            <X size={11} />
                           </button>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* CAPACIDAD */}
-                <div style={fieldLabel}>Capacidad</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  <input className="form-input" type="number" min={0} placeholder="Mín. invitados (opc.)"
-                    value={m.min_guests ?? ''}
-                    onChange={e => updateMenu(mi, { min_guests: e.target.value ? parseInt(e.target.value) : undefined })}
-                    style={{ fontSize: 12 }} />
-                  <input className="form-input" type="number" min={0} placeholder="Máx. invitados (opc.)"
-                    value={(m as any).max_guests ?? ''}
-                    onChange={e => updateMenu(mi, { max_guests: e.target.value ? parseInt(e.target.value) : undefined } as any)}
-                    style={{ fontSize: 12 }} />
-                </div>
-
-                {/* DESCRIPCIÓN */}
-                <div style={fieldLabel}>Descripción</div>
-                <input className="form-input" placeholder="Subtítulo / descripción corta (opcional)"
-                  value={m.subtitle ?? ''}
-                  onChange={e => updateMenu(mi, { subtitle: e.target.value })}
-                  style={{ marginBottom: 6, fontSize: 12 }} />
-                <textarea className="form-textarea"
-                  style={{ minHeight: 60, fontFamily: 'inherit', fontSize: 12 }}
-                  placeholder="Descripción del menú (se muestra si no hay platos estructurados)"
-                  value={m.description ?? ''}
-                  onChange={e => updateMenu(mi, { description: e.target.value || undefined })} />
-
-                {/* PDF adjunto */}
-                <div style={{ marginTop: 6 }}>
-                  {m.pdf_url ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 6 }}>
-                      <FileText size={13} style={{ color: 'var(--gold)' }} />
-                      <a href={m.pdf_url} target="_blank" rel="noopener noreferrer"
-                        style={{ fontSize: 11, color: 'var(--charcoal)', textDecoration: 'none', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        PDF adjunto
-                      </a>
-                      <button type="button" onClick={() => updateMenu(mi, { pdf_url: undefined })}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 2 }}>
-                        <X size={11} />
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <input ref={el => { menuPdfRefs.current[mi] = el }} type="file" accept="application/pdf"
-                        style={{ display: 'none' }}
-                        onChange={e => e.target.files?.[0] && handleAttachPdfToMenu(mi, e.target.files[0])} />
-                      <button type="button" className="btn btn-ghost btn-sm"
-                        onClick={() => menuPdfRefs.current[mi]?.click()}
-                        disabled={uploadingPdf}>
-                        <Upload size={11} /> Adjuntar PDF
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* CURSOS / PLATOS */}
-                <div style={fieldLabel}>Cursos / Platos</div>
-                {(m.courses ?? []).map((c, ci) => (
-                  <div key={ci} style={{ background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)', padding: 10, marginBottom: 6 }}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-                      <GripVertical size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                      <input className="form-input" placeholder="Ej. Primer plato" value={c.label}
-                        onChange={e => updateCourse(mi, ci, { label: e.target.value })} style={{ flex: 1 }} />
-                      <div style={{ width: 160, flexShrink: 0 }}>
-                        <Select value={c.mode ?? 'fixed'} onValueChange={(v) => updateCourse(mi, ci, { mode: v as MenuCourse['mode'] })}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {MODE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {c.mode === 'pick_n' && (
-                        <input className="form-input" type="number" min={1} placeholder="N"
-                          value={c.pick_count ?? 1}
-                          onChange={e => updateCourse(mi, ci, { pick_count: parseInt(e.target.value) || 1 })}
-                          style={{ width: 60, flexShrink: 0 }} />
+                      ) : (
+                        <>
+                          <input ref={el => { menuPdfRefs.current[mi] = el }} type="file" accept="application/pdf"
+                            style={{ display: 'none' }}
+                            onChange={e => e.target.files?.[0] && handleAttachPdfToMenu(mi, e.target.files[0])} />
+                          <button type="button" className="btn btn-ghost btn-sm"
+                            onClick={() => menuPdfRefs.current[mi]?.click()}
+                            disabled={uploadingPdf}>
+                            <Upload size={11} /> Adjuntar PDF
+                          </button>
+                        </>
                       )}
-                      <button type="button" style={removeBtn} onClick={() => removeCourse(mi, ci)}><X size={13} /></button>
                     </div>
 
-                    {c.items.map((it, ii) => (
-                      <div key={ii} style={{ display: 'flex', gap: 6, marginBottom: 4, paddingLeft: 18 }}>
-                        <input className="form-input" placeholder="Nombre del plato" value={it.name}
-                          onChange={e => updateItem(mi, ci, ii, { name: e.target.value })} style={{ flex: 2 }} />
-                        <input className="form-input" placeholder="Descripción (opc.)" value={it.description ?? ''}
-                          onChange={e => updateItem(mi, ci, ii, { description: e.target.value })} style={{ flex: 3 }} />
-                        <input className="form-input" placeholder="+precio" value={it.extra_price ?? ''}
-                          onChange={e => updateItem(mi, ci, ii, { extra_price: e.target.value })}
-                          style={{ width: 80, flexShrink: 0 }} />
-                        <button type="button" style={{ ...removeBtn, width: 24, height: 24 }}
-                          onClick={() => removeItem(mi, ci, ii)}>
-                          <X size={11} />
+                    {/* CURSOS / PLATOS */}
+                    <div style={fieldLabel}>Cursos / Platos</div>
+                    {(m.courses ?? []).map((c, ci) => (
+                      <div key={ci} style={{ background: '#fff', borderRadius: 8, border: '1px solid var(--border)', padding: 10, marginBottom: 6 }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                          <GripVertical size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                          <input className="form-input" placeholder="Ej. Primer plato" value={c.label}
+                            onChange={e => updateCourse(mi, ci, { label: e.target.value })} style={{ flex: 1 }} />
+                          <div style={{ width: 160, flexShrink: 0 }}>
+                            <Select value={c.mode ?? 'fixed'} onValueChange={(v) => updateCourse(mi, ci, { mode: v as MenuCourse['mode'] })}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {MODE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {c.mode === 'pick_n' && (
+                            <input className="form-input" type="number" min={1} placeholder="N"
+                              value={c.pick_count ?? 1} onChange={e => updateCourse(mi, ci, { pick_count: parseInt(e.target.value) || 1 })}
+                              style={{ width: 60, flexShrink: 0 }} />
+                          )}
+                          <button type="button" style={removeBtn} onClick={() => removeCourse(mi, ci)}><X size={13} /></button>
+                        </div>
+                        {c.items.map((it, ii) => (
+                          <div key={ii} style={{ display: 'flex', gap: 6, marginBottom: 4, paddingLeft: 18 }}>
+                            <input className="form-input" placeholder="Nombre del plato" value={it.name}
+                              onChange={e => updateItem(mi, ci, ii, { name: e.target.value })} style={{ flex: 2 }} />
+                            <input className="form-input" placeholder="Descripción (opc.)" value={it.description ?? ''}
+                              onChange={e => updateItem(mi, ci, ii, { description: e.target.value })} style={{ flex: 3 }} />
+                            <input className="form-input" placeholder="+precio" value={it.extra_price ?? ''}
+                              onChange={e => updateItem(mi, ci, ii, { extra_price: e.target.value })}
+                              style={{ width: 80, flexShrink: 0 }} />
+                            <button type="button" style={{ ...removeBtn, width: 24, height: 24 }} onClick={() => removeItem(mi, ci, ii)}>
+                              <X size={11} />
+                            </button>
+                          </div>
+                        ))}
+                        <button type="button"
+                          onClick={() => addItem(mi, ci)}
+                          style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', marginLeft: 18, padding: '4px 0' }}>
+                          + Añadir plato
                         </button>
                       </div>
                     ))}
-                    <button type="button"
-                      onClick={() => addItem(mi, ci)}
-                      style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', marginLeft: 18, padding: '4px 0' }}>
-                      + Añadir plato
-                    </button>
+                    <button type="button" style={addBtn} onClick={() => addCourse(mi)}>+ Añadir curso</button>
                   </div>
                 ))}
-                <button type="button" style={addBtn} onClick={() => addCourse(mi)}>+ Añadir curso</button>
+                <button type="button" style={addBtn} onClick={addMenu}>+ Añadir menú</button>
               </div>
-            ))}
-
-            <button type="button" style={addBtn} onClick={addMenu}>+ Añadir menú</button>
+            </div>
           </div>
         )}
       </div>
@@ -631,10 +642,17 @@ export default function ProposalMenuEditor({
               </div>
             </div>
             {openSections.has('night_extras') && (
-              <div>
-                <div style={hint}>Resopón, barra libre… Opciones para alargar la celebración. El campo <strong>Mín. pax</strong> bloquea la opción si hay pocos comensales.</div>
-                {nightExtras.map(e => renderExtraCard(e, extras.indexOf(e), NIGHT_EXTRA_OPTIONS))}
-                <button type="button" style={addBtn} onClick={() => addExtra('resopon')}>+ Añadir opción de noche</button>
+              <div style={{ paddingTop: 4 }}>
+                <div style={subBlock}>
+                  <div style={subBlockHeader}>
+                    <div style={subBlockTitle}>Opciones de noche</div>
+                    <div style={subBlockHint}>Resopón, barra libre… El campo <strong>Mín. pax</strong> bloquea la opción si hay pocos comensales.</div>
+                  </div>
+                  <div style={subBlockBody}>
+                    {nightExtras.map(e => renderExtraCard(e, extras.indexOf(e), NIGHT_EXTRA_OPTIONS))}
+                    <button type="button" style={addBtn} onClick={() => addExtra('resopon')}>+ Añadir opción de noche</button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -656,10 +674,17 @@ export default function ProposalMenuEditor({
               </div>
             </div>
             {openSections.has('event_extras') && (
-              <div>
-                <div style={hint}>Ceremonia, música, audiovisual… Se muestran en un bloque separado de la propuesta.</div>
-                {eventExtras.map(e => renderExtraCard(e, extras.indexOf(e), EVENT_EXTRA_OPTIONS))}
-                <button type="button" style={addBtn} onClick={() => addExtra('ceremony')}>+ Añadir extra del evento</button>
+              <div style={{ paddingTop: 4 }}>
+                <div style={subBlock}>
+                  <div style={subBlockHeader}>
+                    <div style={subBlockTitle}>Extras del evento</div>
+                    <div style={subBlockHint}>Ceremonia, música, audiovisual… Se muestran en un bloque separado de la propuesta.</div>
+                  </div>
+                  <div style={subBlockBody}>
+                    {eventExtras.map(e => renderExtraCard(e, extras.indexOf(e), EVENT_EXTRA_OPTIONS))}
+                    <button type="button" style={addBtn} onClick={() => addExtra('ceremony')}>+ Añadir extra del evento</button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

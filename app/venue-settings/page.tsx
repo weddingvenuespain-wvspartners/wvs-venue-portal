@@ -1642,23 +1642,20 @@ export default function EstructuraPage() {
                             <div>
                               {/* Section header */}
                               <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, background: '#FAFAF9', borderTop: '1px solid var(--ivory)' }}>
-                                <button onClick={togglePricesCollapsed} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0, flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
                                   <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Tarifas por temporada</span>
                                   {nonPkgPrices.length > 0 && (
                                     <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--warm-gray)' }}>{nonPkgPrices.length}</span>
                                   )}
-                                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--warm-gray)" strokeWidth="1.8" strokeLinecap="round" style={{ marginLeft: 2, transition: 'transform 0.2s', transform: isPricesCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
-                                    <path d="M2 4l4 4 4-4"/>
-                                  </svg>
-                                </button>
-                                {!priceAdding && !isPricesCollapsed && (
+                                </div>
+                                {!priceAdding && (
                                   <button className="btn btn-ghost btn-sm" onClick={() => startAddPrice(m.id)} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                                     <Plus size={11} /> Añadir período
                                   </button>
                                 )}
                               </div>
 
-                              {!isPricesCollapsed && (
+                              {(
                                 <>
                                   {priceAdding?.modalityId === m.id && !priceAdding.packageId && (
                                     <div style={{ padding: '8px 12px 4px' }}>
@@ -2879,13 +2876,23 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
           <div style={{ border: '1px solid var(--ivory)', borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isTierMode ? 8 : 0 }}>
               <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '0.05em', textTransform: 'uppercase', flex: 1 }}>{labelBase}</span>
-              <button type="button"
-                onClick={() => onChange({ ...form, price_tiers: isTierMode ? null : [] })}
-                style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, border: `1px solid ${isTierMode ? accent : '#d1d5db'}`, background: isTierMode ? accent : 'transparent', color: isTierMode ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}>
-                {isTierMode ? 'Tramos ×' : '+ Tramos por aforo'}
-              </button>
+              <div style={{ display: 'flex', borderRadius: 20, border: '1px solid #d1d5db', overflow: 'hidden', flexShrink: 0 }}>
+                {([{ tier: false, label: 'Precio fijo' }, { tier: true, label: 'Por tramos' }] as const).map(({ tier, label }) => {
+                  const active = isTierMode === tier
+                  return (
+                    <button key={label} type="button"
+                      onClick={() => onChange({ ...form, price_tiers: tier ? [] : null })}
+                      style={{ fontSize: 10, padding: '3px 10px', border: 'none', borderLeft: tier ? '1px solid #d1d5db' : 'none', background: active ? accent : 'transparent', color: active ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: active ? 600 : 400 }}>
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
               {!isTierMode && (
-                <input type="number" className="form-input" placeholder="0" value={form.price} onChange={e => onChange({ ...form, price: e.target.value })} style={{ fontSize: 12, width: 100 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input type="number" className="form-input" placeholder="0" value={form.price} onChange={e => onChange({ ...form, price: e.target.value })} style={{ fontSize: 12, width: 90, textAlign: 'right' }} />
+                  <span style={{ fontSize: 12, color: 'var(--warm-gray)', flexShrink: 0 }}>€</span>
+                </div>
               )}
             </div>
             {isTierMode && <TierRows tiers={form.price_tiers!} accent={accent} onChange={tiers => onChange({ ...form, price_tiers: tiers })} />}
@@ -2905,23 +2912,29 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
                 <div key={z.id} style={{ border: '1px solid var(--ivory)', borderRadius: 8, padding: '8px 10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isTierMode ? 8 : 0 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#1D4ED8', flex: 1 }}>{z.name}</span>
-                    <button type="button"
-                      onClick={() => {
-                        if (isTierMode) {
-                          const next = { ...form.zone_tier_prices }; delete next[z.id]
-                          onChange({ ...form, zone_tier_prices: next })
-                        } else {
-                          onChange({ ...form, zone_tier_prices: { ...form.zone_tier_prices, [z.id]: [] } })
-                        }
-                      }}
-                      style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, border: `1px solid ${isTierMode ? accent : '#d1d5db'}`, background: isTierMode ? accent : 'transparent', color: isTierMode ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}>
-                      {isTierMode ? 'Tramos ×' : '+ Tramos por aforo'}
-                    </button>
+                    <div style={{ display: 'flex', borderRadius: 20, border: '1px solid #d1d5db', overflow: 'hidden', flexShrink: 0 }}>
+                      {([{ tier: false, label: 'Precio fijo' }, { tier: true, label: 'Por tramos' }] as const).map(({ tier, label }) => {
+                        const active = isTierMode === tier
+                        return (
+                          <button key={label} type="button"
+                            onClick={() => {
+                              if (tier) onChange({ ...form, zone_tier_prices: { ...form.zone_tier_prices, [z.id]: [] } })
+                              else { const next = { ...form.zone_tier_prices }; delete next[z.id]; onChange({ ...form, zone_tier_prices: next }) }
+                            }}
+                            style={{ fontSize: 10, padding: '3px 10px', border: 'none', borderLeft: tier ? '1px solid #d1d5db' : 'none', background: active ? accent : 'transparent', color: active ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: active ? 600 : 400 }}>
+                            {label}
+                          </button>
+                        )
+                      })}
+                    </div>
                     {!isTierMode && (
-                      <input type="number" className="form-input" placeholder="€"
-                        value={form.zone_prices[z.id] ?? ''}
-                        onChange={e => onChange({ ...form, zone_prices: { ...form.zone_prices, [z.id]: e.target.value } })}
-                        style={{ fontSize: 12, width: 100 }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <input type="number" className="form-input" placeholder="0"
+                          value={form.zone_prices[z.id] ?? ''}
+                          onChange={e => onChange({ ...form, zone_prices: { ...form.zone_prices, [z.id]: e.target.value } })}
+                          style={{ fontSize: 12, width: 90, textAlign: 'right' }} />
+                        <span style={{ fontSize: 12, color: 'var(--warm-gray)', flexShrink: 0 }}>€</span>
+                      </div>
                     )}
                   </div>
                   {isTierMode && (
@@ -3065,24 +3078,32 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
                   /* group_base: base price + tiers toggle + supplements */
                   <>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: (isTierMode || supplementSpaces.length > 0) ? 8 : 0 }}>
-                      <span style={{ fontSize: 11, color: 'var(--warm-gray)', flex: 1 }}>Precio base</span>
-                      <button type="button"
-                        onClick={() => {
-                          if (isTierMode) {
-                            const next = { ...form.group_tier_prices }; delete next[grp.id]
-                            onChange({ ...form, group_tier_prices: next })
-                          } else {
-                            onChange({ ...form, group_tier_prices: { ...form.group_tier_prices, [grp.id]: [] } })
-                          }
-                        }}
-                        style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, border: `1px solid ${isTierMode ? accent : '#d1d5db'}`, background: isTierMode ? accent : 'transparent', color: isTierMode ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}>
-                        {isTierMode ? 'Tramos ×' : '+ Tramos por aforo'}
-                      </button>
+                      <span style={{ fontSize: 11, color: 'var(--warm-gray)', flex: 1 }}>
+                        {isITP && includedSpaces.length > 0 ? 'Precio base — incluidas' : 'Precio base'}
+                      </span>
+                      <div style={{ display: 'flex', borderRadius: 20, border: '1px solid #d1d5db', overflow: 'hidden', flexShrink: 0 }}>
+                        {([{ tier: false, label: 'Precio fijo' }, { tier: true, label: 'Por tramos' }] as const).map(({ tier, label }) => {
+                          const active = isTierMode === tier
+                          return (
+                            <button key={label} type="button"
+                              onClick={() => {
+                                if (tier) onChange({ ...form, group_tier_prices: { ...form.group_tier_prices, [grp.id]: [] } })
+                                else { const next = { ...form.group_tier_prices }; delete next[grp.id]; onChange({ ...form, group_tier_prices: next }) }
+                              }}
+                              style={{ fontSize: 10, padding: '3px 10px', border: 'none', borderLeft: tier ? '1px solid #d1d5db' : 'none', background: active ? accent : 'transparent', color: active ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: active ? 600 : 400 }}>
+                              {label}
+                            </button>
+                          )
+                        })}
+                      </div>
                       {!isTierMode && (
-                        <input type="number" className="form-input" placeholder="Precio base €"
-                          value={form.group_prices[grp.id] ?? ''}
-                          onChange={e => onChange({ ...form, group_prices: { ...form.group_prices, [grp.id]: e.target.value } })}
-                          style={{ fontSize: 12, width: 120 }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <input type="number" className="form-input" placeholder="0"
+                            value={form.group_prices[grp.id] ?? ''}
+                            onChange={e => onChange({ ...form, group_prices: { ...form.group_prices, [grp.id]: e.target.value } })}
+                            style={{ fontSize: 12, width: 90, textAlign: 'right' }} />
+                          <span style={{ fontSize: 12, color: 'var(--warm-gray)', flexShrink: 0 }}>€</span>
+                        </div>
                       )}
                     </div>
                     {isTierMode && (

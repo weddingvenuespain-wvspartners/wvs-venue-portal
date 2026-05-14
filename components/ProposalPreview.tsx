@@ -4,7 +4,7 @@ import { Monitor, Smartphone, RefreshCcw, ExternalLink, Loader2 } from 'lucide-r
 
 type PreviewPatch = Record<string, any>
 
-export default function ProposalPreview({ slug, patch }: { slug: string; patch: PreviewPatch }) {
+export default function ProposalPreview({ slug, patch, onReload }: { slug: string; patch: PreviewPatch; onReload?: () => void }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
   const [loading, setLoading] = useState(true)
@@ -44,6 +44,7 @@ export default function ProposalPreview({ slug, patch }: { slug: string; patch: 
   }, [patch])
 
   const reload = () => {
+    onReload?.()
     setLoading(true)
     if (iframeRef.current) iframeRef.current.src = iframeRef.current.src
   }

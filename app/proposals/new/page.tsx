@@ -110,8 +110,9 @@ function NuevaPropuestaContent() {
       const baseSectionsData = starter?.sections_data ?? { visual_template_id: 1 }
       const finalSectionsData = {
         ...(contentSectionsData
-          ? { ...contentSectionsData, visual_template_id: (baseSectionsData as any).visual_template_id ?? 1 }
+          ? { ...contentSectionsData, visual_template_id: (contentSectionsData as any).visual_template_id ?? (baseSectionsData as any).visual_template_id ?? 1 }
           : baseSectionsData),
+        ...(resolvedContentTemplateId ? { content_template_id: resolvedContentTemplateId } : {}),
         ...(dateSlots ? { date_slots: dateSlots } : {}),
       }
 
