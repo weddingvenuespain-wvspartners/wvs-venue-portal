@@ -48,6 +48,7 @@ export default function ProposalEditarPage({ params }: { params: Promise<{ id: s
         show_price_estimate: data.show_price_estimate ?? true,
         status: data.status,
         lead_id: data.lead_id,
+        modality_id: (data as any).modality_id ?? null,
         sections_data: (data as any).sections_data ?? null,
         template_id: (data as any).template_id ?? null,
         branding: branding ?? null,

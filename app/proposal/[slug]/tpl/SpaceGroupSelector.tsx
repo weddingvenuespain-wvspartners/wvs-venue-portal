@@ -13,6 +13,7 @@ type Props = {
   guestCount?: number
   onSelectionChange?: (selections: SpaceSelection[]) => void
   preview?: boolean
+  pricingBlock?: React.ReactNode
 }
 
 type ZoneModalState = {
@@ -77,7 +78,7 @@ function PhotoPlaceholder({ name, primary, dark, height = 160 }: { name: string;
   )
 }
 
-export default function SpaceGroupSelector({ groups, primary, onPrimary, dark = false, font, guestCount, onSelectionChange, preview }: Props) {
+export default function SpaceGroupSelector({ groups, primary, onPrimary, dark = false, font, guestCount, onSelectionChange, preview, pricingBlock }: Props) {
   const [singleSel, setSingleSel] = useState<Record<number, number>>({})
   const [multiSel,  setMultiSel]  = useState<Record<number, Set<number>>>({})
   const [optIn,     setOptIn]     = useState<Record<number, boolean | null>>({})
@@ -558,7 +559,7 @@ const sliderCard: React.CSSProperties = isMobile ? { minWidth: 240, maxWidth: 24
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 clamp(20px,5vw,60px)' }}>
 
           {/* Section heading */}
-          <div style={{ textAlign: 'center', marginBottom: 64 }}>
+          <div style={{ textAlign: 'center', marginBottom: pricingBlock ? 40 : 64 }}>
             <span style={{ fontSize: '.63rem', fontWeight: 700, letterSpacing: '.22em', textTransform: 'uppercase', color: primary, display: 'block', marginBottom: 12 }}>
               Vuestros espacios
             </span>
@@ -566,6 +567,13 @@ const sliderCard: React.CSSProperties = isMobile ? { minWidth: 240, maxWidth: 24
               Configura tu celebración
             </h2>
           </div>
+
+          {/* Pricing / date block injected by parent */}
+          {pricingBlock && (
+            <div style={{ marginBottom: 48 }}>
+              {pricingBlock}
+            </div>
+          )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 56 }}>
             {groups.map((group, gi) => {

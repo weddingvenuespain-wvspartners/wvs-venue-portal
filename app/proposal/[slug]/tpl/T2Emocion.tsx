@@ -394,24 +394,6 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       {/* ── SPACE GROUPS ── */}
       {on('space_groups') && visibleSpaceGroups.length > 0 ? (
         <div id="sec-space-groups">
-          {on('date_slots') && dateSlots && dateSlots.length > 0 && (
-            <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
-          )}
-          {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
-            <section style={{ background: '#fff', padding: '100px 0' }}>
-              <div className="w">
-                <FadeUp>
-                  <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                    <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>{sec.venue_rental.title || 'Tarifas de alquiler'}</div>
-                    <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Elegid vuestra fecha</h2>
-                  </div>
-                </FadeUp>
-                <FadeUp delay={.1}>
-                  <VenueRentalGrid data={sec.venue_rental} primary={primary} />
-                </FadeUp>
-              </div>
-            </section>
-          )}
           <SpaceGroupSelector
             groups={visibleSpaceGroups}
             primary={primary}
@@ -420,6 +402,21 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             font={font}
             guestCount={guests}
             onSelectionChange={setSelectedSpaces}
+            pricingBlock={(() => {
+              const blocks: React.ReactNode[] = []
+              if (on('date_slots') && dateSlots && dateSlots.length > 0) {
+                blocks.push(<DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />)
+              }
+              if (on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0) {
+                blocks.push(
+                  <div key="vr">
+                    <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.5)`, marginBottom: 14 }}>{sec.venue_rental.title || 'Elegid vuestra fecha'}</div>
+                    <VenueRentalGrid data={sec.venue_rental} primary={primary} />
+                  </div>
+                )
+              }
+              return blocks.length > 0 ? <>{blocks}</> : undefined
+            })()}
           />
         </div>
       ) : null}

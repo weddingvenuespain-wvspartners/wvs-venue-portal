@@ -23,6 +23,7 @@ export default function Sidebar() {
 
   // Badge: new leads count (venue + catering users)
   const [venueOpen, setVenueOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   // Silently refresh venues once on mount so switcher always has the latest list
   useEffect(() => {
@@ -111,13 +112,20 @@ export default function Sidebar() {
     return () => window.removeEventListener('wvs-wp-badge-refresh', fetchWpCount)
   }, [user?.id, isAdmin]) // eslint-disable-line
 
-  // Close venue dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     if (!venueOpen) return
     const close = () => setVenueOpen(false)
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [venueOpen])
+
+  useEffect(() => {
+    if (!userMenuOpen) return
+    const close = () => setUserMenuOpen(false)
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [userMenuOpen])
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -268,12 +276,9 @@ export default function Sidebar() {
 
         {/* Dashboard — visible for non-planners (planners have it in their section) */}
         {!isPlanner && (
-          <>
-            <div className="nav-section">General</div>
-            <Link href={dashboardHref} className={`nav-item ${isActive(dashboardHref) || pathname === dashboardHref ? 'active' : ''}`}>
-              <Icon d="M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z" /> Dashboard
-            </Link>
-          </>
+          <Link href={dashboardHref} className={`nav-item ${isActive(dashboardHref) || pathname === dashboardHref ? 'active' : ''}`}>
+            <Icon d="M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z" /> Dashboard
+          </Link>
         )}
 
         {/* ── ADMIN ── */}
@@ -480,36 +485,56 @@ export default function Sidebar() {
           </Link>
         )}
 
-        <Link href="/perfil" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, textDecoration: 'none' }}>
-          <div className="avatar">{initials}</div>
-          <div style={{ minWidth: 0 }}>
+        {/* User menu */}
+        <div style={{ position: 'relative' }} onMouseDown={e => e.stopPropagation()}>
+          <button
+            onMouseDown={e => { e.stopPropagation(); setUserMenuOpen(o => !o) }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+          >
+            <div className="avatar">{initials}</div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{
+                color: pathname === '/perfil' ? 'var(--gold)' : '#fff',
+                fontSize: 12, fontWeight: 400,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+              }}>
+                {userEmail}
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                {roleLabel}
+                {isVenueOwner && !features.loading && (
+                  <span style={{
+                    background: !features.hasPlan ? '#1e293b' : features.isTrial ? '#78350f' : features.planTier === 'basic' ? '#1e3a5f' : '#451a03',
+                    color: !features.hasPlan ? '#94a3b8' : features.isTrial ? '#fcd34d' : features.planTier === 'basic' ? '#93c5fd' : '#fde68a',
+                    padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: '0.04em'
+                  }}>
+                    {features.isTrial ? 'TRIAL' : !features.hasPlan ? 'SIN PLAN' : features.planName ? features.planName.toUpperCase() : features.planTier === 'basic' ? 'BÁSICO' : 'PREMIUM'}
+                  </span>
+                )}
+              </div>
+            </div>
+            <ChevronDown size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.3)', transform: userMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+          </button>
+
+          {userMenuOpen && (
             <div style={{
-              color: pathname === '/perfil' ? 'var(--gold)' : '#fff',
-              fontSize: 12, fontWeight: 400,
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+              position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: 0,
+              background: '#1e1a17', border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 8, overflow: 'hidden', zIndex: 50,
+              boxShadow: '0 -8px 24px rgba(0,0,0,0.4)',
             }}>
-              {userEmail}
+              <button onMouseDown={() => { setUserMenuOpen(false); router.push('/perfil') }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', fontSize: 12, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left' }}>
+                Mi perfil
+              </button>
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '0 10px' }} />
+              <button onMouseDown={() => { setUserMenuOpen(false); handleLogout() }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'none', border: 'none', color: '#f87171', fontSize: 12, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left' }}>
+                Cerrar sesión
+              </button>
             </div>
-            <div style={{ fontSize: 10, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
-              {roleLabel}
-              {isVenueOwner && !features.loading && (
-                <span style={{
-                  background: !features.hasPlan ? '#1e293b' : features.isTrial ? '#78350f' : features.planTier === 'basic' ? '#1e3a5f' : '#451a03',
-                  color: !features.hasPlan ? '#94a3b8' : features.isTrial ? '#fcd34d' : features.planTier === 'basic' ? '#93c5fd' : '#fde68a',
-                  padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: '0.04em'
-                }}>
-                  {features.isTrial ? 'TRIAL' : !features.hasPlan ? 'SIN PLAN' : features.planName ? features.planName.toUpperCase() : features.planTier === 'basic' ? 'BÁSICO' : 'PREMIUM'}
-                </span>
-              )}
-            </div>
-          </div>
-        </Link>
-        <button
-          onClick={handleLogout}
-          style={{ background: 'none', border: 'none', color: 'var(--warm-gray)', fontSize: 11, cursor: 'pointer', padding: 0 }}
-        >
-          Cerrar sesión →
-        </button>
+          )}
+        </div>
       </div>
     </div>
   )

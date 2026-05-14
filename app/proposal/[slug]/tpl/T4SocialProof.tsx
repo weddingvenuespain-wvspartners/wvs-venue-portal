@@ -974,23 +974,6 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       {/* SPACE GROUPS */}
       {on('space_groups') && visibleSpaceGroups.length > 0 && (
         <section className="t4-section" id="sec-space-groups" style={{ background: CREAM }}>
-          {on('date_slots') && dateSlots && dateSlots.length > 0 && (
-            <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
-          )}
-          {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
-            <div className="t4-inner" style={{ paddingBottom: 0 }}>
-              <FadeUp>
-                <span className="t4-section-label">{sec.venue_rental.title || 'Tarifas de alquiler'}</span>
-                <h2 className="t4-section-title">Elegid vuestra fecha</h2>
-                <div className="t4-divider" />
-              </FadeUp>
-              <FadeUp delay={.1}>
-                <div style={{ marginTop: 40 }}>
-                  <VenueRentalGrid data={sec.venue_rental} primary={primary} />
-                </div>
-              </FadeUp>
-            </div>
-          )}
           <SpaceGroupSelector
             groups={visibleSpaceGroups}
             primary={primary}
@@ -999,6 +982,21 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             font={font}
             guestCount={guests}
             onSelectionChange={setSelectedSpaces}
+            pricingBlock={(() => {
+              const blocks: React.ReactNode[] = []
+              if (on('date_slots') && dateSlots && dateSlots.length > 0) {
+                blocks.push(<DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />)
+              }
+              if (on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0) {
+                blocks.push(
+                  <div key="vr">
+                    <span className="t4-section-label" style={{ display: 'block', marginBottom: 14 }}>{sec.venue_rental.title || 'Elegid vuestra fecha'}</span>
+                    <VenueRentalGrid data={sec.venue_rental} primary={primary} />
+                  </div>
+                )
+              }
+              return blocks.length > 0 ? <>{blocks}</> : undefined
+            })()}
           />
         </section>
       )}

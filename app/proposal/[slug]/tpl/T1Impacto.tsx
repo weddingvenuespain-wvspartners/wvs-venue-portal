@@ -781,7 +781,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 {(() => {
                   const dp: any[] = Array.isArray(ss.date_prices) ? ss.date_prices.filter((e: any) => e.price_min) : []
                   if (dp.length === 0) return null
-                  if (on('space_groups') && visibleSpaceGroups.length > 0) return null
+                  if (on('space_groups') && visibleSpaceGroups.length > 0) return null  // shown inside space_groups section
                   const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
                   const fmtPrice = (p: string) => { const n = parseFloat(p); return isNaN(n) ? p : n.toLocaleString('es-ES') + '€' }
                   const rangeLabel = (e: any) => {
@@ -909,67 +909,6 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       ════════════════════════════════════════════ */}
       {on('space_groups') && visibleSpaceGroups.length > 0 ? (
         <div id="sec-space-groups">
-          {on('date_slots') && dateSlots && dateSlots.length > 0 && (
-            <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={!lightMode} font={FONT} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
-          )}
-          {on('single_space') && (() => {
-            const dp: any[] = Array.isArray((sec as any).single_space?.date_prices)
-              ? (sec as any).single_space.date_prices.filter((e: any) => e.price_min)
-              : []
-            if (dp.length === 0) return null
-            const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
-            const fmtPrice = (p: string) => { const n = parseFloat(p); return isNaN(n) ? p : n.toLocaleString('es-ES') + '€' }
-            const rangeLabel = (e: any) => {
-              if (!e.date_to || e.date_to === e.date_from) return fmtDate(e.date_from)
-              const days = Math.round((new Date(e.date_to + 'T12:00:00').getTime() - new Date(e.date_from + 'T12:00:00').getTime()) / 86400000)
-              if (days === 1) return `${fmtDate(e.date_from)} o ${fmtDate(e.date_to)}`
-              return `${fmtDate(e.date_from)} – ${fmtDate(e.date_to)}`
-            }
-            const priceKey = (e: any) => `${e.price_min ?? ''}|${e.price_max ?? ''}`
-            const priceLabel = (e: any) => e.price_max ? `${fmtPrice(e.price_min)} – ${fmtPrice(e.price_max)}` : fmtPrice(e.price_min)
-            const grouped: Array<{ key: string; entries: any[]; priceStr: string }> = []
-            for (const entry of dp) {
-              const k = priceKey(entry)
-              const existing = grouped.find(g => g.key === k)
-              if (existing) existing.entries.push(entry)
-              else grouped.push({ key: k, entries: [entry], priceStr: priceLabel(entry) })
-            }
-            return (
-              <section className="t1-sec">
-                <div className="w">
-                  <FadeUp>
-                    <span className="t1-label">Tarifas</span>
-                    <h2 className="t1-h2" style={{ marginBottom: 32 }}>Elegid vuestra fecha</h2>
-                  </FadeUp>
-                  <FadeUp delay={.1}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                      {grouped.map((group, i) => (
-                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '12px 18px', borderRadius: 10, border: `1px solid ${fg(.12)}`, background: lightMode ? '#fff' : 'rgba(255,255,255,.04)' }}>
-                          {group.entries.map((entry, j) => (
-                            <span key={j} style={{ fontSize: '.82rem', color: fg(.7) }}>{rangeLabel(entry)}</span>
-                          ))}
-                          <span style={{ fontSize: '.88rem', fontWeight: 700, color: primary, marginTop: 4 }}>{group.priceStr}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </FadeUp>
-                </div>
-              </section>
-            )
-          })()}
-          {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
-            <section className="t1-sec">
-              <div className="w">
-                <FadeUp>
-                  <span className="t1-label">{sec.venue_rental.title || 'Tarifas de alquiler'}</span>
-                  <h2 className="t1-h2">Elegid vuestra fecha</h2>
-                </FadeUp>
-                <FadeUp delay={.1}>
-                  <VenueRentalGrid data={sec.venue_rental} primary={primary} dark={!lightMode} />
-                </FadeUp>
-              </div>
-            </section>
-          )}
           <SpaceGroupSelector
             groups={visibleSpaceGroups}
             primary={primary}
@@ -978,6 +917,75 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
             font={FONT}
             guestCount={guests}
             onSelectionChange={setSelectedSpaces}
+            pricingBlock={(() => {
+              const blocks: React.ReactNode[] = []
+
+              // DateSelector (date_slots)
+              if (on('date_slots') && dateSlots && dateSlots.length > 0) {
+                blocks.push(
+                  <DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={onPri} dark={!lightMode} font={FONT} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
+                )
+              }
+
+              // date_prices — always shown if data exists and venue_rental not active
+              if (!(on('venue_rental') && sec.venue_rental?.rows?.length > 0)) {
+                const dp: any[] = Array.isArray((sec as any).single_space?.date_prices)
+                  ? (sec as any).single_space.date_prices.filter((e: any) => e.price_min)
+                  : []
+                if (dp.length > 0) {
+                  const fmtDateP = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+                  const fmtPriceP = (p: string) => { const n = parseFloat(p); return isNaN(n) ? p : n.toLocaleString('es-ES') + '€' }
+                  const rangeLabelP = (e: any) => {
+                    if (!e.date_to || e.date_to === e.date_from) return fmtDateP(e.date_from)
+                    const days = Math.round((new Date(e.date_to + 'T12:00:00').getTime() - new Date(e.date_from + 'T12:00:00').getTime()) / 86400000)
+                    if (days === 1) return `${fmtDateP(e.date_from)} o ${fmtDateP(e.date_to)}`
+                    return `${fmtDateP(e.date_from)} – ${fmtDateP(e.date_to)}`
+                  }
+                  const priceKeyP = (e: any) => `${e.price_min ?? ''}|${e.price_max ?? ''}`
+                  const priceLabelP = (e: any) => e.price_max ? `${fmtPriceP(e.price_min)} – ${fmtPriceP(e.price_max)}` : fmtPriceP(e.price_min)
+                  const grouped: Array<{ key: string; entries: any[]; priceStr: string }> = []
+                  for (const entry of dp) {
+                    const k = priceKeyP(entry)
+                    const existing = grouped.find(g => g.key === k)
+                    if (existing) existing.entries.push(entry)
+                    else grouped.push({ key: k, entries: [entry], priceStr: priceLabelP(entry) })
+                  }
+                  blocks.push(
+                    <div key="dp" style={{ paddingBottom: 8 }}>
+                      <div style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: lightMode ? '#9a8f82' : 'rgba(255,255,255,.4)', marginBottom: 14 }}>Elegid vuestra fecha</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                        {grouped.map((group, i) => {
+                          const sel = selectedDatePriceIdx === i
+                          return (
+                            <button key={i} type="button" onClick={() => setSelectedDatePriceIdx(sel ? null : i)}
+                              style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '12px 18px', borderRadius: 10, border: `1.5px solid ${sel ? primary : fg(.12)}`, background: sel ? `${primary}12` : (lightMode ? '#fff' : 'rgba(255,255,255,.04)'), cursor: 'pointer', textAlign: 'left', transition: 'all .15s' }}>
+                              {group.entries.map((entry, j) => (
+                                <span key={j} style={{ fontSize: '.82rem', color: sel ? primary : fg(.65) }}>{rangeLabelP(entry)}</span>
+                              ))}
+                              <span style={{ fontSize: '.88rem', fontWeight: 700, color: primary, marginTop: 4 }}>{group.priceStr}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                }
+              }
+
+              // VenueRentalGrid
+              if (on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0) {
+                blocks.push(
+                  <div key="vr">
+                    <div style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: lightMode ? '#9a8f82' : 'rgba(255,255,255,.4)', marginBottom: 14 }}>
+                      {sec.venue_rental.title || 'Elegid vuestra fecha'}
+                    </div>
+                    <VenueRentalGrid data={sec.venue_rental} primary={primary} dark={!lightMode} />
+                  </div>
+                )
+              }
+
+              return blocks.length > 0 ? <>{blocks}</> : undefined
+            })()}
           />
         </div>
       ) : on('space_groups') && _preview ? <EmptySec label="Los espacios" /> : null}

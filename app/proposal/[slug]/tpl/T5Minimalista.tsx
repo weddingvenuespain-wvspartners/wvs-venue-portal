@@ -772,20 +772,6 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       {/* SPACE GROUPS */}
       {on('space_groups') && visibleSpaceGroups.length > 0 && (
         <section id="sec-space-groups" style={{ background: '#fff', padding: '40px 0' }}>
-          {on('date_slots') && dateSlots && dateSlots.length > 0 && (
-            <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
-          )}
-          {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
-            <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 56px 60px' }}>
-              <FadeUp>
-                <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>{sec.venue_rental.title || 'Tarifas de alquiler'}</p>
-                <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Elegid vuestra fecha</h2>
-              </FadeUp>
-              <FadeUp delay={.1}>
-                <VenueRentalGrid data={sec.venue_rental} primary={primary} />
-              </FadeUp>
-            </div>
-          )}
           <SpaceGroupSelector
             groups={visibleSpaceGroups}
             primary={primary}
@@ -794,6 +780,21 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             font={font}
             guestCount={guests}
             onSelectionChange={setSelectedSpaces}
+            pricingBlock={(() => {
+              const blocks: React.ReactNode[] = []
+              if (on('date_slots') && dateSlots && dateSlots.length > 0) {
+                blocks.push(<DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />)
+              }
+              if (on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0) {
+                blocks.push(
+                  <div key="vr">
+                    <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>{sec.venue_rental.title || 'Elegid vuestra fecha'}</p>
+                    <VenueRentalGrid data={sec.venue_rental} primary={primary} />
+                  </div>
+                )
+              }
+              return blocks.length > 0 ? <>{blocks}</> : undefined
+            })()}
           />
         </section>
       )}

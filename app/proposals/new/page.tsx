@@ -108,6 +108,7 @@ function NuevaPropuestaContent() {
       }
 
       const baseSectionsData = starter?.sections_data ?? { visual_template_id: 1 }
+      const templateDefaultModalityId = (contentSectionsData as any)?.default_modality_id ?? null
       const finalSectionsData = {
         ...(contentSectionsData
           ? { ...contentSectionsData, visual_template_id: (contentSectionsData as any).visual_template_id ?? (baseSectionsData as any).visual_template_id ?? 1 }
@@ -134,6 +135,7 @@ function NuevaPropuestaContent() {
         sections_data: finalSectionsData,
         template_id: defTpl?.id ?? null,
         content_template_id: resolvedContentTemplateId,
+        ...(templateDefaultModalityId ? { modality_id: templateDefaultModalityId } : {}),
         ...(firstProposedDate ? { wedding_date: firstProposedDate } : {}),
         ...(starter?.personal_message ? { personal_message: starter.personal_message } : {}),
         ...(starter?.price_estimate ? { price_estimate: starter.price_estimate } : {}),

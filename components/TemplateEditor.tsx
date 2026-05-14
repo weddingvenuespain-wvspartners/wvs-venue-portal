@@ -112,11 +112,22 @@ export default function TemplateEditor({
   const [device, setDevice]           = useState<'desktop' | 'mobile'>('desktop')
 
 
-  const [wizardStep, setWizardStep] = useState<'style' | 'catering' | null>(() => {
+  const [wizardStep, setWizardStep] = useState<'style' | 'catering' | 'modality' | null>(() => {
     if (template.id !== 'new') return null
-    if ((template.sections_data as any)?.visual_template_id) return null
+    const sd = template.sections_data as any
+    // Modal picker already collected all choices → skip wizard entirely
+    if (sd?.__wizard_done) return null
+    // Came from sample style card (old direct link) → style chosen, start at catering
+    if (sd?.visual_template_id) return 'catering'
     return 'style'
   })
+
+  // Modalities — for wizard step + existing template editor
+  const [modalities, setModalities] = useState<any[]>([])
+  useEffect(() => {
+    if (modalities.length > 0) return
+    fetch('/api/estructura/modalities').then(r => r.ok ? r.json() : null).then(d => { if (d?.modalities) setModalities(d.modalities) })
+  }, [modalities.length])
 
   // Open/close section content cards
   const [openSecs, setOpenSecs] = useState<Set<string>>(new Set())
@@ -1470,7 +1481,7 @@ export default function TemplateEditor({
             </button>
           )}
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)' }}>
-            {wizardStep === 'style' ? 'Nueva plantilla · Paso 1 de 2' : 'Nueva plantilla · Paso 2 de 2'}
+            {wizardStep === 'style' ? 'Nueva plantilla · Paso 1 de 3' : wizardStep === 'catering' ? 'Nueva plantilla · Paso 2 de 3' : 'Nueva plantilla · Paso 3 de 3'}
           </span>
         </div>
 
@@ -1529,7 +1540,7 @@ export default function TemplateEditor({
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <button type="button"
-                  onClick={() => { setSections(s => ({ ...s, has_catering: true })); markDirty(); setWizardStep(null) }}
+                  onClick={() => { setSections(s => ({ ...s, has_catering: true })); markDirty(); setWizardStep('modality') }}
                   style={{
                     padding: '20px 24px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
                     border: '2px solid var(--border)', background: 'var(--surface)',
@@ -1544,7 +1555,7 @@ export default function TemplateEditor({
                   </div>
                 </button>
                 <button type="button"
-                  onClick={() => { setSections(s => ({ ...s, has_catering: false })); markDirty(); setWizardStep(null) }}
+                  onClick={() => { setSections(s => ({ ...s, has_catering: false })); markDirty(); setWizardStep('modality') }}
                   style={{
                     padding: '20px 24px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
                     border: '2px solid var(--border)', background: 'var(--surface)',
@@ -1562,6 +1573,41 @@ export default function TemplateEditor({
               <button type="button" onClick={() => setWizardStep('style')}
                 style={{ marginTop: 20, width: '100%', padding: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                 <ChevronLeft size={13} /> Volver al diseño
+              </button>
+            </div>
+          )}
+
+          {wizardStep === 'modality' && (
+            <div style={{ maxWidth: 480, width: '100%' }}>
+              <div style={{ textAlign: 'center', marginBottom: 36 }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 8 }}>¿Qué modalidad se usará?</div>
+                <div style={{ fontSize: 14, color: 'var(--warm-gray)' }}>Se precargará al crear un dosier con esta plantilla. Puedes cambiarlo en cada dosier.</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {modalities.length === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--warm-gray)', textAlign: 'center', padding: '20px 0' }}>Cargando modalidades…</div>
+                ) : modalities.map((m: any) => (
+                  <button key={m.id} type="button"
+                    onClick={() => { setSections(s => ({ ...s, default_modality_id: m.id } as any)); markDirty(); setWizardStep(null) }}
+                    style={{ padding: '16px 20px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', border: '2px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(196,151,90,0.12)', border: '1.5px solid rgba(196,151,90,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>
+                      ☀️
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 2 }}>{m.name}</div>
+                      {m.duration_label && <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>{m.duration_label}</div>}
+                    </div>
+                  </button>
+                ))}
+                <button type="button"
+                  onClick={() => { setSections(s => ({ ...s, default_modality_id: undefined } as any)); setWizardStep(null) }}
+                  style={{ marginTop: 4, padding: '12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--warm-gray)', textAlign: 'center' }}>
+                  Saltar — lo decidiré en cada dosier
+                </button>
+              </div>
+              <button type="button" onClick={() => setWizardStep('catering')}
+                style={{ marginTop: 16, width: '100%', padding: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                <ChevronLeft size={13} /> Volver al catering
               </button>
             </div>
           )}
@@ -1660,6 +1706,39 @@ export default function TemplateEditor({
                     </div>
                     <Toggle value={hasCatering} onChange={v => { setSections(s => ({ ...s, has_catering: v })); markDirty() }} />
                   </div>
+                </div>
+
+                {/* Modality selector */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Modalidad por defecto</div>
+                <div style={{ background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 18 }}>
+                  {modalities.length === 0 ? (
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Sin modalidades configuradas</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {modalities.map((m: any) => {
+                        const selected = (sections as any).default_modality_id === m.id
+                        return (
+                          <button key={m.id} type="button"
+                            onClick={() => { setSections(s => ({ ...s, default_modality_id: selected ? undefined : m.id } as any)); markDirty() }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, border: `1.5px solid ${selected ? 'var(--gold)' : 'var(--border)'}`, background: selected ? 'rgba(196,151,90,0.08)' : '#fff', cursor: 'pointer', textAlign: 'left' }}>
+                            <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${selected ? 'var(--gold)' : 'var(--border)'}`, background: selected ? 'var(--gold)' : 'transparent', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {selected && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{m.name}</div>
+                              {m.duration_label && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{m.duration_label}</div>}
+                            </div>
+                          </button>
+                        )
+                      })}
+                      {(sections as any).default_modality_id && (
+                        <button type="button" onClick={() => { setSections(s => ({ ...s, default_modality_id: undefined } as any)); markDirty() }}
+                          style={{ fontSize: 11, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', textAlign: 'left' }}>
+                          × Quitar modalidad por defecto
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Section list — each row has toggle + label + expand */}

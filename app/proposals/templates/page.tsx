@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, LayoutTemplate, Trash2, Star, Loader2, Pencil, FileText, X, Zap, Sparkles, ClipboardList, MessageCircle, Target, Check, type LucideIcon } from 'lucide-react'
+import { Plus, LayoutTemplate, Trash2, Star, Loader2, Pencil, FileText, X, Zap, Sparkles, ClipboardList, MessageCircle, Target, Check, ChevronLeft, ChefHat, type LucideIcon } from 'lucide-react'
 import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
@@ -39,9 +39,23 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(cachedTemplates === null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [activeSection, setActiveSection] = useState<'samples' | 'mine'>('samples')
-  const [pickerOpen, setPickerOpen] = useState(false)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+
+  // Multi-step picker modal
+  const [pickerStep, setPickerStep] = useState<'style' | 'catering' | 'modality'>('style')
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerFrom, setPickerFrom] = useState<string | undefined>(undefined)
+  const [pickerCatering, setPickerCatering] = useState<boolean | null>(null)
+  const [pickerModalities, setPickerModalities] = useState<any[]>([])
+
+  const openPicker = () => { setPickerStep('style'); setPickerFrom(undefined); setPickerCatering(null); setPickerOpen(true) }
+  const closePicker = () => setPickerOpen(false)
+
+  useEffect(() => {
+    if (!pickerOpen || pickerModalities.length > 0) return
+    fetch('/api/estructura/modalities').then(r => r.ok ? r.json() : null).then(d => { if (d?.modalities) setPickerModalities(d.modalities) })
+  }, [pickerOpen, pickerModalities.length])
 
   useEffect(() => {
     if (authLoading || !ready) return
@@ -69,11 +83,13 @@ export default function TemplatesPage() {
     setDeleting(null)
   }
 
-  const startDraft = (fromSampleId?: string) => {
+  const startDraft = (modalityId?: string | null) => {
     setPickerOpen(false)
-    router.push(fromSampleId
-      ? `/proposals/templates/new?from=${fromSampleId}`
-      : '/proposals/templates/new')
+    const params = new URLSearchParams()
+    if (pickerFrom) params.set('from', pickerFrom)
+    if (pickerCatering !== null) params.set('catering', pickerCatering ? '1' : '0')
+    if (modalityId) params.set('modality_id', modalityId)
+    router.push(`/proposals/templates/new${params.size > 0 ? '?' + params.toString() : ''}`)
   }
 
   const setDefault = async (id: string) => {
@@ -108,7 +124,7 @@ export default function TemplatesPage() {
         <div className="topbar">
           <div className="topbar-title">Propuestas</div>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn btn-primary btn-sm" onClick={() => setPickerOpen(true)}>
+            <button className="btn btn-primary btn-sm" onClick={openPicker}>
               <Plus size={13} /> Nueva plantilla
             </button>
           </div>
@@ -381,51 +397,106 @@ export default function TemplatesPage() {
       </div>
 
       {pickerOpen && (
-        <div className="modal-overlay" onClick={() => setPickerOpen(false)}>
-          <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={closePicker}>
+          <div className="modal" style={{ maxWidth: pickerStep === 'style' ? 640 : 480 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
-              <div className="modal-title">Nueva plantilla</div>
-              <div className="modal-sub">Empieza desde cero o usa uno de los estilos de página como base</div>
-              <button onClick={() => setPickerOpen(false)} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6, display: 'flex', alignItems: 'center', borderRadius: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {pickerStep !== 'style' && (
+                  <button type="button" onClick={() => setPickerStep(pickerStep === 'modality' ? 'catering' : 'style')}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', padding: 0 }}>
+                    <ChevronLeft size={16} />
+                  </button>
+                )}
+                <div>
+                  <div className="modal-title" style={{ marginBottom: 2 }}>
+                    {pickerStep === 'style' ? 'Nueva plantilla' : pickerStep === 'catering' ? '¿Incluye catering?' : '¿Qué modalidad?'}
+                  </div>
+                  <div className="modal-sub">
+                    {pickerStep === 'style' ? 'Empieza desde cero o usa uno de los estilos de página como base'
+                      : pickerStep === 'catering' ? 'Activa la pestaña de Menús en el editor'
+                      : 'Se precargará al crear un dosier con esta plantilla'}
+                  </div>
+                </div>
+              </div>
+              <button onClick={closePicker} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6, display: 'flex', alignItems: 'center', borderRadius: 6 }}>
                 <X size={20} />
               </button>
             </div>
-            <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <button
-                type="button"
-                onClick={() => startDraft()}
-                className="starter-card"
-                style={{ flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}
-              >
-                <div className="starter-card-icon">
-                  <FileText size={20} strokeWidth={1.6} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>En blanco</div>
-                  <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>Plantilla vacía para configurar desde cero.</div>
-                </div>
-              </button>
-              {DEFAULT_TEMPLATES.map(tpl => {
-                const Icon = SAMPLE_ICON[tpl.icon]
-                return (
-                  <button
-                    key={tpl.id}
-                    type="button"
-                    onClick={() => startDraft(tpl.id)}
-                    className="starter-card"
-                    style={{ flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}
-                  >
-                    <div className="starter-card-icon">
-                      <Icon size={20} strokeWidth={1.6} />
-                    </div>
+
+            {/* Step 1 — Style */}
+            {pickerStep === 'style' && (
+              <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <button type="button" onClick={() => { setPickerFrom(undefined); setPickerStep('catering') }}
+                  className="starter-card" style={{ flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                  <div className="starter-card-icon"><FileText size={20} strokeWidth={1.6} /></div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>En blanco</div>
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>Plantilla vacía para configurar desde cero.</div>
+                  </div>
+                </button>
+                {DEFAULT_TEMPLATES.map(tpl => {
+                  const Icon = SAMPLE_ICON[tpl.icon]
+                  return (
+                    <button key={tpl.id} type="button" onClick={() => { setPickerFrom(tpl.id); setPickerStep('catering') }}
+                      className="starter-card" style={{ flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                      <div className="starter-card-icon"><Icon size={20} strokeWidth={1.6} /></div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>{tpl.name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>{tpl.description}</div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Step 2 — Catering */}
+            {pickerStep === 'catering' && (
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button type="button" onClick={() => { setPickerCatering(true); setPickerStep('modality') }}
+                  style={{ padding: '20px 24px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', border: '2px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(196,151,90,0.12)', border: '1.5px solid rgba(196,151,90,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <ChefHat size={18} style={{ color: 'var(--gold)' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 3 }}>Sí, incluye menú y catering</div>
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Configura cóctel, menús principales, noche y madrugada</div>
+                  </div>
+                </button>
+                <button type="button" onClick={() => { setPickerCatering(false); setPickerStep('modality') }}
+                  style={{ padding: '20px 24px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', border: '2px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--cream)', border: '1.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <LayoutTemplate size={18} style={{ color: 'var(--warm-gray)' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 3 }}>No, solo información del venue</div>
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Sin sección de menús ni selección de platos</div>
+                  </div>
+                </button>
+              </div>
+            )}
+
+            {/* Step 3 — Modality */}
+            {pickerStep === 'modality' && (
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {pickerModalities.length === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--warm-gray)', padding: '12px 0' }}>Cargando modalidades…</div>
+                ) : pickerModalities.map((m: any) => (
+                  <button key={m.id} type="button" onClick={() => startDraft(m.id)}
+                    style={{ padding: '16px 20px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', border: '2px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(196,151,90,0.12)', border: '1.5px solid rgba(196,151,90,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>☀️</div>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>{tpl.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>{tpl.description}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 2 }}>{m.name}</div>
+                      {m.duration_label && <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>{m.duration_label}</div>}
                     </div>
                   </button>
-                )
-              })}
-            </div>
+                ))}
+                <button type="button" onClick={() => startDraft(null)}
+                  style={{ marginTop: 4, padding: '12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--warm-gray)', textAlign: 'center' }}>
+                  Saltar — lo decidiré en cada dosier
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

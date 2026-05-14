@@ -181,7 +181,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   })
   const [sections, setSections] = useState<SectionsData>({ ...emptySections, ...(initial.sections_data ?? {}) })
   const [activeTab, setActiveTab] = useState<'datos' | 'visual' | 'secciones' | 'menus'>('datos')
-  const [openSecs, setOpenSecs] = useState<Set<string>>(new Set())
+  const [openSecs, setOpenSecs] = useState<Set<string>>(new Set(['__space_group']))
 
   // Si desactivan catering y estaban en la tab de menús, volver a secciones
   useEffect(() => {
@@ -462,7 +462,13 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
     if (!modality.prices?.length) return null
     const match = modality.prices.find((p: any) => weddingDate >= p.date_from && weddingDate <= p.date_to)
-    return match ? parseFloat(match.price) : null
+    if (!match) return null
+    // For single_with_supplements / multiple_independent, base price is in group_prices[0].base_price (top-level price is always 0)
+    if ((match.price === 0 || match.price === '0' || match.price == null) && Array.isArray(match.group_prices) && match.group_prices.length > 0) {
+      const bp = match.group_prices[0].base_price
+      return bp != null ? parseFloat(bp) : null
+    }
+    return parseFloat(match.price)
   }
 
   const getMatchedPackageLabel = (modalityId: string, weddingDate: string): string | null => {
@@ -536,9 +542,24 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     setForm(f => ({ ...f, wedding_date: date, ...(price !== null ? { price_estimate: String(price) } : {}) }))
   }
 
-  const computeDatePrices = (lead: any, modalityId: string | null) => {
+  const computeDatePrices = (lead: any, modalityId: string | null, modalitiesOverride?: any[]) => {
     const ranges = getLeadDateRanges(lead)
     if (!ranges.length || !modalityId) return null
+
+    const mods = modalitiesOverride ?? modalities
+    const modality = mods.find((m: any) => m.id === modalityId)
+    if (!modality) return null
+
+    const getPriceFn = (wDate: string): number | null => {
+      if (!modality.prices?.length) return null
+      const match = modality.prices.find((p: any) => wDate >= p.date_from && wDate <= p.date_to)
+      if (!match) return null
+      if ((match.price === 0 || match.price === '0' || match.price == null) && Array.isArray(match.group_prices) && match.group_prices.length > 0) {
+        const bp = match.group_prices[0].base_price
+        return bp != null ? parseFloat(bp) : null
+      }
+      return parseFloat(match.price)
+    }
 
     const addDays = (iso: string, n: number) => {
       const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n)
@@ -551,17 +572,17 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
     for (const r of ranges) {
       if (!r.to || r.to === r.from) {
-        const p = getPriceForDate(modalityId, r.from)
+        const p = getPriceFn(r.from)
         result.push({ date_from: r.from, date_to: r.to, price_min: p !== null ? String(p) : undefined, overridden: false })
         continue
       }
       // Walk day by day, group consecutive days with same price into sub-ranges
       const totalDays = diffDays(r.from, r.to)
       let subStart = r.from
-      let subPrice = getPriceForDate(modalityId, r.from)
+      let subPrice = getPriceFn(r.from)
       for (let i = 1; i <= totalDays; i++) {
         const day = addDays(r.from, i)
-        const dayPrice = getPriceForDate(modalityId, day)
+        const dayPrice = getPriceFn(day)
         if (dayPrice !== subPrice || i === totalDays) {
           const subEnd = i === totalDays && dayPrice === subPrice ? day : addDays(r.from, i - 1)
           result.push({
@@ -600,14 +621,26 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
   const recalculateWithFreshLead = async (leadId: string, modalityId: string | null) => {
     const supabase = createClient()
-    const { data: freshLead } = await supabase
-      .from('leads')
-      .select('id, name, guests, email, wedding_date, wedding_date_to, wedding_date_ranges, date_flexibility')
-      .eq('id', leadId)
-      .single()
+    // Fetch fresh lead AND fresh modality prices in parallel
+    const [leadRes, modalRes] = await Promise.all([
+      supabase.from('leads').select('id, name, guests, email, wedding_date, wedding_date_to, wedding_date_ranges, date_flexibility').eq('id', leadId).single(),
+      fetch('/api/estructura/modalities'),
+    ])
+    const freshLead = leadRes.data
     if (!freshLead) return
     setLeads(prev => prev.map(l => l.id === leadId ? freshLead : l))
-    const computed = computeDatePrices(freshLead, modalityId)
+
+    let freshModalities: any[] = modalities
+    if (modalRes.ok) {
+      const mj = await modalRes.json()
+      freshModalities = mj.modalities ?? []
+      setModalities(freshModalities)
+    }
+
+    const effectiveId = modalityId ?? (freshModalities.length === 1 ? freshModalities[0].id : null)
+    if (!effectiveId) return
+
+    const computed = computeDatePrices(freshLead, effectiveId, freshModalities)
     if (computed) setSections((s: any) => ({ ...s, single_space: { ...(s.single_space ?? {}), date_prices: computed } }))
   }
 
@@ -1488,6 +1521,58 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                   return (
                     <Fragment key={secId}>
                     {isInSpaceGroup && isFirstSpaceVisible && renderSpaceGroupHeader()}
+
+                    {/* ── Precio por fecha — editable block (no toggle) ── */}
+                    {secId === 'single_space' && isInSpaceGroup && (() => {
+                      const dpRaw: any[] = Array.isArray((sections as any).single_space?.date_prices)
+                        ? [...(sections as any).single_space.date_prices].sort((a: any, b: any) => (a.date_from ?? '').localeCompare(b.date_from ?? ''))
+                        : []
+                      const setDp = (next: any[]) => setSections((s: any) => ({ ...s, single_space: { ...(s.single_space ?? {}), date_prices: next } }))
+                      const effectiveModalityId = form.modality_id || (modalities.length === 1 ? modalities[0].id : null)
+                      const canCompute = !!form.lead_id && !!effectiveModalityId
+                      const fmtRange = (entry: any) => {
+                        const fmt = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+                        if (!entry.date_to || entry.date_to === entry.date_from) return fmt(entry.date_from)
+                        const days = Math.round((new Date(entry.date_to + 'T12:00:00').getTime() - new Date(entry.date_from + 'T12:00:00').getTime()) / 86400000)
+                        if (days === 1) return `${fmt(entry.date_from)} o ${fmt(entry.date_to)}`
+                        return `${fmt(entry.date_from)} – ${fmt(entry.date_to)}`
+                      }
+                      return (
+                        <div style={{ borderLeft: '1px solid var(--ivory)', borderRight: '1px solid var(--ivory)', borderTop: '1px solid rgba(196,151,90,0.15)', background: 'var(--cream)', padding: '12px 14px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>Precio por fecha</span>
+                            <button type="button" disabled={!canCompute}
+                              title={!canCompute ? 'Selecciona lead y modalidad primero' : undefined}
+                              style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)', background: '#fff', color: canCompute ? 'var(--charcoal)' : 'var(--warm-gray)', cursor: canCompute ? 'pointer' : 'not-allowed', opacity: canCompute ? 1 : 0.5 }}
+                              onClick={() => canCompute && recalculateWithFreshLead(form.lead_id!, effectiveModalityId)}>
+                              ↺ recalcular
+                            </button>
+                          </div>
+                          {dpRaw.length === 0 ? (
+                            <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic' }}>
+                              {canCompute ? 'Haz clic en recalcular para generar los precios' : 'Selecciona lead y modalidad primero'}
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                              {dpRaw.map((entry: any, i: number) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontSize: 11, color: 'var(--charcoal)', flex: 1, minWidth: 0 }}>{fmtRange(entry)}</span>
+                                  <input type="number" className="form-input" placeholder="precio"
+                                    value={entry.price_min ?? ''}
+                                    onChange={e => setDp(dpRaw.map((x: any, j: number) => j === i ? { ...x, price_min: e.target.value, overridden: true } : x))}
+                                    style={{ width: 72, textAlign: 'right', fontSize: 11, padding: '3px 6px' }} />
+                                  <span style={{ fontSize: 10, color: 'var(--warm-gray)', flexShrink: 0 }}>€</span>
+                                  <span style={{ fontSize: 9, color: entry.overridden ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 5px', borderRadius: 6, border: '1px solid var(--border)', flexShrink: 0 }}>
+                                    {entry.overridden ? 'manual' : 'auto'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+
                     <div
                       className={isInSpaceGroup ? undefined : 'sec-row'}
                       style={isInSpaceGroup ? {
@@ -1696,54 +1781,6 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                   ))}
                                   <button type="button" style={addBtn} onClick={() => setFeatures([...features, ''])}>+ Añadir característica</button>
                                 </div>
-                                {(() => {
-                                  const dp: any[] = (Array.isArray(ss.date_prices) ? [...ss.date_prices] : []).sort((a: any, b: any) => a.date_from.localeCompare(b.date_from))
-                                  const lead = leads.find(l => l.id === form.lead_id)
-                                  const canCompute = !!lead && !!form.modality_id
-                                  const fmtRange = (entry: any) => {
-                                    const fmt = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
-                                    if (!entry.date_to || entry.date_to === entry.date_from) return fmt(entry.date_from)
-                                    const days = Math.round((new Date(entry.date_to + 'T12:00:00').getTime() - new Date(entry.date_from + 'T12:00:00').getTime()) / 86400000)
-                                    if (days === 1) return `${fmt(entry.date_from)} o ${fmt(entry.date_to)}`
-                                    return `${fmt(entry.date_from)} – ${fmt(entry.date_to)}`
-                                  }
-                                  if (!dp.length) return canCompute ? (
-                                    <button type="button" style={addBtn} onClick={() => recalculateWithFreshLead(form.lead_id!, form.modality_id ?? null)}>
-                                      ↻ Calcular precio por fechas del lead
-                                    </button>
-                                  ) : null
-                                  return (
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                        <label className="form-label" style={{ margin: 0, flex: 1 }}>Precio por fecha del lead</label>
-                                        {canCompute && <button type="button" onClick={() => recalculateWithFreshLead(form.lead_id!, form.modality_id ?? null)} style={{ fontSize: 9, color: 'var(--warm-gray)', background: 'none', border: '1px solid #d1d5db', borderRadius: 8, padding: '1px 6px', cursor: 'pointer' }}>↻ recalcular</button>}
-                                      </div>
-                                      {dp.map((entry: any, i: number) => (
-                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                          <span style={{ fontSize: 11, color: 'var(--charcoal)', flex: 1 }}>{fmtRange(entry)}</span>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            <input type="number" className="form-input" placeholder="mín"
-                                              value={entry.price_min ?? ''}
-                                              onChange={e => setSs({ date_prices: dp.map((x: any, j: number) => j === i ? { ...x, price_min: e.target.value, overridden: true } : x) })}
-                                              style={{ width: 80, textAlign: 'right', fontSize: 12 }} />
-                                            {entry.price_max !== undefined && <>
-                                              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>–</span>
-                                              <input type="number" className="form-input" placeholder="máx"
-                                                value={entry.price_max ?? ''}
-                                                onChange={e => setSs({ date_prices: dp.map((x: any, j: number) => j === i ? { ...x, price_max: e.target.value, overridden: true } : x) })}
-                                                style={{ width: 80, textAlign: 'right', fontSize: 12 }} />
-                                            </>}
-                                            <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>€</span>
-                                          </div>
-                                          <span style={{ fontSize: 9, color: 'var(--warm-gray)', background: 'var(--cream)', padding: '1px 6px', borderRadius: 8, flexShrink: 0 }}>
-                                            {entry.overridden ? 'manual' : 'auto'}
-                                          </span>
-                                          <button type="button" style={removeBtn} onClick={() => setSs({ date_prices: dp.filter((_: any, j: number) => j !== i) })}><X size={11} /></button>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )
-                                })()}
                               </div>
                             )
                           })()}

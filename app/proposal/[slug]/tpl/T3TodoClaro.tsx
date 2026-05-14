@@ -471,20 +471,6 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           {/* Space groups */}
           {on('space_groups') && visibleSpaceGroups.length > 0 && (
             <div className="sec" id="sec-space-groups">
-              {on('date_slots') && dateSlots && dateSlots.length > 0 && (
-                <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
-              )}
-              {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
-                <div style={{ marginBottom: 32 }}>
-                  <FadeUp>
-                    <div className="sec-n">{secLbl('venue_rental', sec.venue_rental.title || 'Tarifas de alquiler')}</div>
-                    <h2 className="sec-h">Elegid vuestra fecha</h2>
-                  </FadeUp>
-                  <FadeUp delay={.1}>
-                    <VenueRentalGrid data={sec.venue_rental} primary={primary} />
-                  </FadeUp>
-                </div>
-              )}
               <SpaceGroupSelector
                 groups={visibleSpaceGroups}
                 primary={primary}
@@ -493,6 +479,21 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 font={font}
                 guestCount={guests}
                 onSelectionChange={setSelectedSpaces}
+                pricingBlock={(() => {
+                  const blocks: React.ReactNode[] = []
+                  if (on('date_slots') && dateSlots && dateSlots.length > 0) {
+                    blocks.push(<DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />)
+                  }
+                  if (on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0) {
+                    blocks.push(
+                      <div key="vr">
+                        <div className="sec-n" style={{ marginBottom: 14 }}>{secLbl('venue_rental', sec.venue_rental.title || 'Elegid vuestra fecha')}</div>
+                        <VenueRentalGrid data={sec.venue_rental} primary={primary} />
+                      </div>
+                    )
+                  }
+                  return blocks.length > 0 ? <>{blocks}</> : undefined
+                })()}
               />
             </div>
           )}

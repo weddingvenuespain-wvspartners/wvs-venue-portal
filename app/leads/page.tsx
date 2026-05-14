@@ -1312,24 +1312,6 @@ function LeadsPageInner() {
               )}
             </div>
 
-            {!features.leads_new_only && (
-              <div style={{ display: 'flex', border: '1px solid var(--ivory)', borderRadius: 8, overflow: 'hidden', marginLeft: 'auto' }}>
-                <button onClick={() => setViewMode('list')} title="Vista lista"
-                  style={{ padding: '8px 12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 500,
-                    background: viewMode === 'list' ? 'var(--gold)' : 'transparent',
-                    color: viewMode === 'list' ? '#fff' : 'var(--warm-gray)',
-                    transition: 'all 0.15s' }}>
-                  <List size={14} /> Lista
-                </button>
-                <button onClick={() => setViewMode('kanban')} title="Vista kanban"
-                  style={{ padding: '8px 12px', border: 'none', borderLeft: '1px solid var(--ivory)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 500,
-                    background: viewMode === 'kanban' ? 'var(--gold)' : 'transparent',
-                    color: viewMode === 'kanban' ? '#fff' : 'var(--warm-gray)',
-                    transition: 'all 0.15s' }}>
-                  <LayoutGrid size={14} /> Kanban
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Plan restriction notice */}
@@ -1340,11 +1322,10 @@ function LeadsPageInner() {
             </div>
           )}
 
-          {viewMode === 'list' && (<>
-          {/* Tabs + filters row */}
+          {/* Tabs + view toggle row — always visible */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', borderBottom: '1px solid var(--ivory)', marginBottom: 0 }}>
             <div style={{ display: 'flex', gap: 2 }}>
-              {visibleTabs.map(tab => {
+              {viewMode === 'list' && visibleTabs.map(tab => {
                 const count      = tabCounts[tab.key] || 0
                 const isActive   = activeTab === tab.key
                 const isFlashing = flashedTab === tab.key
@@ -1352,24 +1333,29 @@ function LeadsPageInner() {
                 const isEmpty    = count === 0 && !isActive
                 return (
                   <button key={tab.key} onClick={() => { setActiveTab(tab.key); setFlashedTab(null); setVisitSubFilter('all') }} style={{
-                    padding: '10px 14px',
+                    padding: '8px 14px',
                     background: isFlashing && isLost ? '#dc2626'
+                      : isActive && isLost ? '#dc2626'
+                      : isActive ? '#fff'
                       : isFlashing ? '#fefce8'
                       : isLost && count > 0 && !isActive ? 'rgba(239,68,68,0.05)'
                       : 'none',
-                    border: 'none', cursor: 'pointer',
+                    border: isActive ? '1px solid var(--ivory)' : '1px solid transparent',
+                    borderBottom: isActive ? '1px solid #fff' : '1px solid transparent',
+                    cursor: 'pointer',
                     fontSize: 13, fontWeight: isActive || isFlashing ? 600 : 500,
                     opacity: isEmpty ? 0.4 : 1,
                     color: isFlashing && isLost ? '#fff'
+                      : isActive && isLost ? '#fff'
                       : isActive ? 'var(--espresso)'
                       : isLost && count > 0 ? '#ef4444'
                       : isFlashing ? 'var(--gold)'
                       : 'var(--warm-gray)',
-                    borderBottom: isActive ? `2px solid ${isLost ? '#ef4444' : 'var(--gold)'}` : isFlashing ? '2px solid currentColor' : '2px solid transparent',
                     marginBottom: -1, display: 'flex', alignItems: 'center', gap: 6,
-                    transition: 'all 0.25s', whiteSpace: 'nowrap',
-                    borderRadius: isFlashing ? '6px 6px 0 0' : 0,
+                    transition: 'all 0.2s', whiteSpace: 'nowrap',
+                    borderRadius: '6px 6px 0 0',
                     transform: isFlashing && isLost ? 'scale(1.04)' : 'scale(1)',
+                    boxShadow: isActive && !isLost ? '0 -1px 4px rgba(0,0,0,0.04)' : 'none',
                   }}>
                     <span>{tab.emoji}</span>
                     <span>{tab.label}</span>
@@ -1377,13 +1363,11 @@ function LeadsPageInner() {
                       <span style={{
                         fontSize: 10, fontWeight: 700, minWidth: 18, height: 18,
                         borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: isFlashing && isLost ? 'rgba(255,255,255,0.3)'
-                          : isActive && isLost ? '#ef4444'
+                        background: (isFlashing && isLost) || (isActive && isLost) ? 'rgba(255,255,255,0.25)'
                           : isLost && count > 0 ? '#fee2e2'
                           : isActive ? 'var(--gold)'
                           : 'var(--ivory)',
-                        color: isFlashing && isLost ? '#fff'
-                          : isActive && isLost ? '#fff'
+                        color: (isFlashing && isLost) || (isActive && isLost) ? '#fff'
                           : isLost && count > 0 ? '#ef4444'
                           : isActive ? '#fff'
                           : 'var(--warm-gray)',
@@ -1394,8 +1378,27 @@ function LeadsPageInner() {
                 )
               })}
             </div>
-
+            {!features.leads_new_only && (
+              <div style={{ display: 'flex', border: '1px solid var(--ivory)', borderRadius: 8, overflow: 'hidden', marginBottom: 4, flexShrink: 0 }}>
+                <button onClick={() => setViewMode('list')} title="Vista lista"
+                  style={{ padding: '6px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                    background: viewMode === 'list' ? 'var(--gold)' : 'transparent',
+                    color: viewMode === 'list' ? '#fff' : 'var(--warm-gray)',
+                    transition: 'all 0.15s' }}>
+                  <List size={14} />
+                </button>
+                <button onClick={() => setViewMode('kanban')} title="Vista kanban"
+                  style={{ padding: '6px 10px', border: 'none', borderLeft: '1px solid var(--ivory)', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                    background: viewMode === 'kanban' ? 'var(--gold)' : 'transparent',
+                    color: viewMode === 'kanban' ? '#fff' : 'var(--warm-gray)',
+                    transition: 'all 0.15s' }}>
+                  <LayoutGrid size={14} />
+                </button>
+              </div>
+            )}
           </div>
+
+          {viewMode === 'list' && (<>
 
           {/* Lost banner — aparece cuando un lead se mueve a Perdidos */}
           {lostBanner && (

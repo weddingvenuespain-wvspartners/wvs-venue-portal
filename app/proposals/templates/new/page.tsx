@@ -25,18 +25,27 @@ function NewTemplateContent() {
   const searchParams = useSearchParams()
   const fromId = searchParams.get('from')
 
+  const cateringParam = searchParams.get('catering')
+  const modalityIdParam = searchParams.get('modality_id')
+
   const draftTemplate = useMemo<ContentTemplate>(() => {
-    if (!fromId) return BLANK_TEMPLATE
-    const sample = getDefaultTemplate(fromId)
-    if (!sample) return BLANK_TEMPLATE
+    const base = (() => {
+      if (!fromId) return BLANK_TEMPLATE
+      const sample = getDefaultTemplate(fromId)
+      if (!sample) return BLANK_TEMPLATE
+      return { id: 'new', name: sample.name, description: sample.description, is_default: false, sections_data: sample.sections_data }
+    })()
+    // Apply catering + modality choices from modal picker
+    const extraSd: Record<string, unknown> = {}
+    if (cateringParam !== null) extraSd.has_catering = cateringParam === '1'
+    if (modalityIdParam) extraSd.default_modality_id = modalityIdParam
+    const hasPickerChoices = cateringParam !== null
+    if (hasPickerChoices) extraSd.__wizard_done = true  // signal TemplateEditor to skip wizard
     return {
-      id: 'new',
-      name: sample.name,
-      description: sample.description,
-      is_default: false,
-      sections_data: sample.sections_data,
+      ...base,
+      sections_data: { ...base.sections_data, ...extraSd },
     }
-  }, [fromId])
+  }, [fromId, cateringParam, modalityIdParam])
 
   return (
     <TemplateEditor
