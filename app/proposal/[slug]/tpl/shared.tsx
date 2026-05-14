@@ -4,9 +4,34 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ProposalData } from '../page'
 import type { Menu, MenuExtra, AppetizerGroup, SectionsData } from '@/lib/proposal-types'
+import { isSectionAllowed } from '@/lib/section-visibility'
 
 export type { ProposalData }
 export type { MenuItem, MenuCourse, Menu, MenuExtra, AppetizerGroup, SectionsData } from '@/lib/proposal-types'
+
+// ─── ZoneSlider — shared multi-photo slider for zone cards ─────────────────────
+export function ZoneSlider({ photos, name }: { photos: string[]; name: string }) {
+  const [idx, setIdx] = useState(0)
+  if (photos.length === 1) {
+    return <img src={photos[0]} alt={name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+  }
+  return (
+    <>
+      <img src={photos[idx]} alt={name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'opacity .4s' }}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+      <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6, zIndex: 2 }}>
+        {photos.map((_, i) => (
+          <button key={i} onClick={() => setIdx(i)} style={{ width: 8, height: 8, borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === idx ? '#fff' : 'rgba(255,255,255,.4)', transition: 'background .2s' }} />
+        ))}
+      </div>
+      <button onClick={() => setIdx(i => (i - 1 + photos.length) % photos.length)}
+        style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,.4)', border: 'none', color: '#fff', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+      <button onClick={() => setIdx(i => (i + 1) % photos.length)}
+        style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,.4)', border: 'none', color: '#fff', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+    </>
+  )
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -50,12 +75,31 @@ export function ivaLabel(sec: SectionsData | undefined | null, short = false): s
   return short ? 'IVA no incl.' : 'IVA no incluido'
 }
 
+export function formatZonePrice(raw: string | undefined): string {
+  if (!raw?.trim()) return ''
+  const s = raw.trim()
+  if (s.includes('€')) return s
+  // Pure number (possibly with sign)
+  const num = parseFloat(s.replace(/[^0-9.,]/g, '').replace(',', '.'))
+  if (!isNaN(num) && num > 0) {
+    const prefix = s.startsWith('-') ? '-' : '+'
+    return `${prefix}${num.toLocaleString('es-ES', { maximumFractionDigits: 0 })}€`
+  }
+  return s
+}
+
 export function formatZoneFeatures(z: any): string[] {
   const out: string[] = []
   if (z?.sqm) out.push(`${z.sqm} m²`)
-  if (z?.climatized) out.push('Climatizado')
-  if (z?.plan_b) out.push('Plan B cubierto')
   if (z?.covered && ZONE_COVERED_LABELS[z.covered]) out.push(ZONE_COVERED_LABELS[z.covered])
+  // Free-text features (new model)
+  if (Array.isArray(z?.features) && z.features.length) {
+    z.features.forEach((f: string) => { if (f?.trim()) out.push(f.trim()) })
+  } else {
+    // Backward compat: legacy boolean flags
+    if (z?.climatized) out.push('Climatizado')
+    if (z?.plan_b) out.push('Plan B cubierto')
+  }
   return out
 }
 
@@ -1180,12 +1224,19 @@ export function extractData(data: ProposalData) {
   const sec: SectionsData = (data as any).sections_data || {}
   const so = sec as any
   const vc = data.venueContent
+  const spaceType = (data.commercialConfig as any)?.space_type ?? null
   return {
     sec,
     hasCatering: sec.has_catering !== false,
-    on: (id: string) => sec.sections_enabled?.[id] !== false,
+    spaceType,
+    on: (id: string) => {
+      if (sec.sections_enabled?.[id] === false) return false
+      if (spaceType && !isSectionAllowed(id, spaceType)) return false
+      return true
+    },
     packagesShow:   so.packages_override    != null ? so.packages_override    : vc.packages      ?? [],
     zonesShow:      so.zones_override       != null ? so.zones_override       : vc.zones          ?? [],
+    zonesMode:      (so.zones_header?.mode ?? 'zones') as 'single' | 'zones',
     seasonsShow:    so.season_prices_override != null ? so.season_prices_override : vc.season_prices ?? [],
     inclusionsShow: so.inclusions_override  != null ? so.inclusions_override  : vc.inclusions     ?? [],
     faqShow:        so.faq_override         != null ? so.faq_override         : vc.faq            ?? [],
@@ -1467,7 +1518,7 @@ export function TplVenueSpecs({
 export function TplSingleSpace({
   data, fallbackImage, primary, bg, fg, font, label,
 }: {
-  data: { title?: string; description?: string; sqm?: string; max_guests?: string; features?: string[]; image_url?: string } | undefined | null
+  data: { subtitle?: string; title?: string; description?: string; sqm?: string; min_guests?: string; max_guests?: string; features?: string[]; image_url?: string; photos?: string[] } | undefined | null
   fallbackImage?: string | null
   primary: string
   bg: string
@@ -1475,23 +1526,44 @@ export function TplSingleSpace({
   font?: string
   label?: string
 }) {
+  const [photoIdx, setPhotoIdx] = useState(0)
   if (!data) return null
   const features = (Array.isArray(data.features) ? data.features : []).filter(Boolean)
-  const img = data.image_url || fallbackImage || null
+  const allPhotos: string[] = [
+    ...(Array.isArray(data.photos) ? data.photos : []),
+    ...(data.image_url && !(data.photos ?? []).includes(data.image_url) ? [data.image_url] : []),
+  ]
+  const img = allPhotos[0] || fallbackImage || null
   if (!data.title && !data.description && !img && features.length === 0) return null
+  const displayLabel = data.subtitle || label || null
   return (
     <section id="sec-single-space" style={{ padding: '80px 32px', background: bg }}>
       <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: img ? '1fr 1fr' : '1fr', gap: 48, alignItems: 'center' }}>
         {img && (
           <FadeIn>
-            <img src={img} alt={data.title || 'Espacio'} loading="lazy"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-              style={{ width: '100%', height: 440, objectFit: 'cover', borderRadius: 4 }} />
+            <div style={{ position: 'relative', width: '100%', height: 440, borderRadius: 4, overflow: 'hidden' }}>
+              <img src={allPhotos[photoIdx] ?? img} alt={data.title || 'Espacio'} loading="lazy"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transition: 'opacity .4s' }} />
+              {allPhotos.length > 1 && (
+                <>
+                  <button onClick={() => setPhotoIdx(i => (i - 1 + allPhotos.length) % allPhotos.length)}
+                    style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,.4)', border: 'none', color: '#fff', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+                  <button onClick={() => setPhotoIdx(i => (i + 1) % allPhotos.length)}
+                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,.4)', border: 'none', color: '#fff', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+                  <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6, zIndex: 2 }}>
+                    {allPhotos.map((_, i) => (
+                      <button key={i} onClick={() => setPhotoIdx(i)} style={{ width: 7, height: 7, borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === photoIdx ? '#fff' : 'rgba(255,255,255,.4)', transition: 'background .2s' }} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </FadeIn>
         )}
         <FadeUp>
-          {label && (
-            <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: `${fg}99`, marginBottom: 16 }}>{label}</div>
+          {displayLabel && (
+            <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: `${fg}99`, marginBottom: 16 }}>{displayLabel}</div>
           )}
           {data.title && (
             <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,4vw,3rem)', fontWeight: 300, color: fg, lineHeight: 1.1, marginBottom: 18 }}>
@@ -1503,7 +1575,7 @@ export function TplSingleSpace({
               {data.description}
             </p>
           )}
-          {(data.sqm || data.max_guests) && (
+          {(data.sqm || data.min_guests || data.max_guests) && (
             <div style={{ display: 'flex', gap: 36, padding: '20px 0', borderTop: `1px solid ${fg}14`, borderBottom: `1px solid ${fg}14`, marginBottom: 22 }}>
               {data.sqm && (
                 <div>
@@ -1511,10 +1583,14 @@ export function TplSingleSpace({
                   <div style={{ fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: `${fg}80`, marginTop: 4 }}>Superficie</div>
                 </div>
               )}
-              {data.max_guests && (
+              {(data.min_guests || data.max_guests) && (
                 <div>
-                  <div style={{ fontFamily: font, fontSize: '1.6rem', fontWeight: 300, color: fg, lineHeight: 1 }}>{data.max_guests}</div>
-                  <div style={{ fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: `${fg}80`, marginTop: 4 }}>Capacidad máx.</div>
+                  <div style={{ fontFamily: font, fontSize: '1.6rem', fontWeight: 300, color: fg, lineHeight: 1 }}>
+                    {data.min_guests && data.max_guests ? `${data.min_guests}–${data.max_guests}` : (data.max_guests || data.min_guests)}
+                  </div>
+                  <div style={{ fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: `${fg}80`, marginTop: 4 }}>
+                    {data.min_guests && data.max_guests ? 'Capacidad' : data.max_guests ? 'Capacidad máx.' : 'Capacidad mín.'}
+                  </div>
                 </div>
               )}
             </div>
