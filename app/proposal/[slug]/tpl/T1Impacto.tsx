@@ -928,7 +928,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               }
 
               // date_prices — always shown if data exists and venue_rental not active
-              if (!(on('venue_rental') && sec.venue_rental?.rows?.length > 0)) {
+              if (!(on('venue_rental') && (sec.venue_rental?.rows?.length ?? 0) > 0)) {
                 const dp: any[] = Array.isArray((sec as any).single_space?.date_prices)
                   ? (sec as any).single_space.date_prices.filter((e: any) => e.price_min)
                   : []
