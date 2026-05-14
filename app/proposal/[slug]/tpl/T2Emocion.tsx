@@ -5,7 +5,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { buildSingleFontUrl } from '@/lib/fonts'
-import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, TplStickyNav, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, replacePlaceholders, type ProposalData } from './shared'
+import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, formatZonePrice, VenueRentalGrid, TplStickyNav, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, replacePlaceholders, ZoneSlider, type ProposalData } from './shared'
 import { WeddingProposal } from './WeddingProposal'
 import VisitBookingModal from '@/components/VisitBookingModal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
@@ -28,7 +28,7 @@ function EmptySec({ label }: { label: string }) {
 
 export default function T2Emocion({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
-  const { sec, on, hasCatering, packagesShow, inclusionsShow, testsShow, extrasShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, collabsShow, accom, spaceGroups, techspecs, dateSlots } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, testsShow, extrasShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, zonesMode, seasonsShow, collabsShow, accom, spaceGroups, techspecs, dateSlots } = extractData(data)
   const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
   const guests = guest_count ? Number(guest_count) : undefined
   const visibleSpaceGroups = (spaceGroups ?? []).filter(g => {
@@ -43,7 +43,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
 
   const primary = branding?.primary_color ?? '#6B4F3A'
   const rgb     = toRgb(primary)
-  const onPri   = isDark(primary) ? '#fff' : '#111'
+  const onPri   = isDark(primary) ? '#ffffff' : '#111111'
   const logo    = branding?.logo_url ?? null
   const font    = (branding as any)?.font_family || 'Cormorant Garamond,Georgia,serif'
   const contact = resolveContact(data)
@@ -55,6 +55,8 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
   const [visitDone,      setVisitDone]      = useState(false)
   const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
   const [selectedExtraSvcs, setSelectedExtraSvcs] = useState<Record<string, boolean>>({})
+  const [selectedZoneSupplements, setSelectedZoneSupplements] = useState<Record<number, boolean>>({})
+  const [selectedMenus, setSelectedMenus] = useState<string[]>([])
   const [heroLoaded, setHeroLoaded] = useState(false)
   const heroImgRef = useRef<HTMLImageElement>(null)
   useEffect(() => { if (heroImgRef.current?.complete) setHeroLoaded(true) }, [])
@@ -205,7 +207,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       )}
 
       {/* ── DATE SELECTOR ── */}
-      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
         <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
       )}
 
@@ -316,7 +318,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       )}
 
       {/* ── SINGLE SPACE ── */}
-      {on('single_space') && !(spaceGroups?.length) && (
+      {on('single_space') && (
         <TplSingleSpace
           data={(sec as any).single_space}
           fallbackImage={hero}
@@ -331,30 +333,33 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       {/* ══════════════════════════════════════════
           ZONES
       ══════════════════════════════════════════ */}
-      {on('zones') && !(spaceGroups?.length) && (zonesShow.length > 0 ? (
+      {on('zones') && (zonesShow.length > 0 ? (
         <section id="sec-zones" style={{ background: CREAM, padding: '100px 0' }}>
           <div className="w-full">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 56 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Los espacios</div>
-                <h2 className="serif" style={{ fontSize: 'clamp(30px,4vw,46px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Cada rincón del venue</h2>
+                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>{(sec as any).zones_header?.label || 'Los espacios'}</div>
+                <h2 className="serif" style={{ fontSize: 'clamp(30px,4vw,46px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>{(sec as any).zones_header?.title || 'Cada rincón del venue'}</h2>
               </div>
             </FadeUp>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px,1fr))', gap: 24, alignItems: 'stretch' }}>
               {zonesShow.map((z: any, i: number) => {
-                const zPhoto = z.photos?.[0] || photoList[i + 2]
+                const zPhotos: string[] = z.photos?.length ? z.photos : (photoList[i + 2] ? [photoList[i + 2]] : [])
                 const caps = formatZoneCapacities(z)
                 const feats = formatZoneFeatures(z)
+                const hasSuppl = zonesMode === 'zones' && !!z.price
+                const suppSel = !!selectedZoneSupplements[i]
                 return (
                   <FadeUp key={i} delay={(i % 3) * .08} style={{ height: '100%', display: 'flex' }}>
-                    <div style={{ background: '#fff', borderRadius: 4, overflow: 'hidden', border: `1px solid rgba(${rgb},.1)`, display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
+                    <div style={{ background: '#fff', borderRadius: 4, overflow: 'hidden', border: `1.5px solid ${hasSuppl && suppSel ? primary : `rgba(${rgb},.1)`}`, display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
                       <div style={{ position: 'relative', aspectRatio: '4/3', overflow: 'hidden', background: WARM, flexShrink: 0 }}>
-                        {zPhoto
-                          ? <img src={zPhoto} alt={z.name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                        {zPhotos.length > 0
+                          ? <ZoneSlider photos={zPhotos} name={z.name} />
                           : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: `rgba(${rgb},.3)` }}><IcoBuilding width={48} height={48} /></div>
                         }
                       </div>
                       <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+                        {z.subtitle && <div className="sans" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: primary, marginBottom: 2 }}>{z.subtitle}</div>}
                         <h3 className="serif" style={{ fontSize: 22, fontWeight: 400, color: '#2c2418', fontStyle: 'italic' }}>{z.name}</h3>
                         {z.description && <p className="sans" style={{ fontSize: 13, color: '#6a5a4a', lineHeight: 1.7 }}>{z.description}</p>}
                         {caps.length > 0 && (
@@ -370,7 +375,12 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
                           </div>
                         )}
                         {z.notes && <div className="sans" style={{ fontSize: 12, color: '#8a7060', fontStyle: 'italic', marginTop: 4 }}>{z.notes}</div>}
-                        {z.price && <div className="serif" style={{ fontSize: 16, color: primary, marginTop: 4 }}>{z.price}</div>}
+                        {hasSuppl && (
+                          <button type="button" onClick={() => setSelectedZoneSupplements(p => ({ ...p, [i]: !p[i] }))}
+                            style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 6, border: `1.5px solid ${suppSel ? primary : `rgba(${rgb},.25)`}`, background: suppSel ? primary : 'transparent', color: suppSel ? (isDark(primary) ? '#fff' : '#111') : `rgba(${rgb},.8)`, fontSize: 12, fontWeight: 700, letterSpacing: '.04em', cursor: 'pointer', transition: 'all .2s' }}>
+                            {suppSel ? '✓ Añadido' : '+ Añadir'} · {formatZonePrice(z.price)}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </FadeUp>
@@ -382,22 +392,42 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
       {/* ── SPACE GROUPS ── */}
-      {visibleSpaceGroups.length > 0 ? (
-        <SpaceGroupSelector
-          groups={visibleSpaceGroups}
-          primary={primary}
-          onPrimary={onPri}
-          dark={false}
-          font={font}
-          guestCount={guests}
-          onSelectionChange={setSelectedSpaces}
-        />
+      {on('space_groups') && visibleSpaceGroups.length > 0 ? (
+        <div id="sec-space-groups">
+          {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+            <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
+          )}
+          {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+            <section style={{ background: '#fff', padding: '100px 0' }}>
+              <div className="w">
+                <FadeUp>
+                  <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                    <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>{sec.venue_rental.title || 'Tarifas de alquiler'}</div>
+                    <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Elegid vuestra fecha</h2>
+                  </div>
+                </FadeUp>
+                <FadeUp delay={.1}>
+                  <VenueRentalGrid data={sec.venue_rental} primary={primary} />
+                </FadeUp>
+              </div>
+            </section>
+          )}
+          <SpaceGroupSelector
+            groups={visibleSpaceGroups}
+            primary={primary}
+            onPrimary={onPri}
+            dark={false}
+            font={font}
+            guestCount={guests}
+            onSelectionChange={setSelectedSpaces}
+          />
+        </div>
       ) : null}
 
       {/* ══════════════════════════════════════════
           VENUE RENTAL — grid temporada × día
       ══════════════════════════════════════════ */}
-      {on('venue_rental') && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
+      {on('venue_rental') && !(on('space_groups') && visibleSpaceGroups.length > 0) && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
         <section style={{ background: '#fff', padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
@@ -569,6 +599,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           legacyMenus={menuShow}
           primary={primary}
           onPrimary={onPri}
+          onMenusChange={setSelectedMenus}
         />
       )}
 
@@ -815,7 +846,11 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           coupleName={couple_name}
           primaryColor={primary}
           selectedSpaces={selectedSpaces}
-          selectedExtraSvcs={Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k)}
+          selectedMenus={selectedMenus}
+          selectedExtraSvcs={[
+            ...Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k),
+            ...zonesShow.filter((z: any, i: number) => zonesMode === 'zones' && z.price && selectedZoneSupplements[i]).map((z: any) => `${z.name} (${formatZonePrice(z.price)})`),
+          ]}
           spaceGroups={visibleSpaceGroups.length > 0 ? visibleSpaceGroups : undefined}
           dateSlots={dateSlots ?? []}
           preSelectedDateSlot={selectedDateSlotIdx}

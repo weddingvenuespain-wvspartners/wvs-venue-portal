@@ -13,9 +13,9 @@ export const SPACE_TYPE_LABELS: Record<string, string> = {
 // Which space_types each section is designed for. Used to render
 // "matches your config" banners inside template editors.
 export const SECTION_SPACE_TYPES: Record<string, Array<'single' | 'single_with_supplements' | 'multiple_independent'>> = {
-  single_space: ['single'],
+  single_space: ['single', 'single_with_supplements'],
   zones: ['single_with_supplements'],
-  space_groups: ['multiple_independent'],
+  space_groups: ['multiple_independent', 'single_with_supplements'],
   venue_rental: ['single', 'single_with_supplements'],
 }
 
@@ -24,11 +24,11 @@ export function isSectionAllowed(secId: string, spaceType: SpaceType): boolean {
 
   switch (secId) {
     case 'single_space':
-      return spaceType === 'single'
+      return spaceType === 'single' || spaceType === 'single_with_supplements'
     case 'zones':
-      return spaceType === 'single_with_supplements'
+      return spaceType !== 'multiple_independent'
     case 'space_groups':
-      return spaceType === 'multiple_independent'
+      return spaceType === 'multiple_independent' || spaceType === 'single_with_supplements'
     case 'venue_rental':
       return spaceType !== 'multiple_independent'
     default:
@@ -42,10 +42,9 @@ export function getSectionLabel(secId: string, spaceType: SpaceType, fallback: s
       return 'Tu espacio'
     case 'zones':
       if (spaceType === 'single_with_supplements') return 'Zonas opcionales con suplemento'
-      return fallback
+      return 'Los espacios'
     case 'space_groups':
-      if (spaceType === 'multiple_independent') return 'Elige tu zona (cliente escoge)'
-      return fallback
+      return 'Los espacios'
     case 'venue_rental':
       if (spaceType === 'single') return 'Tarifa de alquiler'
       if (spaceType === 'single_with_supplements') return 'Tarifa base de alquiler'

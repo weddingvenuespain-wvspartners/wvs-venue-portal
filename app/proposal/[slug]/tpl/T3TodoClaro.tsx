@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { buildSingleFontUrl } from '@/lib/fonts'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoChat, IcoBuilding, ivaLabel, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, VenueRentalGrid, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, replacePlaceholders, type ProposalData } from './shared'
+import { formatDate, formatPrice, isDark, toRgb, FadeUp, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoChat, IcoBuilding, ivaLabel, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, formatZonePrice, VenueRentalGrid, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, replacePlaceholders, ZoneSlider, type ProposalData } from './shared'
 import { WeddingProposal } from './WeddingProposal'
 import VisitBookingModal from '@/components/VisitBookingModal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
@@ -44,7 +44,7 @@ function EmptySec({ label }: { label: string }) {
 
 export default function T3TodoClaro({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date, price_estimate, show_price_estimate, venue, branding } = data
-  const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow, expShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, testsShow, seasonsShow, collabsShow, accom, spaceGroups, techspecs, dateSlots } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow, expShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, zonesMode, testsShow, seasonsShow, collabsShow, accom, spaceGroups, techspecs, dateSlots } = extractData(data)
   const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
   const guests = guest_count ? Number(guest_count) : undefined
   const visibleSpaceGroups = (spaceGroups ?? []).filter(g => {
@@ -58,7 +58,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
 
   const primary = branding?.primary_color ?? '#1A3A5C'
   const rgb     = toRgb(primary)
-  const onPri   = isDark(primary) ? '#fff' : '#111'
+  const onPri   = isDark(primary) ? '#ffffff' : '#111111'
   const logo    = branding?.logo_url ?? null
   const font    = (branding as any)?.font_family || 'Cormorant Garamond,Georgia,serif'
   const contact = resolveContact(data)
@@ -68,6 +68,8 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
   const [visitDone,      setVisitDone]      = useState(false)
   const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
   const [selectedExtraSvcs, setSelectedExtraSvcs] = useState<Record<string, boolean>>({})
+  const [selectedZoneSupplements, setSelectedZoneSupplements] = useState<Record<number, boolean>>({})
+  const [selectedMenus, setSelectedMenus] = useState<string[]>([])
   const [heroLoaded, setHeroLoaded] = useState(false)
   const [openFaq, setOpenFaq] = useState<number|null>(null)
   const [activeSection, setActiveSection] = useState('')
@@ -254,7 +256,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
       )}
 
       {/* ── DATE SELECTOR ── */}
-      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
         <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
       )}
 
@@ -397,7 +399,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           )}
 
           {/* Single space */}
-          {on('single_space') && !(spaceGroups?.length) && (
+          {on('single_space') && (
             <div className="sec">
               <TplSingleSpace
                 data={(sec as any).single_space}
@@ -412,27 +414,30 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           )}
 
           {/* Zones */}
-          {on('zones') && !(spaceGroups?.length) && (zonesShow.length > 0 ? (
+          {on('zones') && (zonesShow.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['zones'] = el }}>
               <FadeUp>
-                <div className="sec-n">{secLbl('zones', 'Los espacios')}</div>
-                <h2 className="sec-h">Cada rincón, un escenario</h2>
+                <div className="sec-n">{(sec as any).zones_header?.label || secLbl('zones', 'Los espacios')}</div>
+                <h2 className="sec-h">{(sec as any).zones_header?.title || 'Cada rincón, un escenario'}</h2>
               </FadeUp>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
                 {zonesShow.map((z: any, i: number) => {
-                  const zPhoto = z.photos?.[0] || photos[i + 2]
+                  const zPhotos: string[] = z.photos?.length ? z.photos : (photos[i + 2] ? [photos[i + 2]] : [])
                   const caps = formatZoneCapacities(z)
                   const feats = formatZoneFeatures(z)
+                  const hasSuppl = zonesMode === 'zones' && !!z.price
+                  const suppSel = !!selectedZoneSupplements[i]
                   return (
                     <FadeUp key={i} delay={(i % 3) * .06}>
-                      <div style={{ background: '#fff', border: '1px solid #EDEAE6', borderRadius: 12, overflow: 'hidden', height: '100%' }}>
+                      <div style={{ background: '#fff', border: `1.5px solid ${hasSuppl && suppSel ? primary : '#EDEAE6'}`, borderRadius: 12, overflow: 'hidden', height: '100%' }}>
                         <div style={{ position: 'relative', aspectRatio: '4/3', overflow: 'hidden', background: '#F5F1EE' }}>
-                          {zPhoto
-                            ? <img src={zPhoto} alt={z.name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                          {zPhotos.length > 0
+                            ? <ZoneSlider photos={zPhotos} name={z.name} />
                             : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C8C3BE' }}><IcoBuilding width={40} height={40} /></div>
                           }
                         </div>
                         <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {z.subtitle && <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: primary, marginBottom: 2 }}>{z.subtitle}</div>}
                           <h3 style={{ fontFamily: font, fontSize: 19, color: '#181410', fontWeight: 400 }}>{z.name}</h3>
                           {z.description && <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 12.5, color: '#7a7570', lineHeight: 1.65 }}>{z.description}</p>}
                           {caps.length > 0 && (
@@ -448,7 +453,12 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                             </div>
                           )}
                           {z.notes && <div style={{ fontSize: 11.5, color: '#9a9590', fontStyle: 'italic', marginTop: 2 }}>{z.notes}</div>}
-                          {z.price && <div style={{ fontFamily: font, fontSize: 15, color: primary, marginTop: 4 }}>{z.price}</div>}
+                          {hasSuppl && (
+                            <button type="button" onClick={() => setSelectedZoneSupplements(p => ({ ...p, [i]: !p[i] }))}
+                              style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 8, border: `1.5px solid ${suppSel ? primary : '#DEDAD5'}`, background: suppSel ? primary : 'transparent', color: suppSel ? (isDark(primary) ? '#fff' : '#111') : primary, fontSize: 11.5, fontWeight: 700, letterSpacing: '.04em', cursor: 'pointer', transition: 'all .2s' }}>
+                              {suppSel ? '✓ Añadido' : '+ Añadir'} · {formatZonePrice(z.price)}
+                            </button>
+                          )}
                         </div>
                       </div>
                     </FadeUp>
@@ -459,8 +469,22 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
           {/* Space groups */}
-          {visibleSpaceGroups.length > 0 && (
-            <div className="sec">
+          {on('space_groups') && visibleSpaceGroups.length > 0 && (
+            <div className="sec" id="sec-space-groups">
+              {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+                <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
+              )}
+              {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+                <div style={{ marginBottom: 32 }}>
+                  <FadeUp>
+                    <div className="sec-n">{secLbl('venue_rental', sec.venue_rental.title || 'Tarifas de alquiler')}</div>
+                    <h2 className="sec-h">Elegid vuestra fecha</h2>
+                  </FadeUp>
+                  <FadeUp delay={.1}>
+                    <VenueRentalGrid data={sec.venue_rental} primary={primary} />
+                  </FadeUp>
+                </div>
+              )}
               <SpaceGroupSelector
                 groups={visibleSpaceGroups}
                 primary={primary}
@@ -535,8 +559,8 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
             </div>
           ) : _preview ? <EmptySec label="Paquetes" /> : null)}
 
-          {/* Venue rental (grid temporada × día) */}
-          {on('venue_rental') && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
+          {/* Venue rental (grid temporada × día) — standalone only when space_groups not active */}
+          {on('venue_rental') && !(on('space_groups') && visibleSpaceGroups.length > 0) && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['venue_rental'] = el }}>
               <FadeUp>
                 <div className="sec-n">{secLbl('venue_rental', sec.venue_rental.title || 'Tarifas de alquiler')}</div>
@@ -582,6 +606,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
               legacyMenus={menuShow}
               primary={primary}
               onPrimary={onPri}
+              onMenusChange={setSelectedMenus}
             />
           )}
 
@@ -831,7 +856,11 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
               coupleName={couple_name}
               primaryColor={primary}
               selectedSpaces={selectedSpaces}
-              selectedExtraSvcs={Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k)}
+              selectedMenus={selectedMenus}
+              selectedExtraSvcs={[
+                ...Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k),
+                ...zonesShow.filter((z: any, i: number) => zonesMode === 'zones' && z.price && selectedZoneSupplements[i]).map((z: any) => `${z.name} (${formatZonePrice(z.price)})`),
+              ]}
               spaceGroups={visibleSpaceGroups.length > 0 ? visibleSpaceGroups : undefined}
               dateSlots={dateSlots ?? []}
               preSelectedDateSlot={selectedDateSlotIdx}

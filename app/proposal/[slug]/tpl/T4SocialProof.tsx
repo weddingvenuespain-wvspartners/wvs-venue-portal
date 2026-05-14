@@ -10,11 +10,11 @@ import {
   FadeUp, FadeIn, useReveal,
   FloatingWhatsApp, AvailabilityBanner, Gallery,
   IcoCalendar, IcoUsers, IcoBuilding, IcoChat,
-  formatZoneCapacities, formatZoneFeatures, ivaLabel,
+  formatZoneCapacities, formatZoneFeatures, formatZonePrice, ivaLabel,
   InclusionIcon, StarRating, resolveContact, VenueRentalGrid,
   TplVenueSpecs, TplSingleSpace,
   TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant,
-  replacePlaceholders,
+  replacePlaceholders, ZoneSlider,
 } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
@@ -352,8 +352,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, se
   .t4-zone:nth-child(even) .t4-zone-img-wrap { order: 2 }
   .t4-zone:nth-child(even) .t4-zone-info { order: 1 }
   .t4-zone-img-wrap { overflow: hidden; min-height: 260px }
-  .t4-zone-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .6s ease }
-  .t4-zone-img-wrap:hover .t4-zone-img { transform: scale(1.05) }
+  .t4-zone-img { width: 100%; height: 100%; object-fit: cover; display: block }
   .t4-zone-ph {
     width: 100%; height: 100%; min-height: 260px;
     background: linear-gradient(135deg, ${SAND}, ${WARM});
@@ -581,7 +580,7 @@ function EmptySec({ label }: { label: string }) {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function T4SocialProof({ data }: { data: ProposalData }) {
-  const { sec, on, hasCatering, packagesShow, zonesShow, inclusionsShow, faqShow, expShow, testsShow, menuShow, menusStructured, menuExtras, appetizersBase, seasonsShow, collabsShow, extrasShow, accom, spaceGroups, techspecs, dateSlots } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, zonesShow, zonesMode, inclusionsShow, faqShow, expShow, testsShow, menuShow, menusStructured, menuExtras, appetizersBase, seasonsShow, collabsShow, extrasShow, accom, spaceGroups, techspecs, dateSlots } = extractData(data)
   const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
   const guests = data.guest_count ? Number(data.guest_count) : undefined
   const visibleSpaceGroups = (spaceGroups ?? []).filter(g => {
@@ -612,6 +611,8 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
   const [visitDone,      setVisitDone]      = useState(false)
   const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
   const [selectedExtraSvcs, setSelectedExtraSvcs] = useState<Record<string, boolean>>({})
+  const [selectedZoneSupplements, setSelectedZoneSupplements] = useState<Record<number, boolean>>({})
+  const [selectedMenus, setSelectedMenus] = useState<string[]>([])
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -712,7 +713,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       )}
 
       {/* ── DATE SELECTOR ── */}
-      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
         <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
       )}
 
@@ -898,7 +899,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       )}
 
       {/* SINGLE SPACE */}
-      {on('single_space') && !(spaceGroups?.length) && (
+      {on('single_space') && (
         <TplSingleSpace
           data={(sec as any).single_space}
           fallbackImage={heroPhoto}
@@ -911,29 +912,32 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       )}
 
       {/* ZONES */}
-      {on('zones') && !(spaceGroups?.length) && (zonesShow.length > 0 ? (
+      {on('zones') && (zonesShow.length > 0 ? (
         <section className="t4-section" style={{ background: WARM }}>
           <div className="t4-inner">
             <FadeUp>
-              <span className="t4-section-label">Los espacios</span>
-              <h2 className="t4-section-title">Cada rincón, una historia</h2>
+              <span className="t4-section-label">{(sec as any).zones_header?.label || 'Los espacios'}</span>
+              <h2 className="t4-section-title">{(sec as any).zones_header?.title || 'Cada rincón, una historia'}</h2>
               <div className="t4-divider" />
             </FadeUp>
             <div className="t4-zones">
               {zonesShow.map((z: any, i: number) => {
-                const zPhoto = z.photos?.[0] || photos[i + 2]
+                const zPhotos: string[] = z.photos?.length ? z.photos : (photos[i + 2] ? [photos[i + 2]] : [])
                 const caps = formatZoneCapacities(z)
                 const feats = formatZoneFeatures(z)
+                const hasSuppl = zonesMode === 'zones' && !!z.price
+                const suppSel = !!selectedZoneSupplements[i]
                 return (
                   <FadeUp key={i} delay={0.1}>
-                    <div className="t4-zone">
-                      <div className="t4-zone-img-wrap">
-                        {zPhoto
-                          ? <img src={zPhoto} className="t4-zone-img" alt={z.name} loading="lazy" />
+                    <div className="t4-zone" style={hasSuppl && suppSel ? { outline: `2px solid ${primary}`, outlineOffset: 2 } : undefined}>
+                      <div className="t4-zone-img-wrap" style={{ position: 'relative', overflow: 'hidden' }}>
+                        {zPhotos.length > 0
+                          ? <ZoneSlider photos={zPhotos} name={z.name} />
                           : <div className="t4-zone-ph"><IcoBuilding width={48} height={48} style={{ opacity: .3, color: '#fff' }} /></div>
                         }
                       </div>
                       <div className="t4-zone-info">
+                        {z.subtitle && <div style={{ fontSize: '.6rem', fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: primary, marginBottom: 2 }}>{z.subtitle}</div>}
                         <div className="t4-zone-name">{z.name}</div>
                         {z.description && <div className="t4-zone-desc">{z.description}</div>}
                         {caps.length > 0 && (
@@ -951,7 +955,12 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
                           </div>
                         )}
                         {z.notes && <div style={{ fontSize: '.76rem', color: MUTED, marginTop: 6, fontStyle: 'italic' }}>{z.notes}</div>}
-                        {z.price && <div className="t4-zone-price">{z.price}</div>}
+                        {hasSuppl && (
+                          <button type="button" onClick={() => setSelectedZoneSupplements(p => ({ ...p, [i]: !p[i] }))}
+                            style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 6, border: `1.5px solid ${suppSel ? primary : `rgba(${priRgb},.3)`}`, background: suppSel ? primary : 'transparent', color: suppSel ? (isDark(primary) ? '#fff' : '#111') : primary, fontSize: '.7rem', fontWeight: 700, letterSpacing: '.05em', cursor: 'pointer', transition: 'all .2s' }}>
+                            {suppSel ? '✓ Añadido' : '+ Añadir'} · {formatZonePrice(z.price)}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </FadeUp>
@@ -963,8 +972,25 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
       {/* SPACE GROUPS */}
-      {visibleSpaceGroups.length > 0 && (
-        <section className="t4-section" style={{ background: CREAM }}>
+      {on('space_groups') && visibleSpaceGroups.length > 0 && (
+        <section className="t4-section" id="sec-space-groups" style={{ background: CREAM }}>
+          {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+            <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
+          )}
+          {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+            <div className="t4-inner" style={{ paddingBottom: 0 }}>
+              <FadeUp>
+                <span className="t4-section-label">{sec.venue_rental.title || 'Tarifas de alquiler'}</span>
+                <h2 className="t4-section-title">Elegid vuestra fecha</h2>
+                <div className="t4-divider" />
+              </FadeUp>
+              <FadeUp delay={.1}>
+                <div style={{ marginTop: 40 }}>
+                  <VenueRentalGrid data={sec.venue_rental} primary={primary} />
+                </div>
+              </FadeUp>
+            </div>
+          )}
           <SpaceGroupSelector
             groups={visibleSpaceGroups}
             primary={primary}
@@ -978,7 +1004,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
       )}
 
       {/* VENUE RENTAL — grid temporada × día */}
-      {on('venue_rental') && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
+      {on('venue_rental') && !(on('space_groups') && visibleSpaceGroups.length > 0) && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
         <section className="t4-section" style={{ background: CREAM }}>
           <div className="t4-inner">
             <FadeUp>
@@ -1032,6 +1058,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           legacyMenus={menuShow}
           primary={primary}
           onPrimary={darkPri ? '#fff' : '#111'}
+          onMenusChange={setSelectedMenus}
         />
       )}
 
@@ -1264,7 +1291,11 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           coupleName={data.couple_name}
           primaryColor={primary}
           selectedSpaces={selectedSpaces}
-          selectedExtraSvcs={Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k)}
+          selectedMenus={selectedMenus}
+          selectedExtraSvcs={[
+            ...Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k),
+            ...zonesShow.filter((z: any, i: number) => zonesMode === 'zones' && z.price && selectedZoneSupplements[i]).map((z: any) => `${z.name} (${formatZonePrice(z.price)})`),
+          ]}
           spaceGroups={visibleSpaceGroups.length > 0 ? visibleSpaceGroups : undefined}
           dateSlots={dateSlots ?? []}
           preSelectedDateSlot={selectedDateSlotIdx}

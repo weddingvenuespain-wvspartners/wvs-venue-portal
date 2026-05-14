@@ -5,7 +5,7 @@
 //            → Qué incluye → Testimoniales → Colaboradores → Extras → FAQ → CTA
 
 import { useEffect, useRef, useState } from 'react'
-import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, TestimonialsFeatured, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, StarRating, resolveContact, replacePlaceholders, type ProposalData } from './shared'
+import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, formatZonePrice, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, TestimonialsFeatured, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, StarRating, resolveContact, replacePlaceholders, ZoneSlider, type ProposalData } from './shared'
 import InquiryForm from '@/components/InquiryForm'
 import VisitBookingModal from '@/components/VisitBookingModal'
 import { buildSingleFontUrl } from '@/lib/fonts'
@@ -14,32 +14,6 @@ import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 import DateSelector from './DateSelector'
 import { getActiveStyle, isSectionGroupEnabled } from '@/lib/section-styles'
 
-function ZoneSlider({ photos, name }: { photos: string[]; name: string }) {
-  const [idx, setIdx] = useState(0)
-  if (photos.length === 1) {
-    return <img src={photos[0]} alt={name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
-  }
-  return (
-    <>
-      <img src={photos[idx]} alt={name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'opacity .4s' }}
-        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
-      <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6, zIndex: 2 }}>
-        {photos.map((_, i) => (
-          <button key={i} onClick={() => setIdx(i)} style={{ width: 8, height: 8, borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === idx ? '#fff' : 'rgba(255,255,255,.4)', transition: 'background .2s' }} />
-        ))}
-      </div>
-      {photos.length > 1 && (
-        <>
-          <button onClick={() => setIdx(i => (i - 1 + photos.length) % photos.length)}
-            style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,.4)', border: 'none', color: '#fff', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
-          <button onClick={() => setIdx(i => (i + 1) % photos.length)}
-            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,.4)', border: 'none', color: '#fff', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
-        </>
-      )}
-    </>
-  )
-}
 
 function EmptySec({ label: _label }: { label: string }) {
   return null
@@ -50,7 +24,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const { couple_name, personal_message, guest_count, wedding_date,
           price_estimate, show_price_estimate, venue, branding } = data
   const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow,
-          testsShow, zonesShow, seasonsShow, collabsShow, menuShow,
+          testsShow, zonesShow, zonesMode, seasonsShow, collabsShow, menuShow,
           menusStructured, menuExtras, appetizersBase,
           expShow, techspecs, accom, spaceGroups, dateSlots } = extractData(data)
 
@@ -73,7 +47,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
 
   const primary = branding?.primary_color ?? '#8B6914'
   const rgb     = toRgb(primary)
-  const onPri   = isDark(primary) ? '#fff' : '#111'
+  const onPri   = isDark(primary) ? '#ffffff' : '#111111'
   const logo    = branding?.logo_url ?? null
   const FONT    = (branding as any)?.font_family || "'Cormorant Garamond', Georgia, serif"
   const contact = resolveContact(data)
@@ -89,6 +63,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const [ctaBar, setCtaBar]         = useState(false)
   const [openFaq, setOpenFaq]       = useState<number | null>(null)
   const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
+  const [selectedDatePriceIdx, setSelectedDatePriceIdx] = useState<number | null>(null)
   const guests = guest_count ? Number(guest_count) : undefined
   const visibleSpaceGroups = (spaceGroups ?? []).filter(g => {
     if (guests === undefined) return true
@@ -100,6 +75,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const [visitDone, setVisitDone]           = useState(false)
   const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
   const [selectedExtraSvcs, setSelectedExtraSvcs] = useState<Record<string, boolean>>({})
+  const [selectedZoneSupplements, setSelectedZoneSupplements] = useState<Record<number, boolean>>({})
+  const [selectedMenus, setSelectedMenus] = useState<string[]>([])
 
   // Dynamic price: updates when couple selects a date slot
   const selectedSlot = selectedDateSlotIdx !== null && dateSlots ? dateSlots[selectedDateSlotIdx] : null
@@ -254,8 +231,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-zone-reverse .t1-zone-img{order:2}
     .t1-zone-reverse .t1-zone-info{order:1}
     .t1-zone-img{position:relative;overflow:hidden;min-height:360px;height:100%;background:linear-gradient(135deg,rgba(${rgb},.2),${pal.surfaceAlt} 70%,${pal.bg})}
-    .t1-zone-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;filter:brightness(${lightMode ? '.95' : '.85'});transition:transform .7s ease,filter .4s}
-    .t1-zone:hover .t1-zone-img img{transform:scale(1.04);filter:brightness(${lightMode ? '1.05' : '1'})}
+    .t1-zone-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;filter:brightness(${lightMode ? '.95' : '.85'})}
     .t1-zone-ph{width:100%;height:100%;background:${pal.surfaceAlt};display:flex;align-items:center;justify-content:center;opacity:.3}
     .t1-zone-info{padding:56px 52px;display:flex;flex-direction:column;gap:14px;justify-content:center}
     .t1-zone-name{font-family:${FONT};font-size:2rem;font-weight:300;color:${pal.text};line-height:1.15;letter-spacing:-.01em}
@@ -474,8 +450,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 ? { label: 'Bienvenida', anchor: 'sec-welcome' } : null,
               expShow && on('experience') ? { label: 'Historia', anchor: 'sec-experience' } : null,
               on('gallery') && galleryPhotos.length > 0 ? { label: 'Galería', anchor: 'sec-gallery' } : null,
-              on('single_space') && (sec as any).single_space?.title ? { label: 'Vuestro espacio', anchor: 'sec-single-space' } : null,
+              on('single_space') && (sec as any).single_space?.title ? { label: (sec as any).single_space?.subtitle || 'Vuestro espacio', anchor: 'sec-single-space' } : null,
               on('zones') && zonesShow.length > 0 ? { label: 'Espacios', anchor: 'sec-zones' } : null,
+              on('space_groups') && visibleSpaceGroups.length > 0 ? { label: 'Espacios', anchor: 'sec-space-groups' } : null,
               hasCatering && on('menu') ? { label: 'Menús', anchor: 'menu' } : null,
               on('schedule_visit') ? { label: 'Agendar visita', anchor: 'sec-schedule' } : null,
               !on('schedule_visit') && contactOn ? { label: 'Contactar', anchor: 't1-cta' } : null,
@@ -592,7 +569,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           SELECTOR DE FECHAS
       ════════════════════════════════════════════ */}
-      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
         <DateSelector
           slots={dateSlots}
           primary={primary}
@@ -751,24 +728,30 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           SINGLE SPACE (un único espacio)
       ════════════════════════════════════════════ */}
-      {on('single_space') && !(spaceGroups?.length) && (sec as any).single_space && (() => {
+      {on('single_space') && (sec as any).single_space && (() => {
         const ss: any = (sec as any).single_space
         const features: string[] = Array.isArray(ss.features) ? ss.features : []
-        const heroImg = ss.image_url || (sec as any).hero_image_url
+        const allPhotos: string[] = [
+          ...(Array.isArray(ss.photos) ? ss.photos : []),
+          ...(ss.image_url && !(ss.photos ?? []).includes(ss.image_url) ? [ss.image_url] : []),
+        ]
+        const heroImg = allPhotos[0] || (sec as any).hero_image_url
         if (!ss.title && !ss.description && !heroImg && features.length === 0) return null
         return (
           <section id="sec-single-space" className="t1-sec" style={{ background: lightMode ? pal.surface : '#0c0c0c' }}>
             <div className="w" style={{ display: 'grid', gridTemplateColumns: heroImg ? '1fr 1fr' : '1fr', gap: 48, alignItems: 'center' }}>
               {heroImg && (
                 <FadeIn>
-                  <img src={heroImg} alt={ss.title || 'Espacio'} style={{ width: '100%', height: 420, objectFit: 'cover', borderRadius: 4, border: `1px solid ${fg(.06)}` }} />
+                  <div style={{ position: 'relative', width: '100%', height: 420, borderRadius: 4, overflow: 'hidden', border: `1px solid ${fg(.06)}` }}>
+                    <ZoneSlider photos={allPhotos.length > 0 ? allPhotos : [heroImg]} name={ss.title || 'Espacio'} />
+                  </div>
                 </FadeIn>
               )}
               <FadeUp>
-                <span className="t1-label">Vuestro espacio</span>
+                <span className="t1-label">{ss.subtitle || 'Vuestro espacio'}</span>
                 {ss.title && <h2 className="t1-h2" style={{ marginBottom: 16 }}>{ss.title}</h2>}
                 {ss.description && <p className="t1-p" style={{ color: fg(.7), lineHeight: 1.7, marginBottom: 24 }}>{ss.description}</p>}
-                {(ss.sqm || ss.max_guests) && (
+                {(ss.sqm || ss.min_guests || ss.max_guests) && (
                   <div style={{ display: 'flex', gap: 32, marginBottom: 20, paddingTop: 20, borderTop: `1px solid ${fg(.08)}` }}>
                     {ss.sqm && (
                       <div>
@@ -776,10 +759,14 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                         <div style={{ fontSize: '.65rem', letterSpacing: '.18em', textTransform: 'uppercase', color: fg(.45), marginTop: 4 }}>Superficie</div>
                       </div>
                     )}
-                    {ss.max_guests && (
+                    {(ss.min_guests || ss.max_guests) && (
                       <div>
-                        <div style={{ fontSize: '1.6rem', fontWeight: 300, color: pal.text, fontFamily: FONT, lineHeight: 1 }}>{ss.max_guests}</div>
-                        <div style={{ fontSize: '.65rem', letterSpacing: '.18em', textTransform: 'uppercase', color: fg(.45), marginTop: 4 }}>Capacidad máx.</div>
+                        <div style={{ fontSize: '1.6rem', fontWeight: 300, color: pal.text, fontFamily: FONT, lineHeight: 1 }}>
+                          {ss.min_guests && ss.max_guests ? `${ss.min_guests}–${ss.max_guests}` : (ss.max_guests || ss.min_guests)}
+                        </div>
+                        <div style={{ fontSize: '.65rem', letterSpacing: '.18em', textTransform: 'uppercase', color: fg(.45), marginTop: 4 }}>
+                          {ss.min_guests && ss.max_guests ? 'Capacidad' : ss.max_guests ? 'Capacidad máx.' : 'Capacidad mín.'}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -791,6 +778,66 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                     ))}
                   </div>
                 )}
+                {(() => {
+                  const dp: any[] = Array.isArray(ss.date_prices) ? ss.date_prices.filter((e: any) => e.price_min) : []
+                  if (dp.length === 0) return null
+                  if (on('space_groups') && visibleSpaceGroups.length > 0) return null
+                  const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+                  const fmtPrice = (p: string) => { const n = parseFloat(p); return isNaN(n) ? p : n.toLocaleString('es-ES') + '€' }
+                  const rangeLabel = (e: any) => {
+                    if (!e.date_to || e.date_to === e.date_from) return fmtDate(e.date_from)
+                    const days = Math.round((new Date(e.date_to + 'T12:00:00').getTime() - new Date(e.date_from + 'T12:00:00').getTime()) / 86400000)
+                    if (days === 1) return `${fmtDate(e.date_from)} o ${fmtDate(e.date_to)}`
+                    return `${fmtDate(e.date_from)} – ${fmtDate(e.date_to)}`
+                  }
+                  const priceKey = (e: any) => `${e.price_min ?? ''}|${e.price_max ?? ''}`
+                  const priceLabel = (e: any) => e.price_max ? `${fmtPrice(e.price_min)} – ${fmtPrice(e.price_max)}` : fmtPrice(e.price_min)
+                  // Group entries by price — same price = one pill
+                  const grouped: Array<{ key: string; entries: any[]; priceStr: string }> = []
+                  for (const entry of dp) {
+                    const k = priceKey(entry)
+                    const existing = grouped.find(g => g.key === k)
+                    if (existing) existing.entries.push(entry)
+                    else grouped.push({ key: k, entries: [entry], priceStr: priceLabel(entry) })
+                  }
+                  const usePills = grouped.length <= 5
+                  return (
+                    <div style={{ marginTop: 24, paddingTop: 20, borderTop: `1px solid ${fg(.08)}` }}>
+                      <div style={{ fontSize: '.65rem', letterSpacing: '.18em', textTransform: 'uppercase', color: fg(.45), marginBottom: 12 }}>Elige tu fecha</div>
+                      {usePills ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {grouped.map((group, i) => {
+                            const sel = selectedDatePriceIdx === i
+                            return (
+                              <button key={i} type="button" onClick={() => setSelectedDatePriceIdx(sel ? null : i)}
+                                style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '10px 16px', borderRadius: 8, border: `1.5px solid ${sel ? primary : fg(.15)}`, background: sel ? `${primary}12` : 'transparent', cursor: 'pointer', transition: 'all .15s' }}>
+                                {group.entries.map((entry, j) => (
+                                  <span key={j} style={{ fontSize: '.8rem', color: sel ? primary : fg(.7), fontWeight: sel ? 600 : 400 }}>{rangeLabel(entry)}</span>
+                                ))}
+                                <span style={{ fontSize: '.75rem', color: sel ? primary : fg(.5), fontFamily: FONT }}>{group.priceStr}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {grouped.map((group, i) => {
+                            const sel = selectedDatePriceIdx === i
+                            return (
+                              <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', padding: '8px 12px', borderRadius: 6, border: `1px solid ${sel ? primary : fg(.1)}`, background: sel ? `${primary}0d` : 'transparent' }}>
+                                <input type="radio" checked={sel} onChange={() => setSelectedDatePriceIdx(i)} style={{ accentColor: primary, flexShrink: 0 }} />
+                                <span style={{ flex: 1, fontSize: '.82rem', color: fg(.75) }}>
+                                  {group.entries.map((e, j) => <span key={j} style={{ display: 'block' }}>{rangeLabel(e)}</span>)}
+                                </span>
+                                <span style={{ fontSize: '.82rem', color: sel ? primary : fg(.5), fontFamily: FONT, fontWeight: sel ? 600 : 400 }}>{group.priceStr}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </FadeUp>
             </div>
           </section>
@@ -800,12 +847,12 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           ESPACIOS / ZONES
       ════════════════════════════════════════════ */}
-      {on('zones') && !(spaceGroups?.length) && (zonesShow.length > 0 ? (
+      {on('zones') && (zonesShow.length > 0 ? (
         <section id="sec-zones" className="t1-sec">
           <div className="w">
             <FadeUp>
-              <span className="t1-label">Los espacios</span>
-              <h2 className="t1-h2">Cada rincón, un escenario</h2>
+              <span className="t1-label">{(sec as any).zones_header?.label || 'Los espacios'}</span>
+              <h2 className="t1-h2">{(sec as any).zones_header?.title || 'Cada rincón, un escenario'}</h2>
             </FadeUp>
           </div>
           <div className="t1-zones">
@@ -814,9 +861,11 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               const caps = formatZoneCapacities(z)
               const feats = formatZoneFeatures(z)
               const reverse = i % 2 === 1
+              const hasSuppl = zonesMode === 'zones' && !!z.price
+              const suppSel = !!selectedZoneSupplements[i]
               return (
                 <FadeIn key={i} delay={0.05}>
-                  <div className={`t1-zone${reverse ? ' t1-zone-reverse' : ''}`}>
+                  <div className={`t1-zone${reverse ? ' t1-zone-reverse' : ''}`} style={hasSuppl && suppSel ? { outline: `2px solid ${primary}`, outlineOffset: 2, borderRadius: 4 } : undefined}>
                     <div className="t1-zone-img">
                       {zPhotos.length > 0
                         ? <ZoneSlider photos={zPhotos} name={z.name} />
@@ -824,7 +873,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                       }
                     </div>
                     <div className="t1-zone-info">
-                      <div style={{ fontSize: '.62rem', fontWeight: 700, letterSpacing: '.2em', textTransform: 'uppercase', color: fg(.32) }}>Espacio {String(i + 1).padStart(2, '0')}</div>
+                      <div style={{ fontSize: '.62rem', fontWeight: 700, letterSpacing: '.2em', textTransform: 'uppercase', color: fg(.32) }}>{z.subtitle || `Espacio ${String(i + 1).padStart(2, '0')}`}</div>
                       <div className="t1-zone-name">{z.name}</div>
                       {z.description && <p className="t1-zone-desc">{z.description}</p>}
                       {caps.length > 0 && (
@@ -840,7 +889,12 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                         </div>
                       )}
                       {z.notes && <div style={{ fontSize: '.72rem', color: fg(.5), marginTop: 8, fontStyle: 'italic' }}>{z.notes}</div>}
-                      {z.price && <div className="t1-zone-price">{z.price}</div>}
+                      {hasSuppl && (
+                        <button type="button" onClick={() => setSelectedZoneSupplements(p => ({ ...p, [i]: !p[i] }))}
+                          style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 8, border: `1.5px solid ${suppSel ? primary : fg(.2)}`, background: suppSel ? primary : 'transparent', color: suppSel ? (isDark(primary) ? '#fff' : '#111') : fg(.7), fontSize: '.75rem', fontWeight: 700, letterSpacing: '.04em', cursor: 'pointer', transition: 'all .2s' }}>
+                          {suppSel ? '✓ Añadido' : '+ Añadir'} · {formatZonePrice(z.price)}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </FadeIn>
@@ -853,17 +907,80 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           GRUPOS DE ESPACIOS
       ════════════════════════════════════════════ */}
-      {visibleSpaceGroups.length > 0 ? (
-        <SpaceGroupSelector
-          groups={visibleSpaceGroups}
-          primary={primary}
-          onPrimary={onPri}
-          dark={!lightMode}
-          font={FONT}
-          guestCount={guests}
-          onSelectionChange={setSelectedSpaces}
-        />
-      ) : spaceGroups && spaceGroups.length > 0 ? null : on('space_groups') && _preview ? <EmptySec label="Grupos de espacios" /> : null}
+      {on('space_groups') && visibleSpaceGroups.length > 0 ? (
+        <div id="sec-space-groups">
+          {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+            <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={!lightMode} font={FONT} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
+          )}
+          {on('single_space') && (() => {
+            const dp: any[] = Array.isArray((sec as any).single_space?.date_prices)
+              ? (sec as any).single_space.date_prices.filter((e: any) => e.price_min)
+              : []
+            if (dp.length === 0) return null
+            const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+            const fmtPrice = (p: string) => { const n = parseFloat(p); return isNaN(n) ? p : n.toLocaleString('es-ES') + '€' }
+            const rangeLabel = (e: any) => {
+              if (!e.date_to || e.date_to === e.date_from) return fmtDate(e.date_from)
+              const days = Math.round((new Date(e.date_to + 'T12:00:00').getTime() - new Date(e.date_from + 'T12:00:00').getTime()) / 86400000)
+              if (days === 1) return `${fmtDate(e.date_from)} o ${fmtDate(e.date_to)}`
+              return `${fmtDate(e.date_from)} – ${fmtDate(e.date_to)}`
+            }
+            const priceKey = (e: any) => `${e.price_min ?? ''}|${e.price_max ?? ''}`
+            const priceLabel = (e: any) => e.price_max ? `${fmtPrice(e.price_min)} – ${fmtPrice(e.price_max)}` : fmtPrice(e.price_min)
+            const grouped: Array<{ key: string; entries: any[]; priceStr: string }> = []
+            for (const entry of dp) {
+              const k = priceKey(entry)
+              const existing = grouped.find(g => g.key === k)
+              if (existing) existing.entries.push(entry)
+              else grouped.push({ key: k, entries: [entry], priceStr: priceLabel(entry) })
+            }
+            return (
+              <section className="t1-sec">
+                <div className="w">
+                  <FadeUp>
+                    <span className="t1-label">Tarifas</span>
+                    <h2 className="t1-h2" style={{ marginBottom: 32 }}>Elegid vuestra fecha</h2>
+                  </FadeUp>
+                  <FadeUp delay={.1}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                      {grouped.map((group, i) => (
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '12px 18px', borderRadius: 10, border: `1px solid ${fg(.12)}`, background: lightMode ? '#fff' : 'rgba(255,255,255,.04)' }}>
+                          {group.entries.map((entry, j) => (
+                            <span key={j} style={{ fontSize: '.82rem', color: fg(.7) }}>{rangeLabel(entry)}</span>
+                          ))}
+                          <span style={{ fontSize: '.88rem', fontWeight: 700, color: primary, marginTop: 4 }}>{group.priceStr}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </FadeUp>
+                </div>
+              </section>
+            )
+          })()}
+          {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+            <section className="t1-sec">
+              <div className="w">
+                <FadeUp>
+                  <span className="t1-label">{sec.venue_rental.title || 'Tarifas de alquiler'}</span>
+                  <h2 className="t1-h2">Elegid vuestra fecha</h2>
+                </FadeUp>
+                <FadeUp delay={.1}>
+                  <VenueRentalGrid data={sec.venue_rental} primary={primary} dark={!lightMode} />
+                </FadeUp>
+              </div>
+            </section>
+          )}
+          <SpaceGroupSelector
+            groups={visibleSpaceGroups}
+            primary={primary}
+            onPrimary={onPri}
+            dark={!lightMode}
+            font={FONT}
+            guestCount={guests}
+            onSelectionChange={setSelectedSpaces}
+          />
+        </div>
+      ) : on('space_groups') && _preview ? <EmptySec label="Los espacios" /> : null}
 
       {/* ════════════════════════════════════════════
           PAQUETES
@@ -905,7 +1022,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           TARIFAS DE ALQUILER (grid temporada × día)
       ════════════════════════════════════════════ */}
-      {on('venue_rental') && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
+      {on('venue_rental') && !(on('space_groups') && visibleSpaceGroups.length > 0) && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
         <section className="t1-sec">
           <div className="w">
             <FadeUp>
@@ -981,6 +1098,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           primary={primary}
           onPrimary={onPri}
           dark={!lightMode}
+          onMenusChange={setSelectedMenus}
         />
       ) : _preview ? <EmptySec label="Menú" /> : null)}
 
@@ -1248,7 +1366,11 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           coupleName={couple_name}
           primaryColor={primary}
           selectedSpaces={selectedSpaces}
-          selectedExtraSvcs={Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k)}
+          selectedMenus={selectedMenus}
+          selectedExtraSvcs={[
+            ...Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k),
+            ...zonesShow.filter((z: any, i: number) => zonesMode === 'zones' && z.price && selectedZoneSupplements[i]).map((z: any) => `${z.name} (${formatZonePrice(z.price)})`),
+          ]}
           spaceGroups={visibleSpaceGroups.length > 0 ? visibleSpaceGroups : undefined}
           dateSlots={dateSlots ?? []}
           preSelectedDateSlot={selectedDateSlotIdx}

@@ -80,6 +80,7 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
         selection_mode: vg.selection_mode,
         pick_n_min: vg.pick_n_min,
         pick_n_max: vg.pick_n_max,
+        included_zone_ids: vg.included_zone_ids,
         pricing_mode: vg.pricing_mode ?? 'per_space',
         base_price: existing?.base_price ?? vg.base_price ?? '',
         spaces,
@@ -300,6 +301,7 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
                   const newGroup: SpaceGroup = {
                     group_id: vg.id, name: vg.name, description: '', note: '',
                     selection_mode: vg.selection_mode, pick_n_min: vg.pick_n_min, pick_n_max: vg.pick_n_max,
+                    included_zone_ids: vg.included_zone_ids,
                     pricing_mode: vg.pricing_mode ?? 'per_space',
                     base_price: vg.base_price ?? '',
                     spaces: vg.spaces.map(vs => ({ zone_id: vs.id, name: vs.name, description: vs.description ?? '', price: vs.price ?? '', capacity_min: vs.capacity_min, capacity_max: vs.capacity_max })),

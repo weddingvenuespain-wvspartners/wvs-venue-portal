@@ -199,16 +199,23 @@ export default async function ProposalPage({ params, searchParams }: { params: P
   } else if (sectionsData.space_groups?.length && venueSettings?.space_groups?.length) {
     // Sync live fields from venue_settings (source of truth) into sections_data groups
     sectionsData.space_groups = sectionsData.space_groups.map((sg: any) => {
-      const live = (venueSettings.space_groups as any[]).find((v: any) => v.id === sg.id)
+      const live = (venueSettings.space_groups as any[]).find((v: any) => v.id === (sg.group_id ?? sg.id))
       if (!live) return sg
       const synced: any = { ...sg }
       if ('included_zone_ids' in live) synced.included_zone_ids = live.included_zone_ids
+      if ('selection_mode' in live) synced.selection_mode = live.selection_mode
+      if ('pick_n_min' in live) synced.pick_n_min = live.pick_n_min
+      if ('pick_n_max' in live) synced.pick_n_max = live.pick_n_max
       if ('pricing_display' in live) synced.pricing_display = live.pricing_display
       if (Array.isArray(live.spaces) && Array.isArray(sg.spaces)) {
         synced.spaces = sg.spaces.map((sp: any) => {
           const liveSp = live.spaces.find((ls: any) => ls.id === (sp.id ?? sp.zone_id))
-          if (liveSp && Array.isArray(liveSp.price_tiers)) return { ...sp, price_tiers: liveSp.price_tiers }
-          return sp
+          if (!liveSp) return sp
+          return {
+            ...sp,
+            zone_id: liveSp.id,  // ensure zone_id is set for included_zone_ids matching
+            ...(Array.isArray(liveSp.price_tiers) ? { price_tiers: liveSp.price_tiers } : {}),
+          }
         })
       }
       return synced

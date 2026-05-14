@@ -216,15 +216,21 @@ export type SectionsData = {
     notes?: string
   }
   single_space?: {
+    subtitle?: string
     title?: string
     description?: string
     sqm?: string
+    min_guests?: string
     max_guests?: string
     features?: string[]
     image_url?: string
+    photos?: string[]
+    date_prices?: Array<{ date_from: string; date_to?: string; price_min?: string; price_max?: string; overridden?: boolean }> | null
   } | null
   packages_override?:       Array<{ name: string; subtitle?: string; price?: string; description?: string; includes?: string[]; is_recommended?: boolean; min_guests?: number; max_guests?: number; is_active?: boolean }> | null
+  zones_header?: { label?: string; title?: string }
   zones_override?:          Array<{
+    subtitle?: string
     name: string
     description?: string
     photos?: string[]

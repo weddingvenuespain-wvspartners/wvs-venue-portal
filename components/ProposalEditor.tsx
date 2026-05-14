@@ -18,6 +18,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { Checkbox } from '@/components/ui/checkbox'
 import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
+import { getLeadDateRanges } from '@/lib/lead-dates'
 import { DEFAULT_TEMPLATES } from '@/lib/proposal-starter-templates'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -120,9 +121,9 @@ function getDefaultSections(cfg: { space_type: string; price_model: string; menu
     welcome_editorial: false,
     experience:       true,
     gallery:          true,
-    single_space:     cfg.space_type === 'single',
+    single_space:     cfg.space_type === 'single' || cfg.space_type === 'single_with_supplements',
     zones:            cfg.space_type === 'single_with_supplements',
-    space_groups:     cfg.space_type === 'multiple_independent',
+    space_groups:     cfg.space_type === 'multiple_independent' || cfg.space_type === 'single_with_supplements',
     venue_rental:     cfg.price_model === 'rental' && cfg.space_type !== 'multiple_independent',
     inclusions:       cfg.price_model === 'package' && cfg.menu_included !== false,
     testimonials:     true,
@@ -140,7 +141,7 @@ function getDefaultSections(cfg: { space_type: string; price_model: string; menu
 
 export default function ProposalEditor({ proposal: initial }: { proposal: EditorProposal }) {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, activeVenue } = useAuth()
 
   const [proposal, setProposal] = useState<EditorProposal>(initial)
   const [leads, setLeads] = useState<any[]>([])
@@ -154,6 +155,9 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   const [contentTemplates, setContentTemplates] = useState<Array<{ id: string; name: string; description: string | null; sections_data: SectionsData; is_default: boolean }>>([])
   const [applyingTemplate, setApplyingTemplate] = useState(false)
   const [showDateModal, setShowDateModal] = useState(false)
+  const [editLeadDates, setEditLeadDates] = useState(false)
+  const [leadDatesForm, setLeadDatesForm] = useState<any>(null)
+  const [savingLeadDates, setSavingLeadDates] = useState(false)
   const [showTemplateList, setShowTemplateList] = useState(false)
   const [showFontList, setShowFontList] = useState(false)
 
@@ -167,9 +171,9 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     personal_message: initial.personal_message ?? '',
     show_availability: initial.show_availability,
     show_price_estimate: initial.show_price_estimate,
-    primary_color: initial.branding?.primary_color ?? '#2d4a7a',
-    logo_url: initial.branding?.logo_url ?? null as string | null,
-    font_family: initial.branding?.font_family ?? 'Georgia, serif',
+    primary_color: initial.branding?.primary_color ?? (initial.sections_data as any)?.primary_color ?? '#2d4a7a',
+    logo_url: initial.branding?.logo_url ?? (initial.sections_data as any)?.logo_url ?? null as string | null,
+    font_family: initial.branding?.font_family ?? (initial.sections_data as any)?.font_family ?? 'Georgia, serif',
     template_id: initial.template_id ?? '',
     modality_id: initial.modality_id ?? '',
     access_password: initial.access_password ?? '',
@@ -199,10 +203,12 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     const supabase = createClient()
     ;(async () => {
       const [{ data: leadsData }, { data: tplData }, { data: venueRow }, { data: settingsRow }, modalRes, ctplRes] = await Promise.all([
-        supabase.from('leads').select('id, name, guests, email').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('leads').select('id, name, guests, email, wedding_date, wedding_date_to, wedding_date_ranges, date_flexibility, wedding_year, wedding_month, wedding_season').eq('user_id', user.id).order('created_at', { ascending: false }),
         supabase.from('proposal_web_templates').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('venue_onboarding').select('name, city, region, contact_email, contact_phone, website, photo_urls').eq('user_id', user.id).maybeSingle(),
-        supabase.from('venue_settings').select('commercial_config, menu_catalog, space_groups').eq('user_id', user.id).limit(1),
+        (activeVenue?.id
+          ? supabase.from('venue_settings').select('commercial_config, menu_catalog, space_groups').eq('user_id', user.id).eq('venue_id', activeVenue.id).limit(1)
+          : supabase.from('venue_settings').select('commercial_config, menu_catalog, space_groups').eq('user_id', user.id).limit(1)),
         fetch('/api/estructura/modalities'),
         fetch('/api/proposal-templates'),
       ])
@@ -223,36 +229,65 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
       // ── Auto-populate sections for NEW proposals ──────────────────────────
       const isNew = !initial.sections_data || Object.keys(initial.sections_data.sections_enabled ?? {}).length === 0
+      // If proposal was seeded from a content template, skip overwriting content sections
+      // (only allow sections_enabled to be auto-set from venue defaults)
+      const fromTemplate = !!(initial.sections_data as any)?.content_template_id
       if (isNew && cfg) {
         const autoPatch: Partial<SectionsData> = {
           sections_enabled: getDefaultSections(cfg),
         }
 
         // Task 2: Auto-populate space_groups from venue config
-        if (cfg.space_type === 'multiple_independent' && spaceGroups.length > 0) {
-          autoPatch.space_groups = spaceGroups.map(vg => ({
-            group_id: vg.id,
-            name: vg.name,
-            description: '',
-            note: '',
-            selection_mode: vg.selection_mode,
-            pick_n_min: vg.pick_n_min,
-            pick_n_max: vg.pick_n_max,
-            pricing_mode: vg.pricing_mode ?? 'per_space',
-            base_price: vg.base_price ?? '',
-            spaces: vg.spaces.map(vs => ({
-              zone_id: vs.id,
-              name: vs.name,
-              description: vs.description ?? '',
-              price: vs.price ?? '',
-              capacity_min: vs.capacity_min,
-              capacity_max: vs.capacity_max,
-            })),
-          }))
+        if (!fromTemplate && (cfg.space_type === 'multiple_independent' || cfg.space_type === 'single_with_supplements') && spaceGroups.length > 0) {
+          // Gather supplement prices from modality tariffs: {zone_id → [{season_label, price}]}
+          const modPrices: any[] = loadedModalities[0]?.prices ?? loadedModalities[0]?.packages?.flatMap((p: any) => p.prices ?? []) ?? []
+          const suppPricesByZone: Record<string, Array<{label: string; price: string}>> = {}
+          for (const p of modPrices) {
+            const supp = p.supplement_prices ?? {}
+            for (const [zoneId, price] of Object.entries(supp)) {
+              if (!suppPricesByZone[zoneId]) suppPricesByZone[zoneId] = []
+              const label = p.season ?? [p.date_from, p.date_to].filter(Boolean).join(' – ') ?? 'Temporada'
+              suppPricesByZone[zoneId].push({ label, price: String(price) })
+            }
+          }
+
+          autoPatch.space_groups = spaceGroups.map(vg => {
+            const includedIds = new Set(vg.included_zone_ids ?? [])
+            return {
+              group_id: vg.id,
+              name: vg.name,
+              description: '',
+              note: '',
+              selection_mode: vg.selection_mode,
+              pick_n_min: vg.pick_n_min,
+              pick_n_max: vg.pick_n_max,
+              included_zone_ids: vg.included_zone_ids,
+              pricing_mode: vg.pricing_mode ?? 'per_space',
+              base_price: vg.base_price ?? '',
+              spaces: vg.spaces.map(vs => {
+                const isIncluded = includedIds.has(vs.id)
+                const suppTiers = suppPricesByZone[vs.id] ?? []
+                // For selectable (supplement) zones: use tariff prices if available
+                const price = isIncluded ? '' : (vs.price ?? (suppTiers.length === 1 ? `+${suppTiers[0].price}€` : ''))
+                const priceTiers = !isIncluded && suppTiers.length > 1
+                  ? suppTiers.map(t => ({ label: t.label, price: `+${t.price}€` }))
+                  : undefined
+                return {
+                  zone_id: vs.id,
+                  name: vs.name,
+                  description: vs.description ?? '',
+                  price,
+                  ...(priceTiers ? { price_tiers: priceTiers } : {}),
+                  capacity_min: vs.capacity_min,
+                  capacity_max: vs.capacity_max,
+                }
+              }),
+            }
+          })
         }
 
         // Task 3: Auto-populate venue_rental grid from modality tariffs
-        if (cfg.price_model === 'rental' && loadedModalities.length > 0) {
+        if (!fromTemplate && cfg.price_model === 'rental' && loadedModalities.length > 0) {
           const mod = loadedModalities[0] // use first (or selected) modality
           const allPrices: ModalityPrice[] = mod.duration_type === 'package'
             ? (mod.packages ?? []).flatMap((pkg: any) => pkg.prices ?? [])
@@ -290,7 +325,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
         }
 
         // Task 4: Auto-populate packages from modality packages
-        if (loadedModalities.length > 0) {
+        if (!fromTemplate && loadedModalities.length > 0) {
           const mod = loadedModalities[0]
           if (mod.duration_type === 'package' && (mod.packages ?? []).length > 0) {
             autoPatch.packages_override = (mod.packages as any[]).map(pkg => ({
@@ -487,13 +522,93 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   const onModalityChange = (modalityId: string) => {
     const price = modalityId && form.wedding_date ? getPriceForDate(modalityId, form.wedding_date) : null
     setForm(f => ({ ...f, modality_id: modalityId, ...(price !== null ? { price_estimate: String(price) } : {}) }))
-    // Re-group date slots with correct prices
     if (modalityId) regroupDateSlots(modalityId)
+    // Recalculate non-overridden date_prices using day-by-day price split
+    const lead = leads.find(l => l.id === form.lead_id)
+    if (lead) {
+      const computed = computeDatePrices(lead, modalityId)
+      if (computed) setSections((s: any) => ({ ...s, single_space: { ...(s.single_space ?? {}), date_prices: computed } }))
+    }
   }
 
   const onWeddingDateChange = (date: string) => {
     const price = form.modality_id && date ? getPriceForDate(form.modality_id, date) : null
     setForm(f => ({ ...f, wedding_date: date, ...(price !== null ? { price_estimate: String(price) } : {}) }))
+  }
+
+  const computeDatePrices = (lead: any, modalityId: string | null) => {
+    const ranges = getLeadDateRanges(lead)
+    if (!ranges.length || !modalityId) return null
+
+    const addDays = (iso: string, n: number) => {
+      const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n)
+      return d.toISOString().slice(0, 10)
+    }
+    const diffDays = (a: string, b: string) =>
+      Math.round((new Date(b + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()) / 86400000)
+
+    const result: any[] = []
+
+    for (const r of ranges) {
+      if (!r.to || r.to === r.from) {
+        const p = getPriceForDate(modalityId, r.from)
+        result.push({ date_from: r.from, date_to: r.to, price_min: p !== null ? String(p) : undefined, overridden: false })
+        continue
+      }
+      // Walk day by day, group consecutive days with same price into sub-ranges
+      const totalDays = diffDays(r.from, r.to)
+      let subStart = r.from
+      let subPrice = getPriceForDate(modalityId, r.from)
+      for (let i = 1; i <= totalDays; i++) {
+        const day = addDays(r.from, i)
+        const dayPrice = getPriceForDate(modalityId, day)
+        if (dayPrice !== subPrice || i === totalDays) {
+          const subEnd = i === totalDays && dayPrice === subPrice ? day : addDays(r.from, i - 1)
+          result.push({
+            date_from: subStart,
+            date_to: subEnd === subStart ? undefined : subEnd,
+            price_min: subPrice !== null ? String(subPrice) : undefined,
+            overridden: false,
+          })
+          if (i === totalDays && dayPrice !== subPrice) {
+            result.push({ date_from: day, date_to: undefined, price_min: dayPrice !== null ? String(dayPrice) : undefined, overridden: false })
+          }
+          subStart = day
+          subPrice = dayPrice
+        }
+      }
+    }
+
+    // Sort chronologically before merging (lead ranges may be unordered)
+    result.sort((a, b) => a.date_from.localeCompare(b.date_from))
+
+    // Merge adjacent entries with same price into one range
+    const merged: any[] = []
+    for (const entry of result) {
+      const prev = merged[merged.length - 1]
+      const prevEnd = prev?.date_to ?? prev?.date_from
+      const isAdjacent = prev && prev.price_min === entry.price_min && prevEnd && addDays(prevEnd, 1) === entry.date_from
+      if (isAdjacent) {
+        merged[merged.length - 1] = { ...prev, date_to: entry.date_to ?? entry.date_from }
+      } else {
+        merged.push(entry)
+      }
+    }
+
+    return merged.some(r => r.price_min) ? merged : null
+  }
+
+  const recalculateWithFreshLead = async (leadId: string, modalityId: string | null) => {
+    const supabase = createClient()
+    const { data: freshLead } = await supabase
+      .from('leads')
+      .select('id, name, guests, email, wedding_date, wedding_date_to, wedding_date_ranges, date_flexibility')
+      .eq('id', leadId)
+      .single()
+    if (!freshLead) return
+    setLeads(prev => prev.map(l => l.id === leadId ? freshLead : l))
+    const computed = computeDatePrices(freshLead, modalityId)
+    if (computed) setSections((s: any) => ({ ...s, single_space: { ...(s.single_space ?? {}), date_prices: computed } }))
   }
 
   const onLeadChange = (leadId: string) => {
@@ -505,6 +620,10 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       couple_email: lead?.email ?? f.couple_email,
       guest_count: lead?.guests ? String(lead.guests) : f.guest_count,
     }))
+    if (lead) {
+      const dp = computeDatePrices(lead, form.modality_id ?? null)
+      if (dp) setSections((s: any) => ({ ...s, single_space: { ...(s.single_space ?? {}), date_prices: dp } }))
+    }
   }
 
   const copyUrl = () => {
@@ -600,10 +719,37 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   }
   const removeOverrideItem = (key: string, i: number) => setOverride(key, ((sections as any)[key] ?? []).filter((_: any, idx: number) => idx !== i))
   const addOverrideItem = (key: string, template: any) => setOverride(key, [...((sections as any)[key] ?? []), template])
+  const moveOverrideItem = (key: string, i: number, dir: -1 | 1) => {
+    const arr = [...((sections as any)[key] ?? [])]
+    const j = i + dir
+    if (j < 0 || j >= arr.length) return
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    setOverride(key, arr)
+  }
 
   // ── Build preview patch — what the iframe sees as the live state
   const previewPatch = useMemo(() => {
     const cleanSections: SectionsData = { ...sections }
+    // Merge live included_zone_ids + selection_mode from venueSpaceGroups into space_groups
+    // so preview receives correct ITP config even for proposals created before this was stored
+    if (Array.isArray((cleanSections as any).space_groups) && venueSpaceGroups.length > 0) {
+      (cleanSections as any).space_groups = (cleanSections as any).space_groups.map((sg: any) => {
+        const vg = venueSpaceGroups.find(v => v.id === (sg.group_id ?? sg.id))
+        if (!vg) return sg
+        return {
+          ...sg,
+          selection_mode: vg.selection_mode,
+          pick_n_min: vg.pick_n_min,
+          pick_n_max: vg.pick_n_max,
+          included_zone_ids: vg.included_zone_ids,
+          pricing_mode: vg.pricing_mode ?? 'per_space',
+          spaces: Array.isArray(sg.spaces) ? sg.spaces.map((sp: any) => {
+            const vs = vg.spaces.find(s => s.id === (sp.zone_id ?? sp.id))
+            return vs ? { ...sp, zone_id: vs.id } : sp
+          }) : sg.spaces,
+        }
+      })
+    }
     return {
       couple_name: form.couple_name,
       personal_message: form.personal_message || null,
@@ -620,7 +766,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
         font_family: form.font_family,
       },
     }
-  }, [form, sections])
+  }, [form, sections, venueSpaceGroups])
 
   // ── Reusable styles
   const secLabel: React.CSSProperties = { fontSize: 11, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }
@@ -721,21 +867,148 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                   <label className="form-label">Nº invitados</label>
                   <input className="form-input" type="number" value={form.guest_count} onChange={e => setForm(f => ({ ...f, guest_count: e.target.value }))} placeholder="150" />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Fecha de boda</label>
-                  <button type="button" className="form-input" onClick={() => setShowDateModal(true)}
-                    style={{ textAlign: 'left', cursor: 'pointer', color: form.wedding_date ? 'var(--charcoal)' : 'var(--warm-gray)' }}>
-                    {(() => {
-                      const slotDates: string[] = (sections as any).date_slots?.[0]?.dates ?? []
-                      if (slotDates.length > 1) {
-                        return slotDates.map(d => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })).join(' · ')
-                      }
-                      return form.wedding_date
-                        ? new Date(form.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
-                        : 'Seleccionar fecha…'
-                    })()}
+              </div>
+
+              {/* Fechas propuestas (lead) */}
+              {(() => {
+                const lead = leads.find(l => l.id === form.lead_id)
+                if (!lead) return null
+                const flex = lead.date_flexibility || 'exact'
+                const fmtD = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+                type Chip = { label: string }
+                const chips: Chip[] = []
+                if (flex === 'exact' && lead.wedding_date)
+                  chips.push({ label: fmtD(lead.wedding_date) })
+                else if (flex === 'range' && lead.wedding_date)
+                  chips.push({ label: lead.wedding_date_to && lead.wedding_date_to !== lead.wedding_date ? `${fmtD(lead.wedding_date)} – ${fmtD(lead.wedding_date_to)}` : fmtD(lead.wedding_date) })
+                else if (flex === 'multi_range')
+                  (lead.wedding_date_ranges ?? []).filter((r: any) => r?.from).forEach((r: any) => chips.push({ label: r.to && r.to !== r.from ? `${fmtD(r.from)} – ${fmtD(r.to)}` : fmtD(r.from) }))
+                else if (flex === 'month' && lead.wedding_month)
+                  chips.push({ label: `${lead.wedding_month}${lead.wedding_year ? ' ' + lead.wedding_year : ''}` })
+                else if (flex === 'season' && lead.wedding_season)
+                  chips.push({ label: `${lead.wedding_season}${lead.wedding_year ? ' ' + lead.wedding_year : ''}` })
+                else if (lead.wedding_year)
+                  chips.push({ label: `Año ${lead.wedding_year}` })
+
+                const saveLeadDates = async () => {
+                  if (!leadDatesForm) return
+                  setSavingLeadDates(true)
+                  const supabase = createClient()
+                  const payload: any = {
+                    date_flexibility: leadDatesForm.date_flexibility,
+                    wedding_date: leadDatesForm.wedding_date || null,
+                    wedding_date_to: leadDatesForm.wedding_date_to || null,
+                    wedding_date_ranges: leadDatesForm.date_flexibility === 'multi_range' ? leadDatesForm.wedding_date_ranges : null,
+                    wedding_year: leadDatesForm.wedding_year || null,
+                    wedding_month: leadDatesForm.wedding_month || null,
+                    wedding_season: leadDatesForm.wedding_season || null,
+                  }
+                  await supabase.from('leads').update(payload).eq('id', lead.id)
+                  setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, ...payload } : l))
+                  setEditLeadDates(false)
+                  setSavingLeadDates(false)
+                }
+
+                const ldf = leadDatesForm ?? lead
+                const setLdf = (patch: any) => setLeadDatesForm((prev: any) => ({ ...(prev ?? lead), ...patch }))
+                const currentFlex = ldf.date_flexibility || 'exact'
+
+                return (
+                  <div className="form-group">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <label className="form-label" style={{ margin: 0, flex: 1 }}>Fechas propuestas</label>
+                      <button type="button" onClick={() => { if (!editLeadDates) setLeadDatesForm(lead); setEditLeadDates(v => !v) }}
+                        style={{ fontSize: 10, color: 'var(--warm-gray)', background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer' }}>
+                        {editLeadDates ? 'Cancelar' : '✎ Editar'}
+                      </button>
+                    </div>
+
+                    {!editLeadDates ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {chips.length ? chips.map((chip, ci) => (
+                          <span key={ci} style={{ fontSize: 12, padding: '5px 12px', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--charcoal)' }}>
+                            {chip.label}
+                          </span>
+                        )) : <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Sin fechas asignadas</span>}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                        <select className="form-input" style={{ fontSize: 12 }} value={currentFlex} onChange={e => setLdf({ date_flexibility: e.target.value, wedding_date: '', wedding_date_to: '', wedding_date_ranges: [{ from: '', to: '' }] })}>
+                          <option value="exact">Fecha exacta</option>
+                          <option value="range">Rango de fechas</option>
+                          <option value="multi_range">Varios rangos</option>
+                          <option value="month">Mes</option>
+                          <option value="season">Temporada</option>
+                          <option value="flexible">Flexible</option>
+                        </select>
+
+                        {currentFlex === 'exact' && (
+                          <DatePicker value={ldf.wedding_date ?? ''} onChange={v => setLdf({ wedding_date: v })} placeholder="Fecha" />
+                        )}
+                        {currentFlex === 'range' && (
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <DatePicker value={ldf.wedding_date ?? ''} onChange={v => setLdf({ wedding_date: v })} placeholder="Desde" />
+                            <DatePicker value={ldf.wedding_date_to ?? ''} onChange={v => setLdf({ wedding_date_to: v })} placeholder="Hasta" />
+                          </div>
+                        )}
+                        {currentFlex === 'multi_range' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {(ldf.wedding_date_ranges ?? [{ from: '', to: '' }]).map((r: any, ri: number) => (
+                              <div key={ri} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <DatePicker value={r.from ?? ''} onChange={v => { const next = [...(ldf.wedding_date_ranges ?? [])]; next[ri] = { ...next[ri], from: v }; setLdf({ wedding_date_ranges: next }) }} placeholder="Desde" />
+                                <DatePicker value={r.to ?? ''} onChange={v => { const next = [...(ldf.wedding_date_ranges ?? [])]; next[ri] = { ...next[ri], to: v }; setLdf({ wedding_date_ranges: next }) }} placeholder="Hasta" />
+                                <button type="button" style={removeBtn} onClick={() => setLdf({ wedding_date_ranges: (ldf.wedding_date_ranges ?? []).filter((_: any, j: number) => j !== ri) })}><X size={11} /></button>
+                              </div>
+                            ))}
+                            <button type="button" style={addBtn} onClick={() => setLdf({ wedding_date_ranges: [...(ldf.wedding_date_ranges ?? []), { from: '', to: '' }] })}>+ Añadir rango</button>
+                          </div>
+                        )}
+                        {(currentFlex === 'month' || currentFlex === 'season' || currentFlex === 'flexible') && (
+                          <input className="form-input" style={{ fontSize: 12 }} placeholder="Año (ej. 2026)" type="number" value={ldf.wedding_year ?? ''} onChange={e => setLdf({ wedding_year: e.target.value ? Number(e.target.value) : null })} />
+                        )}
+                        {currentFlex === 'month' && (
+                          <input className="form-input" style={{ fontSize: 12 }} placeholder="Mes (1-12)" type="number" min={1} max={12} value={ldf.wedding_month ?? ''} onChange={e => setLdf({ wedding_month: e.target.value ? Number(e.target.value) : null })} />
+                        )}
+                        {currentFlex === 'season' && (
+                          <select className="form-input" style={{ fontSize: 12 }} value={ldf.wedding_season ?? ''} onChange={e => setLdf({ wedding_season: e.target.value })}>
+                            <option value="">— Temporada —</option>
+                            <option value="spring">Primavera</option>
+                            <option value="summer">Verano</option>
+                            <option value="autumn">Otoño</option>
+                            <option value="winter">Invierno</option>
+                          </select>
+                        )}
+
+                        <button type="button" className="btn btn-primary btn-sm" onClick={saveLeadDates} disabled={savingLeadDates}>
+                          {savingLeadDates ? 'Guardando…' : 'Guardar fechas del lead'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* Fecha de boda confirmada */}
+              <div className="form-group">
+                <label className="form-label">Fecha de boda <span style={{ fontWeight: 400, color: 'var(--warm-gray)' }}>(opcional)</span></label>
+                <button type="button" className="form-input" onClick={() => setShowDateModal(true)}
+                  style={{ textAlign: 'left', cursor: 'pointer', color: form.wedding_date ? 'var(--charcoal)' : 'var(--warm-gray)' }}>
+                  {(() => {
+                    const slotDates: string[] = (sections as any).date_slots?.[0]?.dates ?? []
+                    if (slotDates.length > 1) {
+                      return slotDates.map(d => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })).join(' · ')
+                    }
+                    return form.wedding_date
+                      ? new Date(form.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+                      : 'Sin confirmar…'
+                  })()}
+                </button>
+                {form.wedding_date && (
+                  <button type="button" onClick={() => setForm(f => ({ ...f, wedding_date: '' }))}
+                    style={{ fontSize: 10, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', marginTop: 2, padding: 0 }}>
+                    × Quitar fecha confirmada
                   </button>
-                </div>
+                )}
               </div>
 
               {modalities.filter(m => m.is_active).length > 0 && (
@@ -1047,7 +1320,13 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               ? 'Ninguna activa'
               : activeSpaceIds.map(id => getSectionLabel(id, commercialConfig?.space_type as any, SECTION_LABELS[id] || id)).join(' · ')
             const renderSpaceGroupHeader = () => (
-              <div key="__sg_header" className="sec-row" style={{ background: 'rgba(196,151,90,0.06)' }}>
+              <div key="__sg_header" className="sec-row" style={{
+                background: 'rgba(196,151,90,0.06)',
+                marginBottom: isSpaceGroupOpen ? 0 : undefined,
+                borderBottomLeftRadius: isSpaceGroupOpen ? 0 : undefined,
+                borderBottomRightRadius: isSpaceGroupOpen ? 0 : undefined,
+                borderBottom: isSpaceGroupOpen ? 'none' : undefined,
+              }}>
                 <div className="sec-header"
                   onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('__space_group') ? n.delete('__space_group') : n.add('__space_group'); return n })}
                   style={{ cursor: 'pointer', alignItems: 'flex-start' }}>
@@ -1203,11 +1482,25 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                   const isOn = isSectionOn(secId)
                   const isOpen = openSecs.has(secId)
                   const overrideKey = `${secId}_override`
+                  const spaceSubIdx = isInSpaceGroup ? visibleSpaceSubs.indexOf(secId) : -1
+                  const isLastSpaceSub = isInSpaceGroup && spaceSubIdx === visibleSpaceSubs.length - 1
 
                   return (
                     <Fragment key={secId}>
                     {isInSpaceGroup && isFirstSpaceVisible && renderSpaceGroupHeader()}
-                    <div className="sec-row" style={{ opacity: isOn ? 1 : 0.55, ...(isInSpaceGroup ? { paddingLeft: 14, borderLeft: '2px solid rgba(196,151,90,0.25)', background: 'rgba(196,151,90,0.02)' } : {}) }}>
+                    <div
+                      className={isInSpaceGroup ? undefined : 'sec-row'}
+                      style={isInSpaceGroup ? {
+                        opacity: isOn ? 1 : 0.55,
+                        borderLeft: '1px solid var(--ivory)',
+                        borderRight: '1px solid var(--ivory)',
+                        borderBottom: isLastSpaceSub ? '1px solid var(--ivory)' : undefined,
+                        borderTop: spaceSubIdx > 0 ? '1px solid rgba(196,151,90,0.15)' : undefined,
+                        borderRadius: isLastSpaceSub ? '0 0 8px 8px' : 0,
+                        marginBottom: isLastSpaceSub ? 8 : 0,
+                        background: isOn ? '#fff' : '#faf9f7',
+                        overflow: 'hidden',
+                      } : { opacity: isOn ? 1 : 0.55 }}>
                       <div className="sec-header" onClick={() => setOpenSecs(s => { const n = new Set(s); n.has(secId) ? n.delete(secId) : n.add(secId); return n })}>
                         <div onClick={e => { e.stopPropagation(); toggleSec(secId, !isOn) }}
                           style={{ width: 34, height: 19, borderRadius: 10, background: isOn ? 'var(--gold)' : '#d1c9b8', position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0 }}>
@@ -1345,6 +1638,10 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Subtítulo</label>
+                                  <input className="form-input" placeholder="Ej. Vuestro espacio" value={ss.subtitle ?? ''} onChange={e => setSs({ subtitle: e.target.value })} />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
                                   <label className="form-label">Título</label>
                                   <input className="form-input" placeholder="Ej. El Salón Principal" value={ss.title ?? ''} onChange={e => setSs({ title: e.target.value })} />
                                 </div>
@@ -1358,14 +1655,36 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                     <input className="form-input" placeholder="500" value={ss.sqm ?? ''} onChange={e => setSs({ sqm: e.target.value })} />
                                   </div>
                                   <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
-                                    <label className="form-label">Capacidad máx.</label>
-                                    <input className="form-input" placeholder="200 invitados" value={ss.max_guests ?? ''} onChange={e => setSs({ max_guests: e.target.value })} />
+                                    <label className="form-label">Cap. mín.</label>
+                                    <input className="form-input" placeholder="50" value={ss.min_guests ?? ''} onChange={e => setSs({ min_guests: e.target.value })} />
+                                  </div>
+                                  <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                                    <label className="form-label">Cap. máx.</label>
+                                    <input className="form-input" placeholder="200" value={ss.max_guests ?? ''} onChange={e => setSs({ max_guests: e.target.value })} />
                                   </div>
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
-                                  <label className="form-label">Imagen del espacio (opcional)</label>
-                                  <input className="form-input" placeholder="https://..." value={ss.image_url ?? ''} onChange={e => setSs({ image_url: e.target.value })} />
-                                  <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4 }}>Si la dejas vacía, se usará la foto principal.</div>
+                                  <label className="form-label">Fotos del espacio</label>
+                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                    {[...(Array.isArray(ss.photos) ? ss.photos : []), ...(ss.image_url && !(ss.photos ?? []).includes(ss.image_url) ? [ss.image_url] : [])].map((url: string, pi: number) => (
+                                      <div key={pi} style={{ position: 'relative', width: 56, height: 56 }}>
+                                        <img src={url} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover' }} />
+                                        <button type="button" onClick={() => {
+                                          const allPhotos = [...(Array.isArray(ss.photos) ? ss.photos : []), ...(ss.image_url && !(ss.photos ?? []).includes(ss.image_url) ? [ss.image_url] : [])]
+                                          const next = allPhotos.filter((_: string, j: number) => j !== pi)
+                                          setSs({ photos: next, image_url: next[0] ?? '' })
+                                        }} style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                                      </div>
+                                    ))}
+                                    <ImageUploader label="+" height={48} onUpload={async (f) => {
+                                      const url = await uploadImage(f, 'spaces')
+                                      if (url) {
+                                        const allPhotos = [...(Array.isArray(ss.photos) ? ss.photos : []), ...(ss.image_url && !(ss.photos ?? []).includes(ss.image_url) ? [ss.image_url] : [])]
+                                        const next = [...allPhotos, url]
+                                        setSs({ photos: next, image_url: next[0] })
+                                      }
+                                    }} />
+                                  </div>
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                   <label className="form-label">Características destacadas</label>
@@ -1377,118 +1696,197 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                   ))}
                                   <button type="button" style={addBtn} onClick={() => setFeatures([...features, ''])}>+ Añadir característica</button>
                                 </div>
+                                {(() => {
+                                  const dp: any[] = (Array.isArray(ss.date_prices) ? [...ss.date_prices] : []).sort((a: any, b: any) => a.date_from.localeCompare(b.date_from))
+                                  const lead = leads.find(l => l.id === form.lead_id)
+                                  const canCompute = !!lead && !!form.modality_id
+                                  const fmtRange = (entry: any) => {
+                                    const fmt = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+                                    if (!entry.date_to || entry.date_to === entry.date_from) return fmt(entry.date_from)
+                                    const days = Math.round((new Date(entry.date_to + 'T12:00:00').getTime() - new Date(entry.date_from + 'T12:00:00').getTime()) / 86400000)
+                                    if (days === 1) return `${fmt(entry.date_from)} o ${fmt(entry.date_to)}`
+                                    return `${fmt(entry.date_from)} – ${fmt(entry.date_to)}`
+                                  }
+                                  if (!dp.length) return canCompute ? (
+                                    <button type="button" style={addBtn} onClick={() => recalculateWithFreshLead(form.lead_id!, form.modality_id ?? null)}>
+                                      ↻ Calcular precio por fechas del lead
+                                    </button>
+                                  ) : null
+                                  return (
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                        <label className="form-label" style={{ margin: 0, flex: 1 }}>Precio por fecha del lead</label>
+                                        {canCompute && <button type="button" onClick={() => recalculateWithFreshLead(form.lead_id!, form.modality_id ?? null)} style={{ fontSize: 9, color: 'var(--warm-gray)', background: 'none', border: '1px solid #d1d5db', borderRadius: 8, padding: '1px 6px', cursor: 'pointer' }}>↻ recalcular</button>}
+                                      </div>
+                                      {dp.map((entry: any, i: number) => (
+                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                          <span style={{ fontSize: 11, color: 'var(--charcoal)', flex: 1 }}>{fmtRange(entry)}</span>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <input type="number" className="form-input" placeholder="mín"
+                                              value={entry.price_min ?? ''}
+                                              onChange={e => setSs({ date_prices: dp.map((x: any, j: number) => j === i ? { ...x, price_min: e.target.value, overridden: true } : x) })}
+                                              style={{ width: 80, textAlign: 'right', fontSize: 12 }} />
+                                            {entry.price_max !== undefined && <>
+                                              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>–</span>
+                                              <input type="number" className="form-input" placeholder="máx"
+                                                value={entry.price_max ?? ''}
+                                                onChange={e => setSs({ date_prices: dp.map((x: any, j: number) => j === i ? { ...x, price_max: e.target.value, overridden: true } : x) })}
+                                                style={{ width: 80, textAlign: 'right', fontSize: 12 }} />
+                                            </>}
+                                            <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>€</span>
+                                          </div>
+                                          <span style={{ fontSize: 9, color: 'var(--warm-gray)', background: 'var(--cream)', padding: '1px 6px', borderRadius: 8, flexShrink: 0 }}>
+                                            {entry.overridden ? 'manual' : 'auto'}
+                                          </span>
+                                          <button type="button" style={removeBtn} onClick={() => setSs({ date_prices: dp.filter((_: any, j: number) => j !== i) })}><X size={11} /></button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )
+                                })()}
                               </div>
                             )
                           })()}
 
                           {/* ZONES */}
                           {secId === 'zones' && (
-                            <div>
-                              {(getOverride(overrideKey) ?? []).map((z: any, i: number) => {
-                                const caps = Array.isArray(z.capacities) ? z.capacities : []
-                                const updateCaps = (newCaps: any[]) => updateOverrideItem(overrideKey, i, 'capacities', newCaps)
-                                const photo = z.photos?.[0]
-                                const handleUpload = async (file: File) => {
-                                  if (!user) return
-                                  const supabase = createClient()
-                                  const path = `${user.id}/zones/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-                                  const { error } = await supabase.storage.from('proposal-assets').upload(path, file, { upsert: true })
-                                  if (error) return
-                                  const { data } = supabase.storage.from('proposal-assets').getPublicUrl(path)
-                                  updateOverrideItem(overrideKey, i, 'photos', [data.publicUrl])
-                                }
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {/* Section header */}
+                              {(() => {
+                                const zh: any = (sections as any).zones_header ?? {}
+                                const setZh = (patch: any) => setSections((s: any) => ({ ...s, zones_header: { ...((s as any).zones_header ?? {}), ...patch } }))
+                                const zhMode: 'single' | 'zones' = zh.mode ?? 'zones'
                                 return (
-                                  <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8, overflow: 'hidden', background: 'var(--surface)' }}>
-                                    <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
-                                      <ChevronDown size={12} style={{ color: 'var(--warm-gray)' }} />
-                                      <span style={{ flex: 1 }}>{z.name || <em style={{ color: 'var(--warm-gray)' }}>Nueva zona</em>}</span>
-                                      <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeOverrideItem(overrideKey, i) }}><X size={13} /></button>
-                                    </summary>
-                                    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                        <input className="form-input" placeholder="Nombre *" value={z.name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'name', e.target.value)} />
-                                        <input className="form-input" style={{ width: 80, flexShrink: 0 }} type="number" placeholder="m²" value={z.sqm ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'sqm', e.target.value ? Number(e.target.value) : undefined)} />
-                                      </div>
-                                      <input className="form-input" placeholder="Descripción breve" value={z.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
-                                      <input className="form-input"
-                                        placeholder={commercialConfig?.space_type === 'single_with_supplements' ? 'Suplemento (ej. +500€)' : 'Precio (opcional)'}
-                                        value={z.price ?? ''}
-                                        onChange={e => updateOverrideItem(overrideKey, i, 'price', e.target.value)} />
-
-                                      {/* Image upload */}
-                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                        <div style={{ width: 100, flexShrink: 0 }}>
-                                          <ImageUploader
-                                            compact
-                                            value={photo ?? null}
-                                            aspectRatio={4 / 3}
-                                            label="Foto"
-                                            alt={z.name ?? 'Zona'}
-                                            onUpload={handleUpload}
-                                            onRemove={() => updateOverrideItem(overrideKey, i, 'photos', [])}
-                                          />
-                                        </div>
-                                        <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Si no subes una, se usará una foto de la galería del venue.</div>
-                                      </div>
-
-                                      {/* Capacidades múltiples */}
-                                      <div style={{ background: 'var(--cream)', borderRadius: 6, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                        <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>Capacidades</div>
-                                        {caps.map((c: any, ci: number) => (
-                                          <div key={ci} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-                                            <div style={{ flex: 1 }}>
-                                              <Select value={c.type ?? 'other'} onValueChange={(v) => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, type: v } : x))}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                  <SelectItem value="ceremony">Ceremonia</SelectItem>
-                                                  <SelectItem value="cocktail">Coctel</SelectItem>
-                                                  <SelectItem value="banquet">Banquete</SelectItem>
-                                                  <SelectItem value="party">Fiesta</SelectItem>
-                                                  <SelectItem value="other">Otro</SelectItem>
-                                                </SelectContent>
-                                              </Select>
-                                            </div>
-                                            <input className="form-input" type="number" placeholder="pax" style={{ width: 80 }} value={c.count ?? ''}
-                                              onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, count: e.target.value ? Number(e.target.value) : undefined } : x))} />
-                                            <input className="form-input" placeholder="Etiqueta (opc.)" style={{ flex: 1 }} value={c.label ?? ''}
-                                              onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, label: e.target.value } : x))} />
-                                            <button type="button" style={{ ...removeBtn, width: 22, height: 22 }} onClick={() => updateCaps(caps.filter((_: any, j: number) => j !== ci))}><X size={11} /></button>
-                                          </div>
-                                        ))}
-                                        <button type="button" style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 0' }}
-                                          onClick={() => updateCaps([...caps, { type: 'banquet', count: undefined }])}>
-                                          + Añadir capacidad
+                                  <>
+                                    <input className="form-input" placeholder="Etiqueta sección (ej. Los espacios)" style={{ fontSize: 12 }} value={zh.label ?? ''} onChange={e => setZh({ label: e.target.value })} />
+                                    <input className="form-input" placeholder="Título sección (ej. Cada rincón, un escenario)" style={{ fontSize: 12 }} value={zh.title ?? ''} onChange={e => setZh({ title: e.target.value })} />
+                                    {/* Mode toggle */}
+                                    <div style={{ display: 'flex', gap: 4 }}>
+                                      {(['single', 'zones'] as const).map(m => (
+                                        <button key={m} type="button"
+                                          onClick={() => setZh({ mode: m })}
+                                          style={{ flex: 1, padding: '6px 0', fontSize: 11, fontWeight: 600, borderRadius: 6, border: `1px solid ${zhMode === m ? 'var(--gold)' : 'var(--border)'}`, background: zhMode === m ? '#fdf6ea' : '#fff', color: zhMode === m ? '#8a6020' : 'var(--warm-gray)', cursor: 'pointer' }}>
+                                          {m === 'single' ? 'Espacio único' : 'Con suplementos'}
                                         </button>
-                                      </div>
-
-                                      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: 'var(--charcoal)' }}>
-                                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                                          <Checkbox checked={!!z.climatized} onCheckedChange={(v) => updateOverrideItem(overrideKey, i, 'climatized', v === true)} />
-                                          Climatizado
-                                        </label>
-                                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                                          <Checkbox checked={!!z.plan_b} onCheckedChange={(v) => updateOverrideItem(overrideKey, i, 'plan_b', v === true)} />
-                                          Plan B (cubierto)
-                                        </label>
-                                        <div style={{ width: 170 }}>
-                                          <Select value={z.covered || '__none__'} onValueChange={(v) => updateOverrideItem(overrideKey, i, 'covered', v === '__none__' ? undefined : v)}>
-                                            <SelectTrigger><SelectValue placeholder="— tipo —" /></SelectTrigger>
-                                            <SelectContent>
-                                              <SelectItem value="__none__">— tipo —</SelectItem>
-                                              <SelectItem value="indoor">Interior</SelectItem>
-                                              <SelectItem value="outdoor">Exterior</SelectItem>
-                                              <SelectItem value="covered-outdoor">Exterior cubierto</SelectItem>
-                                            </SelectContent>
-                                          </Select>
-                                        </div>
-                                      </div>
-
-                                      <input className="form-input" placeholder="Notas adicionales (ej. *Opción haima +coste)" value={z.notes ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'notes', e.target.value)} />
+                                      ))}
                                     </div>
-                                  </details>
+                                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 2 }} />
+                                    {(getOverride(overrideKey) ?? []).map((z: any, i: number) => {
+                                      const caps = Array.isArray(z.capacities) ? z.capacities : []
+                                      const updateCaps = (newCaps: any[]) => updateOverrideItem(overrideKey, i, 'capacities', newCaps)
+                                      const feats: string[] = Array.isArray(z.features) ? z.features : []
+                                      return (
+                                        <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8, overflow: 'hidden', background: 'var(--surface)' }}>
+                                          <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
+                                            <ChevronDown size={12} style={{ color: 'var(--warm-gray)' }} />
+                                            <span style={{ flex: 1 }}>{z.name || <em style={{ color: 'var(--warm-gray)' }}>Nueva zona</em>}</span>
+                                            <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); moveOverrideItem(overrideKey, i, -1) }} title="Subir" disabled={i === 0}>▲</button>
+                                            <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); moveOverrideItem(overrideKey, i, 1) }} title="Bajar" disabled={i === (getOverride(overrideKey) ?? []).length - 1}>▼</button>
+                                            <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeOverrideItem(overrideKey, i) }}><X size={13} /></button>
+                                          </summary>
+                                          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                            <input className="form-input" placeholder="Subtítulo zona (ej. Espacio 01)" style={{ fontSize: 12 }} value={z.subtitle ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'subtitle', e.target.value)} />
+                                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                              <input className="form-input" placeholder="Nombre *" value={z.name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'name', e.target.value)} />
+                                              <input className="form-input" style={{ width: 80, flexShrink: 0 }} type="number" placeholder="m²" value={z.sqm ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'sqm', e.target.value ? Number(e.target.value) : undefined)} />
+                                            </div>
+                                            <input className="form-input" placeholder="Descripción breve" value={z.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
+                                            {/* Supplement/price — only when mode is 'zones' */}
+                                            {zhMode === 'zones' && (
+                                              <input className="form-input"
+                                                placeholder={commercialConfig?.space_type === 'single_with_supplements' ? 'Suplemento (ej. +500€)' : 'Precio/suplemento (opcional)'}
+                                                value={z.price ?? ''}
+                                                onChange={e => updateOverrideItem(overrideKey, i, 'price', e.target.value)} />
+                                            )}
+                                            {/* Multi-photo upload */}
+                                            <div>
+                                              <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Fotos de la zona</div>
+                                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                                {(z.photos ?? []).map((url: string, pi: number) => (
+                                                  <div key={pi} style={{ position: 'relative', width: 56, height: 56 }}>
+                                                    <img src={url} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover' }} />
+                                                    <button type="button" onClick={() => { const next = [...(z.photos ?? [])]; next.splice(pi, 1); updateOverrideItem(overrideKey, i, 'photos', next) }}
+                                                      style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                                                  </div>
+                                                ))}
+                                                <ImageUploader label="+" height={48} onUpload={async (f) => { const url = await uploadImage(f, 'zones'); if (url) updateOverrideItem(overrideKey, i, 'photos', [...(z.photos ?? []), url]) }} />
+                                              </div>
+                                              <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4 }}>Sin foto: se usará una de la galería del venue.</div>
+                                            </div>
+                                            {/* Capacidades */}
+                                            <div style={{ background: 'var(--cream)', borderRadius: 6, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                              <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>Capacidades</div>
+                                              {caps.map((c: any, ci: number) => (
+                                                <div key={ci} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                                                  <div style={{ flex: 1 }}>
+                                                    <Select value={c.type ?? 'other'} onValueChange={(v) => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, type: v } : x))}>
+                                                      <SelectTrigger><SelectValue /></SelectTrigger>
+                                                      <SelectContent>
+                                                        <SelectItem value="ceremony">Ceremonia</SelectItem>
+                                                        <SelectItem value="cocktail">Coctel</SelectItem>
+                                                        <SelectItem value="banquet">Banquete</SelectItem>
+                                                        <SelectItem value="party">Fiesta</SelectItem>
+                                                        <SelectItem value="other">Otro</SelectItem>
+                                                      </SelectContent>
+                                                    </Select>
+                                                  </div>
+                                                  <input className="form-input" type="number" placeholder="pax" style={{ width: 80 }} value={c.count ?? ''}
+                                                    onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, count: e.target.value ? Number(e.target.value) : undefined } : x))} />
+                                                  <input className="form-input" placeholder="Etiqueta (opc.)" style={{ flex: 1 }} value={c.label ?? ''}
+                                                    onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, label: e.target.value } : x))} />
+                                                  <button type="button" style={{ ...removeBtn, width: 22, height: 22 }} onClick={() => updateCaps(caps.filter((_: any, j: number) => j !== ci))}><X size={11} /></button>
+                                                </div>
+                                              ))}
+                                              <button type="button" style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 0' }}
+                                                onClick={() => updateCaps([...caps, { type: 'banquet', count: undefined }])}>
+                                                + Añadir capacidad
+                                              </button>
+                                            </div>
+                                            {/* Tipo + características libres */}
+                                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                              <div style={{ flex: 1 }}>
+                                                <Select value={z.covered || '__none__'} onValueChange={(v) => updateOverrideItem(overrideKey, i, 'covered', v === '__none__' ? undefined : v)}>
+                                                  <SelectTrigger><SelectValue placeholder="— tipo —" /></SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="__none__">— tipo —</SelectItem>
+                                                    <SelectItem value="indoor">Interior</SelectItem>
+                                                    <SelectItem value="outdoor">Exterior</SelectItem>
+                                                    <SelectItem value="covered-outdoor">Exterior cubierto</SelectItem>
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+                                            </div>
+                                            {/* Features — free text chips */}
+                                            <div style={{ background: 'var(--cream)', borderRadius: 6, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                              <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>Características</div>
+                                              {feats.length > 0 && (
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                                  {feats.map((f: string, fi: number) => (
+                                                    <span key={fi} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#fdf6ea', border: '1px solid var(--gold)', color: '#8a6020' }}>
+                                                      {f}
+                                                      <button type="button" onClick={() => updateOverrideItem(overrideKey, i, 'features', feats.filter((_: string, j: number) => j !== fi))}
+                                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, lineHeight: 1, fontSize: 12 }}>×</button>
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              )}
+                                              <input className="form-input" style={{ fontSize: 12 }} placeholder="Añadir característica (Enter)" onKeyDown={e => {
+                                                if (e.key === 'Enter' || e.key === ',') {
+                                                  e.preventDefault()
+                                                  const val = (e.target as HTMLInputElement).value.trim().replace(/,$/, '')
+                                                  if (val) { updateOverrideItem(overrideKey, i, 'features', [...feats, val]);(e.target as HTMLInputElement).value = '' }
+                                                }
+                                              }} />
+                                            </div>
+                                            <input className="form-input" placeholder="Notas adicionales (ej. *Opción haima +coste)" value={z.notes ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'notes', e.target.value)} />
+                                          </div>
+                                        </details>
+                                      )
+                                    })}
+                                    <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { name: '', description: '', capacities: [] })}>+ Añadir zona</button>
+                                  </>
                                 )
-                              })}
-                              <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { name: '', description: '', capacities: [] })}>+ Añadir zona</button>
+                              })()}
                             </div>
                           )}
 
@@ -1914,7 +2312,18 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
 
       {/* ── RIGHT PANEL: preview ──────────────────────────────────── */}
       <div style={{ flex: 1, minWidth: 0, height: '100vh' }}>
-        <ProposalPreview slug={proposal.slug} patch={previewPatch} />
+        <ProposalPreview slug={proposal.slug} patch={previewPatch} onReload={() => {
+          if (!commercialConfig) return
+          const defaults = getDefaultSections(commercialConfig)
+          const SPACE_KEYS = ['single_space', 'zones', 'space_groups', 'venue_rental', 'extra_services'] as const
+          setSections(prev => ({
+            ...prev,
+            sections_enabled: {
+              ...(prev.sections_enabled ?? {}),
+              ...Object.fromEntries(SPACE_KEYS.map(k => [k, defaults[k as keyof typeof defaults]])),
+            },
+          }))
+        }} />
       </div>
 
       {/* ── Date picker modal ── */}

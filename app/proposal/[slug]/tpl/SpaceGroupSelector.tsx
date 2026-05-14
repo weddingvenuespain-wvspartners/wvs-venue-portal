@@ -29,8 +29,12 @@ type ZoneModalState = {
 type PriceTier = { label: string; max_guests?: number; price: string }
 
 function fmtEur(price: string) {
-  const n = parseFloat(price)
-  return isNaN(n) ? price : `${n.toLocaleString('es-ES')}€`
+  const trimmed = price.trim()
+  const isSupp = trimmed.startsWith('+')
+  const raw = isSupp ? trimmed.slice(1) : trimmed
+  const n = parseFloat(raw.replace('€', ''))
+  if (isNaN(n)) return trimmed
+  return `${isSupp ? '+' : ''}${n.toLocaleString('es-ES')}€`
 }
 
 function resolvePrice(
@@ -49,8 +53,8 @@ function resolvePrice(
     return null // tiers_table: rendered separately
   }
   if (!space.price) return null
-  if (pricingMode === 'group_base') { const t = space.price.trim(); return t.startsWith('+') ? t : `+${t}` }
-  return space.price
+  if (pricingMode === 'group_base') { const t = space.price.trim(); return fmtEur(t.startsWith('+') ? t : `+${t}`) }
+  return fmtEur(space.price)
 }
 
 function capacityOk(space: { capacity_min?: number; capacity_max?: number }, guests?: number): boolean {

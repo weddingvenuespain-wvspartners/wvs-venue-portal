@@ -11,10 +11,10 @@ import {
   FloatingWhatsApp, AvailabilityBanner, Gallery,
   IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating,
   resolveContact, VenueRentalGrid,
-  formatZoneCapacities, formatZoneFeatures,
+  formatZoneCapacities, formatZoneFeatures, formatZonePrice,
   TplVenueSpecs, TplSingleSpace,
   TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant,
-  replacePlaceholders,
+  replacePlaceholders, ZoneSlider,
 } from './shared'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { WeddingProposal } from './WeddingProposal'
@@ -428,7 +428,7 @@ function EmptySec({ label }: { label: string }) {
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 export default function T5Minimalista({ data }: { data: ProposalData }) {
-  const { sec, on, hasCatering, packagesShow, inclusionsShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, seasonsShow, testsShow, collabsShow, extrasShow, accom, spaceGroups, techspecs, dateSlots } = extractData(data)
+  const { sec, on, hasCatering, packagesShow, inclusionsShow, expShow, faqShow, menuShow, menusStructured, menuExtras, appetizersBase, zonesShow, zonesMode, seasonsShow, testsShow, collabsShow, extrasShow, accom, spaceGroups, techspecs, dateSlots } = extractData(data)
   const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
   const guests = data.guest_count ? Number(data.guest_count) : undefined
   const visibleSpaceGroups = (spaceGroups ?? []).filter(g => {
@@ -459,6 +459,8 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
   const [visitDone,      setVisitDone]      = useState(false)
   const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
   const [selectedExtraSvcs, setSelectedExtraSvcs] = useState<Record<string, boolean>>({})
+  const [selectedZoneSupplements, setSelectedZoneSupplements] = useState<Record<number, boolean>>({})
+  const [selectedMenus, setSelectedMenus] = useState<string[]>([])
   const [scrolled, setScrolled]     = useState(false)
   const [progress, setProgress]     = useState(0)
 
@@ -599,7 +601,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       )}
 
       {/* ── DATE SELECTOR ── */}
-      {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+      {on('date_slots') && dateSlots && dateSlots.length > 0 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
         <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
       )}
 
@@ -698,7 +700,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       )}
 
       {/* SINGLE SPACE */}
-      {on('single_space') && !(spaceGroups?.length) && (
+      {on('single_space') && (
         <TplSingleSpace
           data={(sec as any).single_space}
           fallbackImage={heroPhoto}
@@ -711,28 +713,31 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       )}
 
       {/* ZONES */}
-      {on('zones') && !(spaceGroups?.length) && (zonesShow.length > 0 ? (
+      {on('zones') && (zonesShow.length > 0 ? (
         <section style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
-              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Los espacios</p>
-              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 48 }}>Cada rincón del venue</h2>
+              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>{(sec as any).zones_header?.label || 'Los espacios'}</p>
+              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 48 }}>{(sec as any).zones_header?.title || 'Cada rincón del venue'}</h2>
             </FadeUp>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 1, background: LINE, border: `1px solid ${LINE}` }}>
               {zonesShow.map((z: any, i: number) => {
-                const zPhoto = z.photos?.[0] || photos[i + 2]
+                const zPhotos: string[] = z.photos?.length ? z.photos : (photos[i + 2] ? [photos[i + 2]] : [])
                 const caps = formatZoneCapacities(z)
                 const feats = formatZoneFeatures(z)
+                const hasSuppl = zonesMode === 'zones' && !!z.price
+                const suppSel = !!selectedZoneSupplements[i]
                 return (
                   <FadeUp key={i} delay={(i % 3) * .06}>
-                    <div style={{ background: WHITE, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <div style={{ background: WHITE, display: 'flex', flexDirection: 'column', height: '100%', outline: hasSuppl && suppSel ? `2px solid ${primary}` : undefined, outlineOffset: -1 }}>
                       <div style={{ position: 'relative', aspectRatio: '4/3', overflow: 'hidden', background: GRAY }}>
-                        {zPhoto
-                          ? <img src={zPhoto} alt={z.name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                        {zPhotos.length > 0
+                          ? <ZoneSlider photos={zPhotos} name={z.name} />
                           : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED }}><IcoBuilding width={40} height={40} /></div>
                         }
                       </div>
                       <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                        {z.subtitle && <div style={{ fontSize: '.6rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 4 }}>{z.subtitle}</div>}
                         <h3 style={{ fontFamily: font, fontSize: 20, color: INK }}>{z.name}</h3>
                         {z.description && <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.65 }}>{z.description}</p>}
                         {caps.length > 0 && (
@@ -748,7 +753,12 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
                           </div>
                         )}
                         {z.notes && <div style={{ fontSize: 11.5, color: MUTED, fontStyle: 'italic', marginTop: 4 }}>{z.notes}</div>}
-                        {z.price && <div style={{ fontFamily: font, fontSize: 16, color: primary, marginTop: 4 }}>{z.price}</div>}
+                        {hasSuppl && (
+                          <button type="button" onClick={() => setSelectedZoneSupplements(p => ({ ...p, [i]: !p[i] }))}
+                            style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 16px', border: `1.5px solid ${suppSel ? primary : LINE}`, background: suppSel ? primary : 'transparent', color: suppSel ? (isDark(primary) ? '#fff' : '#111') : INK, fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all .2s' }}>
+                            {suppSel ? '✓ Añadido' : '+ Añadir'} · {formatZonePrice(z.price)}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </FadeUp>
@@ -760,8 +770,22 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       ) : _preview ? <EmptySec label="Espacios" /> : null)}
 
       {/* SPACE GROUPS */}
-      {visibleSpaceGroups.length > 0 && (
-        <section style={{ background: '#fff', padding: '40px 0' }}>
+      {on('space_groups') && visibleSpaceGroups.length > 0 && (
+        <section id="sec-space-groups" style={{ background: '#fff', padding: '40px 0' }}>
+          {on('date_slots') && dateSlots && dateSlots.length > 0 && (
+            <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
+          )}
+          {on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 && (
+            <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 56px 60px' }}>
+              <FadeUp>
+                <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>{sec.venue_rental.title || 'Tarifas de alquiler'}</p>
+                <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Elegid vuestra fecha</h2>
+              </FadeUp>
+              <FadeUp delay={.1}>
+                <VenueRentalGrid data={sec.venue_rental} primary={primary} />
+              </FadeUp>
+            </div>
+          )}
           <SpaceGroupSelector
             groups={visibleSpaceGroups}
             primary={primary}
@@ -907,8 +931,8 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         </section>
       ) : _preview ? <EmptySec label="Paquetes" /> : null)}
 
-      {/* VENUE RENTAL — grid temporada × día */}
-      {on('venue_rental') && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
+      {/* VENUE RENTAL — grid temporada × día — standalone only when space_groups not active */}
+      {on('venue_rental') && !(on('space_groups') && visibleSpaceGroups.length > 0) && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
         <section style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
@@ -992,6 +1016,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
           legacyMenus={menuShow}
           primary={primary}
           onPrimary={darkPri ? '#fff' : '#111'}
+          onMenusChange={setSelectedMenus}
         />
       )}
 
@@ -1232,7 +1257,11 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
           coupleName={data.couple_name}
           primaryColor={primary}
           selectedSpaces={selectedSpaces}
-          selectedExtraSvcs={Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k)}
+          selectedMenus={selectedMenus}
+          selectedExtraSvcs={[
+            ...Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k),
+            ...zonesShow.filter((z: any, i: number) => zonesMode === 'zones' && z.price && selectedZoneSupplements[i]).map((z: any) => `${z.name} (${formatZonePrice(z.price)})`),
+          ]}
           spaceGroups={visibleSpaceGroups.length > 0 ? visibleSpaceGroups : undefined}
           dateSlots={dateSlots ?? []}
           preSelectedDateSlot={selectedDateSlotIdx}
