@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Check, Building2, UtensilsCrossed } from 'lucide-react'
+import { Check, Building2, CalendarHeart, UtensilsCrossed } from 'lucide-react'
 import { Suspense } from 'react'
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
@@ -68,8 +68,9 @@ function Stars({ count = 50 }: { count?: number }) {
 type AccountType = 'venue_owner' | 'wedding_planner' | 'catering'
 
 const ACCOUNT_TYPES: { type: AccountType; label: string; sub: string; icon: React.ReactNode }[] = [
-  { type: 'venue_owner', label: 'Venue / Finca', sub: 'Gestionas bodas en tu espacio',       icon: <Building2 size={20} /> },
-  { type: 'catering',    label: 'Catering',      sub: 'Ofreces servicio de comida y bebida', icon: <UtensilsCrossed size={20} /> },
+  { type: 'venue_owner',     label: 'Venue / Finca',   sub: 'Gestionas bodas en tu espacio',       icon: <Building2 size={20} /> },
+  { type: 'wedding_planner', label: 'Wedding Planner', sub: 'Organizas bodas para tus clientes',   icon: <CalendarHeart size={20} /> },
+  { type: 'catering',        label: 'Catering',        sub: 'Ofreces servicio de comida y bebida', icon: <UtensilsCrossed size={20} /> },
 ]
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -281,7 +282,7 @@ function SignupPageInner() {
                 <div style={{ fontSize: 11, color: '#8899AA', marginBottom: 8, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                   Tipo de cuenta
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                   {ACCOUNT_TYPES.map(({ type, label, icon }) => (
                     <button
                       key={type}
