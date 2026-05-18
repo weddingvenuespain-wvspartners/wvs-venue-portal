@@ -7,6 +7,10 @@ import { Toaster } from '@/components/ui/toaster'
 export const metadata: Metadata = {
   title: 'FOREVENTOS',
   description: 'Portal de gestión para venues de FOREVENTOS',
+  icons: {
+    icon: '/foreventos-assets/favicon.png',
+    apple: '/foreventos-assets/favicon.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
