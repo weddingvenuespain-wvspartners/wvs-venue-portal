@@ -184,7 +184,7 @@ export default function Sidebar() {
   const isActive = (href: string) =>
     pathname === href || (href !== '/dashboard' && href !== '/wp' && href !== '/catering' && pathname.startsWith(href))
 
-  const roleLabel = isAdmin ? 'Administrador WVS'
+  const roleLabel = isAdmin ? 'Administrador FOREVENTOS'
     : isPlanner ? 'Wedding Planner'
     : isCatering ? 'Catering'
     : 'Venue Owner'
@@ -199,7 +199,7 @@ export default function Sidebar() {
   return (
     <div className="sidebar">
       <div className="sidebar-logo">
-        <span className="brand">Wedding Venues Spain</span>
+        <img src="/foreventos-assets/LOGOMENUFONDOAZUL.png" alt="FOREVENTOS" style={{ height: 28, width: 'auto', display: 'block', marginBottom: 4 }} />
         <span className="venue-name">{portalLabel}</span>
 
         {/* Venue switcher — only for venue owners with an active venue */}
@@ -216,7 +216,7 @@ export default function Sidebar() {
             >
               <span style={{
                 width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-                background: 'var(--gold)', display: 'flex', alignItems: 'center',
+                background: 'var(--fe-primary)', display: 'flex', alignItems: 'center',
                 justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff',
                 letterSpacing: '-0.01em',
               }}>
@@ -240,7 +240,7 @@ export default function Sidebar() {
             {venueOpen && (
               <div style={{
                 position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0,
-                background: '#1e1a17', border: '1px solid rgba(255,255,255,0.12)',
+                background: '#0D1B2A', border: '1px solid rgba(255,255,255,0.10)',
                 borderRadius: 8, overflow: 'hidden', zIndex: 50,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
               }}>
@@ -255,9 +255,9 @@ export default function Sidebar() {
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 8,
                       padding: '9px 12px', background: 'none', border: 'none',
-                      color: v.id === activeVenue.id ? 'var(--gold)' : 'rgba(255,255,255,0.8)',
+                      color: v.id === activeVenue.id ? 'var(--fe-accent)' : 'rgba(255,255,255,0.8)',
                       fontSize: 12, fontWeight: v.id === activeVenue.id ? 600 : 400,
-                      cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left',
+                      cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left',
                     }}
                   >
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -318,7 +318,7 @@ export default function Sidebar() {
                 {item.href === '/wp' && newClientsCount > 0 && (
                   <span style={{
                     marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
-                    background: 'var(--gold)', color: '#fff',
+                    background: 'var(--fe-primary)', color: '#fff',
                     fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: '0 5px',
                   }}>
@@ -454,23 +454,23 @@ export default function Sidebar() {
         )}
 
         {isVenueOwner && !features.loading && features.isTrial && !features.isTrialExpired && (
-          <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)', textDecoration: 'none' }}>
-            <Hourglass size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+          <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(46,109,180,0.08)', border: '1px solid rgba(46,109,180,0.25)', textDecoration: 'none' }}>
+            <Hourglass size={11} style={{ color: 'var(--fe-accent)', flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.04em' }}>TRIAL</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fe-accent)', letterSpacing: '0.04em' }}>TRIAL</div>
               {features.trialDaysLeft !== null && (
-                <div style={{ fontSize: 10, color: features.trialDaysLeft <= 3 ? '#fca5a5' : 'var(--stone)' }}>
+                <div style={{ fontSize: 10, color: features.trialDaysLeft <= 3 ? '#fca5a5' : 'var(--fe-text-dim)' }}>
                   {features.trialDaysLeft} días restantes
                 </div>
               )}
             </div>
-            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--gold)', whiteSpace: 'nowrap' }}>Activar →</span>
+            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--fe-accent)', whiteSpace: 'nowrap' }}>Activar →</span>
           </Link>
         )}
 
         {isVenueOwner && !features.loading && !features.isTrial && !features.isTrialExpired && features.hasPlan && features.planTier === 'basic' && (
-          <Link href="/pricing" style={{ display: 'block', marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)', textDecoration: 'none' }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 4 }}>PASA A PREMIUM</div>
+          <Link href="/pricing" style={{ display: 'block', marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(46,109,180,0.08)', border: '1px solid rgba(46,109,180,0.25)', textDecoration: 'none' }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fe-accent)', letterSpacing: '0.08em', marginBottom: 4 }}>PASA A PREMIUM</div>
             <div style={{ fontSize: 11, color: 'var(--stone)', lineHeight: 1.5 }}>Propuestas, exportar leads y más.</div>
           </Link>
         )}
@@ -494,7 +494,7 @@ export default function Sidebar() {
             <div className="avatar">{initials}</div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{
-                color: pathname === '/perfil' ? 'var(--gold)' : '#fff',
+                color: pathname === '/perfil' ? 'var(--fe-accent)' : '#fff',
                 fontSize: 12, fontWeight: 400,
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
               }}>
@@ -519,17 +519,17 @@ export default function Sidebar() {
           {userMenuOpen && (
             <div style={{
               position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: 0,
-              background: '#1e1a17', border: '1px solid rgba(255,255,255,0.12)',
+              background: '#0D1B2A', border: '1px solid rgba(255,255,255,0.10)',
               borderRadius: 8, overflow: 'hidden', zIndex: 50,
               boxShadow: '0 -8px 24px rgba(0,0,0,0.4)',
             }}>
               <button onMouseDown={() => { setUserMenuOpen(false); router.push('/perfil') }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', fontSize: 12, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left' }}>
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left' }}>
                 Mi perfil
               </button>
               <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '0 10px' }} />
               <button onMouseDown={() => { setUserMenuOpen(false); handleLogout() }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'none', border: 'none', color: '#f87171', fontSize: 12, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left' }}>
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'none', border: 'none', color: '#f87171', fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left' }}>
                 Cerrar sesión
               </button>
             </div>
