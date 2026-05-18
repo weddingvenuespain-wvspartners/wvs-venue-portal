@@ -100,7 +100,7 @@ export default function GuiasPage() {
                 <HelpCircle size={24} style={{ color: 'var(--gold)' }} />
               </div>
             </div>
-            <div style={{ fontFamily: 'Manrope,sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--espresso)', marginBottom: 6 }}>
+            <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--espresso)', marginBottom: 6 }}>
               ¿En qué podemos ayudarte?
             </div>
             <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 20 }}>
@@ -139,7 +139,7 @@ export default function GuiasPage() {
           <div className="card" style={{ padding: '20px 24px', marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <BookOpen size={16} style={{ color: 'var(--gold)' }} />
-              <div style={{ fontFamily: 'Manrope,sans-serif', fontSize: 15, fontWeight: 700, color: 'var(--espresso)' }}>Preguntas frecuentes</div>
+              <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 15, fontWeight: 700, color: 'var(--espresso)' }}>Preguntas frecuentes</div>
             </div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 20 }}>
               {search ? `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''} para "${search}"` : `${FAQS.length} preguntas`}
@@ -155,7 +155,7 @@ export default function GuiasPage() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
                 <CheckCircle size={15} style={{ color: '#16a34a' }} />
-                <span style={{ fontFamily: 'Manrope,sans-serif', fontSize: 14, fontWeight: 700, color: '#15803d' }}>¿Necesitas más ayuda?</span>
+                <span style={{ fontFamily: 'Inter,sans-serif', fontSize: 14, fontWeight: 700, color: '#15803d' }}>¿Necesitas más ayuda?</span>
               </div>
               <div style={{ fontSize: 12.5, color: '#166534', lineHeight: 1.5 }}>El equipo responde en menos de 24 horas en días laborables.</div>
             </div>
