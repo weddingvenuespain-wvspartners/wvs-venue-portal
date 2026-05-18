@@ -54,7 +54,7 @@ const SOURCE_LABEL: Record<string, string> = {
   web: 'Web', whatsapp: 'WhatsApp', instagram: 'Instagram',
   email: 'Email', referral: 'Referido', manual: 'Manual', other: 'Otro',
   wedding_planner: 'Planner',
-  wedding_venues_spain: 'FOREVENTOS',
+  wedding_venues_spain: 'Wedding Venues Spain',
   bodas_net: 'Bodas.net',
 }
 const BUDGET_LABEL: Record<string, string> = {
@@ -1222,26 +1222,6 @@ function LeadsPageInner() {
       <Sidebar />
       <div className="main-layout">
 
-        {/* Botón volver al calendario (cuando se llega desde ?open=id&returnDate=date) */}
-        {returnToCalendarDate && (
-          <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 900 }}>
-            <button
-              onClick={() => { setReturnToCalendarDate(null); router.push(`/calendario?openDate=${returnToCalendarDate}`) }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '10px 18px', borderRadius: 30,
-                background: 'var(--espresso)', color: '#fff',
-                border: 'none', cursor: 'pointer',
-                fontSize: 13, fontWeight: 600,
-                fontFamily: 'Inter, sans-serif',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-              }}
-            >
-              ← Volver al calendario
-            </button>
-          </div>
-        )}
-
         {/* Topbar */}
         <div className="topbar">
           <div className="topbar-title">Leads</div>
@@ -1540,6 +1520,7 @@ function LeadsPageInner() {
         <LeadFormModal form={form} setForm={setForm} isEdit={!!editLead} editLead={editLead}
           saving={saving} onSubmit={handleSubmit} userId={user!.id} venueId={activeVenue!.id}
           onClose={() => { setShowForm(false); setEditLead(null) }}
+          onReturnToCalendar={returnToCalendarDate ? () => { setReturnToCalendarDate(null); router.push(`/calendario?openDate=${returnToCalendarDate}`) } : undefined}
           onEditVisit={() => {
             if (!editLead) return
             setReturnToEditAfterVisit(true)
@@ -3890,7 +3871,7 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
           </div>
 
           {/* Actions row */}
-          <div style={{ padding: '7px 14px 10px', background: 'var(--cream)', borderTop: '1px solid var(--ivory)' }}>
+          <div style={{ padding: '7px 14px 10px', background: 'var(--cream)', borderTop: '1px solid var(--ivory)', borderRadius: '0 0 13px 13px' }}>
             <QuickActions lead={lead} tab={tab} onMove={onMove} onEdit={onEdit} onDelete={onDelete} onDateConfirm={onDateConfirm} onPdfDigital={onPdfDigital} />
           </div>
         </div>
@@ -5852,13 +5833,14 @@ function LanguagePicker({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 // ── Form Modal ─────────────────────────────────────────────────────────────────
-function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onClose, userId, venueId, onEditVisit, onDeleteVisit, onChangeDates, onChangeBudgetDates }: {
+function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onClose, userId, venueId, onEditVisit, onDeleteVisit, onChangeDates, onChangeBudgetDates, onReturnToCalendar }: {
   form: any; setForm: (f: any) => void; isEdit: boolean; editLead?: any | null
   saving: boolean; onSubmit: () => void; onClose: () => void; userId: string; venueId: string
   onEditVisit?: () => void
   onDeleteVisit?: () => void
   onChangeDates?: () => void
   onChangeBudgetDates?: () => void
+  onReturnToCalendar?: () => void
 }) {
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
   const setOrig = (k: string, v: any) => setForm((f: any) => ({ ...f, [`original_${k}`]: v }))
@@ -5953,13 +5935,23 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
 
         {/* Header — gradient with avatar */}
         <div style={{ position: 'relative', padding: '20px 24px 18px', background: 'linear-gradient(135deg, #fef3c7 0%, #fdf6ee 100%)', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
-          <button
-            onClick={onClose}
-            aria-label="Cerrar"
-            style={{ position: 'absolute', top: 14, right: 14, width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.75)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--espresso)' }}
-          >
-            <X size={16} />
-          </button>
+          <div style={{ position: 'absolute', top: 14, right: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {onReturnToCalendar && (
+              <button
+                onClick={onReturnToCalendar}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(0,0,0,0.12)', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Inter, sans-serif' }}
+              >
+                ← Calendario
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              aria-label="Cerrar"
+              style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.75)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--espresso)' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 48, height: 48, borderRadius: '50%', background: isEdit ? 'var(--gold)' : '#fff', color: isEdit ? '#fff' : 'var(--gold)', border: isEdit ? 'none' : '2px dashed var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, fontFamily: 'Inter, sans-serif', flexShrink: 0, boxShadow: isEdit ? '0 4px 14px rgba(212,160,60,0.4)' : 'none' }}>
               {isEdit ? initials : <Plus size={20} />}

@@ -199,7 +199,7 @@ export default function Sidebar() {
   return (
     <div className="sidebar">
       <div className="sidebar-logo">
-        <img src="/foreventos-assets/LOGOMENUFONDOAZUL.png" alt="FOREVENTOS" style={{ height: 28, width: 'auto', display: 'block', marginBottom: 4 }} />
+        <img src="/foreventos-assets/logo-dark-bg.png" alt="FOREVENTOS" style={{ height: 44, maxWidth: '100%', width: 'auto', display: 'block', marginBottom: 6 }} />
         <span className="venue-name">{portalLabel}</span>
 
         {/* Venue switcher — only for venue owners with an active venue */}

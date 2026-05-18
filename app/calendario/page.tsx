@@ -111,6 +111,11 @@ const LEAD_STATUS: Record<string, { label: string; color: string }> = {
 const BUDGET_LABEL: Record<string, string> = {
   sin_definir: 'Sin definir', menos_5k: '< 5.000 €', '5k_10k': '5.000–10.000 €',
   '10k_20k': '10.000–20.000 €', '20k_40k': '20.000–40.000 €', mas_40k: '> 40.000 €',
+  // WVS ranges
+  menos_20k: '< 20.000 €', '20k_35k': '20.000–35.000 €',
+  wvs_menos_20k: '< 20.000 €', wvs_20k_35k: '20.000–35.000 €',
+  wvs_35k_40k: '35.000–40.000 €', wvs_40k_51k: '40.000–51.000 €',
+  wvs_51k_60k: '51.000–60.000 €', wvs_mas_60k: '> 60.000 €',
 }
 const CEREMONY_LABEL: Record<string, string> = {
   sin_definir: 'Sin definir', civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica', mixta: 'Mixta',
@@ -1271,7 +1276,7 @@ export default function CalendarioPage() {
                                 <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--gold)' }}>{dayInqs.length === 1 ? dayInqs[0].kind === 'visit' ? 'Visita' : 'Solicitud' : `${dayInqs.length} solicitudes`}</span>
                               </div>
                             )}
-                            {dayLeads.filter(l => !visitLeads.some(v => v.id === l.id)).slice(0,2).map(l => (
+                            {dayLeads.filter(l => !visitLeads.some(v => v.id === l.id) && l.id !== entry?.lead_id).slice(0,2).map(l => (
                               <span key={l.id} style={{ fontSize: 9, color: '#3b82f6', fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{l.name}</span>
                             ))}
                           </div>
