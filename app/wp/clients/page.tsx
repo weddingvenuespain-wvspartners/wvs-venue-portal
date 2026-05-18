@@ -481,7 +481,7 @@ export default function ClientsPage() {
             <div style={{ padding: '24px 28px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div>
                 <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 700, color: 'var(--charcoal)', margin: 0 }}>Nueva pareja</h2>
-                <p style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 3, marginBottom: 0 }}>Vía WVS Planner · Los campos con * son obligatorios</p>
+                <p style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 3, marginBottom: 0 }}>Vía FOREVENTOS Planner · Los campos con * son obligatorios</p>
               </div>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}>
                 <X size={18} />
