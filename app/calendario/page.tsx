@@ -11,6 +11,7 @@ import Spinner from '@/components/Spinner'
 import {
   ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
   FileText, Calendar, Search, AlertCircle, Trash2, Flower2, Edit2, Link2, Download,
+  CheckCircle2, Circle, ClipboardList, Flag,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -64,6 +65,19 @@ type Modality = {
   name: string
   duration_type: string
   packages: ModalityPackage[]
+}
+
+type Task = {
+  id: string
+  user_id: string
+  title: string
+  description?: string | null
+  due_date: string
+  type: 'internal' | 'lead'
+  lead_id?: string | null
+  completed: boolean
+  completed_at?: string | null
+  created_at: string
 }
 
 // Lead-driven inbox events with date hints (call, video, visit).
@@ -170,7 +184,7 @@ export default function CalendarioPage() {
   const today  = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
-  const [calView, setCalView] = useState<'month' | 'week' | 'day' | 'agenda'>('month')
+  const [calView, setCalView] = useState<'month' | 'week' | 'day' | 'agenda' | 'tasks'>('month')
   const [weekStart, setWeekStart] = useState<string>(() => {
     const t = new Date(); const day = t.getDay(); const diff = day === 0 ? -6 : 1 - day; t.setDate(t.getDate() + diff)
     return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
@@ -205,6 +219,14 @@ export default function CalendarioPage() {
     })
   }
   const filterAll = calendarFilters.size === 0
+
+  // Tasks
+  const [tasks,          setTasks]          = useState<Task[]>([])
+  const [taskModal,      setTaskModal]      = useState(false)
+  const [taskForm,       setTaskForm]       = useState({ title: '', description: '', due_date: '', type: 'internal' as 'internal' | 'lead', lead_id: '' })
+  const [taskSaving,     setTaskSaving]     = useState(false)
+  const [taskError,      setTaskError]      = useState('')
+  const [taskLeadSearch, setTaskLeadSearch] = useState('')
 
   // Lead search
   const [leadSearch,        setLeadSearch]        = useState('')
@@ -249,7 +271,7 @@ export default function CalendarioPage() {
       to   = dateStr(year, month, lastDay)
     }
 
-    const [entriesRes, leadsRes, modalitiesRes, inquiriesRes] = await Promise.all([
+    const [entriesRes, leadsRes, modalitiesRes, inquiriesRes, tasksRes] = await Promise.all([
       supabase.from('calendar_entries').select('*').eq('venue_id', activeVenue.id).gte('date', from).lte('date', to),
       supabase.from('leads').select('id,name,email,phone,whatsapp,wedding_date,wedding_date_to,wedding_date_ranges,date_flexibility,wedding_year,wedding_month,guests,status,budget,ceremony_type,visit_date,visit_time,visit_duration,notes,budget_date,budget_date_to,budget_date_ranges,budget_date_flexibility').eq('venue_id', activeVenue.id).order('wedding_date', { ascending: true }),
       supabase.from('venue_modalities').select('id,name,duration_type,packages:venue_modality_packages(id,day_from,day_to,label,sort_order)').eq('venue_id', activeVenue.id).order('sort_order'),
@@ -260,6 +282,7 @@ export default function CalendarioPage() {
         .in('kind', ['call', 'video', 'visit'])
         .neq('status', 'closed')
         .order('created_at', { ascending: false }),
+      supabase.from('venue_tasks').select('*').eq('user_id', activeVenue.id).order('due_date', { ascending: true }),
     ])
 
     const map: Record<string, Entry> = {}
@@ -279,6 +302,7 @@ export default function CalendarioPage() {
     if (leadsRes.data) setLeads(leadsRes.data)
     if (modalitiesRes.data) setModalities(modalitiesRes.data as Modality[])
     if (inquiriesRes.data) setPendingInquiries((inquiriesRes.data as any[]).map(r => ({ ...r, preferred_dates: r.preferred_dates ?? [] })) as PendingInquiry[])
+    if (tasksRes.data) setTasks(tasksRes.data as Task[])
     setLoading(false)
   }
 
@@ -703,6 +727,54 @@ export default function CalendarioPage() {
     setSearchOpen(false)
   }
 
+  // ── Task CRUD ─────────────────────────────────────────────────────────────
+  const createTask = async () => {
+    if (!taskForm.title.trim()) { setTaskError('El título es obligatorio'); return }
+    if (!taskForm.due_date) { setTaskError('La fecha límite es obligatoria'); return }
+    if (!activeVenue) return
+    setTaskSaving(true); setTaskError('')
+    const supabase = createClient()
+    const payload: Record<string, any> = {
+      user_id: activeVenue.id,
+      venue_id: activeVenue.id,
+      title: taskForm.title.trim(),
+      description: taskForm.description.trim() || null,
+      due_date: taskForm.due_date,
+      type: taskForm.type,
+      lead_id: taskForm.type === 'lead' && taskForm.lead_id ? taskForm.lead_id : null,
+    }
+    const { data, error: err } = await supabase.from('venue_tasks').insert(payload).select().single()
+    if (err) { setTaskError('Error al crear la tarea'); setTaskSaving(false); return }
+    setTasks(prev => [...prev, data as Task].sort((a, b) => a.due_date.localeCompare(b.due_date)))
+    setTaskModal(false)
+    setTaskForm({ title: '', description: '', due_date: '', type: 'internal', lead_id: '' })
+    setTaskLeadSearch('')
+    setTaskSaving(false)
+  }
+
+  const toggleTask = async (task: Task) => {
+    const supabase = createClient()
+    const updates = { completed: !task.completed, completed_at: !task.completed ? new Date().toISOString() : null }
+    await supabase.from('venue_tasks').update(updates).eq('id', task.id)
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, ...updates } : t))
+  }
+
+  const deleteTask = async (id: string) => {
+    const supabase = createClient()
+    await supabase.from('venue_tasks').delete().eq('id', id)
+    setTasks(prev => prev.filter(t => t.id !== id))
+  }
+
+  // Tasks indexed by date (due_date) for calendar cell dots
+  const tasksByDate = useMemo(() => {
+    const m: Record<string, Task[]> = {}
+    tasks.filter(t => !t.completed).forEach(t => {
+      if (!m[t.due_date]) m[t.due_date] = []
+      m[t.due_date].push(t)
+    })
+    return m
+  }, [tasks])
+
   // Calendar grid
   const lastDay    = new Date(year, month + 1, 0).getDate()
   let   startDow   = new Date(year, month, 1).getDay() - 1
@@ -720,12 +792,14 @@ export default function CalendarioPage() {
     if (calView === 'month') prevMonth()
     else if (calView === 'week') { const d = new Date(weekStart+'T12:00:00'); d.setDate(d.getDate()-7); setWeekStart(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
     else if (calView === 'day') { const d = new Date(dayDate+'T12:00:00'); d.setDate(d.getDate()-1); setDayDate(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+    else if (calView === 'tasks') return
     else { const d = new Date(dayDate+'T12:00:00'); d.setDate(d.getDate()-7); setDayDate(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
   }
   const nextPeriod = () => {
     if (calView === 'month') nextMonth()
     else if (calView === 'week') { const d = new Date(weekStart+'T12:00:00'); d.setDate(d.getDate()+7); setWeekStart(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
     else if (calView === 'day') { const d = new Date(dayDate+'T12:00:00'); d.setDate(d.getDate()+1); setDayDate(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+    else if (calView === 'tasks') return
     else { const d = new Date(dayDate+'T12:00:00'); d.setDate(d.getDate()+7); setDayDate(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
   }
   const periodLabel = (() => {
@@ -917,15 +991,24 @@ export default function CalendarioPage() {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   {/* View tabs */}
                   <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
-                    {(['month','week','day','agenda'] as const).map(v => (
-                      <button key={v} type="button" onClick={() => setCalView(v)}
-                        style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
-                          background: calView === v ? '#fff' : 'transparent',
-                          color: calView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
-                          boxShadow: calView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
-                        {v === 'month' ? 'Mes' : v === 'week' ? 'Semana' : v === 'day' ? 'Día' : 'Agenda'}
-                      </button>
-                    ))}
+                    {(['month','week','day','agenda','tasks'] as const).map(v => {
+                      const pendingOverdue = v === 'tasks' ? tasks.filter(t => !t.completed && t.due_date <= todayIso).length : 0
+                      return (
+                        <button key={v} type="button" onClick={() => setCalView(v)}
+                          style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
+                            background: calView === v ? '#fff' : 'transparent',
+                            color: calView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
+                            boxShadow: calView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none',
+                            position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          {v === 'month' ? 'Mes' : v === 'week' ? 'Semana' : v === 'day' ? 'Día' : v === 'agenda' ? 'Agenda' : 'Tareas'}
+                          {pendingOverdue > 0 && (
+                            <span style={{ background: '#ef4444', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
+                              {pendingOverdue}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                   <button onClick={prevPeriod}
                     style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
@@ -994,6 +1077,8 @@ export default function CalendarioPage() {
                       const dayLeads   = leadsByDate[ds] || []
                       const linkedLead = entry?.lead_id ? leadsById[entry.lead_id] : null
                       const visitLeads = visitsByDate[ds] || []
+                      const dayTasks   = tasksByDate[ds] || []
+                      const hasOverdueTasks = dayTasks.some(t => t.due_date < todayIso)
                       const hasVisits  = visitLeads.length > 0
                       const dayInquiries = inquiriesByDate[ds] || []
                       const hasInquiries = dayInquiries.length > 0
@@ -1214,6 +1299,16 @@ export default function CalendarioPage() {
                                 </span>
                               ) : null
                             })()}
+                            {/* Task indicator dot */}
+                            {dayTasks.length > 0 && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                                title={dayTasks.map(t => t.title).join(' · ')}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: dayTasks.some(t => t.due_date < todayIso) ? '#ef4444' : '#8b5cf6', flexShrink: 0 }} />
+                                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: dayTasks.some(t => t.due_date < todayIso) ? '#ef4444' : '#7c3aed', whiteSpace: 'nowrap' }}>
+                                  {dayTasks.length === 1 ? 'Tarea' : `${dayTasks.length} tareas`}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </button>
                       )
@@ -1363,7 +1458,8 @@ export default function CalendarioPage() {
                       const dLeads = (leadsByDate[iso] || [])
                       const vLeads = leads.filter(l => l.visit_date === iso)
                       const dInqs = pendingInquiries.filter(i => i.event_at?.slice(0,10) === iso)
-                      const hasContent = (entry && entry.status !== 'libre') || vLeads.length > 0 || dInqs.length > 0 || dLeads.length > 0
+                      const dTasks = tasksByDate[iso] || []
+                      const hasContent = (entry && entry.status !== 'libre') || vLeads.length > 0 || dInqs.length > 0 || dLeads.length > 0 || dTasks.length > 0
                       return (
                         <div key={iso} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--ivory)', background: isToday ? '#fffbf0' : 'transparent', opacity: isPast ? 0.45 : 1 }}>
                           {/* Date */}
@@ -1399,6 +1495,15 @@ export default function CalendarioPage() {
                                 <span style={{ fontSize: 11, color: '#1d4ed8' }}>{l.name}</span>
                               </div>
                             ))}
+                            {dTasks.map(t => (
+                              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#8b5cf6', flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, color: '#5b21b6', fontWeight: 500 }}>{t.title}</span>
+                                <button onClick={() => toggleTask(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#8b5cf6', display: 'flex', alignItems: 'center' }} title="Marcar completada">
+                                  <CheckCircle2 size={12} />
+                                </button>
+                              </div>
+                            ))}
                           </div>
                           {!isPast && <button onClick={() => setModalDate(iso)} style={{ fontSize: 10, padding: '3px 9px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#faf8f5', color: 'var(--warm-gray)', cursor: 'pointer', flexShrink: 0 }}>Editar</button>}
                         </div>
@@ -1408,7 +1513,114 @@ export default function CalendarioPage() {
                 )
               })()}
 
-              {/* Legend */}
+              {/* ── Tasks view ────────────────────────────────────────────── */}
+              {!loading && calView === 'tasks' && (() => {
+                const pendingTasks = tasks.filter(t => !t.completed)
+                const doneTasks    = tasks.filter(t => t.completed)
+                const overdue  = pendingTasks.filter(t => t.due_date < todayIso).sort((a,b) => a.due_date.localeCompare(b.due_date))
+                const dueToday = pendingTasks.filter(t => t.due_date === todayIso)
+                const upcoming = pendingTasks.filter(t => t.due_date > todayIso).sort((a,b) => a.due_date.localeCompare(b.due_date))
+
+                const TaskRow = ({ task }: { task: Task }) => {
+                  const linkedLead = task.lead_id ? leads.find(l => l.id === task.lead_id) : null
+                  const isPast = task.due_date < todayIso && !task.completed
+                  const dt = new Date(task.due_date + 'T12:00:00')
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--ivory)', background: task.completed ? '#faf8f5' : 'transparent' }}>
+                      <button onClick={() => toggleTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 1, flexShrink: 0, color: task.completed ? '#10b981' : isPast ? '#ef4444' : '#8b5cf6' }}>
+                        {task.completed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+                      </button>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: task.completed ? 'var(--warm-gray)' : 'var(--charcoal)', textDecoration: task.completed ? 'line-through' : 'none', wordBreak: 'break-word' }}>
+                          {task.title}
+                        </div>
+                        {task.description && (
+                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{task.description}</div>
+                        )}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: isPast && !task.completed ? '#ef4444' : 'var(--warm-gray)' }}>
+                            {dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: dt.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })}
+                            {isPast && !task.completed && ' · Vencida'}
+                          </span>
+                          {task.type === 'lead' && linkedLead && (
+                            <span style={{ fontSize: 11, background: '#ede9fe', color: '#5b21b6', borderRadius: 5, padding: '1px 7px', fontWeight: 500 }}>
+                              {linkedLead.name}
+                            </span>
+                          )}
+                          {task.type === 'internal' && (
+                            <span style={{ fontSize: 10, background: '#f3f4f6', color: '#6b7280', borderRadius: 5, padding: '1px 7px', fontWeight: 500 }}>
+                              Interna
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button onClick={() => deleteTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#d1cac3', flexShrink: 0 }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#d1cac3')}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )
+                }
+
+                const SectionHeader = ({ label, count, color }: { label: string; count: number; color: string }) => (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px 6px', background: '#faf8f5', borderBottom: '1px solid var(--ivory)' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color }}>{label}</span>
+                    <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{count}</span>
+                  </div>
+                )
+
+                return (
+                  <div style={{ flex: 1, overflowY: 'auto', maxHeight: 560 }}>
+                    {/* Nueva tarea button */}
+                    <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button onClick={() => { setTaskForm({ title: '', description: '', due_date: todayIso, type: 'internal', lead_id: '' }); setTaskModal(true) }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#8b5cf6', color: '#fff', cursor: 'pointer' }}>
+                        <Plus size={14} /> Nueva tarea
+                      </button>
+                    </div>
+
+                    {tasks.length === 0 && (
+                      <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                        <ClipboardList size={32} style={{ color: '#d1cac3', marginBottom: 12 }} />
+                        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--warm-gray)', marginBottom: 6 }}>Sin tareas todavía</div>
+                        <div style={{ fontSize: 12, color: '#c0bbb4' }}>Crea tareas internas o vinculadas a leads para hacer seguimiento.</div>
+                      </div>
+                    )}
+
+                    {overdue.length > 0 && (
+                      <>
+                        <SectionHeader label="Vencidas" count={overdue.length} color="#ef4444" />
+                        {overdue.map(t => <TaskRow key={t.id} task={t} />)}
+                      </>
+                    )}
+
+                    {dueToday.length > 0 && (
+                      <>
+                        <SectionHeader label="Hoy" count={dueToday.length} color="var(--gold)" />
+                        {dueToday.map(t => <TaskRow key={t.id} task={t} />)}
+                      </>
+                    )}
+
+                    {upcoming.length > 0 && (
+                      <>
+                        <SectionHeader label="Próximamente" count={upcoming.length} color="#8b5cf6" />
+                        {upcoming.map(t => <TaskRow key={t.id} task={t} />)}
+                      </>
+                    )}
+
+                    {doneTasks.length > 0 && (
+                      <>
+                        <SectionHeader label="Completadas" count={doneTasks.length} color="var(--warm-gray)" />
+                        {doneTasks.slice(0, 10).map(t => <TaskRow key={t.id} task={t} />)}
+                      </>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* Legend — hidden in tasks view */}
+              {calView !== 'tasks' && (
               <div style={{ padding: '12px 20px', borderTop: '1px solid var(--ivory)', display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
                 {Object.entries(STATUS_CFG).map(([key, cfg]) => (
                   <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1420,11 +1632,60 @@ export default function CalendarioPage() {
                   <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#10b981' }} />
                   <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>Visita agendada</span>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#8b5cf6' }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>Tareas</span>
+                </div>
               </div>
+              )}
             </div>
 
             {/* Sidebar */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignSelf: 'stretch' }}>
+              {/* Tasks summary widget */}
+              {(() => {
+                const overdueTasks  = tasks.filter(t => !t.completed && t.due_date < todayIso)
+                const todayTasks    = tasks.filter(t => !t.completed && t.due_date === todayIso)
+                const pendingCount  = tasks.filter(t => !t.completed).length
+                return (
+                  <div className="card" style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <ClipboardList size={14} style={{ color: '#8b5cf6' }} /> Tareas
+                      </div>
+                      <button onClick={() => { setTaskForm({ title: '', description: '', due_date: todayIso, type: 'internal', lead_id: '' }); setTaskModal(true) }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 7, border: 'none', background: '#8b5cf6', color: '#fff', cursor: 'pointer' }}>
+                        <Plus size={11} /> Nueva
+                      </button>
+                    </div>
+                    {pendingCount === 0 ? (
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin tareas pendientes</div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {overdueTasks.length > 0 && (
+                          <div onClick={() => setCalView('tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 7, padding: '5px 10px' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#ef4444' }}>{overdueTasks.length} vencida{overdueTasks.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        )}
+                        {todayTasks.length > 0 && (
+                          <div onClick={() => setCalView('tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 7, padding: '5px 10px' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)' }}>{todayTasks.length} para hoy</span>
+                          </div>
+                        )}
+                        {overdueTasks.length === 0 && todayTasks.length === 0 && (
+                          <div onClick={() => setCalView('tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 7, padding: '5px 10px' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#8b5cf6', flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#5b21b6' }}>{pendingCount} pendiente{pendingCount !== 1 ? 's' : ''}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
               {/* Upcoming booked */}
               <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <div className="card-header" style={{ padding: '12px 16px' }}>
@@ -1515,6 +1776,87 @@ export default function CalendarioPage() {
           </div>
         </div>
       </div>
+
+      {/* Task creation modal */}
+      {taskModal && (
+        <div onClick={() => setTaskModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ClipboardList size={18} style={{ color: '#8b5cf6' }} /> Nueva tarea
+              </div>
+              <button onClick={() => setTaskModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={18} /></button>
+            </div>
+
+            {taskError && <div style={{ fontSize: 12, color: '#ef4444', marginBottom: 12, padding: '8px 12px', background: '#fef2f2', borderRadius: 8 }}>{taskError}</div>}
+
+            <div className="form-group" style={{ marginBottom: 14 }}>
+              <label className="form-label" style={{ fontSize: 11 }}>Título *</label>
+              <input className="form-input" value={taskForm.title} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} placeholder="Ej: Enviar contrato a María & Pablo" autoFocus />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 14 }}>
+              <label className="form-label" style={{ fontSize: 11 }}>Descripción (opcional)</label>
+              <textarea className="form-input" value={taskForm.description} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} placeholder="Detalles adicionales..." rows={2} style={{ resize: 'vertical' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Fecha límite *</label>
+                <input type="date" className="form-input" value={taskForm.due_date} onChange={e => setTaskForm(f => ({ ...f, due_date: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Tipo</label>
+                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  {(['internal', 'lead'] as const).map(t => (
+                    <button key={t} type="button" onClick={() => setTaskForm(f => ({ ...f, type: t, lead_id: '' }))}
+                      style={{ flex: 1, fontSize: 11, fontWeight: 600, padding: '6px 4px', borderRadius: 7, border: '1.5px solid',
+                        borderColor: taskForm.type === t ? '#8b5cf6' : 'var(--ivory)',
+                        background: taskForm.type === t ? '#ede9fe' : 'transparent',
+                        color: taskForm.type === t ? '#5b21b6' : 'var(--warm-gray)', cursor: 'pointer' }}>
+                      {t === 'internal' ? 'Interna' : 'Lead'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {taskForm.type === 'lead' && (
+              <div className="form-group" style={{ marginBottom: 14 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Lead vinculado</label>
+                <div style={{ position: 'relative' }}>
+                  <input className="form-input" value={taskLeadSearch || (taskForm.lead_id ? leads.find(l => l.id === taskForm.lead_id)?.name || '' : '')}
+                    onChange={e => { setTaskLeadSearch(e.target.value); setTaskForm(f => ({ ...f, lead_id: '' })) }}
+                    placeholder="Buscar lead..." />
+                  {taskLeadSearch && !taskForm.lead_id && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--ivory)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: 160, overflowY: 'auto', marginTop: 2 }}>
+                      {leads.filter(l => l.name.toLowerCase().includes(taskLeadSearch.toLowerCase())).slice(0, 8).map(l => (
+                        <button key={l.id} type="button" onClick={() => { setTaskForm(f => ({ ...f, lead_id: l.id })); setTaskLeadSearch('') }}
+                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--charcoal)' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                          {l.name}
+                        </button>
+                      ))}
+                      {leads.filter(l => l.name.toLowerCase().includes(taskLeadSearch.toLowerCase())).length === 0 && (
+                        <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--warm-gray)' }}>Sin resultados</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setTaskModal(false)}>Cancelar</button>
+              <button onClick={createTask} disabled={taskSaving}
+                style={{ fontSize: 12, fontWeight: 600, padding: '8px 20px', borderRadius: 8, border: 'none', background: '#8b5cf6', color: '#fff', cursor: taskSaving ? 'not-allowed' : 'pointer', opacity: taskSaving ? 0.7 : 1 }}>
+                {taskSaving ? 'Guardando...' : 'Crear tarea'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Day Modal */}
       {modalDate && (
