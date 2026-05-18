@@ -425,7 +425,7 @@ function LoginPageInner() {
       </div>
 
       {/* App shell */}
-      <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif" }}>
+      <div style={{ position: 'relative', zIndex: 1, height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif" }}>
         {/* Util bar */}
         <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 50, display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, color: '#8899AA' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', fontSize: 12, fontWeight: 500 }}>
@@ -434,7 +434,7 @@ function LoginPageInner() {
         </div>
 
         {/* Split layout */}
-        <div className="fe-split" style={{ flex: 1, display: 'flex', alignItems: 'stretch', padding: 16, gap: 16, minHeight: '100vh' }}>
+        <div className="fe-split" style={{ flex: 1, display: 'flex', alignItems: 'stretch', padding: 16, gap: 16, minHeight: 0 }}>
           {/* Hero (left) */}
           <div className="fe-hero">
             <Hero />
@@ -446,7 +446,8 @@ function LoginPageInner() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: 48,
+            padding: 'clamp(20px, 4vh, 48px) clamp(20px, 4vw, 48px)',
+            overflowY: 'auto',
           }}>
             <div style={{
               width: '100%',
