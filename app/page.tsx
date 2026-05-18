@@ -203,6 +203,18 @@ function LoginPageInner() {
   const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
 
+  // Prevent page scroll — login must fit in one screen
+  useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    return () => {
+      html.style.overflow = ''
+      body.style.overflow = ''
+    }
+  }, [])
+
   const rawRedirect = searchParams.get('redirect') || ''
   const redirectPath = rawRedirect.startsWith('/') ? rawRedirect : '/dashboard'
   const redirectQuery = new URLSearchParams()
@@ -295,7 +307,7 @@ function LoginPageInner() {
 
         .fe-input {
           width: 100%;
-          height: 46px;
+          height: 42px;
           padding: 0 14px;
           border-radius: 12px;
           background: rgba(255,255,255,0.04);
@@ -332,7 +344,7 @@ function LoginPageInner() {
           font-size: 15px;
           font-family: 'Inter', sans-serif;
           cursor: pointer;
-          height: 50px;
+          height: 46px;
           transition: transform .25s, filter .25s, box-shadow .25s;
         }
         .fe-cta:hover:not(:disabled) { transform: scale(1.015); filter: brightness(1.06); }
@@ -349,7 +361,7 @@ function LoginPageInner() {
 
         .fe-social {
           flex: 1;
-          height: 46px;
+          height: 42px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -405,10 +417,20 @@ function LoginPageInner() {
         /* Hero panel sizing — flex: 1 so it matches the form panel */
         .fe-hero { flex: 1; display: flex; min-width: 0; }
 
+        /* Lock page scroll — login must fit in one screen */
+        html, body { overflow: hidden; height: 100%; }
+
+        /* Hide right-panel brand on desktop (hero already shows it) */
+        .fe-form-brand { display: none; }
+
+        @media (max-width: 900px) {
+          .fe-form-brand { display: inline-flex; }
+        }
+
         @media (max-width: 900px) {
           .fe-hero { display: none !important; }
           .fe-split { flex-direction: column; }
-          .fe-form-panel { padding: 32px 20px !important; }
+          .fe-form-panel { padding: 24px 20px !important; }
         }
       `}</style>
 
@@ -455,14 +477,14 @@ function LoginPageInner() {
               animation: 'fe-cardRise .9s cubic-bezier(0.16,1,0.3,1) both',
             }}>
               {/* Card head */}
-              <div style={{ marginBottom: 28 }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+              <div style={{ marginBottom: 16 }}>
+                <div className="fe-form-brand" style={{ alignItems: 'center', gap: 10, marginBottom: 12 }}>
                   <img src="/foreventos-assets/favicon.png" alt="FE" style={{ height: 28, width: 'auto', borderRadius: 6 }} />
                   <span style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, letterSpacing: 0.5, fontSize: 20, color: '#E8ECF1' }}>
                     FOREVENTOS
                   </span>
                 </div>
-                <h1 style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, fontSize: 32, lineHeight: 1.06, letterSpacing: -1.2, margin: '0 0 6px', color: '#E8ECF1' }}>
+                <h1 style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, fontSize: 28, lineHeight: 1.06, letterSpacing: -1.0, margin: '0 0 4px', color: '#E8ECF1' }}>
                   {mode === 'login' ? 'Iniciar sesión' : mode === 'reset' ? 'Recuperar contraseña' : 'Nueva contraseña'}
                 </h1>
                 <p style={{ margin: 0, color: '#8899AA', fontSize: 14, lineHeight: 1.5 }}>
@@ -490,7 +512,7 @@ function LoginPageInner() {
               {mode === 'login' && (
                 <form onSubmit={handleLogin} noValidate>
                   {/* Email */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10 }}>
                     <label style={{ fontSize: 12, fontWeight: 500, color: '#8899AA', letterSpacing: '0.02em' }}>
                       Email corporativo
                     </label>
@@ -511,7 +533,7 @@ function LoginPageInner() {
                   </div>
 
                   {/* Password */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 0 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 0 }}>
                     <label style={{ fontSize: 12, fontWeight: 500, color: '#8899AA', letterSpacing: '0.02em' }}>
                       Contraseña
                     </label>
@@ -535,7 +557,7 @@ function LoginPageInner() {
                   </div>
 
                   {/* Remember + forgot */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '14px 0 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '10px 0 14px' }}>
                     <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#8899AA', cursor: 'pointer', userSelect: 'none' }}>
                       <span
                         className={'fe-check' + (remember ? ' on' : '')}
@@ -564,7 +586,7 @@ function LoginPageInner() {
                   </button>
 
                   {/* Social */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '22px 0 18px', color: '#5a6878', fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', fontWeight: 500 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '16px 0 12px', color: '#5a6878', fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', fontWeight: 500 }}>
                     <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.10)' }} />
                     o continúa con
                     <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.10)' }} />
@@ -576,7 +598,7 @@ function LoginPageInner() {
                   </div>
 
                   {/* Footer */}
-                  <div style={{ marginTop: 24, textAlign: 'center', paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.07)', fontSize: 13, color: '#8899AA' }}>
+                  <div style={{ marginTop: 16, textAlign: 'center', paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.07)', fontSize: 13, color: '#8899AA' }}>
                     ¿Aún no tienes cuenta?{' '}
                     <button
                       type="button"
@@ -589,7 +611,7 @@ function LoginPageInner() {
                   </div>
 
                   {/* Trust */}
-                  <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontSize: 11, color: '#5a6878' }}>
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontSize: 11, color: '#5a6878' }}>
                     <ShieldIcon /> <span>Cifrado RGPD</span>
                     <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'currentColor', opacity: 0.5, display: 'inline-block' }} />
                     <EuIcon /> <span>Servidores en la UE</span>
