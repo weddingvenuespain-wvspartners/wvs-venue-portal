@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 // Template 2 — ✨ Emoción Primero
 // Visual: Calor, luz, editorial. La galería como protagonista. Todo en crema y serif.
 // Sections: Hero minimal, Gallery (full-bleed), Mensaje personal, Experiencia, Testimonios, Incluye, CTA romántico
@@ -45,7 +45,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
   const rgb     = toRgb(primary)
   const onPri   = isDark(primary) ? '#ffffff' : '#111111'
   const logo    = branding?.logo_url ?? null
-  const font    = (branding as any)?.font_family || 'Cormorant Garamond,Georgia,serif'
+  const font    = (branding as any)?.font_family || 'Satoshi,Georgia,serif'
   const contact = resolveContact(data)
   const contactOn = on('contact') && (contact.phone || contact.email)
   const photoList = venue?.photo_urls ?? []
@@ -87,7 +87,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
     .w{max-width:860px;margin:0 auto;padding:0 48px}
     .w-full{max-width:1200px;margin:0 auto;padding:0 32px}
     /* Typography */
-    .serif{font-family:Cormorant Garamond,Georgia,serif}
+    .serif{font-family:Satoshi,Georgia,serif}
     .sans{font-family:Inter,system-ui,sans-serif}
     /* Hero animations */
     @keyframes hf{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
@@ -97,7 +97,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
     .gcell:hover .gimg{transform:scale(1.06)}
     /* Inputs */
     .inp{width:100%;padding:14px 0;border:none;border-bottom:1px solid rgba(${rgb},.3);
-      background:transparent;font-family:Cormorant Garamond,serif;font-size:17px;
+      background:transparent;font-family:Satoshi,serif;font-size:17px;
       color:#3a2f28;outline:none;transition:border-color .2s}
     .inp:focus{border-color:${primary}}
     .inp::placeholder{color:rgba(58,47,40,.35);font-style:italic}
@@ -936,7 +936,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           {venue?.name && <div className="serif" style={{ fontSize: 18, color: 'rgba(255,255,255,.3)', fontStyle: 'italic' }}>{venue.name}</div>}
         </div>
         <div className="sans" style={{ fontSize: 11, color: 'rgba(255,255,255,.15)' }}>
-          <a href="https://weddingvenuesspain.com" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,.25)', textDecoration: 'none' }}>Wedding Venues Spain</a>
+          <a href="https://weddingvenuesspain.com" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,.25)', textDecoration: 'none' }}>FOREVENTOS</a>
         </div>
       </footer>
     </div>

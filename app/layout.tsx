@@ -1,12 +1,12 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/lib/auth-context'
 import { ThemeProvider } from '@/lib/theme-context'
 import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
-  title: 'Wedding Venues Spain',
-  description: 'Portal de gestión para venues de Wedding Venues Spain',
+  title: 'FOREVENTOS',
+  description: 'Portal de gestión para venues de FOREVENTOS',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useRef, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -1215,7 +1215,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                     <div key={c} onClick={() => setForm(f => ({ ...f, primary_color: c }))}
                       style={{
                         width: 26, height: 26, borderRadius: 6, background: c, cursor: 'pointer',
-                        border: form.primary_color === c ? '2px solid #C4975A' : '2px solid transparent',
+                        border: form.primary_color === c ? '2px solid #2E6DB4' : '2px solid transparent',
                         transform: form.primary_color === c ? 'scale(1.15)' : 'scale(1)',
                       }} />
                   ))}
@@ -2297,8 +2297,8 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               {/* Cargar desde catálogo — solo si hay catálogo y la propuesta no tiene menús aún */}
               {menuCatalog && (menuCatalog.menus_override?.length || menuCatalog.menu_extras_override?.length || menuCatalog.appetizers_base_override?.length) &&
                !sections.menus_override?.length && !sections.menu_extras_override?.length && !sections.appetizers_base_override?.length && (
-                <div style={{ margin: '0 0 16px', background: '#FDF8F0', border: '1px dashed #C4975A66', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <ChefHat size={18} style={{ color: '#C4975A', flexShrink: 0 }} />
+                <div style={{ margin: '0 0 16px', background: '#FDF8F0', border: '1px dashed #2E6DB466', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <ChefHat size={18} style={{ color: '#2E6DB4', flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>Tienes un catálogo de menús definido</div>
                     <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Cárgalo como punto de partida y personalízalo para esta pareja</div>

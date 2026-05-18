@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -90,7 +90,7 @@ export default function CateringCalendarioPage() {
       <div className="main-layout"><main style={{ padding: '32px 40px', overflowY: 'auto', flex: 1 }}>
 
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Calendario</h1>
+          <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Calendario</h1>
           <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Marca tus fechas disponibles e indisponibles para bodas.</p>
         </div>
 
@@ -100,7 +100,7 @@ export default function CateringCalendarioPage() {
             <button onClick={prevMonth} style={{ background: 'none', border: '1px solid var(--ivory)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
               <ChevronLeft size={16} color="var(--charcoal)" />
             </button>
-            <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--charcoal)' }}>
+            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--charcoal)' }}>
               {MONTHS[month]} {year}
             </span>
             <button onClick={nextMonth} style={{ background: 'none', border: '1px solid var(--ivory)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
@@ -157,7 +157,7 @@ export default function CateringCalendarioPage() {
         </div>
 
         <button onClick={handleSave} disabled={saving}
-          style={{ marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 8, border: 'none', background: saved ? '#22c55e' : 'var(--charcoal)', color: '#fff', fontSize: 13, fontWeight: 500, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.7 : 1, fontFamily: 'Manrope, sans-serif' }}>
+          style={{ marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 8, border: 'none', background: saved ? '#22c55e' : 'var(--charcoal)', color: '#fff', fontSize: 13, fontWeight: 500, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.7 : 1, fontFamily: 'Inter, sans-serif' }}>
           {saved ? <><CheckCircle size={14} /> Guardado</> : <><Save size={14} /> Guardar calendario</>}
         </button>
 

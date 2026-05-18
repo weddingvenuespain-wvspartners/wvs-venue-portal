@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import type { Budget, PaymentInstallment, LineItemGroup } from '@/lib/budget-types'
 import { Receipt, Calendar, Users, Clock, CheckCircle, AlertCircle, Lock } from 'lucide-react'
@@ -57,7 +57,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: `${primaryColor}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
             <Lock size={24} style={{ color: primaryColor }} />
           </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a', fontFamily: 'Manrope, sans-serif', marginBottom: 6 }}>Presupuesto protegido</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a', fontFamily: 'Inter, sans-serif', marginBottom: 6 }}>Presupuesto protegido</div>
           <div style={{ fontSize: 13, color: '#888', marginBottom: 24 }}>Introduce la contraseña para ver el presupuesto de {budget.couple_name}</div>
           <form onSubmit={e => { e.preventDefault(); handlePasswordSubmit() }}>
             <input
@@ -96,7 +96,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
       <div style={{ background: '#fff', borderBottom: `3px solid ${primaryColor}`, padding: '32px 24px', textAlign: 'center' }}>
         {logo && <img src={logo} alt={venueName} style={{ height: 48, objectFit: 'contain', marginBottom: 16 }} />}
         <div style={{ fontSize: 14, color: '#888', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>{venueName}</div>
-        <div style={{ fontSize: 28, fontWeight: 700, color: '#1a1a1a', fontFamily: 'Manrope, sans-serif' }}>Presupuesto</div>
+        <div style={{ fontSize: 28, fontWeight: 700, color: '#1a1a1a', fontFamily: 'Inter, sans-serif' }}>Presupuesto</div>
         <div style={{ fontSize: 16, color: '#555', marginTop: 8 }}>{budget.couple_name}</div>
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
           {budget.wedding_date && (
@@ -183,7 +183,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
         {/* Payment plan */}
         {budget.payment_plan && budget.payment_plan.length > 0 && (
           <div style={{ background: '#fff', border: '1px solid #e8e2d9', borderRadius: 12, padding: '20px 24px', marginBottom: 20, opacity: isExpired ? 0.5 : 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#1a1a1a', marginBottom: 16, fontFamily: 'Manrope, sans-serif' }}>Plan de pagos</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#1a1a1a', marginBottom: 16, fontFamily: 'Inter, sans-serif' }}>Plan de pagos</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {(budget.payment_plan as PaymentInstallment[]).map((p, i) => {
                 const isPaid = p.status === 'paid'
@@ -235,7 +235,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
           {venue?.contact_phone && (
             <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>{venue.contact_phone}</div>
           )}
-          <div style={{ fontSize: 10, color: '#ccc' }}>Creado con Wedding Venues Spain</div>
+          <div style={{ fontSize: 10, color: '#ccc' }}>Creado con FOREVENTOS</div>
         </div>
       </div>
     </div>

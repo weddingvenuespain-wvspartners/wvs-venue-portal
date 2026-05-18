@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -147,7 +147,7 @@ function SearchProviderModal({
   const inputSt: React.CSSProperties = {
     width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ivory)',
     background: '#fff', fontSize: 13, color: 'var(--charcoal)', outline: 'none',
-    fontFamily: 'Manrope, sans-serif', boxSizing: 'border-box',
+    fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
   }
 
   const label = mode === 'venue' ? 'venue' : 'catering'
@@ -161,7 +161,7 @@ function SearchProviderModal({
         {/* Header */}
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
-            <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 700, color: 'var(--charcoal)', margin: 0 }}>
+            <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 700, color: 'var(--charcoal)', margin: 0 }}>
               Buscar {label}
             </h2>
             <p style={{ fontSize: 12, color: 'var(--warm-gray)', margin: '2px 0 0' }}>Selecciona un {label} para solicitar disponibilidad</p>
@@ -181,7 +181,7 @@ function SearchProviderModal({
               <button key={String(t.key)} onClick={() => setShowOnlyFavs(t.key)} style={{
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer',
-                fontFamily: 'Manrope, sans-serif', fontSize: 12, fontWeight: showOnlyFavs === t.key ? 600 : 400,
+                fontFamily: 'Inter, sans-serif', fontSize: 12, fontWeight: showOnlyFavs === t.key ? 600 : 400,
                 background: showOnlyFavs === t.key ? '#fff' : 'transparent',
                 color: showOnlyFavs === t.key ? 'var(--charcoal)' : 'var(--warm-gray)',
                 boxShadow: showOnlyFavs === t.key ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
@@ -237,7 +237,7 @@ function SearchProviderModal({
                 return (
                   <div key={p.user_id} style={{ background: alreadyLinked || justSent ? '#f9fafb' : '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: isFav ? '0 1px 8px rgba(239,68,68,0.08)' : '0 1px 5px rgba(0,0,0,0.06)', border: alreadyLinked || justSent ? '1px solid var(--ivory)' : isFav ? '1px solid rgba(239,68,68,0.15)' : '1px solid transparent', opacity: alreadyLinked ? 0.7 : 1 }}>
                     <div style={{ height: 64, background: 'linear-gradient(135deg, rgba(196,151,90,0.1), rgba(196,151,90,0.03))', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                      <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(196,151,90,0.15)', border: '2px solid rgba(196,151,90,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, color: 'var(--gold)', fontFamily: 'Manrope' }}>
+                      <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(196,151,90,0.15)', border: '2px solid rgba(196,151,90,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, color: 'var(--gold)', fontFamily: 'Inter' }}>
                         {initials}
                       </div>
                       {isFav && (
@@ -281,7 +281,7 @@ function SearchProviderModal({
           <div style={{ background: '#fff', borderRadius: 14, padding: '24px 28px', width: '100%', maxWidth: 440 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
               <div>
-                <h3 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 700, color: 'var(--charcoal)', margin: 0 }}>Añadir a la propuesta</h3>
+                <h3 style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 700, color: 'var(--charcoal)', margin: 0 }}>Añadir a la propuesta</h3>
                 <p style={{ fontSize: 12, color: 'var(--warm-gray)', margin: '3px 0 0' }}>{requestTarget.display_name}</p>
               </div>
               <button onClick={() => setRequestTarget(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={15} /></button>
@@ -489,13 +489,13 @@ export default function ClientDetailPage() {
   const inputSt: React.CSSProperties = {
     width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--ivory)',
     background: 'var(--cream)', fontSize: 13, color: 'var(--charcoal)', outline: 'none',
-    fontFamily: 'Manrope, sans-serif', boxSizing: 'border-box',
+    fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
   }
 
   const tabBtn = (t: Tab, lbl: string, icon: React.ReactNode, count?: number) => (
     <button onClick={() => setTab(t)} style={{
       display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8,
-      border: 'none', cursor: 'pointer', fontFamily: 'Manrope, sans-serif',
+      border: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
       background: tab === t ? 'var(--charcoal)' : 'transparent',
       color: tab === t ? '#fff' : 'var(--warm-gray)',
       fontSize: 13, fontWeight: tab === t ? 600 : 400,
@@ -529,7 +529,7 @@ export default function ClientDetailPage() {
               <Heart size={22} color="var(--gold)" />
             </div>
             <div>
-              <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>{client.name}</h1>
+              <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>{client.name}</h1>
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                 {client.wedding_date && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--warm-gray)' }}>
@@ -637,7 +637,7 @@ export default function ClientDetailPage() {
                           <div>
                             <label style={{ display: 'block', fontSize: 11, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 5 }}>Enlace presupuesto / propuesta</label>
                             <input type="url" placeholder="https://…" value={editQuoteUrl[v.id] ?? ''} onChange={e => setEditQuoteUrl(prev => ({ ...prev, [v.id]: e.target.value }))}
-                              style={{ width: '100%', padding: '7px 10px', borderRadius: 7, border: '1px solid var(--ivory)', background: '#fff', fontSize: 12, fontFamily: 'Manrope, sans-serif', color: 'var(--charcoal)', outline: 'none', boxSizing: 'border-box' }} />
+                              style={{ width: '100%', padding: '7px 10px', borderRadius: 7, border: '1px solid var(--ivory)', background: '#fff', fontSize: 12, fontFamily: 'Inter, sans-serif', color: 'var(--charcoal)', outline: 'none', boxSizing: 'border-box' }} />
                           </div>
                           <button onClick={() => saveEntry(v.id, 'wp_client_venues')} disabled={savingEntry === v.id}
                             style={{ padding: '7px 14px', borderRadius: 7, border: 'none', background: 'var(--charcoal)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
@@ -723,7 +723,7 @@ export default function ClientDetailPage() {
                           <div>
                             <label style={{ display: 'block', fontSize: 11, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 5 }}>Enlace presupuesto / propuesta</label>
                             <input type="url" placeholder="https://…" value={editQuoteUrl[c.id] ?? ''} onChange={e => setEditQuoteUrl(prev => ({ ...prev, [c.id]: e.target.value }))}
-                              style={{ width: '100%', padding: '7px 10px', borderRadius: 7, border: '1px solid var(--ivory)', background: '#fff', fontSize: 12, fontFamily: 'Manrope, sans-serif', color: 'var(--charcoal)', outline: 'none', boxSizing: 'border-box' }} />
+                              style={{ width: '100%', padding: '7px 10px', borderRadius: 7, border: '1px solid var(--ivory)', background: '#fff', fontSize: 12, fontFamily: 'Inter, sans-serif', color: 'var(--charcoal)', outline: 'none', boxSizing: 'border-box' }} />
                           </div>
                           <button onClick={() => saveEntry(c.id, 'wp_client_caterings')} disabled={savingEntry === c.id}
                             style={{ padding: '7px 14px', borderRadius: 7, border: 'none', background: 'var(--charcoal)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
@@ -743,7 +743,7 @@ export default function ClientDetailPage() {
         {tab === 'propuesta' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
             <div style={{ background: '#fff', borderRadius: 12, padding: '24px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-              <h3 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Configuración</h3>
+              <h3 style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Configuración</h3>
 
               <div style={{ marginBottom: 20 }}>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 6 }}>
@@ -793,7 +793,7 @@ export default function ClientDetailPage() {
             </div>
 
             <div style={{ background: '#fff', borderRadius: 12, padding: '24px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-              <h3 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Contenido de la propuesta</h3>
+              <h3 style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Contenido de la propuesta</h3>
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '0.06em', marginBottom: 10 }}>VENUES ({venues.length})</div>
                 {venues.length === 0

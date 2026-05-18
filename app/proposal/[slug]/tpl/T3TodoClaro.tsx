@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 // Template 3 — 📋 Todo Claro
 // Visual: Sidebar sticky con números de sección. Diseño profesional como un brochure premium.
 // Sections: Hero + sidebar nav, Experience, Inclusions, Packages, Extras, FAQ, CTA
@@ -60,7 +60,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
   const rgb     = toRgb(primary)
   const onPri   = isDark(primary) ? '#ffffff' : '#111111'
   const logo    = branding?.logo_url ?? null
-  const font    = (branding as any)?.font_family || 'Cormorant Garamond,Georgia,serif'
+  const font    = (branding as any)?.font_family || 'Satoshi,Georgia,serif'
   const contact = resolveContact(data)
   const contactOn = on('contact') && (contact.phone || contact.email)
 
@@ -169,7 +169,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
     .side-box-val-n{font-family:Inter,sans-serif;font-size:17px;font-weight:600;color:#1a1614}
     /* Section number */
     .sec-n{font-family:Inter,sans-serif;font-size:10px;font-weight:700;letter-spacing:.2em;color:#C8C3BE;margin-bottom:8px}
-    .sec-h{font-family:Cormorant Garamond,serif;font-size:clamp(28px,3.5vw,42px);font-weight:400;color:#181410;margin-bottom:36px;line-height:1.1}
+    .sec-h{font-family:Satoshi,serif;font-size:clamp(28px,3.5vw,42px);font-weight:400;color:#181410;margin-bottom:36px;line-height:1.1}
     /* Inputs */
     .inp{width:100%;padding:12px 14px;border:1.5px solid #E2DDD8;border-radius:8px;
       font-family:Inter,sans-serif;font-size:14px;color:#1a1614;background:#FAFAF8;
@@ -941,7 +941,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           {venue?.name && <div style={{ fontFamily: font, fontSize: 16, color: 'rgba(255,255,255,.3)', fontStyle: 'italic' }}>{venue.name}</div>}
         </div>
         <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 11, color: 'rgba(255,255,255,.15)' }}>
-          <a href="https://weddingvenuesspain.com" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,.25)', textDecoration: 'none' }}>Wedding Venues Spain</a>
+          <a href="https://weddingvenuesspain.com" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,.25)', textDecoration: 'none' }}>FOREVENTOS</a>
         </div>
       </footer>
     </div>

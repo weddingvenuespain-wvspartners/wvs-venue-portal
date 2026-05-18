@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 // Template 1 — ⚡ Impacto Directo
 // Dark luxury hotel · Conversión inmediata · Venue presentation completo
 // Secciones: Hero → Historia → Galería → Espacios → Paquetes → Temporadas
@@ -49,7 +49,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const rgb     = toRgb(primary)
   const onPri   = isDark(primary) ? '#ffffff' : '#111111'
   const logo    = branding?.logo_url ?? null
-  const FONT    = (branding as any)?.font_family || "'Cormorant Garamond', Georgia, serif"
+  const FONT    = (branding as any)?.font_family || "'Satoshi', Georgia, serif"
   const contact = resolveContact(data)
   const contactOn = !!(contact.phone || contact.email)
   const waHref = contact.phone ? `https://wa.me/${contact.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, he visto la propuesta para ${couple_name} y me gustaría hablar con vosotros.`)}` : ''

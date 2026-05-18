@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import {
@@ -13,7 +13,7 @@ const QUICK_LINKS = [
   { iconKey: 'calendar', title: 'Calendario',           desc: 'Gestiona disponibilidad, visitas y reservas',            color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc' },
   { iconKey: 'zap',      title: 'Propuestas digitales', desc: 'Crea y envía propuestas profesionales',                  color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
   { iconKey: 'billing',  title: 'Facturación',          desc: 'Planes, facturas y gestión de suscripción',              color: '#be185d', bg: '#fdf2f8', border: '#fbcfe8' },
-  { iconKey: 'chat',     title: 'Soporte directo',      desc: 'Habla con el equipo de Wedding Venues Spain',           color: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
+  { iconKey: 'chat',     title: 'Soporte directo',      desc: 'Habla con el equipo de FOREVENTOS',           color: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
 ]
 
 function getIcon(key: string) {
@@ -104,7 +104,7 @@ export default function GuiasPage() {
               ¿En qué podemos ayudarte?
             </div>
             <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 20 }}>
-              Guías, preguntas frecuentes y soporte del equipo de Wedding Venues Spain
+              Guías, preguntas frecuentes y soporte del equipo de FOREVENTOS
             </div>
             <div style={{ position: 'relative', maxWidth: 420, margin: '0 auto' }}>
               <Search size={15} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
@@ -159,7 +159,7 @@ export default function GuiasPage() {
               </div>
               <div style={{ fontSize: 12.5, color: '#166534', lineHeight: 1.5 }}>El equipo responde en menos de 24 horas en días laborables.</div>
             </div>
-            <a href="mailto:info@weddingvenuesspain.com"
+            <a href="mailto:info@foreventos.com"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 18px', borderRadius: 10, background: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
               <Mail size={14} /> Escribir al soporte
             </a>

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
@@ -79,7 +79,7 @@ export default function CheckoutSuccessPage() {
               <CheckCircle size={28} color="#22c55e" />
             </div>
             <h1 style={{
-              fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 500,
+              fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 500,
               color: 'var(--charcoal)', marginBottom: 8,
             }}>
               Pago completado
@@ -92,7 +92,7 @@ export default function CheckoutSuccessPage() {
               style={{
                 padding: '10px 28px', borderRadius: 6, border: 'none',
                 background: 'var(--gold)', color: '#fff',
-                fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 500,
+                fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500,
                 cursor: 'pointer',
               }}
             >
@@ -102,7 +102,7 @@ export default function CheckoutSuccessPage() {
         ) : error ? (
           <>
             <h1 style={{
-              fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 500,
+              fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 500,
               color: 'var(--charcoal)', marginBottom: 8,
             }}>
               Pago recibido
@@ -115,7 +115,7 @@ export default function CheckoutSuccessPage() {
               style={{
                 padding: '10px 28px', borderRadius: 6, border: 'none',
                 background: 'var(--gold)', color: '#fff',
-                fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 500,
+                fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500,
                 cursor: 'pointer',
               }}
             >
@@ -126,7 +126,7 @@ export default function CheckoutSuccessPage() {
           <>
             <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--gold)', margin: '0 auto 20px' }} />
             <h1 style={{
-              fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 500,
+              fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 500,
               color: 'var(--charcoal)', marginBottom: 8,
             }}>
               Activando tu suscripción...

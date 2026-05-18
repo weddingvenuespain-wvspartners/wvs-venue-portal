@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -68,7 +68,7 @@ export default function CateringDashboard() {
       <div className="main-layout"><main style={{ padding: '32px 40px', overflowY: 'auto', flex: 1 }}>
 
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>
+          <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>
             Dashboard
           </h1>
           <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>
@@ -86,7 +86,7 @@ export default function CateringDashboard() {
               </div>
               {dataLoading
                 ? <Skeleton w={40} h={28} />
-                : <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--charcoal)', fontFamily: 'Manrope, sans-serif' }}>{k.value}</div>
+                : <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--charcoal)', fontFamily: 'Inter, sans-serif' }}>{k.value}</div>
               }
             </div>
           ))}
@@ -95,7 +95,7 @@ export default function CateringDashboard() {
         {/* Recent leads */}
         <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 8px rgba(0,0,0,0.05)', overflow: 'hidden', marginBottom: 24 }}>
           <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--charcoal)', fontFamily: 'Manrope, sans-serif' }}>Solicitudes recientes</span>
+            <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--charcoal)', fontFamily: 'Inter, sans-serif' }}>Solicitudes recientes</span>
             <Link href="/catering/leads" style={{ fontSize: 12, color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
               Ver todas <ArrowRight size={12} />
             </Link>

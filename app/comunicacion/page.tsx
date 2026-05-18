@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -801,7 +801,7 @@ function MessagesTab({ templates, leads, userId, venueId, onRefresh }: {
       {(isNew || selected) ? (
         <div className="card">
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, color: 'var(--espresso)' }}>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, color: 'var(--espresso)' }}>
               {isNew ? 'Nueva plantilla' : 'Editar plantilla'}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -896,7 +896,7 @@ function MessagesTab({ templates, leads, userId, venueId, onRefresh }: {
       ) : (
         <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
           <MessageCircle size={36} style={{ color: 'var(--gold)', margin: '0 auto 16px', opacity: 0.6 }} />
-          <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, marginBottom: 8, color: 'var(--espresso)' }}>Plantillas de mensajes</div>
+          <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, marginBottom: 8, color: 'var(--espresso)' }}>Plantillas de mensajes</div>
           <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 24, maxWidth: 360, margin: '0 auto 24px', lineHeight: 1.7 }}>
             Crea plantillas con variables dinámicas para enviar por WhatsApp o email con un solo click.
           </div>
@@ -970,7 +970,7 @@ function SendMsgModal({ template, leads, onClose }: {
         onClick={e => e.stopPropagation()}>
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 19, color: 'var(--espresso)' }}>Enviar: {template.name}</div>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 19, color: 'var(--espresso)' }}>Enviar: {template.name}</div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2 }}>Selecciona un lead para personalizar el mensaje</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={18} /></button>
@@ -1195,7 +1195,7 @@ function DossierTab({ dossiers, leads, userId, venueId, onRefresh }: {
       {dossiers.length === 0 && !showAdd ? (
         <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
           <FileText size={36} style={{ color: 'var(--gold)', margin: '0 auto 16px', opacity: 0.6 }} />
-          <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, marginBottom: 8 }}>Sin dossiers</div>
+          <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, marginBottom: 8 }}>Sin dossiers</div>
           <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 20 }}>Sube tu dossier en PDF para enviarlo rápidamente a las parejas interesadas.</div>
           <button onClick={() => setShowAdd(true)} className="btn btn-primary"><Plus size={13} /> Añadir dossier</button>
         </div>
@@ -1286,7 +1286,7 @@ function SendDossierModal({ dossier, leads, onClose }: {
         onClick={e => e.stopPropagation()}>
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 19, color: 'var(--espresso)' }}>Enviar dossier</div>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 19, color: 'var(--espresso)' }}>Enviar dossier</div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2 }}>{dossier.name}</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={18} /></button>

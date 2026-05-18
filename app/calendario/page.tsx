@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -885,7 +885,7 @@ export default function CalendarioPage() {
               { value: countByStatus('reservado'), label: 'Reservados', color: '#5c4033' },
             ].map((s, i) => (
               <div key={i} style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, padding: '20px 22px' }}>
-                <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 36, fontWeight: 500, color: s.color, lineHeight: 1, marginBottom: 8 }}>
+                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 36, fontWeight: 500, color: s.color, lineHeight: 1, marginBottom: 8 }}>
                   {String(s.value).padStart(2, '0')}
                 </div>
                 <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>
@@ -901,11 +901,11 @@ export default function CalendarioPage() {
               {/* Calendar header */}
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, color: 'var(--espresso)', fontWeight: 500, letterSpacing: '0.01em' }}>
+                  <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, color: 'var(--espresso)', fontWeight: 500, letterSpacing: '0.01em' }}>
                     {periodLabel}
                   </span>
                   <button onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); const t = new Date(); const dy = t.getDay(); const df = dy === 0 ? -6 : 1 - dy; t.setDate(t.getDate() + df); const p2=(n:number)=>String(n).padStart(2,'0'); setWeekStart(`${t.getFullYear()}-${p2(t.getMonth()+1)}-${p2(t.getDate())}`); setDayDate(dateStr(today.getFullYear(), today.getMonth(), today.getDate())) }}
-                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'Manrope, sans-serif' }}>
+                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
                     Hoy
                   </button>
                 </div>
@@ -1096,7 +1096,7 @@ export default function CalendarioPage() {
                           <span style={{
                             fontSize: 15, fontWeight: isToday ? 700 : 500, lineHeight: 1,
                             color: isPast ? 'var(--stone)' : isToday ? 'var(--gold)' : 'var(--charcoal)',
-                            fontFamily: 'Manrope, sans-serif',
+                            fontFamily: 'Inter, sans-serif',
                             position: 'relative', zIndex: 1,
                           }}>
                             {day}
@@ -1234,7 +1234,7 @@ export default function CalendarioPage() {
                         return (
                           <div key={iso} style={{ textAlign: 'center', padding: '10px 4px', borderLeft: wi > 0 ? '1px solid var(--ivory)' : 'none', opacity: isPast ? 0.5 : 1 }}>
                             <div style={{ fontSize: 10, fontWeight: 600, color: wi >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '.07em', textTransform: 'uppercase' }}>{DOW_SHORT[wi]}</div>
-                            <div style={{ fontSize: 18, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--gold)' : 'var(--charcoal)', width: 30, height: 30, borderRadius: '50%', background: isToday ? '#fef3c7' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0', fontFamily: 'Manrope, sans-serif' }}>{d.getDate()}</div>
+                            <div style={{ fontSize: 18, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--gold)' : 'var(--charcoal)', width: 30, height: 30, borderRadius: '50%', background: isToday ? '#fef3c7' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0', fontFamily: 'Inter, sans-serif' }}>{d.getDate()}</div>
                           </div>
                         )
                       })}
@@ -1300,7 +1300,7 @@ export default function CalendarioPage() {
                       {/* Date stamp */}
                       <div style={{ textAlign: 'center', minWidth: 64 }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: d.getDay() >= 6 ? 'var(--gold)' : 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.07em' }}>{DOW[d.getDay()]}</div>
-                        <div style={{ fontSize: 48, fontWeight: 700, color: isToday ? 'var(--gold)' : 'var(--charcoal)', lineHeight: 1, fontFamily: 'Manrope, sans-serif' }}>{d.getDate()}</div>
+                        <div style={{ fontSize: 48, fontWeight: 700, color: isToday ? 'var(--gold)' : 'var(--charcoal)', lineHeight: 1, fontFamily: 'Inter, sans-serif' }}>{d.getDate()}</div>
                         <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginTop: 2 }}>{MONTHS[d.getMonth()]} {d.getFullYear()}</div>
                       </div>
                       {/* Details */}
@@ -1364,7 +1364,7 @@ export default function CalendarioPage() {
                           {/* Date */}
                           <div style={{ minWidth: 52, textAlign: 'center', paddingTop: 2 }}>
                             <div style={{ fontSize: 9, fontWeight: 600, color: d.getDay() >= 6 ? 'var(--gold)' : 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{DOW_SHORT[d.getDay()]}</div>
-                            <div style={{ fontSize: 17, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--gold)' : 'var(--charcoal)', fontFamily: 'Manrope, sans-serif', lineHeight: 1.1 }}>{d.getDate()}</div>
+                            <div style={{ fontSize: 17, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--gold)' : 'var(--charcoal)', fontFamily: 'Inter, sans-serif', lineHeight: 1.1 }}>{d.getDate()}</div>
                             <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{MONTHS[d.getMonth()].slice(0,3)}</div>
                           </div>
                           {/* Events */}
@@ -1871,7 +1871,7 @@ function DayModal({
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)', textTransform: 'capitalize' }}>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)', textTransform: 'capitalize' }}>
               {dt.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
             {isPast && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 3 }}>Fecha pasada · solo lectura</div>}
@@ -1937,7 +1937,7 @@ function DayModal({
                         <div style={{ width: 64, flexShrink: 0, background: l.visit_time ? '#10b981' : 'rgba(16,185,129,0.18)', color: l.visit_time ? '#fff' : '#047857', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 4px', fontVariantNumeric: 'tabular-nums' }}>
                           {l.visit_time ? (
                             <>
-                              <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1, fontFamily: 'Manrope, sans-serif' }}>{l.visit_time}</div>
+                              <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1, fontFamily: 'Inter, sans-serif' }}>{l.visit_time}</div>
                               {endTime && <div style={{ fontSize: 9, fontWeight: 500, opacity: 0.85, marginTop: 3, lineHeight: 1 }}>– {endTime}</div>}
                               <div style={{ fontSize: 8, fontWeight: 600, opacity: 0.85, marginTop: 4, letterSpacing: '0.05em' }}>{dur} MIN</div>
                             </>
@@ -2017,7 +2017,7 @@ function DayModal({
                         <div style={{ width: 64, flexShrink: 0, background: visitTime ? 'var(--gold)' : 'rgba(196,151,90,0.18)', color: visitTime ? '#fff' : 'var(--gold)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 4px', fontVariantNumeric: 'tabular-nums' }}>
                           {visitTime ? (
                             <>
-                              <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1, fontFamily: 'Manrope, sans-serif' }}>{visitTime}</div>
+                              <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1, fontFamily: 'Inter, sans-serif' }}>{visitTime}</div>
                               <div style={{ fontSize: 8, fontWeight: 700, marginTop: 4, letterSpacing: '0.05em' }}>{cornerLabel}</div>
                             </>
                           ) : (
@@ -2523,11 +2523,11 @@ function DayModal({
                       )}
                       <div style={{ display: 'flex', gap: 6 }}>
                         <a href={`/leads?changeDates=${l.id}&returnDate=${date}`}
-                          style={{ flex: 1, textAlign: 'center', fontSize: 11, padding: '6px 8px', borderRadius: 7, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', fontWeight: 500, fontFamily: 'Manrope, sans-serif' }}>
+                          style={{ flex: 1, textAlign: 'center', fontSize: 11, padding: '6px 8px', borderRadius: 7, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
                           + Añadir otra fecha
                         </a>
                         <button onClick={() => handleRemoveFromDate(l)} disabled={isSav}
-                          style={{ flex: 1, fontSize: 11, padding: '6px 8px', borderRadius: 7, border: '1px solid #fca5a5', color: '#dc2626', background: 'transparent', cursor: 'pointer', fontWeight: 500, fontFamily: 'Manrope, sans-serif' }}>
+                          style={{ flex: 1, fontSize: 11, padding: '6px 8px', borderRadius: 7, border: '1px solid #fca5a5', color: '#dc2626', background: 'transparent', cursor: 'pointer', fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
                           {isSav ? '...' : '✗ Quitar de esta fecha'}
                         </button>
                       </div>
@@ -2539,7 +2539,7 @@ function DayModal({
               {/* Footer */}
               <div style={{ padding: '12px 20px', borderTop: '1px solid var(--ivory)', display: 'flex', justifyContent: 'flex-end' }}>
                 <button onClick={() => setShowAffected(false)}
-                  style={{ fontSize: 12, padding: '7px 16px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'Manrope, sans-serif' }}>
+                  style={{ fontSize: 12, padding: '7px 16px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
                   Gestionar más tarde
                 </button>
               </div>
@@ -2556,7 +2556,7 @@ function DayModal({
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <User size={18} style={{ color: '#ef4444' }} />
                 </div>
-                <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--espresso)' }}>Lead sin fechas asignadas</div>
+                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--espresso)' }}>Lead sin fechas asignadas</div>
               </div>
               <div style={{ fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.6, marginBottom: 20 }}>
                 <strong>{removedLeadForCrm.name}</strong> ya no tiene ninguna fecha de boda asignada en el calendario. ¿Qué quieres hacer?

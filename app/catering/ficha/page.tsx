@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -76,7 +76,7 @@ export default function CateringFichaPage() {
     width: '100%', padding: '9px 12px', borderRadius: 8,
     border: '1px solid var(--ivory)', background: 'var(--cream)',
     fontSize: 13, color: 'var(--charcoal)', outline: 'none',
-    fontFamily: 'Manrope, sans-serif', boxSizing: 'border-box',
+    fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
   }
   const labelSt: React.CSSProperties = { display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 6 }
 
@@ -86,7 +86,7 @@ export default function CateringFichaPage() {
       <div className="main-layout"><main style={{ padding: '32px 40px', overflowY: 'auto', flex: 1 }}>
 
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Mi ficha</h1>
+          <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Mi ficha</h1>
           <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Información de tu empresa de catering que verán los wedding planners.</p>
         </div>
 
@@ -105,7 +105,7 @@ export default function CateringFichaPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, maxWidth: 800 }}>
               {/* Empresa */}
               <div style={{ background: '#fff', borderRadius: 12, padding: '24px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Empresa</h2>
+                <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Empresa</h2>
 
                 <div style={{ marginBottom: 16 }}>
                   <label style={labelSt}>Nombre de la empresa</label>
@@ -137,7 +137,7 @@ export default function CateringFichaPage() {
 
               {/* Contacto */}
               <div style={{ background: '#fff', borderRadius: 12, padding: '24px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Contacto</h2>
+                <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Contacto</h2>
                 <div style={{ marginBottom: 16 }}>
                   <label style={labelSt}>Nombre</label>
                   <input value={form.first_name} onChange={e => set('first_name', e.target.value)} style={inputSt} />
@@ -155,7 +155,7 @@ export default function CateringFichaPage() {
 
             <div style={{ marginTop: 24 }}>
               <button type="submit" disabled={saving}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 8, border: 'none', background: saved ? '#22c55e' : 'var(--charcoal)', color: '#fff', fontSize: 13, fontWeight: 500, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.7 : 1, fontFamily: 'Manrope, sans-serif', transition: 'background 0.3s' }}>
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 8, border: 'none', background: saved ? '#22c55e' : 'var(--charcoal)', color: '#fff', fontSize: 13, fontWeight: 500, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.7 : 1, fontFamily: 'Inter, sans-serif', transition: 'background 0.3s' }}>
                 {saved ? <><CheckCircle size={14} /> Guardado</> : <><Save size={14} /> Guardar cambios</>}
               </button>
             </div>

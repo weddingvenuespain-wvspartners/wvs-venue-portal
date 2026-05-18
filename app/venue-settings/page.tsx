@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
@@ -21,7 +21,7 @@ import type { VisitAvailability, DaySchedule, BlockedDate, VenueSpaceGroup, Venu
 type DurationType = '1_day' | '1_day_morning' | '2_days' | 'package' | 'custom'
 
 const DURATION_TYPES = [
-  { key: '1_day'         as DurationType, label: '1 día',                  sublabel: 'Solo el día del evento',          detail: 'Ej: 12:00 → 00:00',           color: '#C4975A', bg: '#FDF8F0', Icon: Sun              },
+  { key: '1_day'         as DurationType, label: '1 día',                  sublabel: 'Solo el día del evento',          detail: 'Ej: 12:00 → 00:00',           color: '#2E6DB4', bg: '#FDF8F0', Icon: Sun              },
   { key: '1_day_morning' as DurationType, label: '1 día + noche + mañana', sublabel: 'Hasta mediodía del día siguiente', detail: 'Ej: Sáb. 12:00 → Dom. 14:00', color: '#7C3AED', bg: '#F5F3FF', Icon: Moon             },
   { key: '2_days'        as DurationType, label: '2 días completos',        sublabel: 'Día 1 + noche + día 2 entero',    detail: 'Ej: Sáb. 12:00 → Dom. 23:59', color: '#2563EB', bg: '#EFF6FF', Icon: CalendarDays     },
   { key: 'package'       as DurationType, label: 'Paquetes de días',        sublabel: 'Varios rangos que cubren la semana', detail: 'Ej: Lun-Mié, Mié-Vie, Vie-Dom', color: '#059669', bg: '#ECFDF5', Icon: Package      },
@@ -340,7 +340,7 @@ function WeekDayPicker({ dayFrom, dayTo, onChange, accent = '#059669', hint, blo
                 border: 'none',
                 borderRight: i < 6 ? `1px solid ${active ? `${accent}44` : picking ? `${accent}22` : 'var(--ivory)'}` : 'none',
                 cursor: blocked ? 'not-allowed' : 'pointer',
-                fontFamily: 'Manrope, sans-serif',
+                fontFamily: 'Inter, sans-serif',
                 background: active ? accent : blocked ? '#F3F3F3' : isPending ? '#FAFAF9' : '#fff',
                 color: active ? '#fff' : blocked ? '#C8C8C8' : isPendingStart ? accent : 'var(--charcoal)',
                 transition: 'background 0.1s',
@@ -987,9 +987,9 @@ export default function EstructuraPage() {
               )}
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FDF8F0', border: '1px dashed #C4975A66', borderRadius: 10, padding: '14px 16px', marginBottom: 24 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #C4975A44' }}>
-                <Settings2 size={18} style={{ color: '#C4975A' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FDF8F0', border: '1px dashed #2E6DB466', borderRadius: 10, padding: '14px 16px', marginBottom: 24 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #2E6DB444' }}>
+                <Settings2 size={18} style={{ color: '#2E6DB4' }} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>Configura tu modelo comercial</div>
@@ -2520,14 +2520,14 @@ export default function EstructuraPage() {
 
         const cardOpts = (q: WizardQuestion) => {
           if (q === 'space_type') return [
-            { key: 'single',               icon: Building2, label: 'Un único espacio',                   sub: 'Solo un evento a la vez, sin posibilidad de reservar zonas adicionales',                          color: '#C4975A', bg: '#FDF8F0' },
+            { key: 'single',               icon: Building2, label: 'Un único espacio',                   sub: 'Solo un evento a la vez, sin posibilidad de reservar zonas adicionales',                          color: '#2E6DB4', bg: '#FDF8F0' },
             { key: 'single_with_supplements', icon: Layers, label: 'Espacio principal + zonas opcionales', sub: 'El cliente contrata el espacio base y puede añadir zonas extra con suplemento (jardín, terraza…)', color: '#7C3AED', bg: '#F5F3FF' },
             { key: 'multiple_independent', icon: LayoutGrid, label: 'Varias zonas del venue',              sub: 'El cliente puede escoger una zona o combinar varias. Cada zona tiene su propio precio',            color: '#2563EB', bg: '#EFF6FF' },
           ] as { key: string; icon: any; label: string; sub: string; color: string; bg: string }[]
           if (q === 'price_model') return [
             { key: 'rental',     icon: CreditCard, label: 'Alquiler del espacio', sub: 'Precio fijo por el alquiler del espacio',                        color: '#059669', bg: '#ECFDF5' },
             { key: 'per_person', icon: Users,      label: 'Precio por persona',   sub: 'El total depende de cuántos asistentes hay',                     color: '#DC2626', bg: '#FEF2F2' },
-            { key: 'package',    icon: Package,    label: 'Paquetes cerrados',    sub: 'Precio todo incluido (espacio + servicios) por persona o evento', color: '#C4975A', bg: '#FDF8F0' },
+            { key: 'package',    icon: Package,    label: 'Paquetes cerrados',    sub: 'Precio todo incluido (espacio + servicios) por persona o evento', color: '#2E6DB4', bg: '#FDF8F0' },
           ] as { key: string; icon: any; label: string; sub: string; color: string; bg: string }[]
           return null
         }

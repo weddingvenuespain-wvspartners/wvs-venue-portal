@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -119,7 +119,7 @@ export default function CateringSearchPage() {
     width: '100%', padding: '9px 12px', borderRadius: 8,
     border: '1px solid var(--ivory)', background: '#fff',
     fontSize: 13, color: 'var(--charcoal)', outline: 'none',
-    fontFamily: 'Manrope, sans-serif', boxSizing: 'border-box',
+    fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
   }
 
   return (
@@ -128,7 +128,7 @@ export default function CateringSearchPage() {
       <div className="main-layout"><main style={{ padding: '32px 40px', overflowY: 'auto', flex: 1 }}>
 
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Buscar catering</h1>
+          <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Buscar catering</h1>
           <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Encuentra proveedores de catering y solicita disponibilidad para tus parejas.</p>
         </div>
 
@@ -171,7 +171,7 @@ export default function CateringSearchPage() {
                 return (
                   <div key={c.user_id} style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column' }}>
                     <div style={{ height: 80, background: 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.02))', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                      <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', border: '2px solid rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: 16, color: '#16a34a' }}>
+                      <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', border: '2px solid rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 16, color: '#16a34a' }}>
                         {initials}
                       </div>
                       {c.venue_type && (
@@ -225,7 +225,7 @@ export default function CateringSearchPage() {
           <div style={{ background: '#fff', borderRadius: 16, padding: '28px 32px', width: '100%', maxWidth: 440 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
               <div>
-                <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 17, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Solicitar disponibilidad</h2>
+                <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 17, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Solicitar disponibilidad</h2>
                 <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>{requestItem.display_name}</p>
               </div>
               <button onClick={() => setRequestItem(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}>

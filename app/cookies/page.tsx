@@ -1,11 +1,11 @@
-export default function CookiesPage() {
+﻿export default function CookiesPage() {
   const sectionStyle: React.CSSProperties = {
     marginBottom: 32,
     paddingBottom: 32,
     borderBottom: '1px solid #ede8df',
   }
   const headingStyle: React.CSSProperties = {
-    fontFamily: 'Manrope, sans-serif',
+    fontFamily: 'Inter, sans-serif',
     fontSize: 20,
     fontWeight: 600,
     color: '#3b2a1a',
@@ -58,7 +58,7 @@ export default function CookiesPage() {
         <a href="/dashboard" style={{ fontSize: 12, color: '#c9a84c', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 20 }}>
           ← Volver al portal
         </a>
-        <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 500, letterSpacing: '0.01em', color: '#3b2a1a', marginBottom: 8, lineHeight: 1.2 }}>
+        <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 500, letterSpacing: '0.01em', color: '#3b2a1a', marginBottom: 8, lineHeight: 1.2 }}>
           Política de Cookies
         </h1>
         <p style={{ fontSize: 13, color: '#8c7b6b' }}>
@@ -179,7 +179,7 @@ export default function CookiesPage() {
           <div style={{ marginTop: 12, padding: '14px 18px', background: '#faf8f4', border: '1px solid #ede8df', borderRadius: 8 }}>
             <p><strong>WVS Partners SL</strong></p>
             <p style={{ marginTop: 4 }}>
-              <a href="mailto:info@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>info@weddingvenuesspain.com</a>
+              <a href="mailto:info@foreventos.com" style={{ color: '#c9a84c' }}>info@foreventos.com</a>
             </p>
           </div>
         </div>
@@ -187,7 +187,7 @@ export default function CookiesPage() {
 
       {/* Footer */}
       <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid #ede8df', textAlign: 'center', fontSize: 12, color: '#b8a898' }}>
-        Wedding Venues Spain Venue Portal · © 2025 ·{' '}
+        FOREVENTOS Venue Portal · © 2025 ·{' '}
         <a href="/privacidad" style={{ color: '#c9a84c' }}>Política de Privacidad</a>
       </div>
     </div>

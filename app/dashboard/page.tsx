@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -72,7 +72,7 @@ function AdminDashboard() {
         <div className="topbar">
           <div>
             <div className="topbar-title">Panel de Control</div>
-            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>Wedding Venues Spain — Visión general</div>
+            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>FOREVENTOS — Visión general</div>
           </div>
           <Link href="/admin" className="btn btn-primary btn-sm">
             <UserPlus size={13} /> Nuevo venue
@@ -220,7 +220,7 @@ function AdminDashboard() {
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                   {[
                     { label: 'Total', value: wpStats.total, color: '#a21caf', bg: '#fdf2f8' },
-                    { label: 'Nuevas', value: wpStats.new,  color: '#C4975A', bg: '#fdf8f4' },
+                    { label: 'Nuevas', value: wpStats.new,  color: '#2E6DB4', bg: '#fdf8f4' },
                     { label: 'Contactadas', value: wpStats.contacted, color: '#3b82f6', bg: '#eff6ff' },
                     { label: 'Aceptadas', value: wpStats.accepted, color: '#22c55e', bg: '#f0fdf4' },
                   ].map(item => (
@@ -332,7 +332,7 @@ function VenueDashboard() {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 6000)
       fetch(
-        `https://weddingvenuesspain.com/wp-json/wp/v2/venues/${wpVenueId}?acf_format=standard`,
+        `https://foreventos.com/wp-json/wp/v2/venues/${wpVenueId}?acf_format=standard`,
         { cache: 'no-store', signal: controller.signal }
       )
         .then(r => r.ok ? r.json() : null)
@@ -392,16 +392,16 @@ function VenueDashboard() {
           <div className="topbar"><div className="topbar-title">Bienvenido</div></div>
           <div className="page-content" style={{ maxWidth: 600, margin: '0 auto', paddingTop: 48 }}>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 500, letterSpacing: '0.01em', color: 'var(--espresso)', marginBottom: 8 }}>Wedding Venues Spain</div>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 500, letterSpacing: '0.01em', color: 'var(--espresso)', marginBottom: 8 }}>FOREVENTOS</div>
               <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Venue Portal</div>
             </div>
             {!onboarding || onbStatus === 'draft' ? (
               <div className="card">
                 <div className="card-body" style={{ textAlign: 'center', padding: 40 }}>
                   <ClipboardList size={36} style={{ color: 'var(--gold)', margin: '0 auto 16px' }} />
-                  <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Registra tu venue</div>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Registra tu venue</div>
                   <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 24, lineHeight: 1.7 }}>
-                    Para aparecer en Wedding Venues Spain necesitamos la información de tu venue.
+                    Para aparecer en FOREVENTOS necesitamos la información de tu venue.
                   </div>
                   <Link href="/onboarding" className="btn btn-primary">Empezar registro →</Link>
                 </div>
@@ -410,7 +410,7 @@ function VenueDashboard() {
               <div className="card">
                 <div className="card-body" style={{ textAlign: 'center', padding: 40 }}>
                   <AlertCircle size={22} style={{ color: '#92400e', margin: '0 auto 16px' }} />
-                  <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Solicitud en revisión</div>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Solicitud en revisión</div>
                   <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.7 }}>
                     Hemos recibido la información de <strong>{onboarding.name}</strong>. Te avisaremos en 24-48 horas.
                   </div>
@@ -419,7 +419,7 @@ function VenueDashboard() {
             ) : onbStatus === 'rejected' ? (
               <div className="card">
                 <div className="card-body" style={{ textAlign: 'center', padding: 40 }}>
-                  <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, marginBottom: 8, color: 'var(--rose)' }}>Solicitud no aprobada</div>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 600, marginBottom: 8, color: 'var(--rose)' }}>Solicitud no aprobada</div>
                   {onboarding.admin_notes && <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 20 }}>{onboarding.admin_notes}</div>}
                   <Link href="/onboarding" className="btn btn-primary">Volver a intentarlo →</Link>
                 </div>
@@ -500,7 +500,7 @@ function VenueDashboard() {
                     {k.icon}
                   </div>
                 </div>
-                <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 34, fontWeight: 700, color: k.accent, lineHeight: 1, marginBottom: 6 }}>
+                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 34, fontWeight: 700, color: k.accent, lineHeight: 1, marginBottom: 6 }}>
                   {k.value !== null ? k.value : <Skeleton w={40} h={28} radius={4} />}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{k.sub}</div>
@@ -583,7 +583,7 @@ function VenueDashboard() {
                       <img src={venue.acf.photo_gallery.section_2_image[0][0].full_image_url} alt={venueName}
                         style={{ width: '100%', height: 150, objectFit: 'cover', borderRadius: 6, marginBottom: 14 }} />
                     )}
-                    <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 17, fontWeight: 600, marginBottom: 4 }}>{venueName}</div>
+                    <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 17, fontWeight: 600, marginBottom: 4 }}>{venueName}</div>
                     {venue?.acf?.location && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 10 }}>{venue.acf.location}</div>}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className="badge badge-active">Publicada</span>

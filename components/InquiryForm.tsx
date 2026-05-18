@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { Calendar, Phone, Video, UtensilsCrossed, MessageCircle, Check, type LucideIcon } from 'lucide-react'
@@ -31,7 +31,7 @@ export default function InquiryForm({
   proposalId,
   coupleName,
   kinds,
-  primary = '#C4975A',
+  primary = '#2E6DB4',
   onPrimary = '#fff',
   dark = false,
 }: {

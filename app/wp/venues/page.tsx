@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -132,7 +132,7 @@ export default function VenueSearchPage() {
     width: '100%', padding: '9px 12px', borderRadius: 8,
     border: '1px solid var(--ivory)', background: '#fff',
     fontSize: 13, color: 'var(--charcoal)', outline: 'none',
-    fontFamily: 'Manrope, sans-serif', boxSizing: 'border-box',
+    fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
   }
 
   const favCount = venues.filter(v => favorites.has(v.user_id)).length
@@ -143,7 +143,7 @@ export default function VenueSearchPage() {
       <div className="main-layout"><main style={{ padding: '32px 40px', overflowY: 'auto', flex: 1 }}>
 
         <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Venues</h1>
+          <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Venues</h1>
           <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>
             Explora los venues disponibles, guarda tus favoritos y solicita disponibilidad para tus parejas.
           </p>
@@ -157,7 +157,7 @@ export default function VenueSearchPage() {
           ] as { key: ViewTab; label: string }[]).map(t => (
             <button key={t.key} onClick={() => setViewTab(t.key)} style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px',
-              borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'Manrope, sans-serif',
+              borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
               background: viewTab === t.key ? '#fff' : 'transparent',
               color: viewTab === t.key ? 'var(--charcoal)' : 'var(--warm-gray)',
               fontSize: 13, fontWeight: viewTab === t.key ? 600 : 400,
@@ -225,7 +225,7 @@ export default function VenueSearchPage() {
                   <div key={v.user_id} style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: isFav ? '0 2px 12px rgba(239,68,68,0.08)' : '0 1px 6px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', border: isFav ? '1px solid rgba(239,68,68,0.15)' : '1px solid transparent', transition: 'box-shadow 0.2s, border-color 0.2s' }}>
                     {/* Card header */}
                     <div style={{ height: 80, background: 'linear-gradient(135deg, rgba(196,151,90,0.12), rgba(196,151,90,0.04))', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                      <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(196,151,90,0.15)', border: '2px solid rgba(196,151,90,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--gold)' }}>
+                      <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(196,151,90,0.15)', border: '2px solid rgba(196,151,90,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--gold)' }}>
                         {initials}
                       </div>
                       {v.venue_type && (
@@ -308,7 +308,7 @@ export default function VenueSearchPage() {
           <div style={{ background: '#fff', borderRadius: 16, padding: '28px 32px', width: '100%', maxWidth: 440 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
               <div>
-                <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 17, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Solicitar disponibilidad</h2>
+                <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 17, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Solicitar disponibilidad</h2>
                 <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>{requestVenue.display_name}</p>
               </div>
               <button onClick={() => setRequestVenue(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}>

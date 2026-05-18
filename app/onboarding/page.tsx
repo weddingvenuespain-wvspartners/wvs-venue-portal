@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
@@ -19,7 +19,7 @@ const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px 12px 10px 34px', borderRadius: 8,
   border: '1px solid var(--ivory)', background: 'var(--cream)',
   fontSize: 14, color: 'var(--charcoal)', outline: 'none',
-  fontFamily: 'Manrope, sans-serif', boxSizing: 'border-box',
+  fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
 }
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 12, fontWeight: 500,
@@ -231,8 +231,8 @@ export default function OnboardingPage() {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, color: 'var(--gold)', letterSpacing: '0.06em', fontWeight: 500 }}>
-            Wedding Venues Spain
+          <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, color: 'var(--gold)', letterSpacing: '0.06em', fontWeight: 500 }}>
+            FOREVENTOS
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 4 }}>
             <RoleIcon size={13} style={{ color: 'var(--warm-gray)' }} />
@@ -246,7 +246,7 @@ export default function OnboardingPage() {
             <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{
                 width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 12, fontWeight: 600, fontFamily: 'Manrope, sans-serif',
+                fontSize: 12, fontWeight: 600, fontFamily: 'Inter, sans-serif',
                 background: s < step ? 'var(--gold)' : s === step ? 'var(--charcoal)' : 'var(--ivory)',
                 color: s < step ? '#fff' : s === step ? '#fff' : 'var(--warm-gray)',
                 border: s === step ? '2px solid var(--charcoal)' : '2px solid transparent',
@@ -261,7 +261,7 @@ export default function OnboardingPage() {
         {/* ── Step 1 ── */}
         {step === 1 && (
           <div style={{ background: '#fff', borderRadius: 16, padding: '36px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
-            <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 6 }}>
+            <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 6 }}>
               {step1Title}
             </h1>
             <p style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 28 }}>{step1Sub}</p>
@@ -291,7 +291,7 @@ export default function OnboardingPage() {
                       onMouseOut={e => { if (!selected) { e.currentTarget.style.borderColor = 'var(--ivory)'; e.currentTarget.style.background = 'var(--cream)' } }}
                       style={{
                         padding: '9px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-                        fontFamily: 'Manrope, sans-serif', transition: 'all 0.15s', textAlign: 'left',
+                        fontFamily: 'Inter, sans-serif', transition: 'all 0.15s', textAlign: 'left',
                         border: selected ? '2px solid var(--gold)' : '2px solid var(--ivory)',
                         background: selected ? 'rgba(196,151,90,0.08)' : 'var(--cream)',
                         color: selected ? 'var(--gold)' : 'var(--charcoal)',
@@ -317,7 +317,7 @@ export default function OnboardingPage() {
               </div>
 
               <button type="submit" disabled={saving}
-                style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: 'var(--charcoal)', color: '#fff', fontSize: 14, fontWeight: 500, fontFamily: 'Manrope, sans-serif', cursor: saving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: saving ? 0.7 : 1, transition: 'opacity 0.15s' }}
+                style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: 'var(--charcoal)', color: '#fff', fontSize: 14, fontWeight: 500, fontFamily: 'Inter, sans-serif', cursor: saving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: saving ? 0.7 : 1, transition: 'opacity 0.15s' }}
               >
                 {saving ? <><Loader2 size={15} style={{ animation: 'spin 0.8s linear infinite' }} /> Guardando...</> : <>Continuar <ArrowRight size={15} /></>}
               </button>
@@ -328,7 +328,7 @@ export default function OnboardingPage() {
         {/* ── Step 2 ── */}
         {step === 2 && (
           <div style={{ background: '#fff', borderRadius: 16, padding: '36px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
-            <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 6 }}>
+            <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 6 }}>
               Datos de contacto
             </h1>
             <p style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 28 }}>
@@ -397,7 +397,7 @@ export default function OnboardingPage() {
               )}
 
               <button type="submit" disabled={saving}
-                style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: 'var(--charcoal)', color: '#fff', fontSize: 14, fontWeight: 500, fontFamily: 'Manrope, sans-serif', cursor: saving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: saving ? 0.7 : 1, transition: 'opacity 0.15s' }}
+                style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: 'none', background: 'var(--charcoal)', color: '#fff', fontSize: 14, fontWeight: 500, fontFamily: 'Inter, sans-serif', cursor: saving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: saving ? 0.7 : 1, transition: 'opacity 0.15s' }}
               >
                 {saving ? <><Loader2 size={15} style={{ animation: 'spin 0.8s linear infinite' }} /> Guardando...</> : <>Finalizar <Check size={15} /></>}
               </button>

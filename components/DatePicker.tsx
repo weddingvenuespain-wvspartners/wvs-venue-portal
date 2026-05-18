@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useRef, useState } from 'react'
 import { CalendarDays } from 'lucide-react'
 
@@ -11,7 +11,7 @@ export function fmtDate(d: string) {
   return `${parseInt(day)} ${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(m)-1]} ${y.slice(2)}`
 }
 
-export default function DatePicker({ value, onChange, label, accent = '#C4975A', minDate, allowPast = false, dark = false, placeholder = 'Seleccionar fecha', disabledRanges = [] }: {
+export default function DatePicker({ value, onChange, label, accent = '#2E6DB4', minDate, allowPast = false, dark = false, placeholder = 'Seleccionar fecha', disabledRanges = [] }: {
   value: string
   onChange: (v: string) => void
   label?: string
@@ -76,7 +76,7 @@ export default function DatePicker({ value, onChange, label, accent = '#C4975A',
     <div>
       {label && <div style={{ fontSize: 10, fontWeight: 600, color: subText, marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</div>}
       <button ref={btnRef} type="button" onClick={toggle}
-        style={{ width: '100%', padding: '8px 10px', border: `1px solid ${triggerBorder}`, borderRadius: 8, background: triggerBg, cursor: 'pointer', textAlign: 'left', fontSize: 12, color: value ? triggerText : triggerEmpty, fontFamily: 'Manrope, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, outline: 'none' }}>
+        style={{ width: '100%', padding: '8px 10px', border: `1px solid ${triggerBorder}`, borderRadius: 8, background: triggerBg, cursor: 'pointer', textAlign: 'left', fontSize: 12, color: value ? triggerText : triggerEmpty, fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, outline: 'none' }}>
         <span style={{ flex: 1 }}>{value ? fmtDate(value) : placeholder}</span>
         <CalendarDays size={12} style={{ color: subText, flexShrink: 0 }} />
       </button>
@@ -101,15 +101,15 @@ export default function DatePicker({ value, onChange, label, accent = '#C4975A',
               const isDisabled = (!allowPast && iso < today) || (!!minDate && iso < minDate) || isInDisabledRange(iso)
               return (
                 <button key={day} type="button" onClick={() => selectDay(day)} disabled={isDisabled}
-                  style={{ padding: '6px 0', textAlign: 'center', fontSize: 12, border: 'none', borderRadius: 7, cursor: isDisabled ? 'default' : 'pointer', fontFamily: 'Manrope, sans-serif', background: isSel ? accent : 'transparent', color: isSel ? '#fff' : isDisabled ? '#ccc' : isToday ? accent : 'var(--charcoal)', fontWeight: isSel || isToday ? 700 : 400, outline: isToday && !isSel ? `1.5px solid ${accent}` : 'none', outlineOffset: -2 }}>
+                  style={{ padding: '6px 0', textAlign: 'center', fontSize: 12, border: 'none', borderRadius: 7, cursor: isDisabled ? 'default' : 'pointer', fontFamily: 'Inter, sans-serif', background: isSel ? accent : 'transparent', color: isSel ? '#fff' : isDisabled ? '#ccc' : isToday ? accent : 'var(--charcoal)', fontWeight: isSel || isToday ? 700 : 400, outline: isToday && !isSel ? `1.5px solid ${accent}` : 'none', outlineOffset: -2 }}>
                   {day}
                 </button>
               )
             })}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--ivory)' }}>
-            <button type="button" onClick={() => { onChange(''); setOpen(false) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--warm-gray)', fontFamily: 'Manrope, sans-serif' }}>Borrar</button>
-            {!allowPast && <button type="button" onClick={() => { onChange(today); setOpen(false) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: accent, fontWeight: 700, fontFamily: 'Manrope, sans-serif' }}>Hoy</button>}
+            <button type="button" onClick={() => { onChange(''); setOpen(false) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--warm-gray)', fontFamily: 'Inter, sans-serif' }}>Borrar</button>
+            {!allowPast && <button type="button" onClick={() => { onChange(today); setOpen(false) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: accent, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>Hoy</button>}
           </div>
         </div>
       )}

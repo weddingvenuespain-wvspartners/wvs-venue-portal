@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -80,7 +80,7 @@ export default function PlannerDashboard() {
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
             <div>
-              <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 4 }}>
+              <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 4 }}>
                 Bienvenido/a{profile?.first_name ? `, ${profile.first_name}` : ''}
               </h1>
               <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Aquí tienes un resumen de tu actividad como wedding planner.</p>
@@ -90,7 +90,7 @@ export default function PlannerDashboard() {
             <Link href="/wp/clients?new=1" style={{
               display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px',
               borderRadius: 8, background: 'var(--charcoal)', color: '#fff',
-              fontSize: 13, fontWeight: 500, textDecoration: 'none', fontFamily: 'Manrope, sans-serif',
+              fontSize: 13, fontWeight: 500, textDecoration: 'none', fontFamily: 'Inter, sans-serif',
             }}>
               <Plus size={14} /> Nueva pareja
             </Link>
@@ -109,7 +109,7 @@ export default function PlannerDashboard() {
                   </div>
                   {dataLoading
                     ? <Skeleton w={40} h={28} />
-                    : <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--charcoal)', fontFamily: 'Manrope, sans-serif' }}>{k.value}</div>
+                    : <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--charcoal)', fontFamily: 'Inter, sans-serif' }}>{k.value}</div>
                   }
                 </div>
               </Link>
@@ -121,7 +121,7 @@ export default function PlannerDashboard() {
             {/* Recent couples */}
             <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 8px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
               <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--charcoal)', fontFamily: 'Manrope, sans-serif' }}>Parejas recientes</span>
+                <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--charcoal)', fontFamily: 'Inter, sans-serif' }}>Parejas recientes</span>
                 <Link href="/wp/clients" style={{ fontSize: 12, color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
                   Ver todas <ArrowRight size={12} />
                 </Link>
@@ -180,7 +180,7 @@ export default function PlannerDashboard() {
               {/* Pending venues */}
               <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 8px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
                 <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ivory)' }}>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--charcoal)', fontFamily: 'Manrope, sans-serif' }}>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--charcoal)', fontFamily: 'Inter, sans-serif' }}>
                     <Clock size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 5, color: '#3b82f6' }} />
                     Respuestas pendientes
                   </span>
@@ -214,7 +214,7 @@ export default function PlannerDashboard() {
               {/* Quick actions */}
               <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 8px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
                 <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ivory)' }}>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--charcoal)', fontFamily: 'Manrope, sans-serif' }}>Acciones rápidas</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--charcoal)', fontFamily: 'Inter, sans-serif' }}>Acciones rápidas</span>
                 </div>
                 {[
                   { href: '/wp/clients', icon: <Users size={14} />, label: 'Ver todas las parejas', color: 'var(--gold)' },

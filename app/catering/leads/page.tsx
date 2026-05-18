@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -84,7 +84,7 @@ export default function CateringLeadsPage() {
       <div className="main-layout"><main style={{ padding: '32px 40px', overflowY: 'auto', flex: 1 }}>
 
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Solicitudes</h1>
+          <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Solicitudes</h1>
           <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>{leads.length} solicitud{leads.length !== 1 ? 'es' : ''} recibida{leads.length !== 1 ? 's' : ''}</p>
         </div>
 
@@ -97,7 +97,7 @@ export default function CateringLeadsPage() {
                 background: statusFilter === s.value ? 'var(--charcoal)' : '#fff',
                 color: statusFilter === s.value ? '#fff' : 'var(--warm-gray)',
                 fontSize: 12, fontWeight: statusFilter === s.value ? 600 : 400,
-                fontFamily: 'Manrope, sans-serif', boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                fontFamily: 'Inter, sans-serif', boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
               }}>
               {s.label}
             </button>
@@ -163,7 +163,7 @@ export default function CateringLeadsPage() {
         >
           <div style={{ background: '#fff', borderRadius: 16, padding: '28px 32px', width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--charcoal)' }}>{selected.name}</h2>
+              <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--charcoal)' }}>{selected.name}</h2>
               <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', fontSize: 18 }}>✕</button>
             </div>
 
