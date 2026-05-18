@@ -7,7 +7,7 @@ type Props = {
   style?: React.CSSProperties
 }
 
-export default function Spinner({ size = 24, color = 'var(--gold)', thickness = 2, style }: Props) {
+export default function Spinner({ size = 24, color = 'var(--fe-primary)', thickness = 2, style }: Props) {
   return (
     <div
       role="status"
