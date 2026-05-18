@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, X, Check, Loader2 } from 'lucide-react'
 
@@ -47,7 +47,7 @@ function stepNum(s: Step) {
 const TOTAL_STEPS = 3
 
 export default function VisitBookingModal({
-  proposalId, coupleName, primaryColor = '#C4975A',
+  proposalId, coupleName, primaryColor = '#2E6DB4',
   selectedSpaces = [], selectedMenus = [], selectedExtraSvcs = [], spaceGroups,
   dateSlots = [], preSelectedDateSlot = null,
   onClose, onSuccess,

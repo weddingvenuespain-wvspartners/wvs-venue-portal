@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -60,8 +60,8 @@ function Checkbox({
         onKeyDown={e => (e.key === ' ' || e.key === 'Enter') && onChange(!checked)}
         style={{
           width: 18, height: 18, borderRadius: 4, flexShrink: 0, marginTop: 1,
-          border: `2px solid ${checked ? '#C4975A' : 'rgba(255,255,255,0.2)'}`,
-          background: checked ? '#C4975A' : 'transparent',
+          border: `2px solid ${checked ? '#2E6DB4' : 'rgba(255,255,255,0.2)'}`,
+          background: checked ? '#2E6DB4' : 'transparent',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'all 0.15s', cursor: 'pointer',
         }}
@@ -142,8 +142,8 @@ function RegistroPageInner() {
     <div className="login-page">
       <a href="/" style={{ position: 'fixed', top: 20, left: 24, textDecoration: 'none', zIndex: 10 }}>
         <img
-          src="https://weddingvenuesspain.com/wp-content/uploads/2024/10/logo-wedding-venues-spain-white-e1732122540714.png"
-          alt="Wedding Venues Spain"
+          src="https://foreventos.com/wp-content/uploads/2024/10/logo-foreventos-white-e1732122540714.png"
+          alt="FOREVENTOS"
           style={{ height: 30, width: 'auto', opacity: 0.75, transition: 'opacity 0.2s' }}
           onMouseOver={e => (e.currentTarget.style.opacity = '1')}
           onMouseOut={e => (e.currentTarget.style.opacity = '0.75')}
@@ -152,7 +152,7 @@ function RegistroPageInner() {
 
       <div className="login-box" style={{ padding: '28px 32px' }}>
         <div className="login-logo" style={{ fontSize: 16, letterSpacing: '0.05em', whiteSpace: 'nowrap', marginTop: 8 }}>
-          Wedding Venues Spain
+          FOREVENTOS
         </div>
         <div className="login-subtitle" style={{ marginBottom: 18 }}>Venue Portal</div>
 
@@ -174,15 +174,15 @@ function RegistroPageInner() {
                       style={{
                         display: 'flex', flexDirection: 'column', alignItems: 'center',
                         gap: 6, padding: '10px 8px', borderRadius: 8, cursor: 'pointer',
-                        border: selected ? '1.5px solid #C4975A' : '1.5px solid rgba(255,255,255,0.1)',
+                        border: selected ? '1.5px solid #2E6DB4' : '1.5px solid rgba(255,255,255,0.1)',
                         background: selected ? 'rgba(196,151,90,0.12)' : 'rgba(255,255,255,0.03)',
                         transition: 'all 0.15s', textAlign: 'center',
                       }}
                     >
-                      <span style={{ opacity: selected ? 1 : 0.4, color: selected ? '#C4975A' : 'rgba(255,255,255,0.6)' }}>
+                      <span style={{ opacity: selected ? 1 : 0.4, color: selected ? '#2E6DB4' : 'rgba(255,255,255,0.6)' }}>
                         {icon}
                       </span>
-                      <div style={{ fontSize: 12, fontWeight: 600, fontFamily: 'Manrope, sans-serif', color: selected ? '#C4975A' : 'rgba(255,255,255,0.6)', lineHeight: 1.2 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, fontFamily: 'Inter, sans-serif', color: selected ? '#2E6DB4' : 'rgba(255,255,255,0.6)', lineHeight: 1.2 }}>
                         {label}
                       </div>
                     </button>
@@ -196,7 +196,7 @@ function RegistroPageInner() {
               <div style={{ background: 'rgba(196,151,90,0.1)', border: '1px solid rgba(196,151,90,0.25)', borderRadius: 8, padding: '10px 14px', fontSize: 12, marginBottom: 16, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
                 Ya existe una cuenta con este email.{' '}
                 <button type="button" onClick={() => router.push(`/login?hint=${encodeURIComponent(email)}`)}
-                  style={{ background: 'none', border: 'none', color: '#C4975A', fontSize: 12, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textDecoration: 'underline', padding: 0 }}>
+                  style={{ background: 'none', border: 'none', color: '#2E6DB4', fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', textDecoration: 'underline', padding: 0 }}>
                   Iniciar sesión →
                 </button>
               </div>
@@ -220,11 +220,11 @@ function RegistroPageInner() {
                 <Checkbox id="terms" checked={acceptTerms} onChange={setAcceptTerms}>
                   He leído y acepto los{' '}
                   <a href="/terminos" target="_blank" rel="noopener noreferrer"
-                    style={{ color: '#C4975A', textDecoration: 'underline' }}>
+                    style={{ color: '#2E6DB4', textDecoration: 'underline' }}>
                     términos de servicio
                   </a>{' '}y la{' '}
                   <a href="/privacidad" target="_blank" rel="noopener noreferrer"
-                    style={{ color: '#C4975A', textDecoration: 'underline' }}>
+                    style={{ color: '#2E6DB4', textDecoration: 'underline' }}>
                     política de privacidad
                   </a>
                   {' '}<span style={{ color: 'rgba(239,68,68,0.8)' }}>*</span>
@@ -257,8 +257,8 @@ function RegistroPageInner() {
 
             <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.12)', textAlign: 'center', marginTop: 10, lineHeight: 1.5 }}>
               Responsable: WVS Partners SL · Finalidad: gestión del portal ·{' '}
-              <a href="mailto:info@weddingvenuesspain.com" style={{ color: 'rgba(255,255,255,0.2)', textDecoration: 'underline' }}>
-                info@weddingvenuesspain.com
+              <a href="mailto:info@foreventos.com" style={{ color: 'rgba(255,255,255,0.2)', textDecoration: 'underline' }}>
+                info@foreventos.com
               </a>
             </p>
           </>
@@ -271,7 +271,7 @@ function RegistroPageInner() {
             }}>
               <Check size={24} color="#4ade80" strokeWidth={2.5} />
             </div>
-            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 8 }}>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 8 }}>
               ¡Cuenta creada!
             </div>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6 }}>
@@ -282,7 +282,7 @@ function RegistroPageInner() {
             <button
               type="button"
               onClick={() => router.push('/login')}
-              style={{ background: 'none', border: 'none', color: '#C4975A', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', marginTop: 16 }}
+              style={{ background: 'none', border: 'none', color: '#2E6DB4', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'Inter, sans-serif', marginTop: 16 }}
             >
               Ir a iniciar sesión →
             </button>
@@ -295,7 +295,7 @@ function RegistroPageInner() {
             <button
               type="button"
               onClick={() => router.push('/login')}
-              style={{ background: 'none', border: 'none', color: '#C4975A', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'Manrope, sans-serif' }}
+              style={{ background: 'none', border: 'none', color: '#2E6DB4', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
             >
               Iniciar sesión →
             </button>

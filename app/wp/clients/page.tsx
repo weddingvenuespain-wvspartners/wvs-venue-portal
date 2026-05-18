@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -348,7 +348,7 @@ export default function ClientsPage() {
     width: '100%', padding: '9px 12px', borderRadius: 8,
     border: '1px solid var(--ivory)', background: 'var(--cream)',
     fontSize: 13, color: 'var(--charcoal)', outline: 'none',
-    fontFamily: 'Manrope, sans-serif', boxSizing: 'border-box',
+    fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
   }
 
   const labelSt: React.CSSProperties = {
@@ -363,13 +363,13 @@ export default function ClientsPage() {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
           <div>
-            <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Mis parejas</h1>
+            <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Mis parejas</h1>
             <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>{clients.length} pareja{clients.length !== 1 ? 's' : ''} registrada{clients.length !== 1 ? 's' : ''}</p>
           </div>
           <button onClick={openModal} style={{
             display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px',
             borderRadius: 8, background: 'var(--charcoal)', color: '#fff',
-            fontSize: 13, fontWeight: 500, fontFamily: 'Manrope, sans-serif', border: 'none', cursor: 'pointer',
+            fontSize: 13, fontWeight: 500, fontFamily: 'Inter, sans-serif', border: 'none', cursor: 'pointer',
           }}>
             <Plus size={14} /> Nueva pareja
           </button>
@@ -480,8 +480,8 @@ export default function ClientsPage() {
             {/* Modal header */}
             <div style={{ padding: '24px 28px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div>
-                <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 700, color: 'var(--charcoal)', margin: 0 }}>Nueva pareja</h2>
-                <p style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 3, marginBottom: 0 }}>Vía WVS Planner · Los campos con * son obligatorios</p>
+                <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 700, color: 'var(--charcoal)', margin: 0 }}>Nueva pareja</h2>
+                <p style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 3, marginBottom: 0 }}>Vía FOREVENTOS Planner · Los campos con * son obligatorios</p>
               </div>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}>
                 <X size={18} />

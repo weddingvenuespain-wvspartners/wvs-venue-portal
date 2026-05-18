@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { Palette, Upload, CheckCircle, Eye, RotateCcw } from 'lucide-react'
 
 const PRESET_PALETTES = [
-  { label: 'Dorado clásico',  primary: '#c4975a', secondary: '#f5f0ea' },
+  { label: 'Dorado clásico',  primary: '#2E6DB4', secondary: '#f5f0ea' },
   { label: 'Rosa peonía',     primary: '#be185d', secondary: '#fdf2f8' },
   { label: 'Verde salvia',    primary: '#4a7c59', secondary: '#f0f5f1' },
   { label: 'Azul pizarra',    primary: '#334e68', secondary: '#f0f4f8' },
@@ -23,7 +23,7 @@ export default function BrandingPage() {
 
   const [form, setForm] = useState({
     proposal_title:  '',
-    brand_color:     '#c4975a',
+    brand_color:     '#2E6DB4',
     brand_color2:    '#f5f0ea',
     brand_logo_url:  '',
   })
@@ -48,7 +48,7 @@ export default function BrandingPage() {
         if (data) {
           setForm({
             proposal_title: data.proposal_title || '',
-            brand_color:    data.brand_color    || '#c4975a',
+            brand_color:    data.brand_color    || '#2E6DB4',
             brand_color2:   data.brand_color2   || '#f5f0ea',
             brand_logo_url: data.brand_logo_url || '',
           })
@@ -101,7 +101,7 @@ export default function BrandingPage() {
   const inputSt: React.CSSProperties = {
     width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--ivory)',
     background: 'var(--cream)', fontSize: 13, color: 'var(--charcoal)', outline: 'none',
-    fontFamily: 'Manrope, sans-serif', boxSizing: 'border-box',
+    fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
   }
   const labelSt: React.CSSProperties = {
     display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 6,
@@ -113,7 +113,7 @@ export default function BrandingPage() {
       <div className="main-layout"><main style={{ padding: '32px 40px', overflowY: 'auto', flex: 1, maxWidth: 900 }}>
 
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 4 }}>Branding de propuesta</h1>
+          <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 4 }}>Branding de propuesta</h1>
           <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Personaliza los colores y el logo que verá la pareja en su propuesta web.</p>
         </div>
 
@@ -129,7 +129,7 @@ export default function BrandingPage() {
 
               {/* Título de la propuesta */}
               <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 16 }}>
+                <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 16 }}>
                   Título de la propuesta
                 </h2>
                 <div>
@@ -149,7 +149,7 @@ export default function BrandingPage() {
 
               {/* Logo */}
               <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 16 }}>Logo</h2>
+                <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 16 }}>Logo</h2>
 
                 {form.brand_logo_url ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 18px', background: 'var(--cream)', borderRadius: 10, border: '1px solid var(--ivory)', marginBottom: 12 }}>
@@ -200,7 +200,7 @@ export default function BrandingPage() {
 
               {/* Colores */}
               <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 16 }}>Paleta de colores</h2>
+                <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 16 }}>Paleta de colores</h2>
 
                 {/* Presets */}
                 <div style={{ marginBottom: 20 }}>
@@ -275,7 +275,7 @@ export default function BrandingPage() {
                         <Palette size={20} color="#fff" />
                       </div>
                     )}
-                    <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 700, color: form.brand_color, marginBottom: 3 }}>
+                    <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 700, color: form.brand_color, marginBottom: 3 }}>
                       {form.proposal_title || 'Tu propuesta de boda'}
                     </div>
                     <div style={{ fontSize: 11, color: '#6b7280' }}>Preparada especialmente para vosotros</div>

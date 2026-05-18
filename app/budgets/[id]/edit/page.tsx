@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useCallback, use, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -872,7 +872,7 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }} onClick={() => setShowImport(false)}>
           <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 480, maxHeight: '70vh', overflow: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 17, color: 'var(--espresso)' }}>Importar desde estructura</div>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 17, color: 'var(--espresso)' }}>Importar desde estructura</div>
               <button onClick={() => setShowImport(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={18} /></button>
             </div>
             <div style={{ padding: '16px 24px' }}>

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 // Shared utilities for all proposal templates
 
 import { useEffect, useRef, useState } from 'react'
@@ -775,7 +775,7 @@ export function TestimonialsCards({ items, primary, dark = true, font }: { items
   const textColor = dark ? 'rgba(255,255,255,.75)' : '#3a342f'
   const nameColor = dark ? '#fff' : '#181410'
   const dividerColor = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
-  const FONT = font || "'Cormorant Garamond', Georgia, serif"
+  const FONT = font || "'Satoshi', Georgia, serif"
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 24, alignItems: 'stretch' }}>
       {items.map((t, i) => {
@@ -808,7 +808,7 @@ export function TestimonialsQuotes({ items, primary, dark = true, font }: { item
   const textColor = dark ? 'rgba(255,255,255,.85)' : '#3a342f'
   const nameColor = dark ? '#fff' : '#181410'
   const divider = dark ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.08)'
-  const FONT = font || "'Cormorant Garamond', Georgia, serif"
+  const FONT = font || "'Satoshi', Georgia, serif"
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {items.map((t, i) => {
@@ -873,7 +873,7 @@ export function TestimonialsFeatured({ items, primary, dark = true, font }: { it
   const [idx, setIdx] = useState(0)
   if (!items.length) return null
   const rgb = toRgb(primary)
-  const FONT = font || "'Cormorant Garamond', Georgia, serif"
+  const FONT = font || "'Satoshi', Georgia, serif"
   const textColor = dark ? 'rgba(255,255,255,.85)' : '#3a342f'
   const nameColor = dark ? '#fff' : '#181410'
   const t = items[idx % items.length]
@@ -1108,7 +1108,7 @@ export type PackageItem = {
 export function PricingCards({ packages, primary, dark = true, font }: { packages: PackageItem[]; primary: string; dark?: boolean; font?: string }) {
   if (!packages.length) return null
   const rgb = toRgb(primary)
-  const FONT = font || "'Cormorant Garamond', Georgia, serif"
+  const FONT = font || "'Satoshi', Georgia, serif"
   const surface = dark ? 'rgba(255,255,255,.04)' : '#fff'
   const border = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
   const text = dark ? 'rgba(255,255,255,.88)' : '#181410'
@@ -1159,7 +1159,7 @@ export function PricingCards({ packages, primary, dark = true, font }: { package
 export function PricingTable({ packages, primary, dark = true, font }: { packages: PackageItem[]; primary: string; dark?: boolean; font?: string }) {
   if (!packages.length) return null
   const rgb = toRgb(primary)
-  const FONT = font || "'Cormorant Garamond', Georgia, serif"
+  const FONT = font || "'Satoshi', Georgia, serif"
   const border = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
   const text = dark ? 'rgba(255,255,255,.88)' : '#181410'
   const sub = dark ? 'rgba(255,255,255,.45)' : '#6a6560'

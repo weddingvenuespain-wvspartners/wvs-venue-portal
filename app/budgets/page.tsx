@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -180,7 +180,7 @@ export default function BudgetsPage() {
               {filtered.length === 0 ? (
                 <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
                   <Receipt size={36} style={{ color: 'var(--gold)', margin: '0 auto 16px', opacity: 0.6 }} />
-                  <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, marginBottom: 8 }}>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, marginBottom: 8 }}>
                     {budgets.length === 0 ? 'Sin presupuestos' : 'Sin resultados'}
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 20 }}>
@@ -380,7 +380,7 @@ function PaymentTemplatesTab({ templates, userId, venueId, onRefresh }: {
       {templates.length === 0 && !isNew ? (
         <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
           <Calculator size={36} style={{ color: 'var(--gold)', margin: '0 auto 16px', opacity: 0.6 }} />
-          <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, marginBottom: 8 }}>Sin plantillas de pago</div>
+          <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, marginBottom: 8 }}>Sin plantillas de pago</div>
           <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 20 }}>Crea tu primera plantilla para automatizar el plan de pagos en tus presupuestos.</div>
           <button onClick={startNew} className="btn btn-primary"><Plus size={13} /> Nueva plantilla</button>
         </div>
@@ -449,7 +449,7 @@ function SendBudgetModal({ budget, leads, onClose }: {
         onClick={e => e.stopPropagation()}>
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 19, color: 'var(--espresso)' }}>Enviar presupuesto</div>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 19, color: 'var(--espresso)' }}>Enviar presupuesto</div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2 }}>{budget.couple_name} — {budget.total_amount.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={18} /></button>

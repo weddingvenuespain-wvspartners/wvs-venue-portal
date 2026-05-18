@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
 import { ArrowRight } from 'lucide-react'
@@ -21,10 +21,10 @@ const channels: Channel[] = [
     name: 'WeddingVenuesSpain.com',
     tagline: 'Bodas · España',
     description: 'Portal líder en España para venues de bodas. Gestiona tu ficha, fotos, precios y descripción. Revisión editorial incluida.',
-    href: '/canales/weddingvenuesspain',
+    href: '/canales/foreventos',
     status: 'active',
     logoLetter: 'W',
-    accentColor: '#C4975A',
+    accentColor: '#2E6DB4',
     category: 'Bodas',
   },
   {
@@ -91,12 +91,12 @@ export default function CanalesPage() {
                       <div style={{
                         width: 44, height: 44, borderRadius: 10, background: ch.accentColor,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: 20, color: '#fff', flexShrink: 0,
+                        fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 20, color: '#fff', flexShrink: 0,
                       }}>
                         {ch.logoLetter}
                       </div>
                       <div>
-                        <div style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 600, fontSize: 15, color: 'var(--espresso)', lineHeight: 1.2 }}>
+                        <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 15, color: 'var(--espresso)', lineHeight: 1.2 }}>
                           {ch.name}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 3 }}>
@@ -140,12 +140,12 @@ export default function CanalesPage() {
                   <div style={{
                     width: 36, height: 36, borderRadius: 8, background: ch.accentColor,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: 16, color: '#fff', flexShrink: 0,
+                    fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 16, color: '#fff', flexShrink: 0,
                   }}>
                     {ch.logoLetter}
                   </div>
                   <div>
-                    <div style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 600, fontSize: 13.5, color: 'var(--espresso)' }}>
+                    <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 13.5, color: 'var(--espresso)' }}>
                       {ch.name}
                     </div>
                     <div style={{ fontSize: 10.5, color: 'var(--warm-gray)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 2 }}>

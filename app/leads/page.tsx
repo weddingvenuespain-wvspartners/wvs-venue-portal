@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useMemo, useRef, Suspense } from 'react'
 
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -54,7 +54,7 @@ const SOURCE_LABEL: Record<string, string> = {
   web: 'Web', whatsapp: 'WhatsApp', instagram: 'Instagram',
   email: 'Email', referral: 'Referido', manual: 'Manual', other: 'Otro',
   wedding_planner: 'Planner',
-  wedding_venues_spain: 'Wedding Venues Spain',
+  wedding_venues_spain: 'FOREVENTOS',
   bodas_net: 'Bodas.net',
 }
 const BUDGET_LABEL: Record<string, string> = {
@@ -1233,7 +1233,7 @@ function LeadsPageInner() {
                 background: 'var(--espresso)', color: '#fff',
                 border: 'none', cursor: 'pointer',
                 fontSize: 13, fontWeight: 600,
-                fontFamily: 'Manrope, sans-serif',
+                fontFamily: 'Inter, sans-serif',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
               }}
             >
@@ -1656,7 +1656,7 @@ function LeadsPageInner() {
               <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--rose-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <X size={18} style={{ color: 'var(--rose)' }} />
               </div>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
                 Cancelar boda
               </div>
             </div>
@@ -1706,7 +1706,7 @@ function LeadsPageInner() {
               <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--gold-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Calendar size={18} style={{ color: 'var(--gold)' }} />
               </div>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
                 ¿Cancelar la visita?
               </div>
             </div>
@@ -1744,7 +1744,7 @@ function LeadsPageInner() {
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: isSoftDelete ? 'var(--gold-light)' : 'var(--rose-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {isSoftDelete ? <XCircle size={18} style={{ color: 'var(--gold)' }} /> : <Trash2 size={18} style={{ color: 'var(--rose)' }} />}
                 </div>
-                <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
+                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
                   {isSoftDelete ? 'Mover a Perdidos' : 'Eliminar lead'}
                 </div>
               </div>
@@ -1777,7 +1777,7 @@ function LeadsPageInner() {
               <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef9ec', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Calendar size={18} style={{ color: 'var(--gold)' }} />
               </div>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
                 Mover a Nuevos
               </div>
             </div>
@@ -2973,7 +2973,7 @@ function DateConfirmModal({
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: halfDayMode ? '#fffbeb' : 'var(--cream)', borderBottom: '1px solid var(--ivory)', transition: 'background 0.2s' }}>
                 <button onClick={prevMonth} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}><ChevronLeft size={14} /></button>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500 }}>{MONTHS[viewMonth]} {viewYear}</span>
+                  <span style={{ fontFamily: 'Satoshi, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500 }}>{MONTHS[viewMonth]} {viewYear}</span>
                   {!isVisitMode && (
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       {!isWonMode && (<>
@@ -3172,7 +3172,7 @@ function DateConfirmModal({
                       }} disabled={isPkgBlocked || isPast}>
                       {/* Day number */}
                       <span style={{
-                        fontSize: 15, fontWeight: isToday ? 700 : 500, lineHeight: 1, fontFamily: 'Manrope, sans-serif',
+                        fontSize: 15, fontWeight: isToday ? 700 : 500, lineHeight: 1, fontFamily: 'Inter, sans-serif',
                         color: isPast ? 'var(--stone)'
                           : isPkgBlocked ? '#b0b7c0'
                           : isBufferDay || isHalfDayBuffer || isSelected || isPartOfSpan ? '#92400e'
@@ -4184,7 +4184,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
         <SheetTitle className="sr-only">{lead.name}</SheetTitle>
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, fontWeight: 600, color: 'var(--espresso)' }}>{lead.name}</div>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, fontWeight: 600, color: 'var(--espresso)' }}>{lead.name}</div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>
               {SUB_STATUS_LABEL[lead.status as DbStatus]} · {SOURCE_LABEL[lead.source] || lead.source}
             </div>
@@ -4206,7 +4206,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
               </div>
               {lead.wedding_date ? (
                 <>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#831843', fontFamily: 'Cormorant Garamond, Georgia, serif', marginBottom: 4 }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#831843', fontFamily: 'Satoshi, Georgia, serif', marginBottom: 4 }}>
                     {new Date(lead.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                   </div>
                   {(() => {
@@ -4295,7 +4295,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
                   value={commText} onChange={e => setCommText(e.target.value)}
                   placeholder="Ej: Llamé, confirmaron que quieren ver el venue en mayo…"
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComm() } }}
-                  style={{ flex: 1, fontSize: 12, padding: '8px 10px', borderRadius: 7, border: '1px solid var(--ivory)', resize: 'none', minHeight: 60, lineHeight: 1.5, outline: 'none', fontFamily: 'Manrope, sans-serif', color: 'var(--charcoal)', background: '#fff' }}
+                  style={{ flex: 1, fontSize: 12, padding: '8px 10px', borderRadius: 7, border: '1px solid var(--ivory)', resize: 'none', minHeight: 60, lineHeight: 1.5, outline: 'none', fontFamily: 'Inter, sans-serif', color: 'var(--charcoal)', background: '#fff' }}
                 />
                 <button onClick={addComm} disabled={commSaving || !commText.trim()}
                   style={{ alignSelf: 'flex-end', padding: '8px 12px', borderRadius: 7, border: 'none', background: 'var(--gold)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: commText.trim() ? 'pointer' : 'default', opacity: commText.trim() ? 1 : 0.4 }}>
@@ -4727,7 +4727,7 @@ function FilterDateRangePicker({ from, to, onChange }: {
           background: hasFilter ? '#fffbeb' : '#fff',
           cursor: 'pointer', fontSize: 12.5,
           color: hasFilter ? 'var(--espresso)' : 'var(--warm-gray)',
-          fontFamily: 'Manrope, sans-serif',
+          fontFamily: 'Inter, sans-serif',
           fontWeight: hasFilter ? 600 : 400,
           whiteSpace: 'nowrap',
           transition: 'all 0.15s',
@@ -4765,7 +4765,7 @@ function FilterDateRangePicker({ from, to, onChange }: {
                 <div style={{ fontSize: 9, color: 'var(--warm-gray)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 3 }}>
                   {side === 'from' ? 'Desde' : 'Hasta'}
                 </div>
-                <div style={{ fontSize: 13, color: (side === 'from' ? from : to) ? 'var(--espresso)' : '#c5bfb8', fontWeight: (side === 'from' ? from : to) ? 600 : 400, fontFamily: 'Manrope, sans-serif' }}>
+                <div style={{ fontSize: 13, color: (side === 'from' ? from : to) ? 'var(--espresso)' : '#c5bfb8', fontWeight: (side === 'from' ? from : to) ? 600 : 400, fontFamily: 'Inter, sans-serif' }}>
                   {(side === 'from' ? from : to) ? fmt(side === 'from' ? from : to)! : '—'}
                 </div>
               </div>
@@ -4778,7 +4778,7 @@ function FilterDateRangePicker({ from, to, onChange }: {
               style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
               <ChevronLeft size={13} />
             </button>
-            <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 17, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize' }}>
+            <span style={{ fontFamily: 'Satoshi, serif', fontSize: 17, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize' }}>
               {MONTHS_ES[viewMonth]} {viewYear}
             </span>
             <button type="button" onClick={nextM}
@@ -4815,7 +4815,7 @@ function FilterDateRangePicker({ from, to, onChange }: {
                     height: 30, width: '100%', border: 'none',
                     borderRadius: isFrom ? '6px 0 0 6px' : isTo ? '0 6px 6px 0' : 6,
                     cursor: 'pointer',
-                    fontFamily: 'Manrope, sans-serif', fontSize: 12,
+                    fontFamily: 'Inter, sans-serif', fontSize: 12,
                     fontWeight: isActive ? 700 : 400,
                     background: isActive ? 'var(--gold)' : (inRange || isHov) ? '#fef3c7' : 'transparent',
                     color: isActive ? '#fff' : isToday ? 'var(--gold)' : 'var(--charcoal)',
@@ -4832,11 +4832,11 @@ function FilterDateRangePicker({ from, to, onChange }: {
           {/* Footer */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--ivory)' }}>
             <button type="button" onClick={() => { onChange('', ''); setPicking('from') }}
-              style={{ fontSize: 12, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'Manrope, sans-serif' }}>
+              style={{ fontSize: 12, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'Inter, sans-serif' }}>
               Borrar
             </button>
             <button type="button" onClick={() => setOpen(false)}
-              style={{ fontSize: 12, padding: '5px 16px', borderRadius: 8, background: 'var(--gold)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'Manrope, sans-serif' }}>
+              style={{ fontSize: 12, padding: '5px 16px', borderRadius: 8, background: 'var(--gold)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
               Aplicar
             </button>
           </div>
@@ -4958,7 +4958,7 @@ function MiniCalendarPicker({
           style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
           <ChevronLeft size={13} />
         </button>
-        <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 18, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize' }}>{MONTHS_ES[month]} {year}</span>
+        <span style={{ fontFamily: 'Satoshi, serif', fontSize: 18, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize' }}>{MONTHS_ES[month]} {year}</span>
         <button type="button" onClick={() => month === 11 ? (setYear(y => y + 1), setMonth(0)) : setMonth(m => m + 1)}
           style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
           <ChevronRight size={13} />
@@ -5023,7 +5023,7 @@ function MiniCalendarPicker({
                 background: bg, color,
                 cursor: canClick ? 'pointer' : 'default',
                 fontSize: 13, fontWeight: sel ? 700 : isToday ? 700 : 500,
-                fontFamily: 'Manrope, sans-serif',
+                fontFamily: 'Inter, sans-serif',
                 boxShadow: sel
                   ? 'inset 0 0 0 2px var(--gold)'
                   : isToday ? 'inset 0 0 0 1.5px var(--gold)'
@@ -5187,7 +5187,7 @@ function RangeCalendarPicker({
           style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
           <ChevronLeft size={13} />
         </button>
-        <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 18, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize' }}>{MONTHS_ES[month]} {year}</span>
+        <span style={{ fontFamily: 'Satoshi, serif', fontSize: 18, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize' }}>{MONTHS_ES[month]} {year}</span>
         <button type="button" onClick={() => month === 11 ? (setYear(y => y + 1), setMonth(0)) : setMonth(m => m + 1)}
           style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
           <ChevronRight size={13} />
@@ -5256,7 +5256,7 @@ function RangeCalendarPicker({
                 background: bg, color,
                 cursor: canClick ? 'pointer' : 'default',
                 fontSize: 13, fontWeight: isEnd ? 700 : isToday ? 700 : 500,
-                fontFamily: 'Manrope, sans-serif',
+                fontFamily: 'Inter, sans-serif',
                 boxShadow: isEnd
                   ? 'inset 0 0 0 2px var(--gold)'
                   : isToday ? 'inset 0 0 0 1.5px var(--gold)' : 'none',
@@ -5469,7 +5469,7 @@ function MultiRangeCalendarPicker({
             style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
             <ChevronLeft size={13} />
           </button>
-          <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 18, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize' }}>{MONTHS_ES[month]} {year}</span>
+          <span style={{ fontFamily: 'Satoshi, serif', fontSize: 18, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize' }}>{MONTHS_ES[month]} {year}</span>
           <button type="button" onClick={() => month === 11 ? (setYear(y => y + 1), setMonth(0)) : setMonth(m => m + 1)}
             style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
             <ChevronRight size={13} />
@@ -5559,7 +5559,7 @@ function MultiRangeCalendarPicker({
                   background: bg, color,
                   cursor: canClick ? 'pointer' : 'default',
                   fontSize: 13, fontWeight: fw,
-                  fontFamily: 'Manrope, sans-serif',
+                  fontFamily: 'Inter, sans-serif',
                   boxShadow: inset,
                   textDecoration: blocked ? 'line-through' : 'none',
                   position: 'relative',
@@ -5627,7 +5627,7 @@ function MultiRangeCalendarPicker({
                   width: 38, flexShrink: 0,
                   background: col.sel, color: '#fff',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'Cormorant Garamond, serif',
+                  fontFamily: 'Satoshi, serif',
                 }}>
                   <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', opacity: 0.85, lineHeight: 1 }}>OPC.</div>
                   <div style={{ fontSize: 18, fontWeight: 700, lineHeight: 1, marginTop: 2 }}>{i + 1}</div>
@@ -5711,7 +5711,7 @@ function DateSummaryCard({
         <div style={{ fontSize: 10, fontWeight: 700, color: accent === 'gold' ? 'var(--gold)' : 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 }}>
           {miniLabel}
         </div>
-        <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 14, color: 'var(--espresso)', fontWeight: 600, lineHeight: 1.2 }}>
+        <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: 'var(--espresso)', fontWeight: 600, lineHeight: 1.2 }}>
           {title}
         </div>
         {subtitle && (
@@ -5829,7 +5829,7 @@ function LanguagePicker({ value, onChange }: { value: string; onChange: (v: stri
           style={{
             flex: 1, minWidth: 120, border: 'none', outline: 'none',
             fontSize: 13, color: 'var(--charcoal)', background: 'transparent',
-            fontFamily: 'Manrope, sans-serif', padding: '4px 2px',
+            fontFamily: 'Inter, sans-serif', padding: '4px 2px',
           }}
         />
       </div>
@@ -5961,7 +5961,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
             <X size={16} />
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: '50%', background: isEdit ? 'var(--gold)' : '#fff', color: isEdit ? '#fff' : 'var(--gold)', border: isEdit ? 'none' : '2px dashed var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, fontFamily: 'Manrope, sans-serif', flexShrink: 0, boxShadow: isEdit ? '0 4px 14px rgba(212,160,60,0.4)' : 'none' }}>
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: isEdit ? 'var(--gold)' : '#fff', color: isEdit ? '#fff' : 'var(--gold)', border: isEdit ? 'none' : '2px dashed var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, fontFamily: 'Inter, sans-serif', flexShrink: 0, boxShadow: isEdit ? '0 4px 14px rgba(212,160,60,0.4)' : 'none' }}>
               {isEdit ? initials : <Plus size={20} />}
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
@@ -5969,7 +5969,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 {isEdit ? 'Editar lead' : 'Nuevo lead'}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, fontWeight: 700, color: 'var(--espresso)', lineHeight: 1.2, textTransform: 'capitalize' }}>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, fontWeight: 700, color: 'var(--espresso)', lineHeight: 1.2, textTransform: 'capitalize' }}>
                 {isEdit ? (form.name || 'Pareja sin nombre') : 'Nueva pareja interesada'}
               </div>
               {isEdit && leadStatus && (() => {
@@ -7029,7 +7029,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <LockKeyhole size={11} style={{ color: 'var(--warm-gray)' }} />
                   Mensaje inicial de la pareja
-                  <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--warm-gray)' }}>(desde weddingvenuesspain.com)</span>
+                  <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--warm-gray)' }}>(desde foreventos.com)</span>
                 </label>
                 <div style={{
                   padding: '10px 14px', borderRadius: 10,
@@ -7266,14 +7266,14 @@ function VisitScheduleModal({
             <X size={16} />
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--gold)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, fontFamily: 'Manrope, sans-serif', flexShrink: 0, boxShadow: '0 4px 14px rgba(212,160,60,0.4)' }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--gold)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, fontFamily: 'Inter, sans-serif', flexShrink: 0, boxShadow: '0 4px 14px rgba(212,160,60,0.4)' }}>
               {initials}
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <Landmark size={11} /> {isEditing ? 'Editar visita' : 'Agendar visita'}
               </div>
-              <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 26, fontWeight: 500, color: 'var(--espresso)', lineHeight: 1.1, textTransform: 'capitalize' }}>
+              <div style={{ fontFamily: 'Satoshi, serif', fontSize: 26, fontWeight: 500, color: 'var(--espresso)', lineHeight: 1.1, textTransform: 'capitalize' }}>
                 {lead.name || 'Pareja sin nombre'}
               </div>
             </div>
@@ -7365,7 +7365,7 @@ function VisitScheduleModal({
                 <button onClick={prevMonth} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
                   <ChevronLeft size={14} />
                 </button>
-                <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize' }}>
+                <span style={{ fontFamily: 'Satoshi, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize' }}>
                   {MONTHS[viewMonth]} {viewYear}
                 </span>
                 <button onClick={nextMonth} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
@@ -7411,7 +7411,7 @@ function VisitScheduleModal({
                         cursor: canClick ? 'pointer' : 'default',
                         fontSize: 14,
                         fontWeight: isSelected ? 700 : isToday ? 700 : 500,
-                        fontFamily: 'Manrope, sans-serif',
+                        fontFamily: 'Inter, sans-serif',
                         boxShadow: isSelected
                           ? 'inset 0 0 0 2px var(--gold)'
                           : isToday ? 'inset 0 0 0 1.5px var(--gold)' : 'none',
@@ -7507,7 +7507,7 @@ function VisitScheduleModal({
                   border: '1.5px solid var(--ivory)',
                   fontSize: 12,
                   color: 'var(--charcoal)',
-                  fontFamily: 'Manrope, sans-serif',
+                  fontFamily: 'Inter, sans-serif',
                   outline: 'none',
                   width: 110,
                 }}
@@ -7561,7 +7561,7 @@ function VisitScheduleModal({
                   <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2 }}>
                     Resumen de la visita
                   </div>
-                  <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize', lineHeight: 1.2 }}>
+                  <div style={{ fontFamily: 'Satoshi, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500, textTransform: 'capitalize', lineHeight: 1.2 }}>
                     {formatLong(selected)}
                   </div>
                   {visitTime && (

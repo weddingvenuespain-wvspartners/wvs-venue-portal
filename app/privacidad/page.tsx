@@ -1,11 +1,11 @@
-export default function PrivacidadPage() {
+﻿export default function PrivacidadPage() {
   const sectionStyle: React.CSSProperties = {
     marginBottom: 32,
     paddingBottom: 32,
     borderBottom: '1px solid #ede8df',
   }
   const headingStyle: React.CSSProperties = {
-    fontFamily: 'Manrope, sans-serif',
+    fontFamily: 'Inter, sans-serif',
     fontSize: 20,
     fontWeight: 600,
     color: '#3b2a1a',
@@ -30,7 +30,7 @@ export default function PrivacidadPage() {
         <a href="/dashboard" style={{ fontSize: 12, color: '#c9a84c', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 20 }}>
           ← Volver al portal
         </a>
-        <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 500, letterSpacing: '0.01em', color: '#3b2a1a', marginBottom: 8, lineHeight: 1.2 }}>
+        <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 500, letterSpacing: '0.01em', color: '#3b2a1a', marginBottom: 8, lineHeight: 1.2 }}>
           Política de Privacidad
         </h1>
         <p style={{ fontSize: 13, color: '#8c7b6b' }}>
@@ -40,7 +40,7 @@ export default function PrivacidadPage() {
 
       {/* Intro */}
       <div style={{ padding: '16px 20px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, marginBottom: 36, fontSize: 13, color: '#1d4ed8', lineHeight: 1.7 }}>
-        En Wedding Venues Spain respetamos tu privacidad y nos comprometemos a proteger tus datos personales de conformidad con el Reglamento General de Protección de Datos (RGPD) y la Ley Orgánica de Protección de Datos (LOPDGDD). Esta política describe cómo recogemos, usamos y protegemos tus datos.
+        En FOREVENTOS respetamos tu privacidad y nos comprometemos a proteger tus datos personales de conformidad con el Reglamento General de Protección de Datos (RGPD) y la Ley Orgánica de Protección de Datos (LOPDGDD). Esta política describe cómo recogemos, usamos y protegemos tus datos.
       </div>
 
       {/* 1. Responsable */}
@@ -50,7 +50,7 @@ export default function PrivacidadPage() {
           <p>El responsable del tratamiento de tus datos personales es:</p>
           <div style={{ marginTop: 12, padding: '14px 18px', background: '#faf8f4', border: '1px solid #ede8df', borderRadius: 8 }}>
             <p><strong>WVS Partners SL</strong></p>
-            <p style={{ marginTop: 4 }}>Email de contacto: <a href="mailto:info@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>info@weddingvenuesspain.com</a></p>
+            <p style={{ marginTop: 4 }}>Email de contacto: <a href="mailto:info@foreventos.com" style={{ color: '#c9a84c' }}>info@foreventos.com</a></p>
             <p style={{ marginTop: 4 }}>Actividad: Plataforma digital para la gestión de venues de bodas</p>
           </div>
         </div>
@@ -102,7 +102,7 @@ export default function PrivacidadPage() {
           </ul>
           <p style={{ marginTop: 12 }}>
             Para ejercer cualquiera de estos derechos, contacta con nosotros en{' '}
-            <a href="mailto:info@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>info@weddingvenuesspain.com</a>.
+            <a href="mailto:info@foreventos.com" style={{ color: '#c9a84c' }}>info@foreventos.com</a>.
             Responderemos en un plazo máximo de 30 días. También puedes presentar una reclamación ante la{' '}
             <strong>Agencia Española de Protección de Datos (AEPD)</strong> en <a href="https://www.aepd.es" target="_blank" rel="noopener" style={{ color: '#c9a84c' }}>www.aepd.es</a>.
           </p>
@@ -155,7 +155,7 @@ export default function PrivacidadPage() {
           <div style={{ marginTop: 12, padding: '14px 18px', background: '#faf8f4', border: '1px solid #ede8df', borderRadius: 8 }}>
             <p><strong>WVS Partners SL</strong></p>
             <p style={{ marginTop: 4 }}>
-              <a href="mailto:info@weddingvenuesspain.com" style={{ color: '#c9a84c' }}>info@weddingvenuesspain.com</a>
+              <a href="mailto:info@foreventos.com" style={{ color: '#c9a84c' }}>info@foreventos.com</a>
             </p>
           </div>
         </div>
@@ -163,7 +163,7 @@ export default function PrivacidadPage() {
 
       {/* Footer */}
       <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid #ede8df', textAlign: 'center', fontSize: 12, color: '#b8a898' }}>
-        Wedding Venues Spain Venue Portal · © 2025 ·{' '}
+        FOREVENTOS Venue Portal · © 2025 ·{' '}
         <a href="/cookies" style={{ color: '#c9a84c' }}>Política de Cookies</a>
       </div>
     </div>

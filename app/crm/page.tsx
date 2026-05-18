@@ -130,7 +130,7 @@ export default function CrmPage() {
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="manual">Manual</SelectItem>
-                          <SelectItem value="web">Web WVS</SelectItem>
+                          <SelectItem value="web">Web FOREVENTOS</SelectItem>
                           <SelectItem value="instagram">Instagram</SelectItem>
                           <SelectItem value="referral">Referido</SelectItem>
                           <SelectItem value="other">Otro</SelectItem>

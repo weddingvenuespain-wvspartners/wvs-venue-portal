@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
@@ -175,7 +175,7 @@ function PricingPageInner() {
         }}>
           <Check size={24} color="#16a34a" strokeWidth={2.5} />
         </div>
-        <p style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--charcoal)' }}>
+        <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--charcoal)' }}>
           ¡Tu período de prueba está activado!
         </p>
         <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>
@@ -201,7 +201,7 @@ function PricingPageInner() {
                     background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.25)',
                     borderRadius: 20, color: 'var(--espresso)', fontSize: 12, cursor: 'pointer',
                     display: 'inline-flex', alignItems: 'center', gap: 6,
-                    fontFamily: 'Manrope, sans-serif', padding: '6px 14px', fontWeight: 500,
+                    fontFamily: 'Inter, sans-serif', padding: '6px 14px', fontWeight: 500,
                   }}
                 >
                   <ArrowLeft size={13} /> Volver al portal
@@ -213,7 +213,7 @@ function PricingPageInner() {
                   background: 'rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 20,
                   color: 'var(--warm-gray)', fontSize: 12, cursor: 'pointer',
                   display: 'inline-flex', alignItems: 'center', gap: 5,
-                  fontFamily: 'Manrope, sans-serif', padding: '6px 14px', fontWeight: 500,
+                  fontFamily: 'Inter, sans-serif', padding: '6px 14px', fontWeight: 500,
                   transition: 'background 0.15s',
                 }}
               >
@@ -222,15 +222,15 @@ function PricingPageInner() {
             </div>
           ) : (
             <div style={{ marginBottom: 16 }}>
-              <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, color: 'var(--gold)', letterSpacing: '0.06em', fontWeight: 500 }}>
-                Wedding Venues Spain
+              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, color: 'var(--gold)', letterSpacing: '0.06em', fontWeight: 500 }}>
+                FOREVENTOS
               </span>
               <span style={{ fontSize: 11, color: 'var(--warm-gray)', marginLeft: 8 }}>Venue Portal</span>
             </div>
           )}
 
           <h1 style={{
-            fontFamily: 'Manrope, sans-serif', fontSize: 28, fontWeight: 600,
+            fontFamily: 'Inter, sans-serif', fontSize: 28, fontWeight: 600,
             color: 'var(--charcoal)', marginBottom: 8,
           }}>
             {isTrial ? 'Activa tu suscripción' : 'Elige tu plan'}
@@ -259,7 +259,7 @@ function PricingPageInner() {
           {/* Venue selector — only for multi-venue accounts, not in new-venue mode */}
           {isLoggedIn && !newVenueMode && userVenues.length > 1 && (
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontFamily: 'Manrope, sans-serif' }}>
+              <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontFamily: 'Inter, sans-serif' }}>
                 Contratar para:
               </span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -270,7 +270,7 @@ function PricingPageInner() {
                     onClick={() => setSelectedVenueId(v.id)}
                     style={{
                       padding: '6px 16px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
-                      fontFamily: 'Manrope, sans-serif', fontWeight: 600,
+                      fontFamily: 'Inter, sans-serif', fontWeight: 600,
                       border: v.id === selectedVenueId ? '1.5px solid var(--gold)' : '1px solid rgba(0,0,0,0.15)',
                       background: v.id === selectedVenueId ? 'rgba(196,151,90,0.12)' : 'transparent',
                       color: v.id === selectedVenueId ? 'var(--espresso)' : 'var(--warm-gray)',
@@ -393,7 +393,7 @@ function PricingPageInner() {
               <Clock size={18} color="var(--gold)" />
             </div>
             <div>
-              <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', fontFamily: 'Manrope, sans-serif' }}>
+              <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', fontFamily: 'Inter, sans-serif' }}>
                 Estamos verificando tu venue
               </p>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.6 }}>
@@ -418,7 +418,7 @@ function PricingPageInner() {
               <Check size={18} color="#16a34a" />
             </div>
             <div>
-              <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', fontFamily: 'Manrope, sans-serif' }}>
+              <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', fontFamily: 'Inter, sans-serif' }}>
                 Plan contratado — verificación en curso
               </p>
               <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>
@@ -484,14 +484,14 @@ function PricingPageInner() {
                     background: 'var(--gold)', color: '#fff', fontSize: 10, fontWeight: 600,
                     padding: '4px 14px', borderRadius: '0 0 8px 8px',
                     letterSpacing: '0.08em', textTransform: 'uppercase',
-                    fontFamily: 'Manrope, sans-serif',
+                    fontFamily: 'Inter, sans-serif',
                   }}>
                     Recomendado
                   </div>
                 )}
 
                 <h2 style={{
-                  fontFamily: 'Manrope, sans-serif', fontSize: 20, fontWeight: 600,
+                  fontFamily: 'Inter, sans-serif', fontSize: 20, fontWeight: 600,
                   color: 'var(--charcoal)', marginBottom: 4, marginTop: 0,
                 }}>
                   {plan.display_name || plan.name}
@@ -539,7 +539,7 @@ function PricingPageInner() {
                   disabled={!!submitting || isCurrentPlan || !cycle}
                   style={{
                     width: '100%', padding: '12px 0', borderRadius: 8, border: 'none',
-                    fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 500,
+                    fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500,
                     cursor: submitting || isCurrentPlan ? 'default' : 'pointer',
                     transition: 'all 0.15s',
                     background: isCurrentPlan ? 'var(--ivory)' : isPremium ? 'var(--gold)' : 'var(--charcoal)',
@@ -579,7 +579,7 @@ function PricingPageInner() {
               style={{
                 background: 'none', border: 'none', color: 'var(--gold)',
                 fontSize: 13, cursor: 'pointer', textDecoration: 'underline',
-                fontFamily: 'Manrope, sans-serif',
+                fontFamily: 'Inter, sans-serif',
               }}
             >
               Iniciar sesión

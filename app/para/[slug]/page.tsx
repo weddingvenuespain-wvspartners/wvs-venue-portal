@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+﻿import { createClient } from '@supabase/supabase-js'
 import { Heart } from 'lucide-react'
 import CoupleLandingClient from './CoupleLandingClient'
 
@@ -20,7 +20,7 @@ export default async function CoupleLandingPage({ params }: { params: Promise<{ 
 
   if (!client) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#faf9f7', fontFamily: 'Manrope, sans-serif' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#faf9f7', fontFamily: 'Inter, sans-serif' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ marginBottom: 16, color: '#9c8f88' }}><Heart size={48} strokeWidth={1.5} /></div>
           <h1 style={{ fontSize: 22, fontWeight: 600, color: '#3d3530', marginBottom: 8 }}>Propuesta no encontrada</h1>

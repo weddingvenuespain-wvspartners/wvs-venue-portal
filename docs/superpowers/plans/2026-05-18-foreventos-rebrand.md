@@ -1,3 +1,135 @@
+# FOREVENTOS Full Portal Rebrand — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Rebrand the entire wvs-venue-portal from "Wedding Venues Spain" (brown/gold/espresso palette, Manrope font) to "FOREVENTOS" (navy blue palette, Inter/Satoshi fonts), replacing all colours, typography, logos, and brand text across every page and component.
+
+**Architecture:** Three-wave approach. Wave 1 = token swap in `globals.css` + `layout.tsx` (cascades automatically to ~80% of UI via CSS variables). Wave 2 = targeted component changes (Sidebar, Spinner, protectedroute). Wave 3 = global automated find-replace pass across all `.tsx` files to catch hardcoded hex values and font family strings that bypass CSS variables.
+
+**Tech Stack:** Next.js 14 App Router, Tailwind CSS, shadcn/ui, inline React styles, custom CSS classes in `globals.css`, PowerShell for batch text replacement.
+
+**Working directory for all commands:** `C:\Users\Guillermo\OneDrive\Escritorio\wvs-venue-portal\.claude\worktrees\focused-shtern-2174c1`
+
+---
+
+## File Map
+
+| File | Change type |
+|------|-------------|
+| `app/globals.css` | Complete rewrite — new FOREVENTOS tokens + all component styles |
+| `app/layout.tsx` | Title, description, favicon link, Fontshare preconnect |
+| `public/favicon.png` | Replace with FOREVENTOS favicon |
+| `public/foreventos-assets/LOGOMENUFONDOAZUL.png` | Copy from Downloads (sidebar logo) |
+| `public/foreventos-assets/LOGOMENUFONDOBLANCO.png` | Copy from Downloads (light-bg logo) |
+| `components/Sidebar.tsx` | Logo image, gold→primary colour refs, Manrope→Inter, role label |
+| `components/Spinner.tsx` | Default colour `var(--gold)` → `var(--fe-primary)` |
+| `components/protectedroute.tsx` | Background + spinner colour |
+| All `app/**/*.tsx` + `components/**/*.tsx` | Automated replace: hardcoded hex colours + font family strings |
+
+---
+
+## Task 1: Copy brand assets to public folder
+
+**Files:**
+- Create/Replace: `public/favicon.png`
+- Create: `public/foreventos-assets/LOGOMENUFONDOAZUL.png`
+- Create: `public/foreventos-assets/LOGOMENUFONDOBLANCO.png`
+
+- [ ] **Step 1: Copy the three assets**
+
+```powershell
+$base = "C:\Users\Guillermo\OneDrive\Escritorio\wvs-venue-portal\.claude\worktrees\focused-shtern-2174c1"
+$dl   = "C:\Users\Guillermo\Downloads"
+
+Copy-Item "$dl\FOREVENTOS-FAVICON.png"   "$base\public\favicon.png" -Force
+Copy-Item "$dl\LOGOMENUFONDOAZUL.png"   "$base\public\foreventos-assets\LOGOMENUFONDOAZUL.png" -Force
+Copy-Item "$dl\LOGOMENUFONDOBLANCO.png" "$base\public\foreventos-assets\LOGOMENUFONDOBLANCO.png" -Force
+
+Write-Output "Assets copied:"
+Get-ChildItem "$base\public\foreventos-assets" | Select-Object Name, Length
+```
+
+Expected output: lists `favicon.png` in public, `LOGOMENUFONDOAZUL.png`, `LOGOMENUFONDOBLANCO.png`, `favicon.png` in foreventos-assets.
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add public/favicon.png public/foreventos-assets/
+git commit -m "chore: add FOREVENTOS brand assets (favicon, logos)"
+```
+
+---
+
+## Task 2: Update `app/layout.tsx`
+
+**Files:**
+- Modify: `app/layout.tsx`
+
+- [ ] **Step 1: Replace the entire file**
+
+```typescript
+import type { Metadata } from 'next'
+import './globals.css'
+import { AuthProvider } from '@/lib/auth-context'
+import { ThemeProvider } from '@/lib/theme-context'
+import { Toaster } from '@/components/ui/toaster'
+
+export const metadata: Metadata = {
+  title: 'FOREVENTOS',
+  description: 'Plataforma comercial para venues y caterings — bodas y eventos MICE',
+  icons: { icon: '/favicon.png' },
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="es" translate="no" suppressHydrationWarning>
+      <head>
+        <meta name="google" content="notranslate" />
+        <link rel="icon" type="image/png" href="/favicon.png" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://api.fontshare.com" />
+      </head>
+      <body suppressHydrationWarning>
+        <ThemeProvider>
+          <AuthProvider>
+            {children}
+            <Toaster />
+          </AuthProvider>
+        </ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+- [ ] **Step 2: TypeScript check**
+
+```bash
+npx tsc --noEmit 2>&1 | head -20
+```
+
+Expected: no errors relating to `layout.tsx`.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app/layout.tsx
+git commit -m "feat: update layout — FOREVENTOS title, favicon, Fontshare preconnect"
+```
+
+---
+
+## Task 3: Rewrite `app/globals.css`
+
+**Files:**
+- Modify: `app/globals.css` (complete replacement)
+
+- [ ] **Step 1: Replace the entire file with the FOREVENTOS token system**
+
+Write the following content to `app/globals.css`:
+
+```css
 /* ── Fonts ──────────────────────────────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://api.fontshare.com/v2/css?f[]=satoshi@500,700,900&display=swap');
@@ -194,7 +326,7 @@ table.data-table tr:hover td { background: rgba(46,109,180,0.03); }
 .photo-thumb { aspect-ratio: 4/3; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,0.07); }
 .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
 
-/* ── Login (legacy fallback) ─────────────────────────────────────────────────── */
+/* ── Login (legacy fallback — login page uses inline styles) ─────────────────── */
 .login-page { min-height: 100vh; background: var(--fe-deep); display: flex; align-items: center; justify-content: center; padding: 20px; }
 .login-error { background: rgba(220,38,38,0.15); border: 1px solid rgba(220,38,38,0.3); color: #fca5a5; border-radius: 10px; padding: 10px 14px; font-size: 12px; margin-bottom: 14px; }
 
@@ -300,3 +432,634 @@ table.data-table tr:hover td { background: rgba(46,109,180,0.03); }
 [data-theme="dark"] .alert-warning { background: #1f1a0a; border-color: #6b4f1a; color: #e8c97a; }
 [data-theme="dark"] .starter-card { background: rgba(13,27,42,0.7); border-color: rgba(255,255,255,0.08); }
 [data-theme="dark"] .starter-card:hover { border-color: var(--fe-primary); background: rgba(46,109,180,0.08); }
+```
+
+- [ ] **Step 2: TypeScript check**
+
+```bash
+npx tsc --noEmit 2>&1 | head -20
+```
+
+Expected: 0 errors (CSS changes don't affect TS).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app/globals.css
+git commit -m "feat: rewrite globals.css — FOREVENTOS tokens, Inter/Satoshi, navy palette"
+```
+
+---
+
+## Task 4: Rebrand `components/Sidebar.tsx`
+
+**Files:**
+- Modify: `components/Sidebar.tsx`
+
+- [ ] **Step 1: Replace the logo area (lines 200–203)**
+
+Find:
+```tsx
+      <div className="sidebar-logo">
+        <span className="brand">Wedding Venues Spain</span>
+        <span className="venue-name">{portalLabel}</span>
+```
+
+Replace with:
+```tsx
+      <div className="sidebar-logo">
+        <img
+          src="/foreventos-assets/LOGOMENUFONDOAZUL.png"
+          alt="FOREVENTOS"
+          style={{ height: 28, width: 'auto', display: 'block', marginBottom: 4 }}
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+        />
+        <span className="venue-name">{portalLabel}</span>
+```
+
+- [ ] **Step 2: Replace role label "Administrador WVS"**
+
+Find:
+```tsx
+  const roleLabel = isAdmin ? 'Administrador WVS'
+```
+
+Replace with:
+```tsx
+  const roleLabel = isAdmin ? 'Administrador FOREVENTOS'
+```
+
+- [ ] **Step 3: Replace all inline `var(--gold)` with `var(--fe-primary)`**
+
+In `components/Sidebar.tsx`, replace every occurrence of `var(--gold)` with `var(--fe-primary)` and `'var(--gold)'` with `'var(--fe-primary)'`. Also replace `var(--stone)` with `var(--fe-text-dim)` and `var(--warm-gray)` with `var(--fe-text-muted)`.
+
+Run in PowerShell from the worktree root:
+```powershell
+$file = "components\Sidebar.tsx"
+$content = Get-Content $file -Raw
+$content = $content -replace "var\(--gold\)", "var(--fe-primary)"
+$content = $content -replace "'var\(--gold\)'", "'var(--fe-primary)'"
+$content = $content -replace "var\(--stone\)", "var(--fe-text-dim)"
+$content = $content -replace "var\(--warm-gray\)", "var(--fe-text-muted)"
+$content = $content -replace "'Manrope, sans-serif'", "'Inter', sans-serif"
+$content = $content -replace "'Manrope',\s*sans-serif", "'Inter', sans-serif"
+$content | Set-Content $file -NoNewline
+Write-Output "Done"
+```
+
+- [ ] **Step 4: Replace venue switcher + user menu dropdown backgrounds**
+
+Find (venue switcher dropdown):
+```tsx
+                background: '#1e1a17', border: '1px solid rgba(255,255,255,0.12)',
+```
+Replace with:
+```tsx
+                background: '#0D1B2A', border: '1px solid rgba(255,255,255,0.10)',
+```
+
+Find (user menu dropdown — same pattern appears twice, both `#1e1a17`):
+```tsx
+              background: '#1e1a17', border: '1px solid rgba(255,255,255,0.12)',
+```
+Replace with:
+```tsx
+              background: '#0D1B2A', border: '1px solid rgba(255,255,255,0.10)',
+```
+
+- [ ] **Step 5: Update trial banner colors**
+
+Find the trial banner (gold accent):
+```tsx
+            background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)',
+```
+Replace with:
+```tsx
+            background: 'rgba(46,109,180,0.08)', border: '1px solid rgba(46,109,180,0.18)',
+```
+
+Find the "PASA A PREMIUM" banner (same pattern):
+```tsx
+            background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)',
+```
+Replace with:
+```tsx
+            background: 'rgba(46,109,180,0.08)', border: '1px solid rgba(46,109,180,0.18)',
+```
+
+Find `color: 'var(--gold)'` in trial Hourglass icon and text:
+```tsx
+            <Hourglass size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+```
+Replace with:
+```tsx
+            <Hourglass size={11} style={{ color: 'var(--fe-accent)', flexShrink: 0 }} />
+```
+
+Find the TRIAL text color:
+```tsx
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.04em' }}>TRIAL</div>
+```
+Replace with:
+```tsx
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fe-accent)', letterSpacing: '0.04em' }}>TRIAL</div>
+```
+
+Find the "Activar →" span color:
+```tsx
+            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--gold)', whiteSpace: 'nowrap' }}>Activar →</span>
+```
+Replace with:
+```tsx
+            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--fe-accent)', whiteSpace: 'nowrap' }}>Activar →</span>
+```
+
+Find "PASA A PREMIUM" headline color:
+```tsx
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 4 }}>PASA A PREMIUM</div>
+```
+Replace with:
+```tsx
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fe-accent)', letterSpacing: '0.08em', marginBottom: 4 }}>PASA A PREMIUM</div>
+```
+
+- [ ] **Step 6: Update user menu "Mi perfil" active color**
+
+Find:
+```tsx
+                color: pathname === '/perfil' ? 'var(--gold)' : '#fff',
+```
+Replace with:
+```tsx
+                color: pathname === '/perfil' ? 'var(--fe-accent)' : '#fff',
+```
+
+- [ ] **Step 7: TypeScript check**
+
+```bash
+npx tsc --noEmit 2>&1 | head -20
+```
+
+Expected: 0 new errors.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add components/Sidebar.tsx
+git commit -m "feat: rebrand Sidebar — FOREVENTOS logo, navy palette, Inter font"
+```
+
+---
+
+## Task 5: Update shared components
+
+**Files:**
+- Modify: `components/Spinner.tsx`
+- Modify: `components/protectedroute.tsx`
+
+- [ ] **Step 1: Update `components/Spinner.tsx`**
+
+Replace entire file:
+```typescript
+'use client'
+
+type Props = {
+  size?: number
+  color?: string
+  thickness?: number
+  style?: React.CSSProperties
+}
+
+export default function Spinner({ size = 24, color = 'var(--fe-primary)', thickness = 2, style }: Props) {
+  return (
+    <div
+      role="status"
+      aria-label="Cargando"
+      style={{
+        width: size,
+        height: size,
+        border: `${thickness}px solid ${color}`,
+        borderTopColor: 'transparent',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite',
+        ...style,
+      }}
+    />
+  )
+}
+
+export function PageSpinner({ minHeight = '100vh', background }: { minHeight?: string | number; background?: string }) {
+  return (
+    <div style={{ minHeight, background, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Spinner />
+    </div>
+  )
+}
+```
+
+- [ ] **Step 2: Update `components/protectedroute.tsx`**
+
+Replace entire file:
+```typescript
+'use client'
+import { useEffect } from 'react'
+import { useAuth } from '@/lib/auth-context'
+import Spinner from '@/components/Spinner'
+
+export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      window.location.replace('/login')
+    }
+  }, [user, loading])
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0A1628' }}>
+        <Spinner color="#5EAEF7" />
+      </div>
+    )
+  }
+
+  if (!user) return null
+
+  return <>{children}</>
+}
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add components/Spinner.tsx components/protectedroute.tsx
+git commit -m "feat: update Spinner and ProtectedRoute — FOREVENTOS colours"
+```
+
+---
+
+## Task 6: Global automated find-replace pass
+
+**Files:** All `app/**/*.tsx` and `components/**/*.tsx`
+
+This single task replaces all hardcoded WVS hex colours and font family strings across the entire codebase. The legacy CSS aliases in globals.css already handle `var(--gold)` etc., so this pass targets only hardcoded values.
+
+- [ ] **Step 1: Run the replacement script**
+
+Run in PowerShell from the worktree root:
+
+```powershell
+$base = "C:\Users\Guillermo\OneDrive\Escritorio\wvs-venue-portal\.claude\worktrees\focused-shtern-2174c1"
+$files = Get-ChildItem -Path "$base\app", "$base\components" -Recurse -Include "*.tsx" | Select-Object -ExpandProperty FullName
+
+$replacements = @(
+  # Font families
+  @{ From = "'Manrope', sans-serif";               To = "'Inter', sans-serif" },
+  @{ From = "'Manrope',sans-serif";                To = "'Inter',sans-serif" },
+  @{ From = "Manrope, sans-serif";                 To = "Inter, sans-serif" },
+  @{ From = "Manrope,sans-serif";                  To = "Inter,sans-serif" },
+  @{ From = "font-family: 'Manrope'";              To = "font-family: 'Inter'" },
+  @{ From = "fontFamily: 'Manrope'";               To = "fontFamily: 'Inter'" },
+  @{ From = "'Cormorant Garamond', serif";          To = "'Satoshi', 'Inter', sans-serif" },
+  @{ From = "'Cormorant Garamond',serif";           To = "'Satoshi','Inter',sans-serif" },
+  @{ From = "Cormorant Garamond";                   To = "Satoshi" },
+
+  # Gold hex
+  @{ From = "#C4975A";   To = "#2E6DB4" },
+  @{ From = "#c4975a";   To = "#2E6DB4" },
+  @{ From = "#b8894f";   To = "#2660a0" },
+  @{ From = "#B8894F";   To = "#2660a0" },
+  @{ From = "180,130,60";To = "46,109,180" },  # rgba gold components
+
+  # Espresso / dark brown backgrounds
+  @{ From = "#1A1512";   To = "#0A1628" },
+  @{ From = "#1a1512";   To = "#0A1628" },
+  @{ From = "#1e1a17";   To = "#0D1B2A" },
+  @{ From = "#1E1A17";   To = "#0D1B2A" },
+  @{ From = "#100e0b";   To = "#070F1B" },
+
+  # Charcoal / dark text
+  @{ From = "#2C2825";   To = "#1A1A2E" },
+  @{ From = "#2c2825";   To = "#1A1A2E" },
+
+  # Cream background
+  @{ From = "#F7F3EE";   To = "#F4F6F8" },
+  @{ From = "#f7f3ee";   To = "#F4F6F8" },
+
+  # Ivory border
+  @{ From = "#EFE9E0";   To = "rgba(0,0,0,0.08)" },
+  @{ From = "#efe9e0";   To = "rgba(0,0,0,0.08)" },
+
+  # Stone text
+  @{ From = "#C8BDB0";   To = "#8899AA" },
+  @{ From = "#c8bdb0";   To = "#8899AA" },
+
+  # Brand text
+  @{ From = "Wedding Venues Spain";  To = "FOREVENTOS" },
+  @{ From = "wedding-venues-spain";  To = "foreventos" },
+
+  # WVS logo URL (only the white-background portal logo)
+  @{ From = "weddingvenuesspain.com/wp-content/uploads/2024/10/logo-wedding-venues-spain-white-e1732122540714.png"; To = "/foreventos-assets/LOGOMENUFONDOAZUL.png" }
+)
+
+$totalFiles = 0
+$totalChanges = 0
+
+foreach ($file in $files) {
+  $content = Get-Content $file -Raw -Encoding UTF8
+  $original = $content
+  foreach ($r in $replacements) {
+    $content = $content.Replace($r.From, $r.To)
+  }
+  if ($content -ne $original) {
+    Set-Content $file $content -Encoding UTF8 -NoNewline
+    $totalFiles++
+    $totalChanges++
+    Write-Output "Updated: $($file.Replace($base, ''))"
+  }
+}
+
+Write-Output "`n--- Done: $totalFiles files updated ---"
+```
+
+- [ ] **Step 2: Verify no WVS gold hex remains**
+
+```powershell
+$base = "C:\Users\Guillermo\OneDrive\Escritorio\wvs-venue-portal\.claude\worktrees\focused-shtern-2174c1"
+$remaining = Select-String -Path "$base\app\**\*.tsx", "$base\components\**\*.tsx" `
+  -Pattern "#C4975A|#c4975a|#1A1512|#1a1512|#2C2825|#2c2825|#F7F3EE|#f7f3ee|Manrope|Cormorant Garamond" `
+  -Recurse -CaseSensitive:$false |
+  Where-Object { $_.Path -notlike "*node_modules*" -and $_.Path -notlike "*\.git*" }
+
+if ($remaining) {
+  Write-Output "REMAINING HITS:"
+  $remaining | ForEach-Object { Write-Output "$($_.Filename):$($_.LineNumber) — $($_.Line.Trim())" }
+} else {
+  Write-Output "Clean — no WVS colours or fonts remain."
+}
+```
+
+Expected: "Clean — no WVS colours or fonts remain." If there are hits, fix them manually and re-run the check.
+
+- [ ] **Step 3: TypeScript check**
+
+```bash
+npx tsc --noEmit 2>&1 | head -40
+```
+
+Expected: 0 errors. If errors appear, they are pre-existing (not introduced by this task).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add -A
+git commit -m "feat: global rebrand pass — replace WVS colours/fonts/brand text with FOREVENTOS"
+```
+
+---
+
+## Task 7: Fix `app/canales/weddingvenuesspain/page.tsx` route branding
+
+**Files:**
+- Modify: `app/canales/weddingvenuesspain/page.tsx`
+
+This file has "weddingvenuesspain" in its URL path (the route) and 101 WVS references. The route itself (`/canales/weddingvenuesspain`) represents the WeddingVenuesSpain channel integration — this is a functional channel name, not a brand display. Only the displayed text needs updating.
+
+- [ ] **Step 1: Check what "Wedding Venues Spain" references remain in this file after Task 6**
+
+```bash
+grep -n "Wedding Venues Spain\|FOREVENTOS\|weddingvenuesspain" app/canales/weddingvenuesspain/page.tsx | head -30
+```
+
+- [ ] **Step 2: If any displayed text still says "Wedding Venues Spain" in UI labels (not variable names or API keys), replace them**
+
+Search for any `>Wedding Venues Spain<` or similar JSX text nodes and replace with `>FOREVENTOS<` only where it appears as visible UI text (titles, labels, headings). Leave API endpoint strings, route names, and URL strings unchanged.
+
+- [ ] **Step 3: Commit if changes made**
+
+```bash
+git add app/canales/weddingvenuesspain/page.tsx
+git commit -m "feat: update channel page UI text — FOREVENTOS branding"
+```
+
+---
+
+## Task 8: Proposal templates — client-facing pages (skip)
+
+**Files:** `app/proposal/[slug]/tpl/T1Impacto.tsx`, `T2Emocion.tsx`, `T3TodoClaro.tsx`, `T4SocialProof.tsx`, `T5Minimalista.tsx`, `shared.tsx`, `app/para/[slug]/CoupleLandingClient.tsx`
+
+These are **client-facing** proposal templates shown to couples (not portal UI). They have their own brand identity per venue. The automated pass in Task 6 has already replaced any literal "Wedding Venues Spain" text. No further rebrand needed here — these templates should remain visually neutral/venue-branded.
+
+- [ ] **Step 1: Verify no visible "Wedding Venues Spain" text remains in proposal templates**
+
+```bash
+grep -n "Wedding Venues Spain\|WVS" app/proposal/[slug]/tpl/*.tsx app/para/[slug]/*.tsx 2>/dev/null | head -20
+```
+
+Expected: 0 hits. If hits found, check context — only fix if it's literal UI text, not a variable or comment.
+
+---
+
+## Task 9: Signup page — FOREVENTOS dark theme
+
+**Files:**
+- Modify: `app/signup/page.tsx`
+
+The signup page should match the login page aesthetic (dark navy, stars, split layout or centered glass card).
+
+- [ ] **Step 1: Read the current signup page**
+
+```bash
+head -80 app/signup/page.tsx
+```
+
+- [ ] **Step 2: Apply FOREVENTOS dark theme**
+
+The signup page background should use `#0A1628` (fe-deep) and the form card should mirror the login card style (`rgba(255,255,255,0.04)` glass, `border-radius: 20px`). Replace any brown/gold inline styles found:
+
+Run a targeted grep to find remaining WVS references:
+```bash
+grep -n "gold\|espresso\|Manrope\|#C4975A\|#1A1512\|cream\|ivory" app/signup/page.tsx
+```
+
+For each hit, replace:
+- Brown backgrounds → `#0A1628` or `#0D1B2A`
+- Gold colours → `#2E6DB4` or `#5EAEF7`
+- Cream/ivory backgrounds → `#F4F6F8` or `rgba(255,255,255,0.04)`
+- Font Manrope → Inter
+
+Also update any page title text that says "Wedding Venues Spain" → "FOREVENTOS", and any logo src pointing to the WVS CDN → `/foreventos-assets/LOGOMENUFONDOAZUL.png`.
+
+- [ ] **Step 3: TypeScript check**
+
+```bash
+npx tsc --noEmit 2>&1 | grep "signup" | head -10
+```
+
+Expected: no signup errors.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/signup/page.tsx
+git commit -m "feat: signup page — FOREVENTOS dark theme"
+```
+
+---
+
+## Task 10: Pricing page — FOREVENTOS branding
+
+**Files:**
+- Modify: `app/pricing/page.tsx`
+
+- [ ] **Step 1: Check remaining WVS references**
+
+```bash
+grep -n "gold\|espresso\|Manrope\|#C4975A\|#1A1512\|Wedding\|cream\|ivory\|Cormorant" app/pricing/page.tsx | head -30
+```
+
+- [ ] **Step 2: Fix any remaining hardcoded WVS styles**
+
+For each hit from Step 1, apply the equivalent FOREVENTOS colour/font. Use:
+- Accent colour: `#5EAEF7` (accent blue)
+- Primary colour: `#2E6DB4`
+- Background dark: `#0A1628`
+- Background light: `#F4F6F8`
+- Font: `'Inter', sans-serif` (body), `'Satoshi', 'Inter', sans-serif` (headlines)
+
+The pricing page hero/CTA section should use the FOREVENTOS navy background. Plan cards should use white with blue-tinted shadow.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app/pricing/page.tsx
+git commit -m "feat: pricing page — FOREVENTOS branding"
+```
+
+---
+
+## Task 11: Onboarding + checkout pages
+
+**Files:**
+- Modify: `app/onboarding/page.tsx`
+- Modify: `app/checkout/success/page.tsx`
+- Modify: `app/checkout/error/page.tsx`
+
+- [ ] **Step 1: Check remaining references in each file**
+
+```bash
+grep -n "gold\|espresso\|Manrope\|#C4975A\|#1A1512\|Wedding Venues\|cream\|ivory" \
+  app/onboarding/page.tsx \
+  app/checkout/success/page.tsx \
+  app/checkout/error/page.tsx
+```
+
+- [ ] **Step 2: Apply FOREVENTOS colours to each hit**
+
+Same substitution rules as Task 10. Onboarding progress steps should use `var(--fe-primary)` (#2E6DB4) for active/completed states.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app/onboarding/page.tsx app/checkout/success/page.tsx app/checkout/error/page.tsx
+git commit -m "feat: onboarding + checkout pages — FOREVENTOS branding"
+```
+
+---
+
+## Task 12: Component library audit — `components/` files
+
+**Files:**
+- Modify (as needed): `components/FeatureGate.tsx`, `components/DatePicker.tsx`, `components/InquiryForm.tsx`, `components/ProposalEditor.tsx`, `components/ProposalGate.tsx`, `components/TemplateEditor.tsx`, `components/VisitBookingModal.tsx`
+
+- [ ] **Step 1: Check all components for remaining WVS refs**
+
+```bash
+grep -rn "gold\|espresso\|Manrope\|#C4975A\|#1A1512\|cream\|ivory\|Wedding Venues Spain" \
+  components/ --include="*.tsx" | grep -v "node_modules"
+```
+
+- [ ] **Step 2: Fix each hit**
+
+For each file with hits, apply the FOREVENTOS substitutions:
+- `#C4975A` / `var(--gold)` → `#2E6DB4` / `var(--fe-primary)`  
+- `#1A1512` / `var(--espresso)` → `#0A1628` / `var(--fe-deep)`
+- `Manrope` → `Inter`
+- `var(--cream)` → `var(--fe-bg-light)`
+- `var(--ivory)` → `rgba(0,0,0,0.08)`
+
+- [ ] **Step 3: TypeScript check**
+
+```bash
+npx tsc --noEmit 2>&1 | head -20
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add components/
+git commit -m "feat: component library audit — remove remaining WVS refs"
+```
+
+---
+
+## Task 13: Final verification pass
+
+**Files:** Read-only audit
+
+- [ ] **Step 1: Final grep — confirm zero WVS colour/font hits**
+
+```powershell
+$base = "C:\Users\Guillermo\OneDrive\Escritorio\wvs-venue-portal\.claude\worktrees\focused-shtern-2174c1"
+Select-String -Path "$base\app\**\*.tsx", "$base\components\**\*.tsx" `
+  -Pattern "#C4975A|#c4975a|#1A1512|#1a1512|#2C2825|#2c2825|#F7F3EE|#f7f3ee|#b8894f|Manrope|'Cormorant" `
+  -Recurse | Where-Object { $_.Path -notlike "*node_modules*" -and $_.Path -notlike "*\.git*" } |
+  ForEach-Object { Write-Output "$($_.Filename):$($_.LineNumber) — $($_.Line.Trim())" }
+```
+
+Expected: 0 hits.
+
+- [ ] **Step 2: Final grep — confirm zero "Wedding Venues Spain" in UI**
+
+```bash
+grep -rn "Wedding Venues Spain" app/ components/ --include="*.tsx" | grep -v "node_modules"
+```
+
+Expected: 0 hits (or only inside comments/API strings that are not UI text).
+
+- [ ] **Step 3: TypeScript check — clean build**
+
+```bash
+npx tsc --noEmit 2>&1 | head -40
+```
+
+Expected: 0 errors.
+
+- [ ] **Step 4: Push to origin + update PR**
+
+```bash
+git push
+```
+
+The existing PR (`claude/focused-shtern-2174c1`) already has the login + root redirect. Pushing adds the full rebrand to the same PR.
+
+- [ ] **Step 5: Confirm PR is ready to merge**
+
+```bash
+gh pr view claude/focused-shtern-2174c1 --json url,title,state
+```
+
+---
+
+## Success Checklist
+
+- [ ] No "Wedding Venues Spain" visible in any portal page
+- [ ] No brown/gold/espresso colours visible anywhere
+- [ ] Sidebar shows FOREVENTOS logo on `#0A1628` navy background
+- [ ] All CTAs and focus rings are `#2E6DB4` / `#5EAEF7`
+- [ ] Inter used for body text, Satoshi for topbar titles and modal headings
+- [ ] Browser favicon = FOREVENTOS favicon
+- [ ] Browser tab title = "FOREVENTOS"
+- [ ] Dark mode uses navy palette
+- [ ] `/login` → FOREVENTOS login (done)
+- [ ] `/` → redirects to login (done)

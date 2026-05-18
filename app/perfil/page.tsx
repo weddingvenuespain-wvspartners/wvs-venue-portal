@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -663,7 +663,7 @@ function PerfilPageContent() {
                     </div>
                   </Section>
 
-                  <Section title="Correo para propuestas" description="Los emails de propuestas se enviarán desde esta cuenta. Sin configurar, se usa el servidor de Wedding Venues Spain.">
+                  <Section title="Correo para propuestas" description="Los emails de propuestas se enviarán desde esta cuenta. Sin configurar, se usa el servidor de FOREVENTOS.">
                     <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)', marginBottom: 16, fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.6 }}>
                       El nombre del remitente se toma automáticamente del campo <strong>Nombre del venue</strong> en <a href="/ficha" style={{ color: 'var(--gold)' }}>Mi ficha</a>.
                     </div>
@@ -906,7 +906,7 @@ function PerfilPageContent() {
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9', fontFamily: 'Manrope, sans-serif' }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9', fontFamily: 'Inter, sans-serif' }}>
                             Verificación en dos pasos
                           </div>
                           {(mfaFactors.length > 0 || mfaStep === 'done') && (
@@ -1316,7 +1316,7 @@ function PerfilPageContent() {
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.7 }}>
                           Esta acción es <strong>irreversible</strong>. Se eliminarán todos tus leads, propuestas, configuración y datos del portal.
-                          Tu ficha publicada en Wedding Venues Spain <strong>no se verá afectada</strong>.
+                          Tu ficha publicada en FOREVENTOS <strong>no se verá afectada</strong>.
                         </div>
                       </div>
                       {!showDeleteConfirm ? (
@@ -1374,7 +1374,7 @@ function PerfilPageContent() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                         <Clock size={16} style={{ color: '#fcd34d' }} />
-                        <span style={{ fontSize: 14, fontWeight: 600, color: '#f8fafc', fontFamily: 'Manrope, sans-serif' }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#f8fafc', fontFamily: 'Inter, sans-serif' }}>
                           Período de prueba activo
                         </span>
                         {features.trialDaysLeft !== null && (
@@ -1403,13 +1403,13 @@ function PerfilPageContent() {
                       </div>
                       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
                         Para activar tu plan contacta con tu gestor o escríbenos a{' '}
-                        <a href="mailto:info@weddingvenuesspain.com" style={{ color: '#93c5fd' }}>info@weddingvenuesspain.com</a>
+                        <a href="mailto:info@foreventos.com" style={{ color: '#93c5fd' }}>info@foreventos.com</a>
                       </div>
                     </div>
                   )}
 
                   {/* A) Plan actual */}
-                  <Section title="Plan actual" description="Tu suscripción a Wedding Venues Spain Venue Portal.">
+                  <Section title="Plan actual" description="Tu suscripción a FOREVENTOS Venue Portal.">
                     {features.hasPlan ? (
                       <>
                         <div style={{
@@ -1421,7 +1421,7 @@ function PerfilPageContent() {
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                               {features.planTier === 'premium' && <Star size={14} style={{ color: '#b45309' }} />}
-                              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Manrope, sans-serif' }}>
+                              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Inter, sans-serif' }}>
                                 {features.planName || (features.planTier === 'premium' ? 'Plan Premium' : 'Plan Básico')}
                               </div>
                             </div>
@@ -1470,14 +1470,14 @@ function PerfilPageContent() {
                             <div style={{ fontSize: 12, color: '#b45309', lineHeight: 1.6, marginBottom: 10 }}>
                               Desbloquea propuestas digitales, estadísticas avanzadas, exportar leads y comunicación de tarifas.
                             </div>
-                            <a href="mailto:info@weddingvenuesspain.com?subject=Quiero%20pasar%20a%20Premium"
+                            <a href="mailto:info@foreventos.com?subject=Quiero%20pasar%20a%20Premium"
                               className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex' }}>
                               Solicitar upgrade →
                             </a>
                           </div>
                         )}
 
-                        <a href="mailto:info@weddingvenuesspain.com?subject=Gestión%20de%20suscripción"
+                        <a href="mailto:info@foreventos.com?subject=Gestión%20de%20suscripción"
                           className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
                           Gestionar suscripción
                         </a>
@@ -1487,7 +1487,7 @@ function PerfilPageContent() {
                         <CreditCard size={28} style={{ margin: '0 auto 10px', opacity: 0.3 }} />
                         <div style={{ fontSize: 14, marginBottom: 6 }}>Sin suscripción activa</div>
                         <div style={{ fontSize: 12, marginBottom: 16 }}>Contacta con tu gestor para activar tu plan.</div>
-                        <a href="mailto:info@weddingvenuesspain.com?subject=Activar%20plan"
+                        <a href="mailto:info@foreventos.com?subject=Activar%20plan"
                           className="btn btn-primary btn-sm" style={{ textDecoration: 'none' }}>
                           Contactar →
                         </a>
@@ -1572,7 +1572,7 @@ function PerfilPageContent() {
                             {stat.icon}
                           </div>
                           <div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--espresso)', fontFamily: 'Manrope, sans-serif', lineHeight: 1 }}>
+                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--espresso)', fontFamily: 'Inter, sans-serif', lineHeight: 1 }}>
                               {stat.value === null ? '—' : stat.value}
                             </div>
                             <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{stat.label}</div>
@@ -1644,7 +1644,7 @@ function PerfilPageContent() {
                       Los pagos se gestionan mediante domiciliación bancaria (SEPA) o transferencia.
                       Para actualizar tu método de pago contacta con tu gestor.
                     </div>
-                    <a href="mailto:info@weddingvenuesspain.com?subject=Actualizar%20método%20de%20pago"
+                    <a href="mailto:info@foreventos.com?subject=Actualizar%20método%20de%20pago"
                       className="btn btn-ghost btn-sm" style={{ marginTop: 8, textDecoration: 'none' }}>
                       Contactar para actualizar →
                     </a>
@@ -1729,7 +1729,7 @@ function PerfilPageContent() {
                           <Mail size={18} style={{ color: '#b45309' }} />
                         </div>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Manrope, sans-serif', marginBottom: 4 }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Inter, sans-serif', marginBottom: 4 }}>
                             ¿Tienes alguna duda?
                           </div>
                           <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.6, marginBottom: 14 }}>
@@ -1737,10 +1737,10 @@ function PerfilPageContent() {
                           </div>
                           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                             <Mail size={13} style={{ color: 'var(--gold)' }} />
-                            info@weddingvenuesspain.com
+                            info@foreventos.com
                           </div>
                           <a
-                            href="mailto:info@weddingvenuesspain.com?subject=Consulta%20desde%20el%20Portal"
+                            href="mailto:info@foreventos.com?subject=Consulta%20desde%20el%20Portal"
                             className="btn btn-primary btn-sm"
                             style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                           >
@@ -1826,7 +1826,7 @@ function PerfilPageContent() {
 
                   {/* D) Versión */}
                   <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--stone)', padding: '12px 0 4px' }}>
-                    Wedding Venues Spain Venue Portal v2.0 · © 2025
+                    FOREVENTOS Venue Portal v2.0 · © 2025
                   </div>
                 </>
               )}

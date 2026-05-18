@@ -1,4 +1,4 @@
-// app/proposal/[slug]/page.tsx
+﻿// app/proposal/[slug]/page.tsx
 // Ruta pública — NO requiere autenticación
 // URL: /proposal/laura-carlos-mn4h
 
@@ -96,15 +96,15 @@ export async function generateMetadata(
     .eq('slug', slug)
     .single()
 
-  if (!data) return { title: 'Propuesta | Wedding Venues Spain' }
+  if (!data) return { title: 'Propuesta | FOREVENTOS' }
 
   const venue = (data as any).venue_onboarding
   return {
-    title: `${data.couple_name} | ${venue?.name ?? 'Wedding Venues Spain'}`,
+    title: `${data.couple_name} | ${venue?.name ?? 'FOREVENTOS'}`,
     description: `Propuesta personalizada para ${data.couple_name}${venue?.city ? ` en ${venue.city}` : ''}.`,
     openGraph: {
       title: `${data.couple_name} · Propuesta exclusiva`,
-      description: `Tu propuesta personalizada de boda en ${venue?.name ?? 'Wedding Venues Spain'}`,
+      description: `Tu propuesta personalizada de boda en ${venue?.name ?? 'FOREVENTOS'}`,
     },
   }
 }

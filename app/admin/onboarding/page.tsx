@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -116,7 +116,7 @@ function VenueModal({
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
-            <div style={{ fontSize: 20, fontFamily: 'Manrope, sans-serif', fontWeight: 600, color: 'var(--espresso)' }}>
+            <div style={{ fontSize: 20, fontFamily: 'Inter, sans-serif', fontWeight: 600, color: 'var(--espresso)' }}>
               {data?.H1_Venue || onb.changes_data?.H1_Venue || onb.name || 'Sin nombre'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 3 }}>
@@ -127,7 +127,7 @@ function VenueModal({
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {onb.wp_post_id && (
               <a
-                href={`https://weddingvenuesspain.com/wp-admin/post.php?post=${onb.wp_post_id}&action=edit`}
+                href={`https://foreventos.com/wp-admin/post.php?post=${onb.wp_post_id}&action=edit`}
                 target="_blank" rel="noopener noreferrer"
                 className="btn btn-ghost btn-sm"
               >
@@ -566,7 +566,7 @@ export default function AdminOnboardingPage() {
                 color: solTab === tab.key ? 'var(--gold)' : 'var(--warm-gray)',
                 borderTop: 'none', borderLeft: 'none', borderRight: 'none',
                 borderBottom: solTab === tab.key ? '2px solid var(--gold)' : '2px solid transparent',
-                background: 'none', cursor: 'pointer', fontFamily: 'Manrope, sans-serif', marginBottom: -1,
+                background: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif', marginBottom: -1,
               }}>
               {tab.label}{tab.count > 0 && <span style={{ marginLeft: 5, background: '#fef9ec', color: '#92400e', fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 8 }}>{tab.count}</span>}
             </button>

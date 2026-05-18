@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -417,7 +417,7 @@ export default function PlanesPage() {
                 color: plansTab === tab.key ? 'var(--gold)' : 'var(--warm-gray)',
                 borderTop: 'none', borderLeft: 'none', borderRight: 'none',
                 borderBottom: plansTab === tab.key ? '2px solid var(--gold)' : '2px solid transparent',
-                background: 'none', cursor: 'pointer', fontFamily: 'Manrope, sans-serif', marginBottom: -1,
+                background: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif', marginBottom: -1,
               }}>
               {tab.label} <span style={{ fontSize: 11, opacity: 0.6 }}>({plans.filter(p => (p.target_role ?? 'venue_owner') === tab.key).length})</span>
             </button>
@@ -439,7 +439,7 @@ export default function PlanesPage() {
                     <Clock size={16} color={trialConfig.is_active ? 'var(--gold)' : 'var(--warm-gray)'} />
                   </div>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)', fontFamily: 'Manrope, sans-serif' }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)', fontFamily: 'Inter, sans-serif' }}>
                       Prueba gratuita (Trial)
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>
@@ -469,7 +469,7 @@ export default function PlanesPage() {
                     max={365}
                     value={trialConfig.trial_days}
                     onChange={e => setTrialConfig(c => ({ ...c, trial_days: parseInt(e.target.value) || 14 }))}
-                    style={{ width: '100%', padding: '4px 0', border: 'none', background: 'transparent', fontSize: 32, fontWeight: 700, color: 'var(--gold)', textAlign: 'center', fontFamily: 'Manrope, sans-serif', outline: 'none' }}
+                    style={{ width: '100%', padding: '4px 0', border: 'none', background: 'transparent', fontSize: 32, fontWeight: 700, color: 'var(--gold)', textAlign: 'center', fontFamily: 'Inter, sans-serif', outline: 'none' }}
                   />
                   <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>días</span>
                 </div>
@@ -545,7 +545,7 @@ export default function PlanesPage() {
                   <div className="card-body">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                       <div>
-                        <div style={{ fontSize: 17, fontWeight: 600, fontFamily: 'Manrope, sans-serif', color: 'var(--espresso)' }}>
+                        <div style={{ fontSize: 17, fontWeight: 600, fontFamily: 'Inter, sans-serif', color: 'var(--espresso)' }}>
                           {plan.display_name || plan.name}
                         </div>
                         <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontFamily: 'monospace', marginTop: 1 }}>slug: {plan.name}</div>
@@ -582,7 +582,7 @@ export default function PlanesPage() {
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           {cycles.map(c => (
                             <div key={c.id} style={{ background: 'var(--cream)', borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 80 }}>
-                              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Manrope, sans-serif' }}>{c.price}€</div>
+                              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Inter, sans-serif' }}>{c.price}€</div>
                               <div style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{c.label}</div>
                               {c.commitment_months > 0 && (
                                 <div style={{ fontSize: 9, color: 'var(--warm-gray)', marginTop: 2 }}>{c.commitment_months}m mín.</div>

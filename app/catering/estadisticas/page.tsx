@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -55,7 +55,7 @@ export default function CateringEstadisticasPage() {
       <div className="main-layout"><main style={{ padding: '32px 40px', overflowY: 'auto', flex: 1 }}>
 
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Estadísticas</h1>
+          <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Estadísticas</h1>
           <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Análisis de tus solicitudes y conversiones.</p>
         </div>
 
@@ -84,7 +84,7 @@ export default function CateringEstadisticasPage() {
                     {k.icon}
                     <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '0.06em' }}>{k.label.toUpperCase()}</span>
                   </div>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--charcoal)', fontFamily: 'Manrope, sans-serif' }}>{k.value}</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--charcoal)', fontFamily: 'Inter, sans-serif' }}>{k.value}</div>
                 </div>
               ))}
             </div>
@@ -92,7 +92,7 @@ export default function CateringEstadisticasPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               {/* Por origen */}
               <div style={{ background: '#fff', borderRadius: 12, padding: '24px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Solicitudes por origen</h3>
+                <h3 style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Solicitudes por origen</h3>
                 {Object.entries(stats.bySource).map(([src, count]: any) => {
                   const pct = stats.total ? Math.round(count / stats.total * 100) : 0
                   return (
@@ -111,7 +111,7 @@ export default function CateringEstadisticasPage() {
 
               {/* Por mes */}
               <div style={{ background: '#fff', borderRadius: 12, padding: '24px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Solicitudes mensuales</h3>
+                <h3 style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Solicitudes mensuales</h3>
                 {stats.byMonth.length === 0 ? (
                   <p style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Sin datos</p>
                 ) : (() => {

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -823,7 +823,7 @@ export default function FichaPage() {
       <div className="main-layout">
         <div className="topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Link href="/canales" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--warm-gray)', textDecoration: 'none', fontFamily: 'Manrope, sans-serif' }}>
+            <Link href="/canales" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--warm-gray)', textDecoration: 'none', fontFamily: 'Inter, sans-serif' }}>
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13L5 8l5-5"/></svg>
               Canales de venta
             </Link>
@@ -964,7 +964,7 @@ export default function FichaPage() {
               {/* Section title */}
               <div style={{ marginBottom: 24 }}>
                 <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--espresso)' }}>Información principal</div>
-                <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginTop: 4 }}>Gestiona los detalles básicos y la apariencia visual de tu perfil en weddingvenuesspain.com.</div>
+                <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginTop: 4 }}>Gestiona los detalles básicos y la apariencia visual de tu perfil en foreventos.com.</div>
               </div>
 
               {/* Two-column layout */}
@@ -986,7 +986,7 @@ export default function FichaPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, padding: '6px 10px', background: 'var(--ivory)', borderRadius: 7, border: '1px solid var(--border)' }}>
                         <ExternalLink size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
                         <span style={{ fontSize: 11, color: 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          weddingvenuesspain.com/wedding-venues/<strong style={{ color: 'var(--espresso)' }}>{venueSlug}</strong>/
+                          foreventos.com/wedding-venues/<strong style={{ color: 'var(--espresso)' }}>{venueSlug}</strong>/
                         </span>
                       </div>
                     )}
@@ -1789,7 +1789,7 @@ export default function FichaPage() {
               <span style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(220,38,38,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <RotateCcw size={16} color="#dc2626" />
               </span>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)' }}>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)' }}>
                 ¿Volver a la versión original?
               </div>
             </div>
@@ -1806,7 +1806,7 @@ export default function FichaPage() {
                   padding: '8px 16px', borderRadius: 7, border: 'none',
                   background: '#dc2626', color: '#fff',
                   fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                  fontFamily: 'Manrope, sans-serif',
+                  fontFamily: 'Inter, sans-serif',
                 }}
               >
                 <RotateCcw size={13} /> {reverting ? 'Revirtiendo...' : 'Sí, volver al original'}
@@ -1822,7 +1822,7 @@ export default function FichaPage() {
           onClick={() => setConfirmSubmit(false)}>
           <div style={{ background: '#fff', borderRadius: 12, padding: 32, maxWidth: 420, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, fontWeight: 600, color: 'var(--espresso)', marginBottom: 12 }}>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, fontWeight: 600, color: 'var(--espresso)', marginBottom: 12 }}>
               {isApproved ? '¿Enviar cambios para revisión?' : '¿Enviar ficha para revisión?'}
             </div>
             <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.8, marginBottom: 24 }}>
@@ -1955,7 +1955,7 @@ function CropModal({ file, aspect, onCrop, onClose, maxPx = 3000, quality = 0.92
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       onClick={onClose}>
       <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px 24px', maxWidth: '95vw', width: dispW ? dispW + 48 : 'auto' }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)', marginBottom: 2 }}>Ajustar recorte</div>
+        <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)', marginBottom: 2 }}>Ajustar recorte</div>
         <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 12 }}>Arrastra el recuadro para seleccionar el área · usa el slider para cambiar el tamaño</div>
 
         {/* Image + crop overlay */}

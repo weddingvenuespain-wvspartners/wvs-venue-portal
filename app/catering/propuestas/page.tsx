@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -86,7 +86,7 @@ export default function CateringPropuestasPage() {
     width: '100%', padding: '9px 12px', borderRadius: 8,
     border: '1px solid var(--ivory)', background: 'var(--cream)',
     fontSize: 13, color: 'var(--charcoal)', outline: 'none',
-    fontFamily: 'Manrope, sans-serif', boxSizing: 'border-box',
+    fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
   }
 
   return (
@@ -96,10 +96,10 @@ export default function CateringPropuestasPage() {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
           <div>
-            <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Propuestas</h1>
+            <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>Propuestas</h1>
             <p style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Crea y envía propuestas de menú a tus clientes.</p>
           </div>
-          <button onClick={() => setShowModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, background: 'var(--charcoal)', color: '#fff', fontSize: 13, fontWeight: 500, border: 'none', cursor: 'pointer', fontFamily: 'Manrope, sans-serif' }}>
+          <button onClick={() => setShowModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, background: 'var(--charcoal)', color: '#fff', fontSize: 13, fontWeight: 500, border: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
             <Plus size={14} /> Nueva propuesta
           </button>
         </div>
@@ -155,7 +155,7 @@ export default function CateringPropuestasPage() {
           onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}
         >
           <div style={{ background: '#fff', borderRadius: 16, padding: '28px 32px', width: '100%', maxWidth: 460 }}>
-            <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Nueva propuesta</h2>
+            <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Nueva propuesta</h2>
 
             {formError && <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 16 }}>{formError}</div>}
 

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useRouter } from 'next/navigation'
 import { XCircle } from 'lucide-react'
 
@@ -25,7 +25,7 @@ export default function CheckoutErrorPage() {
         </div>
 
         <h1 style={{
-          fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 500,
+          fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 500,
           color: 'var(--charcoal)', marginBottom: 8,
         }}>
           Pago no completado
@@ -42,7 +42,7 @@ export default function CheckoutErrorPage() {
             style={{
               padding: '10px 24px', borderRadius: 6, border: 'none',
               background: 'var(--gold)', color: '#fff',
-              fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 500,
+              fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500,
               cursor: 'pointer',
             }}
           >
@@ -54,7 +54,7 @@ export default function CheckoutErrorPage() {
               padding: '10px 24px', borderRadius: 6,
               border: '1px solid var(--ivory)', background: '#fff',
               color: 'var(--charcoal)',
-              fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 500,
+              fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500,
               cursor: 'pointer',
             }}
           >

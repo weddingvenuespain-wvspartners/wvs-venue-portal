@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -336,7 +336,7 @@ function PropuestasPageContent() {
             <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <AlertCircle size={15} style={{ flexShrink: 0 }} />
               <span style={{ fontSize: 13 }}>
-                No tienes configurado el correo de envío. Los emails de propuestas saldrán desde el servidor de Wedding Venues Spain.{' '}
+                No tienes configurado el correo de envío. Los emails de propuestas saldrán desde el servidor de FOREVENTOS.{' '}
                 <a href="/perfil" style={{ color: 'inherit', fontWeight: 600, textDecoration: 'underline' }}>Configurar ahora →</a>
               </span>
             </div>

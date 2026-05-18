@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -533,12 +533,12 @@ function UserPanel({
                 background: 'var(--cream)', border: '2px solid var(--ivory)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 20, fontWeight: 700, color: 'var(--gold)',
-                fontFamily: 'Manrope, sans-serif',
+                fontFamily: 'Inter, sans-serif',
               }}>
                 {(profile.first_name?.[0] || profile.email?.[0] || '?').toUpperCase()}
               </div>
               <div>
-              <div style={{ fontSize: 18, fontFamily: 'Manrope, sans-serif', fontWeight: 600, color: 'var(--espresso)' }}>
+              <div style={{ fontSize: 18, fontFamily: 'Inter, sans-serif', fontWeight: 600, color: 'var(--espresso)' }}>
                 {displayName}
               </div>
               {/* Email + phone quick links */}
@@ -1009,7 +1009,7 @@ function UserPanel({
                         onClick={() => setSubVenueId(v.id)}
                         style={{
                           padding: '5px 14px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
-                          fontFamily: 'Manrope, sans-serif', fontWeight: 600,
+                          fontFamily: 'Inter, sans-serif', fontWeight: 600,
                           border: v.id === effectiveVenueId ? '1.5px solid var(--gold)' : '1px solid var(--ivory)',
                           background: v.id === effectiveVenueId ? 'var(--gold-light)' : 'transparent',
                           color: v.id === effectiveVenueId ? 'var(--espresso)' : 'var(--warm-gray)',
@@ -1059,7 +1059,7 @@ function UserPanel({
                       <div style={{ fontSize: 10, fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>
                         {activeSub.status === 'trial' ? 'Fin del trial' : 'Fin del ciclo actual'}
                       </div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#92400e', fontFamily: 'Manrope, sans-serif' }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#92400e', fontFamily: 'Inter, sans-serif' }}>
                         {(() => {
                           const d = activeSub.status === 'trial' ? activeSub.trial_end_date : activeSub.renewal_date
                           return d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'
@@ -1695,7 +1695,7 @@ export default function AdminPage() {
     // ── WP venues: background, non-blocking ──
     const wpController = new AbortController()
     const wpTimeout = setTimeout(() => wpController.abort(), 6000)
-    fetch('https://weddingvenuesspain.com/wp-json/wp/v2/venues?per_page=100&acf_format=standard&_fields=id,title,acf,link', { cache: 'no-store', signal: wpController.signal })
+    fetch('https://foreventos.com/wp-json/wp/v2/venues?per_page=100&acf_format=standard&_fields=id,title,acf,link', { cache: 'no-store', signal: wpController.signal })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (Array.isArray(d)) { setWpVenues(d); sessionStorage.setItem('wvs_wp_venues', JSON.stringify(d)) } })
       .catch(() => {})
@@ -2115,7 +2115,7 @@ export default function AdminPage() {
                     style={{
                       padding: '5px 14px', fontSize: 11, fontWeight: venueView === k ? 600 : 400,
                       border: venueView === k ? '1px solid var(--gold)' : '1px solid var(--ivory)',
-                      borderRadius: 6, cursor: 'pointer', fontFamily: 'Manrope, sans-serif',
+                      borderRadius: 6, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
                       background: venueView === k ? 'rgba(196,151,90,0.08)' : '#fff',
                       color: venueView === k ? 'var(--gold)' : 'var(--warm-gray)',
                     }}>
@@ -2257,7 +2257,7 @@ export default function AdminPage() {
                               border: `2px solid ${p.status === 'active' ? '#fde68a' : '#e5e7eb'}`,
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               fontSize: 12, fontWeight: 700, color: p.status === 'active' ? '#92400e' : '#9ca3af',
-                              fontFamily: 'Manrope, sans-serif',
+                              fontFamily: 'Inter, sans-serif',
                             }}>
                               {(p.first_name?.[0] || p.display_name?.[0] || p.company?.[0] || p.email?.[0] || '?').toUpperCase()}
                             </div>
