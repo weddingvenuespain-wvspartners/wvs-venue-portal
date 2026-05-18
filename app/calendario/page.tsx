@@ -282,7 +282,7 @@ export default function CalendarioPage() {
         .in('kind', ['call', 'video', 'visit'])
         .neq('status', 'closed')
         .order('created_at', { ascending: false }),
-      supabase.from('venue_tasks').select('*').eq('user_id', activeVenue.id).order('due_date', { ascending: true }),
+      supabase.from('venue_tasks').select('*').eq('user_id', user!.id).eq('venue_id', activeVenue.id).order('due_date', { ascending: true }),
     ])
 
     const map: Record<string, Entry> = {}
@@ -735,7 +735,7 @@ export default function CalendarioPage() {
     setTaskSaving(true); setTaskError('')
     const supabase = createClient()
     const payload: Record<string, any> = {
-      user_id: activeVenue.id,
+      user_id: user!.id,
       venue_id: activeVenue.id,
       title: taskForm.title.trim(),
       description: taskForm.description.trim() || null,
