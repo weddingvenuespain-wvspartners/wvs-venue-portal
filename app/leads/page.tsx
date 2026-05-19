@@ -5957,12 +5957,14 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               {isEdit ? initials : <Plus size={20} />}
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2 }}>
-                {isEdit ? 'Editar lead' : 'Nuevo lead'}
-              </div>
+              {!isEdit && (
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2 }}>
+                  Nuevo lead
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, fontWeight: 700, color: 'var(--espresso)', lineHeight: 1.2, textTransform: 'capitalize' }}>
-                {isEdit ? (form.name || 'Pareja sin nombre') : 'Nueva pareja interesada'}
+                {isEdit ? (form.name || 'Sin nombre') : 'Nueva pareja interesada'}
               </div>
               {isEdit && leadStatus && (() => {
                 const STATUS_INFO: Record<string, { label: string; bg: string; border: string; color: string; icon: React.ReactNode }> = {
@@ -5999,6 +6001,12 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 )
               })()}
               </div>
+              {isEdit && editLead?.id && (
+                <a href={`/crm/${editLead.id}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, padding: '3px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(0,0,0,0.1)', fontSize: 11, fontWeight: 600, color: 'var(--charcoal)', textDecoration: 'none' }}>
+                  <ExternalLink size={10} /> Ver en CRM
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -6676,7 +6684,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
 
             {/* Presupuesto */}
             <div style={{ marginBottom: 22 }}>
-              {(leadStatus === 'visit_scheduled' || leadStatus === 'post_visit') ? (<>
+              {(leadStatus === 'visit_scheduled' || leadStatus === 'post_visit') && (<>
                 <SectionTitle icon={<Receipt size={14} />} title="Presupuesto" hint="Adjunta el presupuesto para enviárselo a la pareja" />
                 {/* Multi-file list */}
                 {(form.budget_files || []).map((bf: { url: string; name: string }, idx: number) => (
@@ -6727,19 +6735,6 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: 'none', cursor: (budgetFileSaving || !(form.budget_files || []).length) ? 'not-allowed' : 'pointer', background: budgetFileSaved ? '#16a34a' : 'var(--espresso)', color: '#fff', fontSize: 12, fontWeight: 700, opacity: (budgetFileSaving || !(form.budget_files || []).length) ? 0.6 : 1, transition: 'all 0.2s' }}>
                   {budgetFileSaved ? <><CheckCircle2 size={13} /> Guardado</> : budgetFileSaving ? 'Guardando…' : <><Upload size={13} /> Guardar documento</>}
                 </button>
-              </>) : (<>
-                <SectionTitle icon={<Receipt size={14} />} title="Presupuesto" hint="Importe orientativo del presupuesto" />
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Importe orientativo</label>
-                  <Select value={form.budget} onValueChange={(v) => set('budget', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {BUDGET_OPTS.map(v => (
-                        <SelectItem key={v} value={v}>{v === 'sin_definir' ? 'Sin definir' : BUDGET_LABEL[v].replace('k€', '.000 €')}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </>)}
             </div>
 
