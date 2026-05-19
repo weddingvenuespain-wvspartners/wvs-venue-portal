@@ -20,7 +20,7 @@ import {
   ExternalLink, Edit2, Trash2, Clock, Filter, FileText, Download,
   AlertTriangle, PartyPopper, Snowflake, Sparkles, Eye, Landmark, XCircle,
   Sprout, Sun, Leaf, Zap, LockKeyhole, OctagonAlert, Flower2, Info,
-  List, LayoutGrid, Receipt, ChevronDown, ChevronUp, Paperclip, Upload, CheckCircle2, CalendarDays, Package, Inbox,
+  List, LayoutGrid, Receipt, ChevronDown, ChevronUp, Paperclip, Upload, CheckCircle2, CalendarDays, Package, Inbox, SlidersHorizontal,
 } from 'lucide-react'
 
 // ── Types & config ─────────────────────────────────────────────────────────────
@@ -5846,8 +5846,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
   const setOrig = (k: string, v: any) => setForm((f: any) => ({ ...f, [`original_${k}`]: v }))
   const [editingOriginal,  setEditingOriginal]  = useState(false)
   const [showOriginal,     setShowOriginal]     = useState(false)   // Lo que pidió — collapsed by default
-  const [showMoreDetails,  setShowMoreDetails]  = useState(true)    // Ceremony/lang/style collapsible
-  const [activeModalTab,   setActiveModalTab]   = useState<'boda' | 'oferta' | 'pareja'>(isEdit ? 'boda' : 'pareja')
+  const [activeModalTab,   setActiveModalTab]   = useState<'fechas' | 'detalles' | 'oferta' | 'contacto'>(isEdit ? 'fechas' : 'contacto')
   const { propuestas: canPropuesta } = usePlanFeatures()
   // Budget file upload (budget_sent and visit leads)
   const [budgetUploading,   setBudgetUploading]   = useState(false)
@@ -6015,37 +6014,44 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
         <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--ivory)', padding: '0 24px', background: '#fafaf8' }}>
           {((() => {
             if (!isEdit) return [
-              { key: 'pareja', label: 'Contacto', icon: <Users        size={12} /> },
-              { key: 'boda',   label: 'Evento',   icon: <CalendarDays size={12} /> },
+              { key: 'contacto', label: 'Contacto', icon: <Users           size={12} /> },
+              { key: 'fechas',   label: 'Evento',   icon: <CalendarDays    size={12} /> },
             ]
             if (!isNewPhase) return [
-              { key: 'boda',   label: 'Evento',     icon: <CalendarDays size={12} /> },
-              { key: 'oferta', label: 'Comercial',  icon: <Receipt      size={12} /> },
-              { key: 'pareja', label: 'Contacto',   icon: <Users        size={12} /> },
+              { key: 'fechas',   label: 'Evento',    icon: <CalendarDays      size={12} /> },
+              { key: 'detalles', label: 'Detalles',  icon: <SlidersHorizontal size={12} /> },
+              { key: 'oferta',   label: 'Comercial', icon: <Receipt           size={12} /> },
+              { key: 'contacto', label: 'Contacto',  icon: <Users             size={12} /> },
             ]
             return [
-              { key: 'boda',   label: 'Evento',   icon: <CalendarDays size={12} /> },
-              { key: 'pareja', label: 'Contacto', icon: <Users        size={12} /> },
+              { key: 'fechas',   label: 'Evento',   icon: <CalendarDays size={12} /> },
+              { key: 'contacto', label: 'Contacto', icon: <Users        size={12} /> },
             ]
-          })() as { key: 'boda' | 'oferta' | 'pareja'; label: string; icon: React.ReactNode }[]).map(t => (
-            <button key={t.key} type="button" onClick={() => setActiveModalTab(t.key)} style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '10px 16px', border: 'none', background: 'transparent', cursor: 'pointer',
-              fontSize: 12.5, fontWeight: activeModalTab === t.key ? 700 : 500,
-              color: activeModalTab === t.key ? 'var(--espresso)' : 'var(--warm-gray)',
-              borderBottom: activeModalTab === t.key ? '2px solid var(--gold)' : '2px solid transparent',
-              marginBottom: -1, whiteSpace: 'nowrap', transition: 'all 0.15s',
-            }}>
-              {t.icon} {t.label}
-            </button>
-          ))}
+          })() as { key: 'fechas' | 'detalles' | 'oferta' | 'contacto'; label: string; icon: React.ReactNode }[]).map(t => {
+            const isActive = activeModalTab === t.key
+            return (
+              <button key={t.key} type="button" onClick={() => setActiveModalTab(t.key)} style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '8px 14px', border: isActive ? '1px solid var(--ivory)' : '1px solid transparent',
+                borderBottom: isActive ? '1px solid #fff' : '1px solid transparent',
+                borderRadius: '6px 6px 0 0',
+                background: isActive ? '#fff' : 'transparent', cursor: 'pointer',
+                fontSize: 12.5, fontWeight: isActive ? 700 : 500,
+                color: isActive ? 'var(--espresso)' : 'var(--warm-gray)',
+                marginBottom: -1, whiteSpace: 'nowrap', transition: 'all 0.15s',
+                boxShadow: isActive ? '0 -1px 4px rgba(0,0,0,0.04)' : 'none',
+              }}>
+                {t.icon} {t.label}
+              </button>
+            )
+          })}
         </div>
 
         {/* Body — scrollable tab content */}
         <div className="modal-body" style={{ padding: '20px 24px' }}>
 
-          {/* ── TAB: BODA ──────────────────────────────────────────────────────── */}
-          {activeModalTab === 'boda' && (<>
+          {/* ── TAB: FECHAS ────────────────────────────────────────────────────── */}
+          {activeModalTab === 'fechas' && (<>
 
           {/* ── Visita agendada: banner destacado cuando hay visita programada ── */}
           {!isNewPhase && editLead && editLead.visit_date && (
@@ -6222,15 +6228,15 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     )}
                   </label>
                   {/* Type selector */}
-                  <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
-                    {DATE_FLEX_OPTS.map(opt => (
-                      <button key={opt.value} type="button" onClick={() => set('date_flexibility', opt.value)} style={{
-                        padding: '4px 11px', borderRadius: 20, fontSize: 12, cursor: 'pointer', border: '1px solid', fontWeight: 500,
-                        borderColor: form.date_flexibility === opt.value ? 'var(--gold)' : 'var(--ivory)',
-                        background:  form.date_flexibility === opt.value ? 'var(--gold)' : 'transparent',
-                        color:       form.date_flexibility === opt.value ? '#fff' : 'var(--warm-gray)',
-                      }}>{opt.label}</button>
-                    ))}
+                  <div style={{ marginBottom: 10, maxWidth: 220 }}>
+                    <Select value={form.date_flexibility} onValueChange={v => set('date_flexibility', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {DATE_FLEX_OPTS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* EXACT DATE */}
@@ -6458,103 +6464,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
 
           </div>
 
-          {/* Divider */}
-          <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 18 }} />
-
-          {/* Más detalles — collapsible */}
-          <div style={{ marginBottom: 4 }}>
-            <button type="button" onClick={() => setShowMoreDetails((v: boolean) => !v)} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: 0, background: 'none', border: 'none',
-              color: 'var(--warm-gray)', fontSize: 12, fontWeight: 500,
-              cursor: 'pointer', outline: 'none', marginBottom: showMoreDetails ? 10 : 0,
-              textDecoration: 'underline', textDecorationColor: 'var(--ivory)',
-              textUnderlineOffset: 3,
-            }}>
-              {showMoreDetails ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-              {showMoreDetails ? 'Ocultar detalles' : 'Más detalles'}
-            </button>
-            {showMoreDetails && (
-              <>
-                <div className="two-col">
-                  <div className="form-group">
-                    <label className="form-label">Tipo de ceremonia</label>
-                    <Select value={form.ceremony_type} onValueChange={(v) => set('ceremony_type', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sin_definir">Sin definir</SelectItem>
-                        <SelectItem value="civil">Civil</SelectItem>
-                        <SelectItem value="religiosa">Religiosa</SelectItem>
-                        <SelectItem value="simbolica">Simbólica</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="form-group">
-                    <LanguagePicker value={form.language} onChange={v => set('language', v)} />
-                  </div>
-                </div>
-                <div className="two-col">
-                  <div className="form-group">
-                    <label className="form-label">País de la pareja</label>
-                    <input className="form-input" value={form.country} onChange={e => set('country', e.target.value)} placeholder="España, Francia…" />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Catering</label>
-                    <Select value={form.catering_needed} onValueChange={(v) => set('catering_needed', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sin_definir">Sin definir</SelectItem>
-                        <SelectItem value="incluido">Incluido en el venue</SelectItem>
-                        <SelectItem value="externo">Traen catering externo</SelectItem>
-                        <SelectItem value="por_definir">Por definir</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Total invitados</label>
-                    <div style={{ position: 'relative' }}>
-                      <Users size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', pointerEvents: 'none' }} />
-                      <input className="form-input" type="number" min={0} value={form.guests} onChange={e => set('guests', e.target.value)} placeholder="150" style={{ paddingLeft: 34 }} />
-                    </div>
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Adultos</label>
-                    <input className="form-input" type="number" min={0} value={form.guests_adults} onChange={e => set('guests_adults', e.target.value)} placeholder="120" />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Niños</label>
-                    <input className="form-input" type="number" min={0} value={form.guests_children} onChange={e => set('guests_children', e.target.value)} placeholder="20" />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Estilo buscado</label>
-                  <input className="form-input" value={form.style} onChange={e => set('style', e.target.value)} placeholder="Rústico, moderno, clásico…" />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Etiquetas</label>
-                  <TagInput value={form.tags} onChange={v => set('tags', v)} />
-                </div>
-                {/* Presupuesto orientativo — inside Más detalles for new leads */}
-                {isNewPhase && (
-                  <div className="form-group" style={{ marginTop: 12, marginBottom: 0 }}>
-                    <label className="form-label">Presupuesto orientativo</label>
-                    <Select value={form.budget} onValueChange={(v) => set('budget', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {BUDGET_OPTS.map(v => (
-                          <SelectItem key={v} value={v}>{v === 'sin_definir' ? 'Sin definir' : BUDGET_LABEL[v].replace('k€', '.000 €')}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Solicitud original — archivo histórico al fondo del tab Boda */}
+          {/* Solicitud original — archivo histórico al fondo del tab Fechas */}
           {!isNewPhase && editLead && (
             <div style={{ marginTop: 14 }}>
               <div style={{ borderTop: '1px dashed var(--ivory)', marginBottom: 14 }} />
@@ -6673,6 +6583,83 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               ))}
             </div>
           )}
+
+          </>)}
+
+          {/* ── TAB: DETALLES ─────────────────────────────────────────────────────── */}
+          {activeModalTab === 'detalles' && (<>
+
+            <div className="two-col">
+              <div className="form-group">
+                <label className="form-label">Tipo de ceremonia</label>
+                <Select value={form.ceremony_type} onValueChange={(v) => set('ceremony_type', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sin_definir">Sin definir</SelectItem>
+                    <SelectItem value="civil">Civil</SelectItem>
+                    <SelectItem value="religiosa">Religiosa</SelectItem>
+                    <SelectItem value="simbolica">Simbólica</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Catering</label>
+                <Select value={form.catering_needed} onValueChange={(v) => set('catering_needed', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sin_definir">Sin definir</SelectItem>
+                    <SelectItem value="incluido">Incluido en el venue</SelectItem>
+                    <SelectItem value="externo">Traen catering externo</SelectItem>
+                    <SelectItem value="por_definir">Por definir</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="two-col">
+              <div className="form-group">
+                <label className="form-label">País de la pareja</label>
+                <input className="form-input" value={form.country} onChange={e => set('country', e.target.value)} placeholder="España, Francia…" />
+              </div>
+              <div className="form-group">
+                <LanguagePicker value={form.language} onChange={v => set('language', v)} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Total invitados</label>
+                <div style={{ position: 'relative' }}>
+                  <Users size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', pointerEvents: 'none' }} />
+                  <input className="form-input" type="number" min={0} value={form.guests} onChange={e => set('guests', e.target.value)} placeholder="150" style={{ paddingLeft: 34 }} />
+                </div>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Adultos</label>
+                <input className="form-input" type="number" min={0} value={form.guests_adults} onChange={e => set('guests_adults', e.target.value)} placeholder="120" />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Niños</label>
+                <input className="form-input" type="number" min={0} value={form.guests_children} onChange={e => set('guests_children', e.target.value)} placeholder="20" />
+              </div>
+            </div>
+            <div className="form-group" style={{ marginTop: 12 }}>
+              <label className="form-label">💰 Presupuesto orientativo</label>
+              <Select value={form.budget} onValueChange={(v) => set('budget', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {BUDGET_OPTS.map(v => (
+                    <SelectItem key={v} value={v}>{v === 'sin_definir' ? 'Sin definir' : BUDGET_LABEL[v].replace('k€', '.000 €')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Estilo buscado</label>
+              <input className="form-input" value={form.style} onChange={e => set('style', e.target.value)} placeholder="Rústico, moderno, clásico…" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Etiquetas</label>
+              <TagInput value={form.tags} onChange={v => set('tags', v)} />
+            </div>
 
           </>)}
 
@@ -6953,7 +6940,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
           </>)}
 
           {/* ── TAB: CONTACTO ─────────────────────────────────────────────────────── */}
-          {activeModalTab === 'pareja' && (<>
+          {activeModalTab === 'contacto' && (<>
 
           {/* Section: Contacto */}
           <div style={{ marginBottom: 22 }}>
