@@ -10,7 +10,7 @@ import {
   ChevronLeft, Phone, Mail, MessageCircle, Users, Calendar,
   Banknote, Tag, MapPin, Clock, FileText, ExternalLink, Edit2, Save, X,
   Landmark, UtensilsCrossed, Globe, Palette, Sparkles, CheckCircle2,
-  MessageSquare, Heart,
+  MessageSquare, Heart, Paperclip, Link2, CalendarCheck,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -45,6 +45,20 @@ type Lead = {
   visit_time?: string | null
   visit_duration?: number | null
   initial_message?: string | null
+  wedding_duration_days?: number | null
+  // Budget/confirmed dates (budget_sent, won)
+  budget_date?: string | null
+  budget_date_to?: string | null
+  budget_date_flexibility?: string | null
+  budget_date_ranges?: { from: string; to: string }[] | null
+  // Attached documents
+  budget_file_url?: string | null
+  budget_file_name?: string | null
+  budget_files?: { url: string; name: string }[] | null
+  // Original desired dates
+  original_wedding_date?: string | null
+  original_wedding_date_to?: string | null
+  original_date_flexibility?: string | null
   created_at: string
   updated_at?: string | null
 }
@@ -116,7 +130,28 @@ function weddingLabel(lead: Lead): string {
   if (lead.wedding_year) return String(lead.wedding_year)
   const flex = lead.date_flexibility
   if (flex === 'flexible') return 'Flexible (sin fecha definida)'
-  if (flex === 'season') return 'Por estación'
+  if (flex === 'season')   return 'Por estación'
+  return '—'
+}
+
+function budgetDatesLabel(lead: Lead): string {
+  if (lead.budget_date) {
+    const from = fmtDate(lead.budget_date)
+    const to   = lead.budget_date_to ? ` → ${fmtDate(lead.budget_date_to)}` : ''
+    return from + to
+  }
+  if (lead.budget_date_ranges && lead.budget_date_ranges.length > 0) {
+    return lead.budget_date_ranges.map(r => `${fmtDate(r.from)}${r.to && r.to !== r.from ? ` → ${fmtDate(r.to)}` : ''}`).join(', ')
+  }
+  return '—'
+}
+
+function originalDatesLabel(lead: Lead): string {
+  if (lead.original_wedding_date) {
+    const from = fmtDate(lead.original_wedding_date)
+    const to   = lead.original_wedding_date_to ? ` → ${fmtDate(lead.original_wedding_date_to)}` : ''
+    return from + to
+  }
   return '—'
 }
 
@@ -160,11 +195,12 @@ export default function CrmContactPage() {
   const { user, loading: authLoading, activeVenue } = useAuth()
   const { isBlocked } = useRequireSubscription()
 
-  const [lead,    setLead]    = useState<Lead | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState(false)
-  const [saving,  setSaving]  = useState(false)
-  const [form,    setForm]    = useState<Partial<Lead>>({})
+  const [lead,         setLead]         = useState<Lead | null>(null)
+  const [loading,      setLoading]      = useState(true)
+  const [editing,      setEditing]      = useState(false)
+  const [saving,       setSaving]       = useState(false)
+  const [form,         setForm]         = useState<Partial<Lead>>({})
+  const [relatedLeads, setRelatedLeads] = useState<Lead[]>([])
 
   useEffect(() => {
     if (authLoading) return
@@ -177,10 +213,25 @@ export default function CrmContactPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from('leads')
-      .select('id,name,email,phone,whatsapp,whatsapp_consent,source,status,contact_type,wedding_date,wedding_date_to,wedding_year,wedding_month,date_flexibility,guests,guests_adults,guests_children,budget,ceremony_type,catering_needed,language,style,notes,country,tags,visit_date,visit_time,visit_duration,initial_message,created_at,updated_at')
+      .select('id,name,email,phone,whatsapp,whatsapp_consent,source,status,contact_type,wedding_date,wedding_date_to,wedding_year,wedding_month,date_flexibility,wedding_duration_days,guests,guests_adults,guests_children,budget,ceremony_type,catering_needed,language,style,notes,country,tags,visit_date,visit_time,visit_duration,initial_message,budget_date,budget_date_to,budget_date_flexibility,budget_date_ranges,budget_file_url,budget_file_name,budget_files,original_wedding_date,original_wedding_date_to,original_date_flexibility,created_at,updated_at')
       .eq('id', id)
       .maybeSingle()
-    if (data) { setLead(data as Lead); setForm(data as Lead) }
+    if (data) {
+      const loadedLead = data as Lead
+      setLead(loadedLead)
+      setForm(loadedLead)
+      // For wedding planners: load other leads from same WP (matched by email)
+      if (loadedLead.contact_type === 'wedding_planner' && loadedLead.email) {
+        const { data: rel } = await supabase
+          .from('leads')
+          .select('id,name,status,wedding_date,wedding_year,wedding_month,date_flexibility,budget_date,created_at')
+          .eq('email', loadedLead.email)
+          .neq('id', loadedLead.id)
+          .order('created_at', { ascending: false })
+          .limit(20)
+        setRelatedLeads((rel || []) as Lead[])
+      }
+    }
     setLoading(false)
   }
 
@@ -225,8 +276,20 @@ export default function CrmContactPage() {
   const pipelineIdx  = PIPELINE.findIndex(p => p.key === lead.status)
   const isLost       = lead.status === 'lost'
 
-  const isPareja = lead.contact_type === 'pareja' || !lead.contact_type
-  const hasVisit = !!lead.visit_date
+  const isPareja    = lead.contact_type === 'pareja' || !lead.contact_type
+  const isWP        = lead.contact_type === 'wedding_planner'
+  const hasVisit    = !!lead.visit_date
+  const isNewPhase  = lead.status === 'new'  || lead.status === 'lost'
+  const isBudget    = lead.status === 'budget_sent' || lead.status === 'won'
+  const isActive    = !isNewPhase && !isBudget  // contacted / proposal_sent / visit_*
+
+  // Documents list
+  const docFiles: { url: string; name: string }[] = (() => {
+    const files = lead.budget_files || []
+    if (files.length) return files
+    if (lead.budget_file_url) return [{ url: lead.budget_file_url, name: lead.budget_file_name || 'Documento adjunto' }]
+    return []
+  })()
 
   // Visit time display
   const visitTimeLabel = (() => {
@@ -427,32 +490,62 @@ export default function CrmContactPage() {
               {isPareja && (
                 <div className="card" style={{ padding: '20px 28px' }}>
                   <SectionLabel>Detalles del evento</SectionLabel>
-                  <InfoRow icon={<Calendar size={14} />} label="Fecha deseada" value={weddingLabel(lead)} />
+
+                  {/* ── Confirmed / budget dates ── */}
+                  {isBudget && (
+                    <InfoRow icon={<CalendarCheck size={14} />} label="Fechas confirmadas" value={budgetDatesLabel(lead)} />
+                  )}
+
+                  {/* ── Proposed / negotiated dates (active non-budget leads) ── */}
+                  {isActive && (
+                    <InfoRow icon={<Calendar size={14} />} label="Fechas propuestas" value={weddingLabel(lead)} />
+                  )}
+
+                  {/* ── Wedding duration ── */}
+                  {lead.wedding_duration_days && lead.wedding_duration_days > 1 && (
+                    <InfoRow icon={<Clock size={14} />} label="Duración" value={`${lead.wedding_duration_days} días`} />
+                  )}
+
+                  {/* ── Original desired dates (for non-new-phase leads) ── */}
+                  {!isNewPhase && originalDatesLabel(lead) !== '—' && (
+                    <InfoRow icon={<FileText size={14} />} label="Fecha solicitada originalmente" value={originalDatesLabel(lead)} />
+                  )}
+
+                  {/* ── New/lost: just show desired dates ── */}
+                  {isNewPhase && (
+                    <InfoRow icon={<Calendar size={14} />} label="Fecha deseada" value={weddingLabel(lead)} />
+                  )}
+
+                  {/* ── Guests ── */}
                   {(lead.guests || lead.guests_adults) && (
                     <InfoRow icon={<Users size={14} />} label="Invitados" value={
                       lead.guests_adults
-                        ? `${(lead.guests_adults || 0) + (lead.guests_children || 0)} total · ${lead.guests_adults} adultos, ${lead.guests_children || 0} niños`
+                        ? `${(lead.guests_adults || 0) + (lead.guests_children || 0)} total · ${lead.guests_adults} adultos${lead.guests_children ? `, ${lead.guests_children} niños` : ''}`
                         : `${lead.guests}`
                     } />
                   )}
+
+                  {/* ── Budget ── */}
                   {lead.budget && lead.budget !== 'sin_definir' && (
                     <InfoRow icon={<Banknote size={14} />} label="Presupuesto orientativo" value={BUDGET_LABEL[lead.budget] || lead.budget} />
                   )}
+
+                  {/* ── Ceremony ── */}
                   {lead.ceremony_type && lead.ceremony_type !== 'sin_definir' && (
-                    <InfoRow icon={<Heart size={14} />} label="Tipo de ceremonia" value={{ civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica', mixta: 'Mixta' }[lead.ceremony_type] || lead.ceremony_type} />
+                    <InfoRow icon={<Heart size={14} />} label="Ceremonia" value={{ civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica', mixta: 'Mixta' }[lead.ceremony_type] || lead.ceremony_type} />
                   )}
+
+                  {/* ── Catering ── */}
                   {lead.catering_needed && lead.catering_needed !== 'sin_definir' && (
                     <InfoRow icon={<UtensilsCrossed size={14} />} label="Catering" value={{ incluido: 'Incluido en el venue', externo: 'Traen catering externo', por_definir: 'Por definir' }[lead.catering_needed] || lead.catering_needed} />
                   )}
-                  {lead.country && (
-                    <InfoRow icon={<MapPin size={14} />} label="País" value={lead.country} />
-                  )}
-                  {lead.language && (
-                    <InfoRow icon={<Globe size={14} />} label="Idioma" value={lead.language} />
-                  )}
-                  {lead.style && (
-                    <InfoRow icon={<Palette size={14} />} label="Estilo buscado" value={lead.style} />
-                  )}
+
+                  {/* ── Country / Language / Style ── */}
+                  {lead.country  && <InfoRow icon={<MapPin  size={14} />} label="País"           value={lead.country} />}
+                  {lead.language && <InfoRow icon={<Globe   size={14} />} label="Idioma"          value={lead.language} />}
+                  {lead.style    && <InfoRow icon={<Palette size={14} />} label="Estilo buscado"  value={lead.style} />}
+
+                  {/* ── Tags ── */}
                   {lead.tags && lead.tags.length > 0 && (
                     <div style={{ padding: '9px 0', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                       <div style={{ color: 'var(--warm-gray)', flexShrink: 0, marginTop: 1 }}><Tag size={14} /></div>
@@ -494,6 +587,53 @@ export default function CrmContactPage() {
                   <p style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic', margin: 0 }}>Sin notas</p>
                 )}
               </div>
+              {/* Documents (budget files) */}
+              {docFiles.length > 0 && (
+                <div className="card" style={{ padding: '20px 28px' }}>
+                  <SectionLabel>Documentos adjuntos</SectionLabel>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {docFiles.map((f, i) => (
+                      <a key={i} href={f.url} target="_blank" rel="noreferrer"
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#f9fafb', border: '1.5px solid var(--ivory)', textDecoration: 'none', color: 'var(--charcoal)' }}>
+                        <Paperclip size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Presupuesto adjunto</div>
+                        </div>
+                        <ExternalLink size={12} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Related leads — for wedding planners */}
+              {isWP && relatedLeads.length > 0 && (
+                <div className="card" style={{ padding: '20px 28px' }}>
+                  <SectionLabel>Otras parejas de este WP</SectionLabel>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {relatedLeads.map(rl => {
+                      const sc2 = STATUS_CFG[rl.status] || { label: rl.status, bg: '#f3f4f6', color: '#6b7280' }
+                      const dateLabel = rl.budget_date ? fmtDate(rl.budget_date)
+                        : rl.wedding_date ? fmtDate(rl.wedding_date)
+                        : rl.wedding_year ? String(rl.wedding_year)
+                        : '—'
+                      return (
+                        <button key={rl.id} onClick={() => router.push(`/crm/${rl.id}`)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: '#fafaf8', border: '1px solid var(--ivory)', cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left', width: '100%' }}>
+                          <div style={{ width: 34, height: 34, borderRadius: 10, background: sc2.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>💑</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rl.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{dateLabel}</div>
+                          </div>
+                          <span style={{ fontSize: 10, fontWeight: 600, background: sc2.bg, color: sc2.color, borderRadius: 5, padding: '2px 7px', flexShrink: 0 }}>{sc2.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
             </div>
 
             {/* ── Right sidebar ─────────────────────────────────────────────── */}
