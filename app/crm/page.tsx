@@ -6,11 +6,9 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import Spinner from '@/components/Spinner'
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import {
   Search, X, Phone, Mail, MessageCircle, Users, Download,
   ChevronUp, ChevronDown, ArrowUpDown, ExternalLink,
-  Calendar, Banknote, MapPin, FileText, Tag, Clock,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -23,6 +21,7 @@ type Lead = {
   whatsapp?: string | null
   source?: string | null
   status: string
+  contact_type?: string | null
   wedding_date?: string | null
   wedding_year?: number | null
   wedding_month?: number | null
@@ -31,6 +30,14 @@ type Lead = {
   ceremony_type?: string | null
   notes?: string | null
   created_at: string
+}
+
+const CONTACT_TYPE_CFG: Record<string, { label: string; bg: string; color: string; emoji: string }> = {
+  pareja:          { label: 'Pareja',          bg: '#fdf4ff', color: '#7e22ce', emoji: '💑' },
+  wedding_planner: { label: 'Wedding Planner', bg: '#f0f9ff', color: '#0369a1', emoji: '📋' },
+  event_organizer: { label: 'Event Organizer', bg: '#fff7ed', color: '#c2410c', emoji: '🎪' },
+  empresa:         { label: 'Empresa',          bg: '#f8fafc', color: '#334155', emoji: '🏢' },
+  otro:            { label: 'Otro',             bg: '#f3f4f6', color: '#6b7280', emoji: '👤' },
 }
 
 type SortKey = 'name' | 'status' | 'wedding_date' | 'guests' | 'created_at'
@@ -94,12 +101,12 @@ export default function CrmPage() {
   const [leads,   setLeads]   = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [search,  setSearch]  = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [sourceFilter, setSourceFilter] = useState<string>('all')
-  const [yearFilter,   setYearFilter]   = useState<string>('all')
+  const [statusFilter,      setStatusFilter]      = useState<string>('all')
+  const [sourceFilter,      setSourceFilter]      = useState<string>('all')
+  const [yearFilter,        setYearFilter]        = useState<string>('all')
+  const [contactTypeFilter, setContactTypeFilter] = useState<string>('all')
   const [sortKey,  setSortKey]  = useState<SortKey>('created_at')
   const [sortDir,  setSortDir]  = useState<SortDir>('desc')
-  const [selected, setSelected] = useState<Lead | null>(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -113,18 +120,11 @@ export default function CrmPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from('leads')
-      .select('id,name,email,phone,whatsapp,source,status,wedding_date,wedding_year,wedding_month,guests,budget,ceremony_type,notes,created_at')
+      .select('id,name,email,phone,whatsapp,source,status,contact_type,wedding_date,wedding_year,wedding_month,guests,budget,ceremony_type,notes,created_at')
       .eq('venue_id', activeVenue.id)
       .order('created_at', { ascending: false })
     if (data) setLeads(data as Lead[])
     setLoading(false)
-  }
-
-  const updateStatus = async (id: string, status: string) => {
-    const supabase = createClient()
-    await supabase.from('leads').update({ status }).eq('id', id)
-    setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
-    setSelected(prev => prev?.id === id ? { ...prev, status } : prev)
   }
 
   // ── Stats ──────────────────────────────────────────────────────────────────
@@ -163,8 +163,9 @@ export default function CrmPage() {
         (l.whatsapp || '').includes(q)
       )
     }
-    if (statusFilter !== 'all') rows = rows.filter(l => l.status === statusFilter)
-    if (sourceFilter !== 'all') rows = rows.filter(l => l.source === sourceFilter)
+    if (statusFilter !== 'all')      rows = rows.filter(l => l.status === statusFilter)
+    if (sourceFilter !== 'all')      rows = rows.filter(l => l.source === sourceFilter)
+    if (contactTypeFilter !== 'all') rows = rows.filter(l => (l.contact_type || 'pareja') === contactTypeFilter)
     if (yearFilter !== 'all') {
       const y = parseInt(yearFilter)
       rows = rows.filter(l => {
@@ -310,9 +311,16 @@ export default function CrmPage() {
               </select>
             )}
 
+            {/* Contact type filter */}
+            <select value={contactTypeFilter} onChange={e => setContactTypeFilter(e.target.value)}
+              style={{ padding: '7px 10px', border: '1px solid var(--ivory)', borderRadius: 8, fontSize: 12, fontFamily: 'Inter, sans-serif', background: '#faf8f5', color: 'var(--charcoal)', cursor: 'pointer' }}>
+              <option value="all">Todos los tipos</option>
+              {Object.entries(CONTACT_TYPE_CFG).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+            </select>
+
             {/* Clear */}
-            {(statusFilter !== 'all' || sourceFilter !== 'all' || yearFilter !== 'all' || search) && (
-              <button onClick={() => { setStatusFilter('all'); setSourceFilter('all'); setYearFilter('all'); setSearch('') }}
+            {(statusFilter !== 'all' || sourceFilter !== 'all' || yearFilter !== 'all' || contactTypeFilter !== 'all' || search) && (
+              <button onClick={() => { setStatusFilter('all'); setSourceFilter('all'); setYearFilter('all'); setContactTypeFilter('all'); setSearch('') }}
                 style={{ fontSize: 11, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
                 Limpiar filtros
               </button>
@@ -335,15 +343,16 @@ export default function CrmPage() {
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--ivory)', background: '#faf8f5' }}>
                       {[
-                        { label: 'Nombre',      key: 'name' as SortKey,         w: '20%' },
-                        { label: 'Contacto',    key: null,                       w: '14%' },
-                        { label: 'Canal',       key: null,                       w: '12%' },
-                        { label: 'Estado',      key: 'status' as SortKey,       w: '13%' },
-                        { label: 'Boda',        key: 'wedding_date' as SortKey, w: '10%' },
-                        { label: 'Invitados',   key: 'guests' as SortKey,       w: '8%'  },
-                        { label: 'Presupuesto', key: null,                       w: '10%' },
-                        { label: 'Entrada',     key: 'created_at' as SortKey,   w: '10%' },
-                        { label: '',            key: null,                       w: '3%'  },
+                        { label: 'Nombre',      key: 'name' as SortKey,         w: '18%' },
+                        { label: 'Tipo',        key: null,                       w: '12%' },
+                        { label: 'Contacto',    key: null,                       w: '10%' },
+                        { label: 'Canal',       key: null,                       w: '10%' },
+                        { label: 'Estado',      key: 'status' as SortKey,       w: '12%' },
+                        { label: 'Boda',        key: 'wedding_date' as SortKey, w: '9%'  },
+                        { label: 'Invitados',   key: 'guests' as SortKey,       w: '7%'  },
+                        { label: 'Presupuesto', key: null,                       w: '9%'  },
+                        { label: 'Entrada',     key: 'created_at' as SortKey,   w: '9%'  },
+                        { label: '',            key: null,                       w: '4%'  },
                       ].map((col, i) => (
                         <th key={i} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--warm-gray)', width: col.w, whiteSpace: 'nowrap' }}>
                           {col.label} {col.key && <SortBtn col={col.key} />}
@@ -356,15 +365,27 @@ export default function CrmPage() {
                       const sc = STATUS_CFG[lead.status] || { label: lead.status, bg: '#f3f4f6', color: '#6b7280' }
                       return (
                         <tr key={lead.id}
-                          onClick={() => setSelected(lead)}
+                          onClick={() => router.push(`/crm/${lead.id}`)}
                           style={{ borderBottom: '1px solid var(--ivory)', cursor: 'pointer', transition: 'background 0.1s' }}
                           onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
                           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                         >
                           {/* Name */}
                           <td style={{ padding: '10px 14px' }}>
-                            <div style={{ fontWeight: 600, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{lead.name}</div>
-                            {lead.email && <div style={{ fontSize: 11, color: 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{lead.email}</div>}
+                            <div style={{ fontWeight: 600, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{lead.name}</div>
+                            {lead.email && <div style={{ fontSize: 11, color: 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{lead.email}</div>}
+                          </td>
+
+                          {/* Contact type */}
+                          <td style={{ padding: '10px 14px' }}>
+                            {(() => {
+                              const ct = CONTACT_TYPE_CFG[lead.contact_type || 'pareja'] || CONTACT_TYPE_CFG.otro
+                              return (
+                                <span style={{ fontSize: 11, fontWeight: 500, background: ct.bg, color: ct.color, borderRadius: 5, padding: '2px 7px', whiteSpace: 'nowrap' }}>
+                                  {ct.emoji} {ct.label}
+                                </span>
+                              )
+                            })()}
                           </td>
 
                           {/* Contact icons */}
@@ -444,146 +465,6 @@ export default function CrmPage() {
         </div>
       </div>
 
-      {/* Contact detail drawer */}
-      <Sheet open={!!selected} onOpenChange={open => { if (!open) setSelected(null) }}>
-        <SheetContent side="right" style={{ width: 420, maxWidth: '95vw', padding: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-          {selected && (() => {
-            const sc = STATUS_CFG[selected.status] || { label: selected.status, bg: '#f3f4f6', color: '#6b7280' }
-            return (
-              <>
-                {/* Header */}
-                <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid var(--ivory)' }}>
-                  <SheetTitle style={{ fontSize: 18, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 6 }}>
-                    {selected.name}
-                  </SheetTitle>
-                  <span style={{ fontSize: 12, fontWeight: 600, background: sc.bg, color: sc.color, borderRadius: 6, padding: '3px 10px' }}>
-                    {sc.label}
-                  </span>
-                </div>
-
-                {/* Body */}
-                <div style={{ padding: '20px 24px', flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-                  {/* Contact info */}
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 10 }}>Contacto</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {selected.email && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <Mail size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                          <a href={`mailto:${selected.email}`} style={{ fontSize: 13, color: 'var(--charcoal)', textDecoration: 'none' }}
-                            onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
-                            onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}>
-                            {selected.email}
-                          </a>
-                        </div>
-                      )}
-                      {selected.phone && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <Phone size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                          <a href={`tel:${selected.phone}`} style={{ fontSize: 13, color: 'var(--charcoal)', textDecoration: 'none' }}>
-                            {selected.phone}
-                          </a>
-                        </div>
-                      )}
-                      {selected.whatsapp && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <MessageCircle size={14} style={{ color: '#25D366', flexShrink: 0 }} />
-                          <a href={`https://wa.me/${selected.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                            style={{ fontSize: 13, color: '#25D366', textDecoration: 'none' }}>
-                            {selected.whatsapp}
-                          </a>
-                        </div>
-                      )}
-                      {!selected.email && !selected.phone && !selected.whatsapp && (
-                        <div style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin datos de contacto</div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Boda info */}
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 10 }}>Boda</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <Calendar size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                        <span style={{ fontSize: 13, color: 'var(--charcoal)' }}>{weddingLabel(selected)}</span>
-                      </div>
-                      {selected.guests && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <Users size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                          <span style={{ fontSize: 13, color: 'var(--charcoal)' }}>{selected.guests} invitados</span>
-                        </div>
-                      )}
-                      {selected.budget && selected.budget !== 'sin_definir' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <Banknote size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                          <span style={{ fontSize: 13, color: 'var(--charcoal)' }}>{BUDGET_LABEL[selected.budget] || selected.budget}</span>
-                        </div>
-                      )}
-                      {selected.ceremony_type && selected.ceremony_type !== 'sin_definir' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <Tag size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                          <span style={{ fontSize: 13, color: 'var(--charcoal)' }}>
-                            {{ civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica', mixta: 'Mixta' }[selected.ceremony_type] || selected.ceremony_type}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Origen + entrada */}
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 10 }}>Origen</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <MapPin size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                        <span style={{ fontSize: 13, color: 'var(--charcoal)' }}>{SOURCE_LABEL[selected.source || ''] || selected.source || '—'}</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <Clock size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                        <span style={{ fontSize: 13, color: 'var(--charcoal)' }}>{fmtDate(selected.created_at)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Notes */}
-                  {selected.notes && (
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 10 }}>Notas</div>
-                      <div style={{ fontSize: 13, color: 'var(--charcoal)', background: '#faf8f5', borderRadius: 8, padding: '10px 12px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                        {selected.notes}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Change status */}
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 10 }}>Cambiar estado</div>
-                    <select
-                      value={selected.status}
-                      onChange={e => updateStatus(selected.id, e.target.value)}
-                      style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--ivory)', borderRadius: 8, fontSize: 13, fontFamily: 'Inter, sans-serif', background: '#faf8f5', color: 'var(--charcoal)', cursor: 'pointer' }}
-                    >
-                      {Object.entries(STATUS_CFG).map(([k, v]) => (
-                        <option key={k} value={k}>{v.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div style={{ padding: '16px 24px', borderTop: '1px solid var(--ivory)' }}>
-                  <button onClick={() => router.push('/leads')}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px', borderRadius: 8, border: '1px solid var(--ivory)', background: '#faf8f5', color: 'var(--charcoal)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
-                    <ExternalLink size={14} /> Ver ficha completa en Leads
-                  </button>
-                </div>
-              </>
-            )
-          })()}
-        </SheetContent>
-      </Sheet>
     </div>
   )
 }
