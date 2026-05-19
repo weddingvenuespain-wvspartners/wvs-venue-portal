@@ -5963,7 +5963,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, fontWeight: 700, color: 'var(--espresso)', lineHeight: 1.2, textTransform: 'capitalize' }}>
-                {isEdit ? (form.name || 'Sin nombre') : 'Nueva pareja interesada'}
+                {isEdit ? (form.name || 'Sin nombre') : (form.name ? form.name : 'Nueva pareja interesada')}
               </div>
               {isEdit && leadStatus && (() => {
                 const STATUS_INFO: Record<string, { label: string; bg: string; border: string; color: string; icon: React.ReactNode }> = {
@@ -6015,16 +6015,16 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
           {((() => {
             if (!isEdit) return [
               { key: 'contacto', label: 'Contacto', icon: <Users           size={12} /> },
-              { key: 'fechas',   label: 'Evento',   icon: <CalendarDays    size={12} /> },
+              { key: 'fechas',   label: 'Fechas',   icon: <CalendarDays    size={12} /> },
             ]
             if (!isNewPhase) return [
-              { key: 'fechas',   label: 'Evento',    icon: <CalendarDays      size={12} /> },
+              { key: 'fechas',   label: 'Fechas',    icon: <CalendarDays      size={12} /> },
               { key: 'detalles', label: 'Detalles',  icon: <SlidersHorizontal size={12} /> },
               { key: 'oferta',   label: 'Comercial', icon: <Receipt           size={12} /> },
               { key: 'contacto', label: 'Contacto',  icon: <Users             size={12} /> },
             ]
             return [
-              { key: 'fechas',   label: 'Evento',   icon: <CalendarDays size={12} /> },
+              { key: 'fechas',   label: 'Fechas',   icon: <CalendarDays size={12} /> },
               { key: 'contacto', label: 'Contacto', icon: <Users        size={12} /> },
             ]
           })() as { key: 'fechas' | 'detalles' | 'oferta' | 'contacto'; label: string; icon: React.ReactNode }[]).map(t => {
@@ -6080,34 +6080,6 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   </button>
                 )}
               </div>
-            </div>
-          )}
-
-          {/* ── Documentos adjuntos: acceso rápido desde Boda ───────────────────── */}
-          {!isNewPhase && editLead && ((form.budget_files || []).length > 0 || form.budget_file_url) && (
-            <div style={{ marginBottom: 16 }}>
-              {((form.budget_files || []).length > 0 ? form.budget_files : [{ url: form.budget_file_url, name: form.budget_file_name }]).map((bf: { url: string; name: string }, idx: number) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 10, background: '#f9fafb', border: '1.5px solid var(--ivory)', marginBottom: idx < ((form.budget_files || []).length || 1) - 1 ? 6 : 0 }}>
-                  <Paperclip size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {bf.name || 'Documento adjunto'}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
-                      Presupuesto ·{' '}
-                      <button type="button"
-                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--gold)', fontWeight: 600, fontSize: 11 }}
-                        onClick={() => setActiveModalTab('oferta')}>
-                        Ver en Comercial →
-                      </button>
-                    </div>
-                  </div>
-                  <a href={bf.url} target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: 11, color: 'var(--warm-gray)', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '5px 9px', background: 'var(--cream)', borderRadius: 7, border: '1px solid var(--ivory)' }}>
-                    <ExternalLink size={11} /> Ver
-                  </a>
-                </div>
-              ))}
             </div>
           )}
 
@@ -6642,7 +6614,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               </div>
             </div>
             <div className="form-group" style={{ marginTop: 12 }}>
-              <label className="form-label">💰 Presupuesto orientativo</label>
+              <label className="form-label">Presupuesto orientativo</label>
               <Select value={form.budget} onValueChange={(v) => set('budget', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -6669,10 +6641,20 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
           {/* ════ EN SEGUIMIENTO + VISITA + PERDIDOS: Fechas ofertadas → Presupuesto → Pres.digital → Prop.digital ════ */}
           {(leadStatus === 'contacted' || leadStatus === 'proposal_sent' || leadStatus === 'visit_scheduled' || leadStatus === 'post_visit' || leadStatus === 'lost') && (<>
 
+            {/* Post-visita: resultado de la visita */}
+            {leadStatus === 'post_visit' && (
+              <div style={{ marginBottom: 20 }}>
+                <SectionTitle icon={<CheckCircle size={14} />} title="Resultado de la visita" hint="¿Cómo fue? Anota el feedback para dar seguimiento" />
+                <textarea className="form-textarea" style={{ minHeight: 80 }} value={form.notes}
+                  onChange={e => set('notes', e.target.value)} placeholder="Ej: les encantó el jardín, preguntaron por catering externo, esperan presupuesto esta semana…" />
+                <div style={{ borderTop: '1px solid var(--ivory)', marginTop: 18, marginBottom: 18 }} />
+              </div>
+            )}
+
             {/* Presupuesto */}
             <div style={{ marginBottom: 22 }}>
-              {(leadStatus === 'visit_scheduled' || leadStatus === 'post_visit') && (<>
-                <SectionTitle icon={<Receipt size={14} />} title="Presupuesto" hint="Adjunta el presupuesto para enviárselo a la pareja" />
+              {(leadStatus === 'contacted' || leadStatus === 'proposal_sent' || leadStatus === 'visit_scheduled' || leadStatus === 'post_visit') && (<>
+                <SectionTitle icon={<Receipt size={14} />} title="Documentos" hint="Adjunta propuestas, presupuestos o cualquier documento para la pareja" />
                 {/* Multi-file list */}
                 {(form.budget_files || []).map((bf: { url: string; name: string }, idx: number) => (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#f0fdf4', border: '1.5px solid #86efac', marginBottom: 8 }}>
