@@ -59,6 +59,7 @@ type Lead = {
   original_wedding_date?: string | null
   original_wedding_date_to?: string | null
   original_date_flexibility?: string | null
+  planner_id?: string | null
   created_at: string
   updated_at?: string | null
 }
@@ -213,23 +214,38 @@ export default function CrmContactPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from('leads')
-      .select('id,name,email,phone,whatsapp,whatsapp_consent,source,status,contact_type,wedding_date,wedding_date_to,wedding_year,wedding_month,date_flexibility,wedding_duration_days,guests,guests_adults,guests_children,budget,ceremony_type,catering_needed,language,style,notes,country,tags,visit_date,visit_time,visit_duration,initial_message,budget_date,budget_date_to,budget_date_flexibility,budget_date_ranges,budget_file_url,budget_file_name,budget_files,original_wedding_date,original_wedding_date_to,original_date_flexibility,created_at,updated_at')
+      .select('id,name,email,phone,whatsapp,whatsapp_consent,source,status,contact_type,wedding_date,wedding_date_to,wedding_year,wedding_month,date_flexibility,wedding_duration_days,guests,guests_adults,guests_children,budget,ceremony_type,catering_needed,language,style,notes,country,tags,visit_date,visit_time,visit_duration,initial_message,budget_date,budget_date_to,budget_date_flexibility,budget_date_ranges,budget_file_url,budget_file_name,budget_files,original_wedding_date,original_wedding_date_to,original_date_flexibility,planner_id,created_at,updated_at')
       .eq('id', id)
       .maybeSingle()
     if (data) {
       const loadedLead = data as Lead
       setLead(loadedLead)
       setForm(loadedLead)
-      // For wedding planners: load other leads from same WP (matched by email)
-      if (loadedLead.contact_type === 'wedding_planner' && loadedLead.email) {
-        const { data: rel } = await supabase
-          .from('leads')
-          .select('id,name,status,wedding_date,wedding_year,wedding_month,date_flexibility,budget_date,created_at')
-          .eq('email', loadedLead.email)
-          .neq('id', loadedLead.id)
-          .order('created_at', { ascending: false })
-          .limit(20)
-        setRelatedLeads((rel || []) as Lead[])
+      // For wedding planners: load all leads from this WP (linked via planner_id, fallback to email)
+      if (loadedLead.contact_type === 'wedding_planner') {
+        let rel: any[] = []
+        if (loadedLead.planner_id) {
+          // Primary: same planner_id = same WP user, different couples
+          const { data } = await supabase
+            .from('leads')
+            .select('id,name,status,contact_type,wedding_date,wedding_year,wedding_month,date_flexibility,budget_date,guests,created_at')
+            .eq('planner_id', loadedLead.planner_id)
+            .neq('id', loadedLead.id)
+            .order('created_at', { ascending: false })
+            .limit(50)
+          rel = data || []
+        } else if (loadedLead.email) {
+          // Fallback: same email (for manually created WP leads without planner_id)
+          const { data } = await supabase
+            .from('leads')
+            .select('id,name,status,contact_type,wedding_date,wedding_year,wedding_month,date_flexibility,budget_date,guests,created_at')
+            .eq('email', loadedLead.email)
+            .neq('id', loadedLead.id)
+            .order('created_at', { ascending: false })
+            .limit(50)
+          rel = data || []
+        }
+        setRelatedLeads(rel as Lead[])
       }
     }
     setLoading(false)
@@ -608,9 +624,19 @@ export default function CrmContactPage() {
               )}
 
               {/* Related leads — for wedding planners */}
-              {isWP && relatedLeads.length > 0 && (
+              {isWP && (
                 <div className="card" style={{ padding: '20px 28px' }}>
-                  <SectionLabel>Otras parejas de este WP</SectionLabel>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <SectionLabel>Parejas de este WP</SectionLabel>
+                    <span style={{ fontSize: 11, color: 'var(--warm-gray)', fontWeight: 500, marginBottom: 14 }}>
+                      {relatedLeads.length} {relatedLeads.length === 1 ? 'pareja' : 'parejas'}
+                    </span>
+                  </div>
+                  {relatedLeads.length === 0 && (
+                    <p style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic', margin: 0 }}>
+                      Sin otras parejas registradas
+                    </p>
+                  )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {relatedLeads.map(rl => {
                       const sc2 = STATUS_CFG[rl.status] || { label: rl.status, bg: '#f3f4f6', color: '#6b7280' }
