@@ -6001,7 +6001,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               })()}
               </div>
               {isEdit && editLead?.id && (
-                <a href={`/crm/${editLead.id}`}
+                <a href={`/crm/${(editLead as any).client_id || editLead.id}`}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, padding: '3px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(0,0,0,0.1)', fontSize: 11, fontWeight: 600, color: 'var(--charcoal)', textDecoration: 'none' }}>
                   <ExternalLink size={10} /> Ver en CRM
                 </a>

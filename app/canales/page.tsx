@@ -90,9 +90,9 @@ function WvsCard({ snap, loading }: { snap: WvsSnapshot | null; loading: boolean
         }}
       >
         {/* Top bar: hero + venue info */}
-        <div style={{ display: 'flex', alignItems: 'stretch', minHeight: 110 }}>
+        <div style={{ display: 'flex', alignItems: 'stretch', minHeight: 110, flexWrap: 'wrap' }}>
           {/* Hero thumbnail */}
-          <div style={{ width: 140, flexShrink: 0, background: '#f1f5f9', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ width: 140, minWidth: 100, flexShrink: 0, background: '#f1f5f9', position: 'relative', overflow: 'hidden' }}>
             {loading ? (
               <div style={{ width: '100%', height: '100%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ImageIcon size={20} style={{ color: '#94a3b8' }} />
@@ -108,10 +108,10 @@ function WvsCard({ snap, loading }: { snap: WvsSnapshot | null; loading: boolean
           </div>
 
           {/* Venue info */}
-          <div style={{ flex: 1, padding: '16px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div style={{ flex: 1, padding: '16px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
             <div>
               {/* Header row */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 13, color: 'var(--espresso)', lineHeight: 1.2 }}>WeddingVenuesSpain.com</div>
@@ -177,7 +177,7 @@ function WvsCard({ snap, loading }: { snap: WvsSnapshot | null; loading: boolean
         </div>
 
         {/* Stats row */}
-        <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', background: '#fafafa' }}>
+        <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', background: '#fafafa' }}>
           {[
             {
               icon: <TrendingUp size={13} style={{ color: '#2E6DB4' }} />,
@@ -307,7 +307,7 @@ export default function CanalesPage() {
         <div className="topbar">
           <div className="topbar-title">Canales de venta</div>
         </div>
-        <div className="page-content" style={{ maxWidth: 860, margin: '0 auto' }}>
+        <div className="page-content">
 
           {/* Intro */}
           <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.6, marginBottom: 28 }}>
@@ -335,7 +335,7 @@ export default function CanalesPage() {
               <span style={{ fontSize: 11, color: 'var(--warm-gray)', marginLeft: 2 }}>({soonChannels.length})</span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
               {soonChannels.map(ch => (
                 <div key={ch.name} style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 14, padding: '18px 20px', position: 'relative', overflow: 'hidden' }}>
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `${ch.accentColor}35`, borderRadius: '14px 14px 0 0' }} />

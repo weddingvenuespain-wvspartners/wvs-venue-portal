@@ -145,7 +145,7 @@ export default function Sidebar() {
     { href: '/canales',      label: 'Canales de venta',                               icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
     { href: '/calendario',   label: isMultiVenue ? 'Calendarios'    : 'Calendario',  icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
     { href: '/leads',        label: 'Leads',                                          icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', feature: 'leads'        },
-    { href: '/clientes',     label: 'Clientes',                                      icon: 'M1 12s2-4 7-4 7 4 7 4M8 8a3 3 0 100-6 3 3 0 000 6zM15 12s-1-2.5-3.5-3.5M12.5 5.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z', feature: 'leads' },
+    { href: '/crm',          label: 'CRM',                                           icon: 'M1 12s2-4 7-4 7 4 7 4M8 8a3 3 0 100-6 3 3 0 000 6zM15 12s-1-2.5-3.5-3.5M12.5 5.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z', feature: 'leads' },
     { href: '/proposals',    label: isMultiVenue ? 'Mis dosieres'   : 'Dosieres',    icon: 'M2 2h12v10H2zM14 8l2 4M5 6h6M5 9h4',                feature: 'propuestas'   },
     { href: '/budgets',      label: 'Presupuestos',                                     icon: 'M2 3h12v11H2zM5 1v3M11 1v3M5 7h6M5 10h3',             feature: 'presupuestos' },
     { href: '/venue-settings', label: 'Configuración',                                 icon: 'M1 3h14M1 7h9M1 11h5M11 9l2 2 4-4',                  feature: 'estructura'   },

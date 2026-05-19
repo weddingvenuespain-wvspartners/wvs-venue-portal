@@ -1,4 +1,5 @@
 ﻿'use client'
+import * as React from 'react'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -7,6 +8,10 @@ import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
+import { Calendar as CalendarWidget } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { format, parseISO } from 'date-fns'
+import { es } from 'date-fns/locale'
 import Spinner from '@/components/Spinner'
 import {
   ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
@@ -166,6 +171,92 @@ function formatDateEs(ds: string): string {
   return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
+// ── Date range filter (single calendar with DESDE/HASTA header) ──────────────
+
+function DateRangeFilter({ from, to, onChange }: { from: string; to: string; onChange: (f: string, t: string) => void }) {
+  const [open, setOpen] = React.useState(false)
+  const [draft, setDraft] = React.useState<{ from: string; to: string }>({ from, to })
+  const hasRange = !!(from || to)
+
+  // Sync draft when props change or popover opens
+  React.useEffect(() => { if (open) setDraft({ from, to }) }, [open]) // eslint-disable-line
+
+  const draftFromDate = draft.from ? parseISO(draft.from + 'T12:00:00') : undefined
+  const draftToDate   = draft.to   ? parseISO(draft.to   + 'T12:00:00') : undefined
+
+  const fmtShort = (iso: string) => {
+    const d = parseISO(iso + 'T12:00:00')
+    return format(d, 'd MMM', { locale: es })
+  }
+
+  const label = from && to
+    ? `${fmtShort(from)} – ${fmtShort(to)}`
+    : from ? `Desde ${fmtShort(from)}`
+    : 'Filtrar por fecha'
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button style={{
+          fontSize: 11, padding: '3px 10px', borderRadius: 20, border: '1.5px solid',
+          borderColor: hasRange ? 'var(--gold)' : 'var(--ivory)',
+          background: hasRange ? 'var(--gold)' : 'transparent',
+          color: hasRange ? '#fff' : 'var(--warm-gray)',
+          cursor: 'pointer', fontWeight: hasRange ? 600 : 400,
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          fontFamily: 'Inter, sans-serif', transition: 'all 0.15s',
+        }}>
+          <Calendar size={11} /> {label}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 z-[300]" align="end" style={{ borderRadius: 14, overflow: 'hidden' }}>
+        {/* DESDE / HASTA header */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+          <div style={{ flex: 1, padding: '10px 14px', background: draft.from ? '#fefce8' : '#fafaf8', borderRight: '1px solid #e5e7eb' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 3 }}>Desde</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: draft.from ? 'var(--charcoal)' : '#c0bbb4' }}>
+              {draft.from ? fmtShort(draft.from) : '—'}
+            </div>
+          </div>
+          <div style={{ flex: 1, padding: '10px 14px', background: draft.to ? '#fefce8' : '#fafaf8' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 3 }}>Hasta</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: draft.to ? 'var(--charcoal)' : '#c0bbb4' }}>
+              {draft.to ? fmtShort(draft.to) : '—'}
+            </div>
+          </div>
+        </div>
+        {/* Calendar */}
+        <CalendarWidget
+          mode="range"
+          selected={draftFromDate && draftToDate ? { from: draftFromDate, to: draftToDate } : draftFromDate ? { from: draftFromDate, to: undefined } : undefined}
+          onSelect={(range) => {
+            setDraft({
+              from: range?.from ? format(range.from, 'yyyy-MM-dd') : '',
+              to:   range?.to   ? format(range.to,   'yyyy-MM-dd') : '',
+            })
+          }}
+          numberOfMonths={1}
+          autoFocus
+        />
+        {/* Footer: Borrar / Aplicar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 14px', borderTop: '1px solid #e5e7eb' }}>
+          <button onClick={() => { onChange('', ''); setOpen(false) }}
+            style={{ fontSize: 12, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif', padding: '4px 8px', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            Borrar
+          </button>
+          <button onClick={() => { onChange(draft.from, draft.to); setOpen(false) }}
+            disabled={!draft.from}
+            style={{ fontSize: 12, fontWeight: 600, padding: '6px 18px', borderRadius: 8, border: 'none',
+              background: draft.from ? '#2E6DB4' : '#e5e7eb', color: draft.from ? '#fff' : '#9ca3af',
+              cursor: draft.from ? 'pointer' : 'default', fontFamily: 'Inter, sans-serif' }}>
+            Aplicar
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function CalendarioPage() {
@@ -185,6 +276,9 @@ export default function CalendarioPage() {
   const [year,  setYear]  = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
   const [calView, setCalView] = useState<'month' | 'week' | 'day' | 'agenda' | 'tasks'>('month')
+  const [subView, setSubView] = useState<'list' | 'cal'>('list')
+  const [filterFrom, setFilterFrom] = useState<string>('')
+  const [filterTo, setFilterTo]     = useState<string>('')
   const [weekStart, setWeekStart] = useState<string>(() => {
     const t = new Date(); const day = t.getDay(); const diff = day === 0 ? -6 : 1 - day; t.setDate(t.getDate() + diff)
     return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
@@ -237,7 +331,7 @@ export default function CalendarioPage() {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
     load()
-  }, [user, authLoading, year, month, calView, weekStart, dayDate, activeVenue?.id])
+  }, [user, authLoading, year, month, calView, subView, weekStart, dayDate, activeVenue?.id])
 
   // Deep-link: reabrir modal de fecha al volver desde ?openDate=YYYY-MM-DD
   useEffect(() => {
@@ -261,7 +355,7 @@ export default function CalendarioPage() {
       to = `${endD.getFullYear()}-${pad2(endD.getMonth()+1)}-${pad2(endD.getDate())}`
     } else if (calView === 'day') {
       from = dayDate; to = dayDate
-    } else if (calView === 'agenda') {
+    } else if (calView === 'agenda' && subView === 'list') {
       from = dayDate
       const endD = new Date(dayDate + 'T12:00:00'); endD.setDate(endD.getDate() + 29)
       to = `${endD.getFullYear()}-${pad2(endD.getMonth()+1)}-${pad2(endD.getDate())}`
@@ -979,50 +1073,134 @@ export default function CalendarioPage() {
             <div className="card" style={{ overflow: 'hidden', gridColumn: 'span 3' }}>
               {/* Calendar header */}
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, color: 'var(--espresso)', fontWeight: 500, letterSpacing: '0.01em' }}>
-                    {periodLabel}
-                  </span>
-                  <button onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); const t = new Date(); const dy = t.getDay(); const df = dy === 0 ? -6 : 1 - dy; t.setDate(t.getDate() + df); const p2=(n:number)=>String(n).padStart(2,'0'); setWeekStart(`${t.getFullYear()}-${p2(t.getMonth()+1)}-${p2(t.getDate())}`); setDayDate(dateStr(today.getFullYear(), today.getMonth(), today.getDate())) }}
-                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
-                    Hoy
-                  </button>
-                </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  {/* View tabs */}
-                  <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
-                    {(['month','week','day','agenda','tasks'] as const).map(v => {
-                      const pendingOverdue = v === 'tasks' ? tasks.filter(t => !t.completed && t.due_date <= todayIso).length : 0
-                      return (
-                        <button key={v} type="button" onClick={() => setCalView(v)}
-                          style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
-                            background: calView === v ? '#fff' : 'transparent',
-                            color: calView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
-                            boxShadow: calView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none',
-                            position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          {v === 'month' ? 'Mes' : v === 'week' ? 'Semana' : v === 'day' ? 'Día' : v === 'agenda' ? 'Agenda' : 'Tareas'}
-                          {pendingOverdue > 0 && (
-                            <span style={{ background: '#ef4444', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
-                              {pendingOverdue}
-                            </span>
-                          )}
-                        </button>
-                      )
-                    })}
+                {/* Left: period label + Hoy (calendar views) OR title + date picker (agenda/tasks) */}
+                {calView !== 'agenda' && calView !== 'tasks' ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, color: 'var(--espresso)', fontWeight: 500, letterSpacing: '0.01em' }}>
+                      {periodLabel}
+                    </span>
+                    <button onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); const t = new Date(); const dy = t.getDay(); const df = dy === 0 ? -6 : 1 - dy; t.setDate(t.getDate() + df); const p2=(n:number)=>String(n).padStart(2,'0'); setWeekStart(`${t.getFullYear()}-${p2(t.getMonth()+1)}-${p2(t.getDate())}`); setDayDate(dateStr(today.getFullYear(), today.getMonth(), today.getDate())) }}
+                      style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
+                      Hoy
+                    </button>
                   </div>
-                  <button onClick={prevPeriod}
-                    style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
-                    <ChevronLeft size={15} />
-                  </button>
-                  <button onClick={nextPeriod}
-                    style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
-                    <ChevronRight size={15} />
-                  </button>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, color: 'var(--espresso)', fontWeight: 500, letterSpacing: '0.01em' }}>
+                      {calView === 'agenda' ? 'Agenda' : 'Tareas'}
+                    </span>
+                    {/* Sub-toggle: Lista / Calendario */}
+                    <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 6, padding: 2, gap: 1 }}>
+                      {(['list', 'cal'] as const).map(sv => (
+                        <button key={sv} onClick={() => setSubView(sv)}
+                          style={{ fontSize: 10, padding: '2px 9px', borderRadius: 5, border: 'none', cursor: 'pointer', fontWeight: 600,
+                            background: subView === sv ? '#fff' : 'transparent',
+                            color: subView === sv ? 'var(--charcoal)' : 'var(--warm-gray)',
+                            boxShadow: subView === sv ? '0 1px 3px rgba(0,0,0,.08)' : 'none',
+                            fontFamily: 'Inter, sans-serif' }}>
+                          {sv === 'list' ? 'Lista' : 'Calendario'}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Date range filter */}
+                    <DateRangeFilter from={filterFrom} to={filterTo} onChange={(f, t) => { setFilterFrom(f); setFilterTo(t); if (f) setDayDate(f) }} />
+                    {/* Month nav for calendar sub-view */}
+                    {subView === 'cal' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button onClick={prevMonth} style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
+                          <ChevronLeft size={13} />
+                        </button>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', minWidth: 110, textAlign: 'center' }}>{MONTHS[month]} {year}</span>
+                        <button onClick={nextMonth} style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
+                          <ChevronRight size={13} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {/* View tabs — two groups */}
+                  {calView !== 'agenda' && calView !== 'tasks' ? (
+                    <>
+                      {/* Calendar views group */}
+                      <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
+                        {(['month','week','day'] as const).map(v => (
+                          <button key={v} type="button" onClick={() => setCalView(v)}
+                            style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
+                              background: calView === v ? '#fff' : 'transparent',
+                              color: calView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
+                              boxShadow: calView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none',
+                              fontFamily: 'Inter, sans-serif' }}>
+                            {v === 'month' ? 'Mes' : v === 'week' ? 'Semana' : 'Día'}
+                          </button>
+                        ))}
+                      </div>
+                      {/* Link to Agenda/Tareas */}
+                      <div style={{ display: 'flex', gap: 2 }}>
+                        {(['agenda','tasks'] as const).map(v => {
+                          const pendingOverdue = v === 'tasks' ? tasks.filter(t => !t.completed && t.due_date <= todayIso).length : 0
+                          return (
+                            <button key={v} type="button" onClick={() => { setCalView(v); setSubView('list') }}
+                              style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', cursor: 'pointer', fontWeight: 500,
+                                color: 'var(--warm-gray)', fontFamily: 'Inter, sans-serif', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              {v === 'agenda' ? 'Agenda' : 'Tareas'}
+                              {pendingOverdue > 0 && (
+                                <span style={{ background: '#ef4444', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
+                                  {pendingOverdue}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {/* Period nav arrows */}
+                      <button onClick={prevPeriod}
+                        style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
+                        <ChevronLeft size={15} />
+                      </button>
+                      <button onClick={nextPeriod}
+                        style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
+                        <ChevronRight size={15} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* Agenda/Tareas group */}
+                      <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
+                        {(['agenda','tasks'] as const).map(v => {
+                          const pendingOverdue = v === 'tasks' ? tasks.filter(t => !t.completed && t.due_date <= todayIso).length : 0
+                          return (
+                            <button key={v} type="button" onClick={() => { setCalView(v); setSubView('list') }}
+                              style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
+                                background: calView === v ? '#fff' : 'transparent',
+                                color: calView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
+                                boxShadow: calView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none',
+                                fontFamily: 'Inter, sans-serif', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              {v === 'agenda' ? 'Agenda' : 'Tareas'}
+                              {pendingOverdue > 0 && (
+                                <span style={{ background: '#ef4444', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
+                                  {pendingOverdue}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {/* Link back to Calendar */}
+                      <button type="button" onClick={() => setCalView('month')}
+                        style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', cursor: 'pointer', fontWeight: 500,
+                          color: 'var(--warm-gray)', fontFamily: 'Inter, sans-serif' }}>
+                        Calendario
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* Filter buttons — multi-select */}
-              <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+              {/* Filter buttons + date range — calendar views only */}
+              {calView !== 'agenda' && calView !== 'tasks' && (
+              <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 {([
                   { key: 'all',    label: 'Todos',             color: 'var(--gold)' },
                   { key: 'visitas', label: 'Visitas',           color: '#10b981' },
@@ -1042,7 +1220,12 @@ export default function CalendarioPage() {
                     </button>
                   )
                 })}
+                {/* Date range filter — single calendar popover */}
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <DateRangeFilter from={filterFrom} to={filterTo} onChange={(f, t) => { setFilterFrom(f); setFilterTo(t) }} />
+                </div>
               </div>
+              )}
 
               {/* Day headers — month view only */}
               {calView === 'month' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid var(--ivory)' }}>
@@ -1072,6 +1255,7 @@ export default function CalendarioPage() {
                       const cfg2nd = STATUS_CFG[(entry2nd?.status as Status) || 'libre']
                       const isToday   = ds === todayIso
                       const isPast    = ds < todayIso
+                      const isOutOfRange = (filterFrom && ds < filterFrom) || (filterTo && ds > filterTo)
                       const isBulkSel = bulkDates.has(ds)
                       const isBulkStart = bulkStart === ds
                       const dayLeads   = leadsByDate[ds] || []
@@ -1178,7 +1362,7 @@ export default function CalendarioPage() {
                             display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
                             justifyContent: 'space-between', padding: '8px 10px', outline: 'none',
                             boxShadow: isToday ? 'inset 0 0 0 2px var(--gold)' : isBulkStart ? 'inset 0 0 0 2px var(--gold)' : 'none',
-                            opacity: saving ? 0.7 : 1,
+                            opacity: saving ? 0.7 : isOutOfRange ? 0.25 : 1,
                             position: 'relative',
                           }}
                         >
@@ -1349,7 +1533,7 @@ export default function CalendarioPage() {
                         const dayInqs = pendingInquiries.filter(i => { const ev = i.event_at ? i.event_at.slice(0,10) : null; return ev === iso })
                         return (
                           <div key={iso} onClick={() => !isPast && setModalDate(iso)}
-                            style={{ minHeight: 120, borderLeft: wi > 0 ? '1px solid var(--ivory)' : 'none', borderTop: '1px solid var(--ivory)', padding: '8px 8px', background: entry?.status && entry.status !== 'libre' ? cfg.bg : '#fff', cursor: isPast ? 'default' : 'pointer', opacity: isPast ? 0.45 : 1, transition: 'background .15s', position: 'relative', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            style={{ minHeight: 120, borderLeft: wi > 0 ? '1px solid var(--ivory)' : 'none', borderTop: '1px solid var(--ivory)', padding: '8px 8px', background: entry?.status && entry.status !== 'libre' ? cfg.bg : '#fff', cursor: isPast ? 'default' : 'pointer', opacity: ((filterFrom && iso < filterFrom) || (filterTo && iso > filterTo)) ? 0.25 : isPast ? 0.45 : 1, transition: 'background .15s', position: 'relative', display: 'flex', flexDirection: 'column', gap: 4 }}>
                             {entry?.status && entry.status !== 'libre' && (
                               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
@@ -1439,12 +1623,100 @@ export default function CalendarioPage() {
                 )
               })()}
 
-              {/* ── Agenda view ───────────────────────────────────────────── */}
-              {!loading && calView === 'agenda' && (() => {
+              {/* ── Agenda/Tasks calendar sub-view (mini month) ────────── */}
+              {!loading && (calView === 'agenda' || calView === 'tasks') && subView === 'cal' && (() => {
+                const lastDayCal = new Date(year, month + 1, 0).getDate()
+                const startDowCal = new Date(year, month, 1).getDay()
+                const offsetCal = startDowCal === 0 ? 6 : startDowCal - 1
+                const cellsCal: (number | null)[] = Array(offsetCal).fill(null)
+                for (let d = 1; d <= lastDayCal; d++) cellsCal.push(d)
+                while (cellsCal.length % 7 !== 0) cellsCal.push(null)
+                const DOW_H = ['L','M','X','J','V','S','D']
+                return (
+                  <div style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 0, marginBottom: 4 }}>
+                      {DOW_H.map((d,i) => (
+                        <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', padding: '6px 0' }}>{d}</div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 0 }}>
+                      {cellsCal.map((day, i) => {
+                        if (!day) return <div key={`e-${i}`} style={{ minHeight: 44 }} />
+                        const ds = dateStr(year, month, day)
+                        const isToday = ds === todayIso
+                        const entry = entries[ds]
+                        const hasReservado = entry?.status === 'reservado'
+                        const hasNegociacion = entry?.status === 'negociacion'
+                        const hasBloqueado = entry?.status === 'bloqueado'
+                        const hasVisit = leads.some(l => l.visit_date === ds)
+                        const hasLead = !!(leadsByDate[ds]?.length)
+                        const hasTasks = !!(tasksByDate[ds]?.length)
+                        const taskCount = tasksByDate[ds]?.length || 0
+                        const showDots = calView === 'tasks'
+                          ? hasTasks
+                          : (hasReservado || hasNegociacion || hasBloqueado || hasVisit || hasLead || hasTasks)
+                        return (
+                          <button key={ds} onClick={() => {
+                            setDayDate(ds)
+                            setSubView('list')
+                            if (calView === 'tasks') { /* tasks list doesn't use dayDate but stays on tasks */ }
+                          }}
+                            style={{ minHeight: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                              border: 'none', background: isToday ? '#fffbf0' : 'transparent', cursor: 'pointer', borderRadius: 8,
+                              fontFamily: 'Inter, sans-serif' }}>
+                            <span style={{ fontSize: 13, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--gold)' : ds < todayIso ? '#c0bbb4' : 'var(--charcoal)' }}>{day}</span>
+                            {showDots && (
+                              <div style={{ display: 'flex', gap: 2 }}>
+                                {calView === 'tasks' ? (
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: '#8b5cf6' }}>{taskCount}</span>
+                                ) : (
+                                  <>
+                                    {hasReservado && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#5c4033' }} />}
+                                    {hasNegociacion && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--gold)' }} />}
+                                    {hasBloqueado && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#6b7280' }} />}
+                                    {hasVisit && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981' }} />}
+                                    {hasLead && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6' }} />}
+                                    {hasTasks && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#8b5cf6' }} />}
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {/* Mini legend */}
+                    <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+                      {calView === 'tasks' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#8b5cf6' }} />
+                          <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Tareas pendientes</span>
+                        </div>
+                      ) : (
+                        <>
+                          {[{ c: '#5c4033', l: 'Reservado' }, { c: 'var(--gold)', l: 'Negociación' }, { c: '#10b981', l: 'Visita' }, { c: '#3b82f6', l: 'Lead' }, { c: '#8b5cf6', l: 'Tarea' }].map(x => (
+                            <div key={x.l} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: x.c }} />
+                              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{x.l}</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* ── Agenda list view ──────────────────────────────────────── */}
+              {!loading && calView === 'agenda' && subView === 'list' && (() => {
+                const startDate = filterFrom || dayDate
+                const endDate = filterTo || undefined
                 const agendaDates: string[] = []
-                for (let i = 0; i < 30; i++) {
-                  const d = new Date(dayDate + 'T12:00:00'); d.setDate(d.getDate() + i)
-                  agendaDates.push(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`)
+                for (let i = 0; i < (endDate ? 365 : 30); i++) {
+                  const d = new Date(startDate + 'T12:00:00'); d.setDate(d.getDate() + i)
+                  const iso = `${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`
+                  if (endDate && iso > endDate) break
+                  agendaDates.push(iso)
                 }
                 const DOW_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
                 return (
@@ -1513,10 +1785,18 @@ export default function CalendarioPage() {
                 )
               })()}
 
-              {/* ── Tasks view ────────────────────────────────────────────── */}
-              {!loading && calView === 'tasks' && (() => {
-                const pendingTasks = tasks.filter(t => !t.completed)
-                const doneTasks    = tasks.filter(t => t.completed)
+              {/* ── Tasks list view ──────────────────────────────────────── */}
+              {!loading && calView === 'tasks' && subView === 'list' && (() => {
+                const hasDateFilter = !!(filterFrom || filterTo)
+                const allPending = tasks.filter(t => !t.completed)
+                const allDone    = tasks.filter(t => t.completed)
+                // Apply date range filter
+                const pendingTasks = hasDateFilter
+                  ? allPending.filter(t => (!filterFrom || t.due_date >= filterFrom) && (!filterTo || t.due_date <= filterTo))
+                  : allPending
+                const doneTasks = hasDateFilter
+                  ? allDone.filter(t => (!filterFrom || t.due_date >= filterFrom) && (!filterTo || t.due_date <= filterTo))
+                  : allDone
                 const overdue  = pendingTasks.filter(t => t.due_date < todayIso).sort((a,b) => a.due_date.localeCompare(b.due_date))
                 const dueToday = pendingTasks.filter(t => t.due_date === todayIso)
                 const upcoming = pendingTasks.filter(t => t.due_date > todayIso).sort((a,b) => a.due_date.localeCompare(b.due_date))
@@ -1619,8 +1899,8 @@ export default function CalendarioPage() {
                 )
               })()}
 
-              {/* Legend — hidden in tasks view */}
-              {calView !== 'tasks' && (
+              {/* Legend — hidden in agenda/tasks views */}
+              {calView !== 'tasks' && calView !== 'agenda' && (
               <div style={{ padding: '12px 20px', borderTop: '1px solid var(--ivory)', display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
                 {Object.entries(STATUS_CFG).map(([key, cfg]) => (
                   <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
