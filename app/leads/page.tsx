@@ -6014,8 +6014,9 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
         <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--ivory)', padding: '0 24px', background: '#fafaf8' }}>
           {((() => {
             if (!isEdit) return [
-              { key: 'contacto', label: 'Contacto', icon: <Users           size={12} /> },
-              { key: 'fechas',   label: 'Fechas',   icon: <CalendarDays    size={12} /> },
+              { key: 'contacto', label: 'Contacto', icon: <Users            size={12} /> },
+              { key: 'fechas',   label: 'Fechas',   icon: <CalendarDays     size={12} /> },
+              { key: 'detalles', label: 'Detalles', icon: <SlidersHorizontal size={12} /> },
             ]
             if (!isNewPhase) return [
               { key: 'fechas',   label: 'Fechas',    icon: <CalendarDays      size={12} /> },
@@ -6024,8 +6025,9 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               { key: 'contacto', label: 'Contacto',  icon: <Users             size={12} /> },
             ]
             return [
-              { key: 'fechas',   label: 'Fechas',   icon: <CalendarDays size={12} /> },
-              { key: 'contacto', label: 'Contacto', icon: <Users        size={12} /> },
+              { key: 'fechas',   label: 'Fechas',    icon: <CalendarDays      size={12} /> },
+              { key: 'detalles', label: 'Detalles',  icon: <SlidersHorizontal size={12} /> },
+              { key: 'contacto', label: 'Contacto',  icon: <Users             size={12} /> },
             ]
           })() as { key: 'fechas' | 'detalles' | 'oferta' | 'contacto'; label: string; icon: React.ReactNode }[]).map(t => {
             const isActive = activeModalTab === t.key
@@ -6596,22 +6598,42 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 <LanguagePicker value={form.language} onChange={v => set('language', v)} />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Total invitados</label>
-                <div style={{ position: 'relative' }}>
-                  <Users size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', pointerEvents: 'none' }} />
-                  <input className="form-input" type="number" min={0} value={form.guests} onChange={e => set('guests', e.target.value)} placeholder="150" style={{ paddingLeft: 34 }} />
+            <div className="form-group">
+              <label className="form-label">Invitados</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontWeight: 500, marginBottom: 4 }}>Adultos</div>
+                  <input className="form-input" type="number" min={0} value={form.guests_adults}
+                    onChange={e => {
+                      const a = e.target.value
+                      set('guests_adults', a)
+                      set('guests', String((parseInt(a) || 0) + (parseInt(form.guests_children) || 0)))
+                    }} placeholder="120" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontWeight: 500, marginBottom: 4 }}>Niños</div>
+                  <input className="form-input" type="number" min={0} value={form.guests_children}
+                    onChange={e => {
+                      const c = e.target.value
+                      set('guests_children', c)
+                      set('guests', String((parseInt(form.guests_adults) || 0) + (parseInt(c) || 0)))
+                    }} placeholder="20" />
                 </div>
               </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Adultos</label>
-                <input className="form-input" type="number" min={0} value={form.guests_adults} onChange={e => set('guests_adults', e.target.value)} placeholder="120" />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Niños</label>
-                <input className="form-input" type="number" min={0} value={form.guests_children} onChange={e => set('guests_children', e.target.value)} placeholder="20" />
-              </div>
+              {(form.guests_adults || form.guests_children) ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', fontSize: 12, fontWeight: 700, color: 'var(--espresso)' }}>
+                  <Users size={12} style={{ color: 'var(--gold)' }} />
+                  {(parseInt(form.guests_adults) || 0) + (parseInt(form.guests_children) || 0)} invitados en total
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontWeight: 500, marginBottom: 4 }}>Total (si no sabes el desglose)</div>
+                  <div style={{ position: 'relative', maxWidth: 130 }}>
+                    <Users size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', pointerEvents: 'none' }} />
+                    <input className="form-input" type="number" min={0} value={form.guests} onChange={e => set('guests', e.target.value)} placeholder="150" style={{ paddingLeft: 34 }} />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="form-group" style={{ marginTop: 12 }}>
               <label className="form-label">Presupuesto orientativo</label>
