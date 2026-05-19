@@ -142,13 +142,14 @@ export default function Sidebar() {
   // ── Nav item definitions ──────────────────────────────────────────────────────
 
   const venueItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/canales',      label: 'Canales de venta',                               icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
-    { href: '/calendario',   label: isMultiVenue ? 'Calendarios'    : 'Calendario',  icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
-    { href: '/leads',        label: 'Leads',                                          icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', feature: 'leads'        },
-    { href: '/proposals',    label: isMultiVenue ? 'Mis dosieres'   : 'Dosieres',    icon: 'M2 2h12v10H2zM14 8l2 4M5 6h6M5 9h4',                feature: 'propuestas'   },
-    { href: '/budgets',      label: 'Presupuestos',                                     icon: 'M2 3h12v11H2zM5 1v3M11 1v3M5 7h6M5 10h3',             feature: 'presupuestos' },
-    { href: '/venue-settings', label: 'Configuración',                                 icon: 'M1 3h14M1 7h9M1 11h5M11 9l2 2 4-4',                  feature: 'estructura'   },
-    { href: '/comunicacion', label: 'Comunicación',                                   icon: 'M14 2H2v9h5l1 3 1-3h5V2zM5 6h6M5 9h3',              feature: 'comunicacion' },
+    { href: '/canales',        label: 'Canales de venta',                             icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
+    { href: '/calendario',     label: isMultiVenue ? 'Calendarios' : 'Calendario',   icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
+    { href: '/leads',          label: 'Leads',                                        icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', feature: 'leads'        },
+    { href: '/crm',            label: 'CRM',                                          icon: 'M2 2h12v11H2zM5 6h6M5 9h4M2 2l2-2h8l2 2',           feature: 'leads'        },
+    { href: '/proposals',      label: isMultiVenue ? 'Mis dosieres' : 'Dosieres',    icon: 'M2 2h12v10H2zM14 8l2 4M5 6h6M5 9h4',                feature: 'propuestas'   },
+    { href: '/budgets',        label: 'Presupuestos',                                 icon: 'M2 3h12v11H2zM5 1v3M11 1v3M5 7h6M5 10h3',           feature: 'presupuestos' },
+    { href: '/venue-settings', label: 'Configuración',                               icon: 'M1 3h14M1 7h9M1 11h5M11 9l2 2 4-4',                 feature: 'estructura'   },
+    { href: '/comunicacion',   label: 'Comunicación',                                icon: 'M14 2H2v9h5l1 3 1-3h5V2zM5 6h6M5 9h3',             feature: 'comunicacion' },
   ]
   const estadisticasItem = { href: '/estadisticas', label: 'Estadísticas', icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z', feature: 'estadisticas' as keyof PlanFeatures }
   const facturasItem = { href: '/facturas', label: 'Facturas', icon: 'M3 1h10v14l-2-1-2 1-2-1-2 1-2-1V1zM5 5h6M5 8h6M5 11h4' }
