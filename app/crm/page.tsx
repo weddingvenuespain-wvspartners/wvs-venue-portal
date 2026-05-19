@@ -6,9 +6,11 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import Spinner from '@/components/Spinner'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import {
   Search, X, Phone, Mail, MessageCircle, Users, Download,
   ChevronUp, ChevronDown, ArrowUpDown, ExternalLink,
+  Calendar, Banknote, MapPin, FileText, Tag, Clock,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -97,6 +99,7 @@ export default function CrmPage() {
   const [yearFilter,   setYearFilter]   = useState<string>('all')
   const [sortKey,  setSortKey]  = useState<SortKey>('created_at')
   const [sortDir,  setSortDir]  = useState<SortDir>('desc')
+  const [selected, setSelected] = useState<Lead | null>(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -115,6 +118,13 @@ export default function CrmPage() {
       .order('created_at', { ascending: false })
     if (data) setLeads(data as Lead[])
     setLoading(false)
+  }
+
+  const updateStatus = async (id: string, status: string) => {
+    const supabase = createClient()
+    await supabase.from('leads').update({ status }).eq('id', id)
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
+    setSelected(prev => prev?.id === id ? { ...prev, status } : prev)
   }
 
   // ── Stats ──────────────────────────────────────────────────────────────────
@@ -346,7 +356,7 @@ export default function CrmPage() {
                       const sc = STATUS_CFG[lead.status] || { label: lead.status, bg: '#f3f4f6', color: '#6b7280' }
                       return (
                         <tr key={lead.id}
-                          onClick={() => router.push(`/leads`)}
+                          onClick={() => setSelected(lead)}
                           style={{ borderBottom: '1px solid var(--ivory)', cursor: 'pointer', transition: 'background 0.1s' }}
                           onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
                           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -433,6 +443,147 @@ export default function CrmPage() {
           </div>
         </div>
       </div>
+
+      {/* Contact detail drawer */}
+      <Sheet open={!!selected} onOpenChange={open => { if (!open) setSelected(null) }}>
+        <SheetContent side="right" style={{ width: 420, maxWidth: '95vw', padding: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          {selected && (() => {
+            const sc = STATUS_CFG[selected.status] || { label: selected.status, bg: '#f3f4f6', color: '#6b7280' }
+            return (
+              <>
+                {/* Header */}
+                <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid var(--ivory)' }}>
+                  <SheetTitle style={{ fontSize: 18, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 6 }}>
+                    {selected.name}
+                  </SheetTitle>
+                  <span style={{ fontSize: 12, fontWeight: 600, background: sc.bg, color: sc.color, borderRadius: 6, padding: '3px 10px' }}>
+                    {sc.label}
+                  </span>
+                </div>
+
+                {/* Body */}
+                <div style={{ padding: '20px 24px', flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+                  {/* Contact info */}
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 10 }}>Contacto</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {selected.email && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Mail size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                          <a href={`mailto:${selected.email}`} style={{ fontSize: 13, color: 'var(--charcoal)', textDecoration: 'none' }}
+                            onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+                            onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}>
+                            {selected.email}
+                          </a>
+                        </div>
+                      )}
+                      {selected.phone && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Phone size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                          <a href={`tel:${selected.phone}`} style={{ fontSize: 13, color: 'var(--charcoal)', textDecoration: 'none' }}>
+                            {selected.phone}
+                          </a>
+                        </div>
+                      )}
+                      {selected.whatsapp && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <MessageCircle size={14} style={{ color: '#25D366', flexShrink: 0 }} />
+                          <a href={`https://wa.me/${selected.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
+                            style={{ fontSize: 13, color: '#25D366', textDecoration: 'none' }}>
+                            {selected.whatsapp}
+                          </a>
+                        </div>
+                      )}
+                      {!selected.email && !selected.phone && !selected.whatsapp && (
+                        <div style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin datos de contacto</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Boda info */}
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 10 }}>Boda</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Calendar size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, color: 'var(--charcoal)' }}>{weddingLabel(selected)}</span>
+                      </div>
+                      {selected.guests && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Users size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                          <span style={{ fontSize: 13, color: 'var(--charcoal)' }}>{selected.guests} invitados</span>
+                        </div>
+                      )}
+                      {selected.budget && selected.budget !== 'sin_definir' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Banknote size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                          <span style={{ fontSize: 13, color: 'var(--charcoal)' }}>{BUDGET_LABEL[selected.budget] || selected.budget}</span>
+                        </div>
+                      )}
+                      {selected.ceremony_type && selected.ceremony_type !== 'sin_definir' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Tag size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                          <span style={{ fontSize: 13, color: 'var(--charcoal)' }}>
+                            {{ civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica', mixta: 'Mixta' }[selected.ceremony_type] || selected.ceremony_type}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Origen + entrada */}
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 10 }}>Origen</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <MapPin size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, color: 'var(--charcoal)' }}>{SOURCE_LABEL[selected.source || ''] || selected.source || '—'}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Clock size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, color: 'var(--charcoal)' }}>{fmtDate(selected.created_at)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  {selected.notes && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 10 }}>Notas</div>
+                      <div style={{ fontSize: 13, color: 'var(--charcoal)', background: '#faf8f5', borderRadius: 8, padding: '10px 12px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                        {selected.notes}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Change status */}
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 10 }}>Cambiar estado</div>
+                    <select
+                      value={selected.status}
+                      onChange={e => updateStatus(selected.id, e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--ivory)', borderRadius: 8, fontSize: 13, fontFamily: 'Inter, sans-serif', background: '#faf8f5', color: 'var(--charcoal)', cursor: 'pointer' }}
+                    >
+                      {Object.entries(STATUS_CFG).map(([k, v]) => (
+                        <option key={k} value={k}>{v.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div style={{ padding: '16px 24px', borderTop: '1px solid var(--ivory)' }}>
+                  <button onClick={() => router.push('/leads')}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px', borderRadius: 8, border: '1px solid var(--ivory)', background: '#faf8f5', color: 'var(--charcoal)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
+                    <ExternalLink size={14} /> Ver ficha completa en Leads
+                  </button>
+                </div>
+              </>
+            )
+          })()}
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
