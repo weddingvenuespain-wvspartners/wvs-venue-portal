@@ -6007,17 +6007,17 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
         <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--ivory)', padding: '0 24px', background: '#fafaf8' }}>
           {((() => {
             if (!isEdit) return [
-              { key: 'pareja', label: 'Pareja', icon: <Users        size={12} /> },
-              { key: 'boda',   label: 'Boda',   icon: <CalendarDays size={12} /> },
+              { key: 'pareja', label: 'Contacto', icon: <Users        size={12} /> },
+              { key: 'boda',   label: 'Evento',   icon: <CalendarDays size={12} /> },
             ]
             if (!isNewPhase) return [
-              { key: 'boda',   label: 'Boda',   icon: <CalendarDays size={12} /> },
-              { key: 'oferta', label: 'Oferta', icon: <Flower2      size={12} /> },
-              { key: 'pareja', label: 'Pareja', icon: <Users        size={12} /> },
+              { key: 'boda',   label: 'Evento',     icon: <CalendarDays size={12} /> },
+              { key: 'oferta', label: 'Comercial',  icon: <Receipt      size={12} /> },
+              { key: 'pareja', label: 'Contacto',   icon: <Users        size={12} /> },
             ]
             return [
-              { key: 'boda',   label: 'Boda',   icon: <CalendarDays size={12} /> },
-              { key: 'pareja', label: 'Pareja', icon: <Users        size={12} /> },
+              { key: 'boda',   label: 'Evento',   icon: <CalendarDays size={12} /> },
+              { key: 'pareja', label: 'Contacto', icon: <Users        size={12} /> },
             ]
           })() as { key: 'boda' | 'oferta' | 'pareja'; label: string; icon: React.ReactNode }[]).map(t => (
             <button key={t.key} type="button" onClick={() => setActiveModalTab(t.key)} style={{
@@ -6084,7 +6084,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                       <button type="button"
                         style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--gold)', fontWeight: 600, fontSize: 11 }}
                         onClick={() => setActiveModalTab('oferta')}>
-                        Ver en Oferta →
+                        Ver en Comercial →
                       </button>
                     </div>
                   </div>
@@ -6957,12 +6957,12 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
 
           </>)}
 
-          {/* ── TAB: PAREJA ───────────────────────────────────────────────────────── */}
+          {/* ── TAB: CONTACTO ─────────────────────────────────────────────────────── */}
           {activeModalTab === 'pareja' && (<>
 
           {/* Section: Contacto */}
           <div style={{ marginBottom: 22 }}>
-            <SectionTitle icon={<Users size={14} />} title="Contacto de la pareja" />
+            <SectionTitle icon={<Users size={14} />} title="Datos de contacto" />
 
             <div className="form-group">
               <label className="form-label">Nombre de la pareja <span style={{ color: 'var(--rose)' }}>*</span></label>

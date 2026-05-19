@@ -216,7 +216,7 @@ export default function CrmContactPage() {
                 <button onClick={() => setEditing(true)} className="btn btn-ghost btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <Edit2 size={13} /> Editar
                 </button>
-                <button onClick={() => router.push('/leads')} className="btn btn-ghost btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <button onClick={() => router.push(`/leads?open=${lead.id}`)} className="btn btn-ghost btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <ExternalLink size={13} /> Ver en Leads
                 </button>
               </>
@@ -371,7 +371,7 @@ export default function CrmContactPage() {
                       <Phone size={13} /> Llamar
                     </a>
                   )}
-                  <button onClick={() => router.push('/leads')}
+                  <button onClick={() => router.push(`/leads?open=${lead.id}`)}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--ivory)', color: 'var(--charcoal)', fontSize: 12, fontWeight: 500, border: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left' }}>
                     <ExternalLink size={13} /> Ver pipeline en Leads
                   </button>
