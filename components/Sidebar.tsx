@@ -142,14 +142,14 @@ export default function Sidebar() {
   // ── Nav item definitions ──────────────────────────────────────────────────────
 
   const venueItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/canales',        label: 'Canales de venta',                             icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
-    { href: '/calendario',     label: isMultiVenue ? 'Calendarios' : 'Calendario',   icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
-    { href: '/leads',          label: 'Leads',                                        icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', feature: 'leads'        },
-    { href: '/crm',            label: 'CRM',                                          icon: 'M2 2h12v11H2zM5 6h6M5 9h4M2 2l2-2h8l2 2',           feature: 'leads'        },
-    { href: '/proposals',      label: isMultiVenue ? 'Mis dosieres' : 'Dosieres',    icon: 'M2 2h12v10H2zM14 8l2 4M5 6h6M5 9h4',                feature: 'propuestas'   },
-    { href: '/budgets',        label: 'Presupuestos',                                 icon: 'M2 3h12v11H2zM5 1v3M11 1v3M5 7h6M5 10h3',           feature: 'presupuestos' },
-    { href: '/venue-settings', label: 'Configuración',                               icon: 'M1 3h14M1 7h9M1 11h5M11 9l2 2 4-4',                 feature: 'estructura'   },
-    { href: '/comunicacion',   label: 'Comunicación',                                icon: 'M14 2H2v9h5l1 3 1-3h5V2zM5 6h6M5 9h3',             feature: 'comunicacion' },
+    { href: '/canales',      label: 'Canales de venta',                               icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
+    { href: '/calendario',   label: isMultiVenue ? 'Calendarios'    : 'Calendario',  icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
+    { href: '/leads',        label: 'Leads',                                          icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', feature: 'leads'        },
+    { href: '/clientes',     label: 'Clientes',                                      icon: 'M1 12s2-4 7-4 7 4 7 4M8 8a3 3 0 100-6 3 3 0 000 6zM15 12s-1-2.5-3.5-3.5M12.5 5.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z', feature: 'leads' },
+    { href: '/proposals',    label: isMultiVenue ? 'Mis dosieres'   : 'Dosieres',    icon: 'M2 2h12v10H2zM14 8l2 4M5 6h6M5 9h4',                feature: 'propuestas'   },
+    { href: '/budgets',      label: 'Presupuestos',                                     icon: 'M2 3h12v11H2zM5 1v3M11 1v3M5 7h6M5 10h3',             feature: 'presupuestos' },
+    { href: '/venue-settings', label: 'Configuración',                                 icon: 'M1 3h14M1 7h9M1 11h5M11 9l2 2 4-4',                  feature: 'estructura'   },
+    { href: '/comunicacion', label: 'Comunicación',                                   icon: 'M14 2H2v9h5l1 3 1-3h5V2zM5 6h6M5 9h3',              feature: 'comunicacion' },
   ]
   const estadisticasItem = { href: '/estadisticas', label: 'Estadísticas', icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z', feature: 'estadisticas' as keyof PlanFeatures }
   const facturasItem = { href: '/facturas', label: 'Facturas', icon: 'M3 1h10v14l-2-1-2 1-2-1-2 1-2-1V1zM5 5h6M5 8h6M5 11h4' }
@@ -185,7 +185,7 @@ export default function Sidebar() {
   const isActive = (href: string) =>
     pathname === href || (href !== '/dashboard' && href !== '/wp' && href !== '/catering' && pathname.startsWith(href))
 
-  const roleLabel = isAdmin ? 'Administrador FOREVENTOS'
+  const roleLabel = isAdmin ? 'Administrador WVS'
     : isPlanner ? 'Wedding Planner'
     : isCatering ? 'Catering'
     : 'Venue Owner'
@@ -200,7 +200,7 @@ export default function Sidebar() {
   return (
     <div className="sidebar">
       <div className="sidebar-logo">
-        <img src="/foreventos-assets/logo-dark-bg.png" alt="FOREVENTOS" style={{ height: 44, maxWidth: '100%', width: 'auto', display: 'block', marginBottom: 6 }} />
+        <span className="brand">Wedding Venues Spain</span>
         <span className="venue-name">{portalLabel}</span>
 
         {/* Venue switcher — only for venue owners with an active venue */}
@@ -217,7 +217,7 @@ export default function Sidebar() {
             >
               <span style={{
                 width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-                background: 'var(--fe-primary)', display: 'flex', alignItems: 'center',
+                background: 'var(--gold)', display: 'flex', alignItems: 'center',
                 justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff',
                 letterSpacing: '-0.01em',
               }}>
@@ -241,7 +241,7 @@ export default function Sidebar() {
             {venueOpen && (
               <div style={{
                 position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0,
-                background: '#0D1B2A', border: '1px solid rgba(255,255,255,0.10)',
+                background: '#1e1a17', border: '1px solid rgba(255,255,255,0.12)',
                 borderRadius: 8, overflow: 'hidden', zIndex: 50,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
               }}>
@@ -256,9 +256,9 @@ export default function Sidebar() {
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 8,
                       padding: '9px 12px', background: 'none', border: 'none',
-                      color: v.id === activeVenue.id ? 'var(--fe-accent)' : 'rgba(255,255,255,0.8)',
+                      color: v.id === activeVenue.id ? 'var(--gold)' : 'rgba(255,255,255,0.8)',
                       fontSize: 12, fontWeight: v.id === activeVenue.id ? 600 : 400,
-                      cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left',
+                      cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left',
                     }}
                   >
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -319,7 +319,7 @@ export default function Sidebar() {
                 {item.href === '/wp' && newClientsCount > 0 && (
                   <span style={{
                     marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
-                    background: 'var(--fe-primary)', color: '#fff',
+                    background: 'var(--gold)', color: '#fff',
                     fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: '0 5px',
                   }}>
@@ -455,23 +455,23 @@ export default function Sidebar() {
         )}
 
         {isVenueOwner && !features.loading && features.isTrial && !features.isTrialExpired && (
-          <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(46,109,180,0.08)', border: '1px solid rgba(46,109,180,0.25)', textDecoration: 'none' }}>
-            <Hourglass size={11} style={{ color: 'var(--fe-accent)', flexShrink: 0 }} />
+          <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)', textDecoration: 'none' }}>
+            <Hourglass size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fe-accent)', letterSpacing: '0.04em' }}>TRIAL</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.04em' }}>TRIAL</div>
               {features.trialDaysLeft !== null && (
-                <div style={{ fontSize: 10, color: features.trialDaysLeft <= 3 ? '#fca5a5' : 'var(--fe-text-dim)' }}>
+                <div style={{ fontSize: 10, color: features.trialDaysLeft <= 3 ? '#fca5a5' : 'var(--stone)' }}>
                   {features.trialDaysLeft} días restantes
                 </div>
               )}
             </div>
-            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--fe-accent)', whiteSpace: 'nowrap' }}>Activar →</span>
+            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--gold)', whiteSpace: 'nowrap' }}>Activar →</span>
           </Link>
         )}
 
         {isVenueOwner && !features.loading && !features.isTrial && !features.isTrialExpired && features.hasPlan && features.planTier === 'basic' && (
-          <Link href="/pricing" style={{ display: 'block', marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(46,109,180,0.08)', border: '1px solid rgba(46,109,180,0.25)', textDecoration: 'none' }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fe-accent)', letterSpacing: '0.08em', marginBottom: 4 }}>PASA A PREMIUM</div>
+          <Link href="/pricing" style={{ display: 'block', marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)', textDecoration: 'none' }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 4 }}>PASA A PREMIUM</div>
             <div style={{ fontSize: 11, color: 'var(--stone)', lineHeight: 1.5 }}>Propuestas, exportar leads y más.</div>
           </Link>
         )}
@@ -495,7 +495,7 @@ export default function Sidebar() {
             <div className="avatar">{initials}</div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{
-                color: pathname === '/perfil' ? 'var(--fe-accent)' : '#fff',
+                color: pathname === '/perfil' ? 'var(--gold)' : '#fff',
                 fontSize: 12, fontWeight: 400,
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
               }}>
@@ -520,17 +520,17 @@ export default function Sidebar() {
           {userMenuOpen && (
             <div style={{
               position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: 0,
-              background: '#0D1B2A', border: '1px solid rgba(255,255,255,0.10)',
+              background: '#1e1a17', border: '1px solid rgba(255,255,255,0.12)',
               borderRadius: 8, overflow: 'hidden', zIndex: 50,
               boxShadow: '0 -8px 24px rgba(0,0,0,0.4)',
             }}>
               <button onMouseDown={() => { setUserMenuOpen(false); router.push('/perfil') }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left' }}>
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', fontSize: 12, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left' }}>
                 Mi perfil
               </button>
               <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '0 10px' }} />
               <button onMouseDown={() => { setUserMenuOpen(false); handleLogout() }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'none', border: 'none', color: '#f87171', fontSize: 12, cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left' }}>
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'none', border: 'none', color: '#f87171', fontSize: 12, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left' }}>
                 Cerrar sesión
               </button>
             </div>

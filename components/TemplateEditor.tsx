@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useCallback, useEffect, useRef, Fragment } from 'react'
 import {
@@ -126,7 +126,7 @@ export default function TemplateEditor({
   const [modalities, setModalities] = useState<any[]>([])
   useEffect(() => {
     if (modalities.length > 0) return
-    fetch('/api/estructura/modalities').then(r => r.ok ? r.json() : null).then(d => { if (d?.modalities) setModalities(d.modalities) })
+    fetch('/api/estructura/modalities').then(r => r.ok ? r.json() : null).then(d => { if (d?.modalities) setModalities(d.modalities) }).catch(() => {})
   }, [modalities.length])
 
   // Open/close section content cards
@@ -741,7 +741,7 @@ export default function TemplateEditor({
                       {feats.length > 0 && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                           {feats.map((f: string, fi: number) => (
-                            <span key={fi} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#fdf6ea', border: '1px solid var(--gold, #2E6DB4)', color: '#8a6020' }}>
+                            <span key={fi} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#fdf6ea', border: '1px solid var(--gold, #C4975A)', color: '#8a6020' }}>
                               {f}
                               <button type="button" onClick={() => updateItem(overrideKey, i, 'features', feats.filter((_: string, j: number) => j !== fi))}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, lineHeight: 1, fontSize: 12 }}>×</button>
@@ -1496,7 +1496,7 @@ export default function TemplateEditor({
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                 {DEFAULT_TEMPLATES.map(tpl => {
-                  const color = (tpl.sections_data as any).primary_color ?? '#2E6DB4'
+                  const color = (tpl.sections_data as any).primary_color ?? '#C4975A'
                   return (
                     <button key={tpl.id} type="button"
                       onClick={() => {
@@ -1937,19 +1937,19 @@ export default function TemplateEditor({
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Color principal</div>
                 <div style={{ marginBottom: 20 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
-                    {['#2d4a7a','#7a5c3c','#6b2d42','#2a6b4a','#4a4a4a','#8b6914','#2E6DB4','#8B4513','#1a3a5c','#5c2d6b'].map(c => (
+                    {['#2d4a7a','#7a5c3c','#6b2d42','#2a6b4a','#4a4a4a','#8b6914','#C4975A','#8B4513','#1a3a5c','#5c2d6b'].map(c => (
                       <div key={c} onClick={() => { setSections(s => ({ ...s, primary_color: c })); markDirty() }}
                         style={{
                           width: 24, height: 24, borderRadius: 5, background: c, cursor: 'pointer', flexShrink: 0,
-                          border: (sections.primary_color ?? '#2E6DB4') === c ? '2px solid var(--espresso)' : '2px solid transparent',
-                          transform: (sections.primary_color ?? '#2E6DB4') === c ? 'scale(1.2)' : 'scale(1)', transition: 'transform .1s',
+                          border: (sections.primary_color ?? '#C4975A') === c ? '2px solid var(--espresso)' : '2px solid transparent',
+                          transform: (sections.primary_color ?? '#C4975A') === c ? 'scale(1.2)' : 'scale(1)', transition: 'transform .1s',
                         }} />
                     ))}
-                    <input type="color" value={sections.primary_color ?? '#2E6DB4'}
+                    <input type="color" value={sections.primary_color ?? '#C4975A'}
                       onChange={e => { setSections(s => ({ ...s, primary_color: e.target.value })); markDirty() }}
                       style={{ width: 24, height: 24, padding: 2, borderRadius: 5, border: '1px solid var(--border)', cursor: 'pointer', background: 'none' }} />
                   </div>
-                  <div style={{ height: 5, borderRadius: 3, background: sections.primary_color ?? '#2E6DB4', opacity: 0.8 }} />
+                  <div style={{ height: 5, borderRadius: 3, background: sections.primary_color ?? '#C4975A', opacity: 0.8 }} />
                 </div>
 
                 {/* Color mode — only for templates that support it (T1) */}

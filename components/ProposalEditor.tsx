@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useEffect, useState, useRef, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -347,6 +347,37 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       document.head.appendChild(link)
     }
   }, [user])
+
+  // Auto-sync space_groups for existing proposals when venue has groups but proposal doesn't yet
+  // This ensures the preview shows spaces without requiring the user to manually expand the section
+  useEffect(() => {
+    if (venueSpaceGroups.length === 0) return
+    const existing = (sections as any).space_groups
+    if (Array.isArray(existing) && existing.length > 0) return
+    // Auto-populate from venue config (same logic as MultipleZonesEditor.syncAll)
+    const synced = venueSpaceGroups.map(vg => ({
+      group_id: vg.id,
+      name: vg.name,
+      description: '',
+      note: '',
+      selection_mode: vg.selection_mode,
+      pick_n_min: vg.pick_n_min,
+      pick_n_max: vg.pick_n_max,
+      included_zone_ids: vg.included_zone_ids,
+      pricing_mode: vg.pricing_mode ?? 'per_space',
+      base_price: vg.base_price ?? '',
+      spaces: vg.spaces.map(vs => ({
+        zone_id: vs.id,
+        name: vs.name,
+        description: vs.description ?? '',
+        price: vs.price ?? '',
+        capacity_min: vs.capacity_min,
+        capacity_max: vs.capacity_max,
+      })),
+    }))
+    setSections(s => ({ ...s, space_groups: synced }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venueSpaceGroups])
 
   // Re-group date slots with prices when modalities load for existing proposals
   useEffect(() => {
@@ -1215,7 +1246,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                     <div key={c} onClick={() => setForm(f => ({ ...f, primary_color: c }))}
                       style={{
                         width: 26, height: 26, borderRadius: 6, background: c, cursor: 'pointer',
-                        border: form.primary_color === c ? '2px solid #2E6DB4' : '2px solid transparent',
+                        border: form.primary_color === c ? '2px solid #C4975A' : '2px solid transparent',
                         transform: form.primary_color === c ? 'scale(1.15)' : 'scale(1)',
                       }} />
                   ))}
@@ -1557,11 +1588,13 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                               {dpRaw.map((entry: any, i: number) => (
                                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <span style={{ fontSize: 11, color: 'var(--charcoal)', flex: 1, minWidth: 0 }}>{fmtRange(entry)}</span>
-                                  <input type="number" className="form-input" placeholder="precio"
-                                    value={entry.price_min ?? ''}
-                                    onChange={e => setDp(dpRaw.map((x: any, j: number) => j === i ? { ...x, price_min: e.target.value, overridden: true } : x))}
-                                    style={{ width: 72, textAlign: 'right', fontSize: 11, padding: '3px 6px' }} />
-                                  <span style={{ fontSize: 10, color: 'var(--warm-gray)', flexShrink: 0 }}>€</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+                                    <input type="number" placeholder="precio"
+                                      value={entry.price_min ?? ''}
+                                      onChange={e => setDp(dpRaw.map((x: any, j: number) => j === i ? { ...x, price_min: e.target.value, overridden: true } : x))}
+                                      style={{ width: 64, textAlign: 'right', fontSize: 11, padding: '4px 4px 4px 6px', border: 'none', outline: 'none', background: 'transparent', MozAppearance: 'textfield' }} />
+                                    <span style={{ fontSize: 11, color: '#999', padding: '4px 6px 4px 2px', background: '#f9f8f6', borderLeft: '1px solid var(--border)', fontWeight: 600, lineHeight: 1 }}>€</span>
+                                  </div>
                                   <span style={{ fontSize: 9, color: entry.overridden ? 'var(--gold)' : 'var(--warm-gray)', background: '#fff', padding: '1px 5px', borderRadius: 6, border: '1px solid var(--border)', flexShrink: 0 }}>
                                     {entry.overridden ? 'manual' : 'auto'}
                                   </span>
@@ -1591,7 +1624,35 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                           style={{ width: 34, height: 19, borderRadius: 10, background: isOn ? 'var(--gold)' : '#d1c9b8', position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0 }}>
                           <div style={{ position: 'absolute', top: 2, left: isOn ? 15 : 2, width: 15, height: 15, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
                         </div>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)', flex: 1, userSelect: 'none' }}>{label}</span>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)', userSelect: 'none' }}>{label}</span>
+                          {secId === 'space_groups' && venueSpaceGroups.length > 0 && !isOpen && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {venueSpaceGroups.map(vg => {
+                                const hasOnlyIncluded = (vg.included_zone_ids ?? []).length === vg.spaces.length
+                                const isAllIncluded = vg.selection_mode === 'none' || hasOnlyIncluded
+                                const isMixed = vg.selection_mode === 'included_then_pick'
+                                const includedCount = (vg.included_zone_ids ?? []).length
+                                const optionalCount = vg.spaces.length - includedCount
+                                const modeLabel = isAllIncluded ? 'Incluidos'
+                                  : isMixed ? `${includedCount} incl. + ${optionalCount} opc.`
+                                  : vg.selection_mode === 'pick_one' ? 'Elegir 1'
+                                  : vg.selection_mode === 'pick_n' ? `Elegir ${vg.pick_n_min ?? ''}–${vg.pick_n_max ?? 'N'}`
+                                  : 'Opcional'
+                                return (
+                                  <span key={vg.id} style={{
+                                    fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 6, lineHeight: '16px',
+                                    background: isAllIncluded ? '#f0fdf4' : isMixed ? '#eff6ff' : '#fef3c7',
+                                    color: isAllIncluded ? '#166534' : isMixed ? '#1e3a8a' : '#92400e',
+                                    border: `1px solid ${isAllIncluded ? '#bbf7d0' : isMixed ? '#bfdbfe' : '#fde68a'}`,
+                                  }}>
+                                    {vg.name}: {modeLabel}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
                         <ChevronDown size={14} style={{ color: 'var(--warm-gray)', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
                       </div>
 
@@ -2297,8 +2358,8 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               {/* Cargar desde catálogo — solo si hay catálogo y la propuesta no tiene menús aún */}
               {menuCatalog && (menuCatalog.menus_override?.length || menuCatalog.menu_extras_override?.length || menuCatalog.appetizers_base_override?.length) &&
                !sections.menus_override?.length && !sections.menu_extras_override?.length && !sections.appetizers_base_override?.length && (
-                <div style={{ margin: '0 0 16px', background: '#FDF8F0', border: '1px dashed #2E6DB466', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <ChefHat size={18} style={{ color: '#2E6DB4', flexShrink: 0 }} />
+                <div style={{ margin: '0 0 16px', background: '#FDF8F0', border: '1px dashed #C4975A66', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <ChefHat size={18} style={{ color: '#C4975A', flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>Tienes un catálogo de menús definido</div>
                     <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Cárgalo como punto de partida y personalízalo para esta pareja</div>

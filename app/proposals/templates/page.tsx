@@ -54,7 +54,7 @@ export default function TemplatesPage() {
 
   useEffect(() => {
     if (!pickerOpen || pickerModalities.length > 0) return
-    fetch('/api/estructura/modalities').then(r => r.ok ? r.json() : null).then(d => { if (d?.modalities) setPickerModalities(d.modalities) })
+    fetch('/api/estructura/modalities').then(r => r.ok ? r.json() : null).then(d => { if (d?.modalities) setPickerModalities(d.modalities) }).catch(() => {})
   }, [pickerOpen, pickerModalities.length])
 
   useEffect(() => {

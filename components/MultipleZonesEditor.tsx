@@ -1,7 +1,7 @@
 'use client'
 import { X, Check, RefreshCw, AlertCircle, Users, ChevronDown, ChevronRight } from 'lucide-react'
 import type { VenueSpaceGroup, SpaceGroup, VenueSpaceItem } from '@/lib/proposal-types'
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { ImageUploader } from './ImageUploader'
 
 type Props = {
@@ -124,7 +124,110 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
     if (url) updateSpace(groupId, zoneId, { photo_url: url })
   }
 
-  const SELECTION_LABELS: Record<string, string> = { pick_one: 'Elegir 1', pick_n: 'Elegir N', optional: 'Opcional' }
+  const SELECTION_LABELS: Record<string, string> = {
+    pick_one: 'Elegir 1', pick_n: 'Elegir N', optional: 'Opcional',
+    included_then_pick: 'Incluidos + opcionales', none: 'Todos incluidos',
+    pick_any: 'Elegir varios', pick_range: 'Elegir rango',
+    optional_one: 'Opcional (1)', optional_any: 'Opcionales',
+  }
+
+  const renderSpace = (vg: VenueSpaceGroup, pg: SpaceGroup, vs: VenueSpaceGroup['spaces'][0], isIncluded?: boolean) => {
+    const ps = findProposalSpace(pg, vs.id)
+    const outOfRange = !capacityOk(vs, guestCount)
+
+    if (!ps) {
+      return (
+        <div style={{ border: '1px dashed #BFDBFE', borderRadius: 6, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8, opacity: 0.7 }}>
+          <span style={{ fontSize: 12, color: 'var(--warm-gray)', flex: 1, fontStyle: 'italic' }}>{vs.name} — no importado</span>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
+            const newSpace: VenueSpaceItem = { zone_id: vs.id, name: vs.name, description: vs.description ?? '', price: vs.price ?? '', capacity_min: vs.capacity_min, capacity_max: vs.capacity_max }
+            onChange(groups.map(g => g.group_id === vg.id ? { ...g, spaces: [...g.spaces, newSpace] } : g))
+          }}>+ Añadir</button>
+        </div>
+      )
+    }
+
+    return (
+      <div style={{
+        border: `1px solid ${isIncluded === true ? '#bbf7d0' : isIncluded === false ? '#fde68a' : 'var(--border)'}`,
+        borderRadius: 7, padding: 10,
+        background: outOfRange ? '#FAFAF9' : isIncluded === true ? '#f0fdf4' : isIncluded === false ? '#fffbeb' : 'var(--surface)',
+        display: 'flex', flexDirection: 'column', gap: 6, opacity: outOfRange ? 0.65 : 1,
+      }}>
+        {/* Space header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', flex: 1 }}>
+            {ps.name}
+            <span style={{ marginLeft: 6, fontSize: 9, color: '#15803d', background: '#dcfce7', padding: '1px 5px', borderRadius: 8, fontWeight: 600 }}>ESTRUCTURA</span>
+            {isIncluded === true && (
+              <span style={{ marginLeft: 4, fontSize: 9, color: '#166534', background: '#bbf7d0', padding: '1px 5px', borderRadius: 8, fontWeight: 600 }}>INCLUIDO</span>
+            )}
+            {isIncluded === false && (
+              <span style={{ marginLeft: 4, fontSize: 9, color: '#92400e', background: '#fde68a', padding: '1px 5px', borderRadius: 8, fontWeight: 600 }}>OPCIONAL</span>
+            )}
+          </span>
+          {(vs.capacity_min || vs.capacity_max) && (
+            <span style={{ fontSize: 10, color: outOfRange ? '#9a3412' : '#64748B', background: outOfRange ? '#fed7aa' : '#F1F5F9', borderRadius: 5, padding: '1px 6px', whiteSpace: 'nowrap' }}>
+              <Users size={9} style={{ verticalAlign: 'middle', marginRight: 2 }} />
+              {vs.capacity_min ?? '0'}–{vs.capacity_max ?? '∞'} pax
+              {outOfRange && guestCount && <span style={{ marginLeft: 4 }}>(vosotros: {guestCount})</span>}
+            </span>
+          )}
+          <button type="button" style={removeBtn} onClick={() => removeSpace(vg.id, vs.id)} title="Quitar de propuesta"><X size={13} /></button>
+        </div>
+
+        <input className="form-input" style={{ fontSize: 12 }}
+          placeholder="Descripción breve (opcional)"
+          value={ps.description ?? ''} onChange={e => updateSpace(vg.id, vs.id, { description: e.target.value })} />
+
+        {isTemplate ? (
+          <div style={{ fontSize: 11, color: 'var(--warm-gray)', padding: '6px 10px', background: '#faf8f5', border: '1px solid var(--ivory)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AlertCircle size={12} style={{ flexShrink: 0, color: 'var(--gold)' }} />
+            El precio se añadirá automáticamente desde tus tarifas al crear una propuesta
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0, border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', background: '#fff' }}>
+            <input type="text" style={{ fontSize: 12, flex: 1, border: 'none', outline: 'none', padding: '6px 8px', background: 'transparent' }}
+              placeholder={(pg.pricing_mode ?? vg.pricing_mode) === 'group_base' ? 'Suplemento (ej. 500)' : isIncluded === true ? 'Incluido en precio base' : 'Precio (ej. 5.000)'}
+              value={ps.price ?? ''} onChange={e => updateSpace(vg.id, vs.id, { price: e.target.value })} />
+            <span style={{ fontSize: 12, color: '#999', padding: '6px 8px', background: '#f9f8f6', borderLeft: '1px solid var(--border)', fontWeight: 600, lineHeight: 1 }}>€</span>
+          </div>
+        )}
+
+        {/* Photos */}
+        {uploadImage && (
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Fotos</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              {[...(Array.isArray((ps as any).photos) ? (ps as any).photos : []), ...(ps.photo_url && !((ps as any).photos ?? []).includes(ps.photo_url) ? [ps.photo_url] : [])].map((url: string, pi: number) => (
+                <div key={pi} style={{ position: 'relative', width: 56, height: 56 }}>
+                  <img src={url} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover' }} />
+                  <button type="button" onClick={() => {
+                    const allPhotos = [...(Array.isArray((ps as any).photos) ? (ps as any).photos : []), ...(ps.photo_url && !((ps as any).photos ?? []).includes(ps.photo_url) ? [ps.photo_url] : [])]
+                    const next = allPhotos.filter((_: string, j: number) => j !== pi)
+                    updateSpace(vg.id, vs.id, { photos: next, photo_url: next[0] ?? '' } as any)
+                  }}
+                    style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                </div>
+              ))}
+              <ImageUploader label="+" height={48} onUpload={async (f) => {
+                const url = await uploadImage(f, 'zones')
+                if (url) {
+                  const allPhotos = [...(Array.isArray((ps as any).photos) ? (ps as any).photos : []), ...(ps.photo_url && !((ps as any).photos ?? []).includes(ps.photo_url) ? [ps.photo_url] : [])]
+                  const next = [...allPhotos, url]
+                  updateSpace(vg.id, vs.id, { photos: next, photo_url: next[0] } as any)
+                }
+              }} />
+            </div>
+          </div>
+        )}
+        {!uploadImage && (
+          <input className="form-input" style={{ fontSize: 12, flex: 1 }}
+            placeholder="URL imagen" value={ps.photo_url ?? ''} onChange={e => updateSpace(vg.id, vs.id, { photo_url: e.target.value })} />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -203,94 +306,37 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
                   </div>
                 )}
 
-                {/* Spaces */}
-                {vg.spaces.map(vs => {
-                  const ps = findProposalSpace(pg, vs.id)
-                  const outOfRange = !capacityOk(vs, guestCount)
+                {/* Spaces — separated by included vs optional */}
+                {(() => {
+                  const includedIds = new Set(vg.included_zone_ids ?? [])
+                  const isITP = vg.selection_mode === 'included_then_pick'
+                  const includedSpaces = isITP ? vg.spaces.filter(vs => includedIds.has(vs.id)) : []
+                  const optionalSpaces = isITP ? vg.spaces.filter(vs => !includedIds.has(vs.id)) : []
+                  const spaceList = isITP ? [...includedSpaces, ...optionalSpaces] : vg.spaces
+                  const showDivider = isITP && includedSpaces.length > 0 && optionalSpaces.length > 0
 
-                  if (!ps) {
-                    // Space exists in estructura but not yet imported in proposal
+                  return spaceList.map((vs, idx) => {
+                    const isIncluded = isITP && includedIds.has(vs.id)
+                    const isFirstOptional = isITP && idx === includedSpaces.length && showDivider
+
                     return (
-                      <div key={vs.id} style={{ border: '1px dashed #BFDBFE', borderRadius: 6, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8, opacity: 0.7 }}>
-                        <span style={{ fontSize: 12, color: 'var(--warm-gray)', flex: 1, fontStyle: 'italic' }}>{vs.name} — no importado</span>
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
-                          const newSpace: VenueSpaceItem = { zone_id: vs.id, name: vs.name, description: vs.description ?? '', price: vs.price ?? '', capacity_min: vs.capacity_min, capacity_max: vs.capacity_max }
-                          onChange(groups.map(g => g.group_id === vg.id ? { ...g, spaces: [...g.spaces, newSpace] } : g))
-                        }}>+ Añadir</button>
-                      </div>
-                    )
-                  }
-
-                  return (
-                    <div key={vs.id} style={{ border: '1px solid var(--border)', borderRadius: 7, padding: 10, background: outOfRange ? '#FAFAF9' : 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 6, opacity: outOfRange ? 0.65 : 1 }}>
-                      {/* Space header */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', flex: 1 }}>
-                          {ps.name}
-                          <span style={{ marginLeft: 6, fontSize: 9, color: '#15803d', background: '#dcfce7', padding: '1px 5px', borderRadius: 8, fontWeight: 600 }}>ESTRUCTURA</span>
-                        </span>
-                        {(vs.capacity_min || vs.capacity_max) && (
-                          <span style={{ fontSize: 10, color: outOfRange ? '#9a3412' : '#64748B', background: outOfRange ? '#fed7aa' : '#F1F5F9', borderRadius: 5, padding: '1px 6px', whiteSpace: 'nowrap' }}>
-                            <Users size={9} style={{ verticalAlign: 'middle', marginRight: 2 }} />
-                            {vs.capacity_min ?? '0'}–{vs.capacity_max ?? '∞'} pax
-                            {outOfRange && guestCount && <span style={{ marginLeft: 4 }}>(vosotros: {guestCount})</span>}
-                          </span>
-                        )}
-                        <button type="button" style={removeBtn} onClick={() => removeSpace(vg.id, vs.id)} title="Quitar de propuesta"><X size={13} /></button>
-                      </div>
-
-                      <input className="form-input" style={{ fontSize: 12 }}
-                        placeholder="Descripción breve (opcional)"
-                        value={ps.description ?? ''} onChange={e => updateSpace(vg.id, vs.id, { description: e.target.value })} />
-
-                      {isTemplate ? (
-                        <div style={{ fontSize: 11, color: 'var(--warm-gray)', padding: '6px 10px', background: '#faf8f5', border: '1px solid var(--ivory)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <AlertCircle size={12} style={{ flexShrink: 0, color: 'var(--gold)' }} />
-                          El precio se añadirá automáticamente desde tus tarifas al crear una propuesta
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <input className="form-input" style={{ fontSize: 12, flex: 1 }}
-                            placeholder={(pg.pricing_mode ?? vg.pricing_mode) === 'group_base' ? 'Suplemento (ej. +500€)' : 'Precio (ej. 5.000€)'}
-                            value={ps.price ?? ''} onChange={e => updateSpace(vg.id, vs.id, { price: e.target.value })} />
-                        </div>
-                      )}
-
-                      {/* Photos */}
-                      {uploadImage && (
-                        <div>
-                          <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Fotos</div>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                            {/* Legacy single photo_url + multi photos array */}
-                            {[...(Array.isArray((ps as any).photos) ? (ps as any).photos : []), ...(ps.photo_url && !((ps as any).photos ?? []).includes(ps.photo_url) ? [ps.photo_url] : [])].map((url: string, pi: number) => (
-                              <div key={pi} style={{ position: 'relative', width: 56, height: 56 }}>
-                                <img src={url} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover' }} />
-                                <button type="button" onClick={() => {
-                                  const allPhotos = [...(Array.isArray((ps as any).photos) ? (ps as any).photos : []), ...(ps.photo_url && !((ps as any).photos ?? []).includes(ps.photo_url) ? [ps.photo_url] : [])]
-                                  const next = allPhotos.filter((_: string, j: number) => j !== pi)
-                                  updateSpace(vg.id, vs.id, { photos: next, photo_url: next[0] ?? '' } as any)
-                                }}
-                                  style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-                              </div>
-                            ))}
-                            <ImageUploader label="+" height={48} onUpload={async (f) => {
-                              const url = await uploadImage(f, 'zones')
-                              if (url) {
-                                const allPhotos = [...(Array.isArray((ps as any).photos) ? (ps as any).photos : []), ...(ps.photo_url && !((ps as any).photos ?? []).includes(ps.photo_url) ? [ps.photo_url] : [])]
-                                const next = [...allPhotos, url]
-                                updateSpace(vg.id, vs.id, { photos: next, photo_url: next[0] } as any)
-                              }
-                            }} />
+                      <React.Fragment key={vs.id}>
+                        {/* Section divider between included and optional */}
+                        {idx === 0 && isITP && includedSpaces.length > 0 && (
+                          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#166534', padding: '4px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ background: '#dcfce7', padding: '2px 8px', borderRadius: 4 }}>✓ Siempre incluidos</span>
                           </div>
-                        </div>
-                      )}
-                      {!uploadImage && (
-                        <input className="form-input" style={{ fontSize: 12, flex: 1 }}
-                          placeholder="URL imagen" value={ps.photo_url ?? ''} onChange={e => updateSpace(vg.id, vs.id, { photo_url: e.target.value })} />
-                      )}
-                    </div>
-                  )
-                })}
+                        )}
+                        {isFirstOptional && (
+                          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#92400e', padding: '8px 0 2px', borderTop: '1px dashed #fde68a', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ background: '#fef3c7', padding: '2px 8px', borderRadius: 4 }}>Adicionales a elegir</span>
+                          </div>
+                        )}
+                        {renderSpace(vg, pg, vs, isITP ? isIncluded : undefined)}
+                      </React.Fragment>
+                    )
+                  })
+                })()}
               </div>
             )}
 
