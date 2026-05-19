@@ -9,6 +9,8 @@ import Spinner from '@/components/Spinner'
 import {
   ChevronLeft, Phone, Mail, MessageCircle, Users, Calendar,
   Banknote, Tag, MapPin, Clock, FileText, ExternalLink, Edit2, Save, X,
+  Landmark, UtensilsCrossed, Globe, Palette, Sparkles, CheckCircle2,
+  MessageSquare, Heart,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -19,6 +21,7 @@ type Lead = {
   email?: string | null
   phone?: string | null
   whatsapp?: string | null
+  whatsapp_consent?: boolean | null
   source?: string | null
   status: string
   contact_type: string
@@ -26,37 +29,55 @@ type Lead = {
   wedding_date_to?: string | null
   wedding_year?: number | null
   wedding_month?: number | null
+  date_flexibility?: string | null
   guests?: number | null
   guests_adults?: number | null
   guests_children?: number | null
   budget?: string | null
   ceremony_type?: string | null
+  catering_needed?: string | null
+  language?: string | null
+  style?: string | null
   notes?: string | null
   country?: string | null
   tags?: string[] | null
+  visit_date?: string | null
+  visit_time?: string | null
+  visit_duration?: number | null
+  initial_message?: string | null
   created_at: string
   updated_at?: string | null
 }
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
+const PIPELINE: { key: string; label: string }[] = [
+  { key: 'new',             label: 'Nuevo'      },
+  { key: 'contacted',       label: 'Seguimiento' },
+  { key: 'proposal_sent',   label: 'Propuesta'  },
+  { key: 'visit_scheduled', label: 'Visita'     },
+  { key: 'post_visit',      label: 'Post-visita' },
+  { key: 'budget_sent',     label: 'Presupuesto' },
+  { key: 'won',             label: 'Confirmado' },
+]
+
 const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> = {
-  new:             { label: 'Nuevo',             bg: '#eff6ff', color: '#1d4ed8' },
-  contacted:       { label: 'Contactado',        bg: '#f5f3ff', color: '#6d28d9' },
-  proposal_sent:   { label: 'Propuesta enviada', bg: '#fefce8', color: '#a16207' },
-  visit_scheduled: { label: 'Visita agendada',   bg: '#f0fdf4', color: '#15803d' },
-  post_visit:      { label: 'Post-visita',       bg: '#ecfdf5', color: '#059669' },
-  budget_sent:     { label: 'Presupuesto',       bg: '#fff7ed', color: '#c2410c' },
-  won:             { label: 'Confirmado',        bg: '#d1fae5', color: '#065f46' },
-  lost:            { label: 'Perdido',           bg: '#fef2f2', color: '#b91c1c' },
+  new:             { label: 'Nuevo',              bg: '#eff6ff', color: '#1d4ed8' },
+  contacted:       { label: 'En seguimiento',     bg: '#f5f3ff', color: '#6d28d9' },
+  proposal_sent:   { label: 'Propuesta enviada',  bg: '#fefce8', color: '#a16207' },
+  visit_scheduled: { label: 'Visita agendada',    bg: '#f0fdf4', color: '#15803d' },
+  post_visit:      { label: 'Post-visita',        bg: '#ecfdf5', color: '#059669' },
+  budget_sent:     { label: 'Presupuesto enviado',bg: '#fff7ed', color: '#c2410c' },
+  won:             { label: 'Confirmado',         bg: '#d1fae5', color: '#065f46' },
+  lost:            { label: 'Perdido',            bg: '#fef2f2', color: '#b91c1c' },
 }
 
 const CONTACT_TYPE_CFG: Record<string, { label: string; bg: string; color: string; emoji: string }> = {
-  pareja:           { label: 'Pareja',            bg: '#fdf4ff', color: '#7e22ce', emoji: '💑' },
-  wedding_planner:  { label: 'Wedding Planner',   bg: '#f0f9ff', color: '#0369a1', emoji: '📋' },
-  event_organizer:  { label: 'Event Organizer',   bg: '#fff7ed', color: '#c2410c', emoji: '🎪' },
-  empresa:          { label: 'Empresa',            bg: '#f8fafc', color: '#334155', emoji: '🏢' },
-  otro:             { label: 'Otro',               bg: '#f3f4f6', color: '#6b7280', emoji: '👤' },
+  pareja:           { label: 'Pareja',          bg: '#fdf4ff', color: '#7e22ce', emoji: '💑' },
+  wedding_planner:  { label: 'Wedding Planner', bg: '#f0f9ff', color: '#0369a1', emoji: '📋' },
+  event_organizer:  { label: 'Event Organizer', bg: '#fff7ed', color: '#c2410c', emoji: '🎪' },
+  empresa:          { label: 'Empresa',          bg: '#f8fafc', color: '#334155', emoji: '🏢' },
+  otro:             { label: 'Otro',             bg: '#f3f4f6', color: '#6b7280', emoji: '👤' },
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -78,37 +99,48 @@ const BUDGET_LABEL: Record<string, string> = {
 
 const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
-function fmtDate(iso: string) {
-  const d = new Date(iso + 'T12:00:00')
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '—'
   return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`
 }
 
-function weddingLabel(lead: Lead) {
+function weddingLabel(lead: Lead): string {
   if (lead.wedding_date) {
     const from = fmtDate(lead.wedding_date)
     const to   = lead.wedding_date_to ? ` → ${fmtDate(lead.wedding_date_to)}` : ''
     return from + to
   }
   if (lead.wedding_year && lead.wedding_month) return `${MONTHS_SHORT[lead.wedding_month - 1]} ${lead.wedding_year}`
-  if (lead.wedding_year) return `${lead.wedding_year}`
+  if (lead.wedding_year) return String(lead.wedding_year)
+  const flex = lead.date_flexibility
+  if (flex === 'flexible') return 'Flexible (sin fecha definida)'
+  if (flex === 'season') return 'Por estación'
   return '—'
 }
 
-// ── Row helper ────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function InfoRow({ icon, label, value, href, isAction }: {
-  icon: React.ReactNode; label: string; value: string | React.ReactNode; href?: string; isAction?: boolean
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 14 }}>
+      {children}
+    </div>
+  )
+}
+
+function InfoRow({ icon, label, value, href, mono }: {
+  icon: React.ReactNode; label: string; value: string | React.ReactNode; href?: string; mono?: boolean
 }) {
   return (
-    <div style={{ display: 'flex', gap: 14, padding: '10px 0', borderBottom: '1px solid var(--ivory)', alignItems: 'flex-start' }}>
+    <div style={{ display: 'flex', gap: 12, padding: '9px 0', borderBottom: '1px solid var(--ivory)', alignItems: 'flex-start' }}>
       <div style={{ color: 'var(--warm-gray)', flexShrink: 0, marginTop: 1 }}>{icon}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 2 }}>{label}</div>
         {href ? (
           <a href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"
-            style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', wordBreak: 'break-all' }}
-            onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
-            onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}>
+            style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', wordBreak: 'break-all', fontFamily: mono ? 'monospace' : undefined }}>
             {value}
           </a>
         ) : (
@@ -145,7 +177,7 @@ export default function CrmContactPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from('leads')
-      .select('id,name,email,phone,whatsapp,source,status,contact_type,wedding_date,wedding_date_to,wedding_year,wedding_month,guests,guests_adults,guests_children,budget,ceremony_type,notes,country,tags,created_at,updated_at')
+      .select('id,name,email,phone,whatsapp,whatsapp_consent,source,status,contact_type,wedding_date,wedding_date_to,wedding_year,wedding_month,date_flexibility,guests,guests_adults,guests_children,budget,ceremony_type,catering_needed,language,style,notes,country,tags,visit_date,visit_time,visit_duration,initial_message,created_at,updated_at')
       .eq('id', id)
       .maybeSingle()
     if (data) { setLead(data as Lead); setForm(data as Lead) }
@@ -158,12 +190,12 @@ export default function CrmContactPage() {
     const supabase = createClient()
     const updates = {
       name:         form.name,
-      email:        form.email || null,
-      phone:        form.phone || null,
-      whatsapp:     form.whatsapp || null,
-      contact_type: form.contact_type || 'pareja',
+      email:        form.email         || null,
+      phone:        form.phone         || null,
+      whatsapp:     form.whatsapp      || null,
+      contact_type: form.contact_type  || 'pareja',
       status:       form.status,
-      notes:        form.notes || null,
+      notes:        form.notes         || null,
     }
     const { data } = await supabase.from('leads').update(updates).eq('id', id).select().maybeSingle()
     if (data) setLead(data as Lead)
@@ -186,8 +218,26 @@ export default function CrmContactPage() {
     </div>
   )
 
-  const sc  = STATUS_CFG[lead.status]   || { label: lead.status,       bg: '#f3f4f6', color: '#6b7280' }
-  const ctc = CONTACT_TYPE_CFG[lead.contact_type] || CONTACT_TYPE_CFG.otro
+  const sc  = STATUS_CFG[lead.status]              || { label: lead.status,       bg: '#f3f4f6', color: '#6b7280' }
+  const ctc = CONTACT_TYPE_CFG[lead.contact_type]  || CONTACT_TYPE_CFG.otro
+
+  // Pipeline index
+  const pipelineIdx  = PIPELINE.findIndex(p => p.key === lead.status)
+  const isLost       = lead.status === 'lost'
+
+  const isPareja = lead.contact_type === 'pareja' || !lead.contact_type
+  const hasVisit = !!lead.visit_date
+
+  // Visit time display
+  const visitTimeLabel = (() => {
+    if (!lead.visit_time) return ''
+    if (!lead.visit_duration) return lead.visit_time
+    const [h, m] = lead.visit_time.split(':').map(Number)
+    const tot = h * 60 + m + lead.visit_duration
+    const eh  = Math.floor(tot / 60) % 24
+    const em  = tot % 60
+    return `${lead.visit_time} – ${String(eh).padStart(2,'0')}:${String(em).padStart(2,'0')} (${lead.visit_duration} min)`
+  })()
 
   return (
     <div style={{ display: 'flex' }}>
@@ -225,9 +275,9 @@ export default function CrmContactPage() {
         </div>
 
         <div className="page-content">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>
 
-            {/* Left: main info */}
+            {/* ── Left column ──────────────────────────────────────────────── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
               {/* Header card */}
@@ -244,7 +294,6 @@ export default function CrmContactPage() {
                       <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--charcoal)', margin: '0 0 8px' }}>{lead.name}</h1>
                     )}
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {/* Contact type badge */}
                       {editing ? (
                         <select value={form.contact_type || 'pareja'} onChange={e => setForm(f => ({ ...f, contact_type: e.target.value }))}
                           style={{ fontSize: 12, padding: '3px 8px', border: '1px solid var(--ivory)', borderRadius: 6, background: ctc.bg, color: ctc.color, fontFamily: 'Inter, sans-serif' }}>
@@ -255,7 +304,6 @@ export default function CrmContactPage() {
                           {ctc.emoji} {ctc.label}
                         </span>
                       )}
-                      {/* Status badge */}
                       {editing ? (
                         <select value={form.status || lead.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
                           style={{ fontSize: 12, padding: '3px 8px', border: '1px solid var(--ivory)', borderRadius: 6, background: sc.bg, color: sc.color, fontFamily: 'Inter, sans-serif' }}>
@@ -269,17 +317,79 @@ export default function CrmContactPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Pipeline progress bar */}
+                {!isLost && (
+                  <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid var(--ivory)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 0, position: 'relative' }}>
+                      {/* Connecting line */}
+                      <div style={{ position: 'absolute', top: 10, left: 10, right: 10, height: 2, background: 'var(--ivory)', zIndex: 0 }} />
+                      <div style={{ position: 'absolute', top: 10, left: 10, height: 2, background: 'var(--gold)', zIndex: 1,
+                        width: pipelineIdx < 0 ? '0%' : `${(pipelineIdx / (PIPELINE.length - 1)) * (100 - 20 / PIPELINE.length)}%`,
+                        transition: 'width 0.3s',
+                      }} />
+                      {PIPELINE.map((step, i) => {
+                        const done    = i < pipelineIdx
+                        const current = i === pipelineIdx
+                        return (
+                          <div key={step.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, position: 'relative', zIndex: 2 }}>
+                            <div style={{
+                              width: 20, height: 20, borderRadius: '50%',
+                              background: done ? 'var(--gold)' : current ? 'var(--espresso)' : '#fff',
+                              border: `2px solid ${done || current ? (done ? 'var(--gold)' : 'var(--espresso)') : 'var(--ivory)'}`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                              {done && <span style={{ color: '#fff', fontSize: 9, fontWeight: 700 }}>✓</span>}
+                              {current && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', display: 'block' }} />}
+                            </div>
+                            <span style={{ fontSize: 9.5, fontWeight: current ? 700 : 500, color: current ? 'var(--espresso)' : done ? 'var(--gold)' : 'var(--warm-gray)', textAlign: 'center', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+                              {step.label}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                {isLost && (
+                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: '#b91c1c', fontWeight: 500 }}>Lead perdido — ya no está activo en el pipeline</span>
+                  </div>
+                )}
               </div>
+
+              {/* Visit banner — shown prominently when visit exists */}
+              {hasVisit && (
+                <div style={{ padding: '16px 20px', borderRadius: 12, background: 'linear-gradient(135deg,#ecfdf5,#f0fdf4)', border: '1.5px solid #6ee7b7', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Landmark size={18} style={{ color: '#fff' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#065f46', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
+                      {lead.status === 'post_visit' ? 'Visita realizada' : 'Visita agendada'}
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#047857' }}>
+                      {fmtDate(lead.visit_date)}
+                      {visitTimeLabel && <span style={{ fontWeight: 400, fontSize: 13, color: '#059669' }}> · {visitTimeLabel}</span>}
+                    </div>
+                  </div>
+                  <button onClick={() => router.push(`/leads?open=${lead.id}`)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.7)', border: '1px solid #a7f3d0', color: '#047857', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
+                    <ExternalLink size={11} /> Gestionar
+                  </button>
+                </div>
+              )}
 
               {/* Contact info card */}
               <div className="card" style={{ padding: '20px 28px' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 4 }}>Datos de contacto</div>
+                <SectionLabel>Datos de contacto</SectionLabel>
                 {editing ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {[
-                      { key: 'email',    label: 'Email',     type: 'email' },
-                      { key: 'phone',    label: 'Teléfono',  type: 'tel'   },
-                      { key: 'whatsapp', label: 'WhatsApp',  type: 'tel'   },
+                      { key: 'email',    label: 'Email',    type: 'email' },
+                      { key: 'phone',    label: 'Teléfono', type: 'tel'   },
+                      { key: 'whatsapp', label: 'WhatsApp', type: 'tel'   },
                     ].map(({ key, label, type }) => (
                       <div key={key} className="form-group" style={{ marginBottom: 0 }}>
                         <label className="form-label" style={{ fontSize: 11 }}>{label}</label>
@@ -291,33 +401,90 @@ export default function CrmContactPage() {
                   </div>
                 ) : (
                   <>
-                    {lead.email && <InfoRow icon={<Mail size={15} />} label="Email" value={lead.email} href={`mailto:${lead.email}`} />}
-                    {lead.phone && <InfoRow icon={<Phone size={15} />} label="Teléfono" value={lead.phone} href={`tel:${lead.phone}`} />}
-                    {lead.whatsapp && <InfoRow icon={<MessageCircle size={15} />} label="WhatsApp" value={lead.whatsapp} href={`https://wa.me/${lead.whatsapp.replace(/\D/g,'')}`} />}
+                    {lead.email    && <InfoRow icon={<Mail           size={14} />} label="Email"     value={lead.email}    href={`mailto:${lead.email}`} />}
+                    {lead.phone    && <InfoRow icon={<Phone          size={14} />} label="Teléfono"  value={lead.phone}    href={`tel:${lead.phone}`} />}
+                    {lead.whatsapp && <InfoRow icon={<MessageCircle  size={14} />} label="WhatsApp"  value={lead.whatsapp} href={`https://wa.me/${lead.whatsapp.replace(/\D/g,'')}`} />}
+                    {lead.whatsapp_consent !== null && lead.whatsapp_consent !== undefined && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', borderBottom: '1px solid var(--ivory)' }}>
+                        <div style={{ width: 20, height: 20, borderRadius: '50%', background: lead.whatsapp_consent ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {lead.whatsapp_consent
+                            ? <CheckCircle2 size={12} style={{ color: '#16a34a' }} />
+                            : <X size={12} style={{ color: '#dc2626' }} />}
+                        </div>
+                        <span style={{ fontSize: 12, color: lead.whatsapp_consent ? '#15803d' : '#b91c1c', fontWeight: 500 }}>
+                          {lead.whatsapp_consent ? 'Acepta contacto por WhatsApp' : 'No acepta contacto por WhatsApp'}
+                        </span>
+                      </div>
+                    )}
                     {!lead.email && !lead.phone && !lead.whatsapp && (
-                      <p style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic', marginTop: 12 }}>Sin datos de contacto</p>
+                      <p style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic', margin: '8px 0 0' }}>Sin datos de contacto</p>
                     )}
                   </>
                 )}
               </div>
 
-              {/* Wedding / event info — only for parejas */}
-              {(lead.contact_type === 'pareja' || !lead.contact_type) && (
+              {/* Event / wedding details — parejas only */}
+              {isPareja && (
                 <div className="card" style={{ padding: '20px 28px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 4 }}>Detalles de la boda</div>
-                  <InfoRow icon={<Calendar size={15} />}    label="Fecha"       value={weddingLabel(lead)} />
-                  {lead.guests      && <InfoRow icon={<Users size={15} />}     label="Invitados"    value={`${lead.guests}${lead.guests_adults ? ` (${lead.guests_adults} adultos, ${lead.guests_children || 0} niños)` : ''}`} />}
-                  {lead.budget && lead.budget !== 'sin_definir' && <InfoRow icon={<Banknote size={15} />}  label="Presupuesto"  value={BUDGET_LABEL[lead.budget] || lead.budget} />}
-                  {lead.ceremony_type && lead.ceremony_type !== 'sin_definir' && (
-                    <InfoRow icon={<Tag size={15} />} label="Ceremonia" value={{ civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica', mixta: 'Mixta' }[lead.ceremony_type] || lead.ceremony_type} />
+                  <SectionLabel>Detalles del evento</SectionLabel>
+                  <InfoRow icon={<Calendar size={14} />} label="Fecha deseada" value={weddingLabel(lead)} />
+                  {(lead.guests || lead.guests_adults) && (
+                    <InfoRow icon={<Users size={14} />} label="Invitados" value={
+                      lead.guests_adults
+                        ? `${(lead.guests_adults || 0) + (lead.guests_children || 0)} total · ${lead.guests_adults} adultos, ${lead.guests_children || 0} niños`
+                        : `${lead.guests}`
+                    } />
                   )}
-                  {lead.country && <InfoRow icon={<MapPin size={15} />} label="País" value={lead.country} />}
+                  {lead.budget && lead.budget !== 'sin_definir' && (
+                    <InfoRow icon={<Banknote size={14} />} label="Presupuesto orientativo" value={BUDGET_LABEL[lead.budget] || lead.budget} />
+                  )}
+                  {lead.ceremony_type && lead.ceremony_type !== 'sin_definir' && (
+                    <InfoRow icon={<Heart size={14} />} label="Tipo de ceremonia" value={{ civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica', mixta: 'Mixta' }[lead.ceremony_type] || lead.ceremony_type} />
+                  )}
+                  {lead.catering_needed && lead.catering_needed !== 'sin_definir' && (
+                    <InfoRow icon={<UtensilsCrossed size={14} />} label="Catering" value={{ incluido: 'Incluido en el venue', externo: 'Traen catering externo', por_definir: 'Por definir' }[lead.catering_needed] || lead.catering_needed} />
+                  )}
+                  {lead.country && (
+                    <InfoRow icon={<MapPin size={14} />} label="País" value={lead.country} />
+                  )}
+                  {lead.language && (
+                    <InfoRow icon={<Globe size={14} />} label="Idioma" value={lead.language} />
+                  )}
+                  {lead.style && (
+                    <InfoRow icon={<Palette size={14} />} label="Estilo buscado" value={lead.style} />
+                  )}
+                  {lead.tags && lead.tags.length > 0 && (
+                    <div style={{ padding: '9px 0', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                      <div style={{ color: 'var(--warm-gray)', flexShrink: 0, marginTop: 1 }}><Tag size={14} /></div>
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 5 }}>Etiquetas</div>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                          {lead.tags.map(t => (
+                            <span key={t} style={{ fontSize: 11, background: 'var(--cream)', color: 'var(--warm-gray)', border: '1px solid var(--ivory)', borderRadius: 5, padding: '2px 8px' }}>{t}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Initial message — if exists */}
+              {lead.initial_message && (
+                <div className="card" style={{ padding: '20px 28px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <SectionLabel>Mensaje inicial</SectionLabel>
+                    <span style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 400, marginBottom: 14, marginLeft: 4 }}>desde foreventos.com</span>
+                  </div>
+                  <div style={{ padding: '12px 16px', borderRadius: 10, background: '#faf8f5', border: '1px solid var(--ivory)', fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {lead.initial_message}
+                  </div>
                 </div>
               )}
 
               {/* Notes */}
               <div className="card" style={{ padding: '20px 28px' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 12 }}>Notas</div>
+                <SectionLabel>Notas internas</SectionLabel>
                 {editing ? (
                   <textarea className="form-input" rows={5} value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                     placeholder="Añade notas sobre este contacto…" style={{ resize: 'vertical', fontSize: 13 }} />
@@ -329,18 +496,50 @@ export default function CrmContactPage() {
               </div>
             </div>
 
-            {/* Right: metadata sidebar */}
+            {/* ── Right sidebar ─────────────────────────────────────────────── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+              {/* Quick actions */}
               <div className="card" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 12 }}>Origen</div>
-                <InfoRow icon={<MapPin size={14} />} label="Canal" value={SOURCE_LABEL[lead.source || ''] || lead.source || '—'} />
-                <InfoRow icon={<Clock size={14} />}  label="Entrada" value={fmtDate(lead.created_at)} />
-                {lead.updated_at && <InfoRow icon={<Clock size={14} />} label="Actualizado" value={fmtDate(lead.updated_at)} />}
+                <SectionLabel>Acciones rápidas</SectionLabel>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {lead.email && (
+                    <a href={`mailto:${lead.email}`}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 8, background: '#f0f9ff', color: '#0369a1', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+                      <Mail size={13} /> Enviar email
+                    </a>
+                  )}
+                  {lead.whatsapp && (
+                    <a href={`https://wa.me/${lead.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 8, background: '#f0fdf4', color: '#15803d', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+                      <MessageCircle size={13} /> WhatsApp
+                    </a>
+                  )}
+                  {lead.phone && (
+                    <a href={`tel:${lead.phone}`}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 8, background: '#faf8f5', color: 'var(--charcoal)', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+                      <Phone size={13} /> Llamar
+                    </a>
+                  )}
+                  <button onClick={() => router.push(`/leads?open=${lead.id}`)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 8, background: 'var(--ivory)', color: 'var(--charcoal)', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left' }}>
+                    <ExternalLink size={13} /> Ver pipeline en Leads
+                  </button>
+                </div>
               </div>
 
-              {lead.tags && lead.tags.length > 0 && (
+              {/* Origin + dates */}
+              <div className="card" style={{ padding: '18px 20px' }}>
+                <SectionLabel>Origen</SectionLabel>
+                <InfoRow icon={<Sparkles size={13} />} label="Canal" value={SOURCE_LABEL[lead.source || ''] || lead.source || '—'} />
+                <InfoRow icon={<Clock    size={13} />} label="Entrada"     value={fmtDate(lead.created_at)} />
+                {lead.updated_at && <InfoRow icon={<Clock size={13} />} label="Actualizado" value={fmtDate(lead.updated_at)} />}
+              </div>
+
+              {/* Tags — for non-parejas */}
+              {!isPareja && lead.tags && lead.tags.length > 0 && (
                 <div className="card" style={{ padding: '18px 20px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 10 }}>Etiquetas</div>
+                  <SectionLabel>Etiquetas</SectionLabel>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {lead.tags.map(t => (
                       <span key={t} style={{ fontSize: 11, background: 'var(--ivory)', color: 'var(--warm-gray)', borderRadius: 5, padding: '3px 8px' }}>{t}</span>
@@ -348,36 +547,8 @@ export default function CrmContactPage() {
                   </div>
                 </div>
               )}
-
-              {/* Quick actions */}
-              <div className="card" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 10 }}>Acciones rápidas</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {lead.email && (
-                    <a href={`mailto:${lead.email}`}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: '#f0f9ff', color: '#0369a1', fontSize: 12, fontWeight: 500, textDecoration: 'none' }}>
-                      <Mail size={13} /> Enviar email
-                    </a>
-                  )}
-                  {lead.whatsapp && (
-                    <a href={`https://wa.me/${lead.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: '#f0fdf4', color: '#15803d', fontSize: 12, fontWeight: 500, textDecoration: 'none' }}>
-                      <MessageCircle size={13} /> WhatsApp
-                    </a>
-                  )}
-                  {lead.phone && (
-                    <a href={`tel:${lead.phone}`}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: '#faf8f5', color: 'var(--charcoal)', fontSize: 12, fontWeight: 500, textDecoration: 'none' }}>
-                      <Phone size={13} /> Llamar
-                    </a>
-                  )}
-                  <button onClick={() => router.push(`/leads?open=${lead.id}`)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--ivory)', color: 'var(--charcoal)', fontSize: 12, fontWeight: 500, border: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left' }}>
-                    <ExternalLink size={13} /> Ver pipeline en Leads
-                  </button>
-                </div>
-              </div>
             </div>
+
           </div>
         </div>
       </div>
