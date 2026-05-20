@@ -230,11 +230,11 @@ export default function Sidebar() {
                 justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff',
                 letterSpacing: '-0.01em',
               }}>
-                {(activeVenue.name ?? 'V').slice(0, 1).toUpperCase()}
+                {(activeVenue?.name ?? 'V').slice(0, 1).toUpperCase()}
               </span>
               <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#fff', lineHeight: 1.2 }}>
-                  {activeVenue.name ?? `Venue ${activeVenue.wp_venue_id}`}
+                  {activeVenue?.name ?? `Venue ${activeVenue?.wp_venue_id}`}
                 </div>
                 {userVenues.length > 1 && (
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Cambiar venue</div>
@@ -265,15 +265,15 @@ export default function Sidebar() {
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 8,
                       padding: '9px 12px', background: 'none', border: 'none',
-                      color: v.id === activeVenue.id ? 'var(--gold)' : 'rgba(255,255,255,0.8)',
-                      fontSize: 12, fontWeight: v.id === activeVenue.id ? 600 : 400,
+                      color: v.id === activeVenue?.id ? 'var(--gold)' : 'rgba(255,255,255,0.8)',
+                      fontSize: 12, fontWeight: v.id === activeVenue?.id ? 600 : 400,
                       cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left',
                     }}
                   >
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {v.name ?? `Venue ${v.wp_venue_id}`}
                     </span>
-                    {v.id === activeVenue.id && <Check size={11} />}
+                    {v.id === activeVenue?.id && <Check size={11} />}
                   </button>
                 ))}
               </div>
