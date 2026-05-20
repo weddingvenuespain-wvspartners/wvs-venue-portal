@@ -588,7 +588,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
 
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
-        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} guestCount={guests} weddingDate={data.wedding_date} />
+        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} guestCount={guests} weddingDate={data.wedding_date ?? undefined} />
       )}
 
       {/* ── DATE SELECTOR ── */}
