@@ -200,7 +200,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
 
     /* ── Sections base ── */
     .t1-sec{padding:96px 0;border-top:1px solid ${pal.borderHard}}
-    .t1-label{font-size:.62rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:${fg(.28)};margin-bottom:12px;display:block}
+    .t1-label{font-size:.62rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${primary};margin-bottom:14px;display:flex;align-items:center;gap:10px}
+    .t1-label::before{content:'';width:20px;height:1.5px;background:${primary};opacity:.5}
     .t1-h2{font-family:${FONT};font-size:clamp(2rem,3.8vw,3.4rem);font-weight:300;color:${pal.text};line-height:1.08;margin-bottom:56px}
     .t1-line{width:36px;height:1.5px;background:${primary};margin:18px 0 40px}
 
@@ -313,10 +314,10 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-extra-price{font-family:${FONT};font-size:1.4rem;font-weight:300;color:${primary};white-space:nowrap}
 
     /* ── Message ── */
-    .t1-msg{max-width:640px;margin:0 auto;text-align:center;padding:40px 48px}
-    .t1-msg-qmark{font-family:${FONT};font-size:8rem;font-weight:300;color:${primary};opacity:.15;line-height:.8;margin-bottom:-10px}
-    .t1-msg-text{font-family:${FONT};font-size:clamp(1.1rem,2.2vw,1.45rem);font-style:italic;font-weight:300;color:${fg(.7)};line-height:1.85;white-space:pre-wrap}
-    .t1-msg-sig{margin-top:28px;font-size:.68rem;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:${fg(.3)}}
+    .t1-msg{max-width:640px;margin:0 auto;text-align:center;padding:24px 48px}
+    .t1-msg-qmark{font-family:${FONT};font-size:4.5rem;font-weight:300;color:${primary};opacity:.15;line-height:.8;margin-bottom:4px}
+    .t1-msg-text{font-family:${FONT};font-size:clamp(1.05rem,2vw,1.3rem);font-style:italic;font-weight:300;color:${fg(.7)};line-height:1.85;white-space:pre-wrap}
+    .t1-msg-sig{margin-top:20px;font-size:.65rem;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:${fg(.3)}}
 
     /* ── FAQ ── */
     .t1-faq-item{border-bottom:1px solid ${pal.borderHard}}
@@ -351,17 +352,17 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-wl-sig{margin-top:28px;font-size:.65rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:${primary};opacity:.7}
 
     /* ── Welcome split ── */
-    .t1-ws{display:grid;grid-template-columns:1fr 1fr;min-height:420px}
-    .t1-ws-img{overflow:hidden;position:relative;background:${pal.surfaceAlt};order:0}
+    .t1-ws{display:grid;grid-template-columns:1fr 1fr;align-items:stretch}
+    .t1-ws>*{min-height:0}
+    .t1-ws-img{overflow:hidden;position:relative;background:${pal.surfaceAlt};order:0;min-height:320px}
     .t1-ws-img.right{order:1}
-    .t1-ws-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .8s ease}
-    .t1-ws:hover .t1-ws-img img{transform:scale(1.04)}
-    .t1-ws-text{background:${pal.welcomeSplitTextBg};padding:48px 56px;display:flex;flex-direction:column;justify-content:center;order:0}
+    .t1-ws-img img{width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0}
+    .t1-ws-text{background:${pal.welcomeSplitTextBg};padding:40px 48px;display:flex;flex-direction:column;justify-content:center;order:0}
     .t1-ws-text.after-img{order:1}
-    .t1-ws-eyebrow{font-size:.6rem;font-weight:700;letter-spacing:.26em;text-transform:uppercase;color:${primary};margin-bottom:20px;display:block}
-    .t1-ws-body{font-family:${FONT};font-size:clamp(1rem,1.8vw,1.25rem);font-style:italic;font-weight:300;color:#3a3530;line-height:1.85;white-space:pre-wrap}
-    .t1-ws-sig{margin-top:24px;font-size:.65rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${primary};opacity:.65}
-    @media(max-width:780px){.t1-ws{grid-template-columns:1fr}.t1-ws-img{min-height:280px;order:0!important}.t1-ws-text{order:1!important;padding:48px 28px}}
+    .t1-ws-eyebrow{font-size:.6rem;font-weight:700;letter-spacing:.26em;text-transform:uppercase;color:${primary};margin-bottom:16px;display:block}
+    .t1-ws-body{font-family:${FONT};font-size:clamp(1rem,1.8vw,1.2rem);font-style:italic;font-weight:300;color:#3a3530;line-height:1.8;white-space:pre-wrap}
+    .t1-ws-sig{margin-top:20px;font-size:.65rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${primary};opacity:.65}
+    @media(max-width:780px){.t1-ws{grid-template-columns:1fr}.t1-ws-img{min-height:260px;order:0!important}.t1-ws-text{order:1!important;padding:32px 24px}}
 
     /* ── Welcome editorial ── */
     .t1-we{background:${pal.bg};padding:56px 0;border-top:1px solid ${pal.borderHard}}
@@ -533,37 +534,28 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           const subLabel = `rgba(${sr},${sg},${sb},.6)`
           return (
             <div style={{ position: 'relative', zIndex: 10, padding: '0 48px 80px' }}>
-              <div className="ha" style={{ width: 36, height: 1.5, background: primary, marginBottom: 24, animationDelay: '.15s' }} />
-              <div className="ha" style={{ fontSize: '.65rem', letterSpacing: '.26em', textTransform: 'uppercase', color: subLabel, marginBottom: 16, animationDelay: '.2s' }}>
-                Propuesta exclusiva para
-              </div>
-              <h1 className="ha" style={{ fontFamily: FONT, fontSize: 'clamp(3.2rem,10vw,8rem)', fontWeight: 300, lineHeight: .95, letterSpacing: '-.02em', marginBottom: 32, animationDelay: '.35s', color: heroTitleColor }}>
-                {couple_name}
-              </h1>
-              <div className="ha" style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', animationDelay: '.55s' }}>
-                {venue?.city && <span style={{ fontSize: '.85rem', color: subFull, letterSpacing: '.04em', display: 'flex', alignItems: 'center', gap: 6 }}><IcoPin width={13} height={13} /> {venue.name}, {venue.city}</span>}
-                {wDate && <span style={{ fontSize: '.85rem', color: subFull, display: 'flex', alignItems: 'center', gap: 6 }}><IcoCalendar width={13} height={13} /> {wDate}</span>}
-                {guest_count && <span style={{ fontSize: '.85rem', color: subFull, display: 'flex', alignItems: 'center', gap: 6 }}><IcoUsers width={13} height={13} /> {guest_count} invitados</span>}
-                {show_price_estimate && displayPrice && (
-                  <span style={{ fontFamily: FONT, fontSize: '2rem', fontWeight: 300, color: heroSubColor, borderLeft: `2px solid ${primary}`, paddingLeft: 20, marginLeft: 4, lineHeight: 1, display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    {formatPrice(displayPrice)}
-                    {ivaLabel(sec, true) && <span style={{ fontSize: '.65rem', opacity: .8, letterSpacing: '.08em', marginTop: 4, fontFamily: "'Inter', sans-serif" }}>{ivaLabel(sec, true)}</span>}
-                  </span>
+              <div className="ha" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', borderRadius: 999, background: 'rgba(0,0,0,.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', marginBottom: 22, animationDelay: '.15s' }}>
+                <span style={{ fontFamily: 'Inter,sans-serif', fontSize: '.68rem', fontWeight: 600, letterSpacing: '.14em', textTransform: 'uppercase', color: '#fff' }}>
+                  Propuesta exclusiva
+                </span>
+                {venue?.name && (
+                  <>
+                    <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,.3)' }} />
+                    <span style={{ fontFamily: 'Inter,sans-serif', fontSize: '.68rem', fontWeight: 500, color: 'rgba(255,255,255,.85)' }}>{venue.name}</span>
+                  </>
                 )}
               </div>
+              <h1 className="ha" style={{ fontFamily: FONT, fontSize: 'clamp(3.2rem,10vw,8rem)', fontWeight: 300, lineHeight: .95, letterSpacing: '-.02em', marginBottom: 24, animationDelay: '.35s', color: heroTitleColor }}>
+                {couple_name}
+              </h1>
             </div>
           )
         })()}
-        {/* Scroll indicator */}
-        <div style={{ position: 'absolute', bottom: 28, left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: '.55rem', letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,.25)' }}>Desliza</span>
-          <div style={{ width: 1, height: 40, background: `linear-gradient(to bottom, rgba(255,255,255,.3), transparent)` }} />
-        </div>
       </section>
 
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
-        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} />
+        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} guestCount={guests} weddingDate={wedding_date} />
       )}
 
       {/* ════════════════════════════════════════════
@@ -578,6 +570,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           font={FONT}
           proposalId={data.id}
           onSelect={setSelectedDateSlotIdx}
+          guestCount={guests}
         />
       )}
 
@@ -612,7 +605,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           MENSAJE PERSONAL + CONVERSION BLOCK
       ════════════════════════════════════════════ */}
       {activeWelcomeVariant === 'welcome' && displayMsg && (
-        <section id="sec-welcome" className="t1-sec" style={{ background: lightMode ? pal.surface : '#080808', padding: '48px 0' }}>
+        <section id="sec-welcome" className="t1-sec" style={{ background: lightMode ? pal.surface : '#080808', padding: '32px 0' }}>
           <FadeUp>
             <div className="t1-msg">
               <div className="t1-msg-qmark">"</div>
@@ -654,8 +647,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
               )}
             </div>
-            <FadeUp>
-              <div className={`t1-ws-text${(sec as any).welcome_split?.image_side === 'right' ? '' : ' after-img'}`}>
+            <FadeUp style={{ display: 'flex' }}>
+              <div className={`t1-ws-text${(sec as any).welcome_split?.image_side === 'right' ? '' : ' after-img'}`} style={{ flex: 1 }}>
                 <span className="t1-ws-eyebrow">Un mensaje para vosotros</span>
                 <p className="t1-ws-body">{displayMsg}</p>
                 {venue?.name && <div className="t1-ws-sig">— {venue.name}</div>}
@@ -690,7 +683,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <div className="t1-story">
             <FadeUp>
               <div className="t1-story-text">
-                <span className="t1-label">Nuestra historia</span>
+                <span className="t1-label">{(expShow as any).eyebrow || 'La experiencia'}</span>
                 <h2 style={{ fontFamily: FONT, fontSize: 'clamp(1.8rem,3vw,2.8rem)', fontWeight: 300, color: pal.text, lineHeight: 1.15, marginBottom: 24 }}>
                   {expShow.title}
                 </h2>
@@ -748,7 +741,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 </FadeIn>
               )}
               <FadeUp>
-                <span className="t1-label">{ss.subtitle || 'Vuestro espacio'}</span>
+                <span className="t1-label">{ss.subtitle || 'El espacio'}</span>
                 {ss.title && <h2 className="t1-h2" style={{ marginBottom: 16 }}>{ss.title}</h2>}
                 {ss.description && <p className="t1-p" style={{ color: fg(.7), lineHeight: 1.7, marginBottom: 24 }}>{ss.description}</p>}
                 {(ss.sqm || ss.min_guests || ss.max_guests) && (
@@ -851,7 +844,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         <section id="sec-zones" className="t1-sec">
           <div className="w">
             <FadeUp>
-              <span className="t1-label">{(sec as any).zones_header?.label || 'Los espacios'}</span>
+              <span className="t1-label">{(sec as any).zones_header?.label || 'Espacios'}</span>
               <h2 className="t1-h2">{(sec as any).zones_header?.title || 'Cada rincón, un escenario'}</h2>
             </FadeUp>
           </div>
@@ -923,7 +916,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               // DateSelector (date_slots)
               if (on('date_slots') && dateSlots && dateSlots.length > 0) {
                 blocks.push(
-                  <DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={onPri} dark={!lightMode} font={FONT} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
+                  <DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={onPri} dark={!lightMode} font={FONT} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />
                 )
               }
 
@@ -1002,7 +995,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <section className="t1-sec" style={{ background: lightMode ? pal.bg : '#050505' }}>
             <div className="w">
               <FadeUp>
-                <span className="t1-label">Paquetes y precios</span>
+                <span className="t1-label">{(sec as any).pricing_eyebrow || 'Paquetes'}</span>
                 <h2 className="t1-h2">Elige tu propuesta</h2>
               </FadeUp>
               <FadeUp delay={.1}>
@@ -1082,7 +1075,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <section className="t1-sec" style={{ background: lightMode ? pal.surfaceAlt : '#0e0e0e' }}>
             <div className="w">
               <FadeUp>
-                <span className="t1-label">{(sec as any).inclusions_title || 'Qué incluye'}</span>
+                <span className="t1-label">{(sec as any).inclusions_eyebrow || (sec as any).inclusions_title || 'Qué incluye'}</span>
                 <h2 className="t1-h2" style={{ whiteSpace: 'pre-line' }}>{(sec as any).inclusions_subtitle || 'Todo lo que necesitáis,\nsin sorpresas'}</h2>
               </FadeUp>
               <FadeUp delay={.05}>
@@ -1161,7 +1154,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <section className="t1-sec" style={{ background: lightMode ? pal.surface : '#050505' }}>
             <div className="w">
               <FadeUp>
-                <span className="t1-label">Lo dicen nuestras parejas</span>
+                <span className="t1-label">{(sec as any).testimonials_eyebrow || 'Testimonios'}</span>
                 <h2 className="t1-h2">Experiencias reales</h2>
               </FadeUp>
               <FadeUp delay={.05}>
@@ -1179,7 +1172,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         <section className="t1-sec" style={{ background: lightMode ? pal.surfaceAlt : '#0e0e0e' }}>
           <div className="w">
             <FadeUp>
-              <span className="t1-label">Alojamiento en la finca</span>
+              <span className="t1-label">{(sec as any).accommodation_eyebrow || 'Alojamiento'}</span>
               <h2 className="t1-h2">Quedaos a dormir</h2>
             </FadeUp>
             <div className="t1-accom">
@@ -1247,8 +1240,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         <section className="t1-sec">
           <div className="w">
             <FadeUp>
-              <span className="t1-label">Personaliza</span>
-              <h2 className="t1-h2">Servicios adicionales</h2>
+              <span className="t1-label">{(sec as any).extra_services_eyebrow || 'Servicios adicionales'}</span>
+              <h2 className="t1-h2">{(sec as any).extra_services_eyebrow || 'Servicios adicionales'}</h2>
             </FadeUp>
             {extrasShow.map((svc: any, i: number) => {
               const isSel = !!selectedExtraSvcs[svc.name]
@@ -1293,8 +1286,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <section className="t1-sec" style={{ background: lightMode ? pal.bg : '#050505' }}>
             <div className="w-sm">
               <FadeUp>
-                <span className="t1-label">Dudas</span>
-                <h2 className="t1-h2">Preguntas frecuentes</h2>
+                <span className="t1-label">{(sec as any).faq_eyebrow || 'Preguntas frecuentes'}</span>
+                <h2 className="t1-h2">{(sec as any).faq_eyebrow || 'Preguntas frecuentes'}</h2>
               </FadeUp>
               <FadeUp delay={.05}>
                 <FaqComp items={faqShow} primary={primary} dark={!lightMode} />
@@ -1397,7 +1390,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <section className="t1-sec">
             <div className="w">
               <FadeUp>
-                <span className="t1-label">Ubicación</span>
+                <span className="t1-label">{(sec as any).map_eyebrow || 'Ubicación'}</span>
                 <h2 className="t1-h2">Cómo llegar</h2>
                 {address && <p style={{ fontSize: '.92rem', color: fg(.6), marginTop: -32, marginBottom: 40 }}>{address}</p>}
               </FadeUp>

@@ -141,18 +141,27 @@ export default function Sidebar() {
 
   // ── Nav item definitions ──────────────────────────────────────────────────────
 
-  const venueItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/canales',      label: 'Canales de venta',                               icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
-    { href: '/calendario',   label: isMultiVenue ? 'Calendarios'    : 'Calendario',  icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
+  // ── Venue owner nav groups ──────────────────────────────────────────────────
+  const comercialItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
     { href: '/leads',        label: 'Leads',                                          icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', feature: 'leads'        },
     { href: '/crm',          label: 'CRM',                                           icon: 'M1 12s2-4 7-4 7 4 7 4M8 8a3 3 0 100-6 3 3 0 000 6zM15 12s-1-2.5-3.5-3.5M12.5 5.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z', feature: 'leads' },
+    { href: '/calendario',   label: isMultiVenue ? 'Calendarios'    : 'Calendario',  icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
+  ]
+  const propuestasItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
     { href: '/proposals',    label: isMultiVenue ? 'Mis dosieres'   : 'Dosieres',    icon: 'M2 2h12v10H2zM14 8l2 4M5 6h6M5 9h4',                feature: 'propuestas'   },
     { href: '/budgets',      label: 'Presupuestos',                                     icon: 'M2 3h12v11H2zM5 1v3M11 1v3M5 7h6M5 10h3',             feature: 'presupuestos' },
-    { href: '/venue-settings', label: 'Configuración',                                 icon: 'M1 3h14M1 7h9M1 11h5M11 9l2 2 4-4',                  feature: 'estructura'   },
+  ]
+  const canalesItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
+    { href: '/canales',      label: 'Canales de venta',                               icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
     { href: '/comunicacion', label: 'Comunicación',                                   icon: 'M14 2H2v9h5l1 3 1-3h5V2zM5 6h6M5 9h3',              feature: 'comunicacion' },
   ]
-  const estadisticasItem = { href: '/estadisticas', label: 'Estadísticas', icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z', feature: 'estadisticas' as keyof PlanFeatures }
+  const datosItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
+    { href: '/estadisticas', label: 'Estadísticas', icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z', feature: 'estadisticas' },
+  ]
   const facturasItem = { href: '/facturas', label: 'Facturas', icon: 'M3 1h10v14l-2-1-2 1-2-1-2 1-2-1V1zM5 5h6M5 8h6M5 11h4' }
+  const configItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
+    { href: '/venue-settings', label: 'Configuración',                                 icon: 'M1 3h14M1 7h9M1 11h5M11 9l2 2 4-4',                  feature: 'estructura'   },
+  ]
 
   const plannerItems = [
     { href: '/wp',           label: 'Dashboard',        icon: 'M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z' },
@@ -371,9 +380,48 @@ export default function Sidebar() {
         {/* ── VENUE OWNER ── */}
         {isVenueOwner && (
           <>
-            <div className="nav-section" style={{ marginTop: 8 }}>Mi Venue</div>
+            {[
+              { label: 'Comercial',      items: comercialItems },
+              { label: 'Propuestas',     items: propuestasItems },
+              { label: 'Canales',        items: canalesItems },
+            ].map(group => (
+              <div key={group.label}>
+                <div className="nav-section" style={{ marginTop: 8 }}>{group.label}</div>
+                {group.items.map(item => {
+                  const locked = !features.loading && !features[item.feature]
+                  if (locked) return (
+                    <div key={item.href} className="nav-item"
+                      title="Funcionalidad no disponible en tu plan actual"
+                      style={{ paddingLeft: 20, opacity: 0.38, cursor: 'not-allowed', userSelect: 'none' }}
+                    >
+                      <Icon d={item.icon} /> {item.label}
+                      <span style={{ marginLeft: 'auto', fontSize: 9 }}>PRO</span>
+                    </div>
+                  )
+                  return (
+                    <Link key={item.href} href={item.href}
+                      className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
+                      style={{ paddingLeft: 20 }}
+                    >
+                      <Icon d={item.icon} /> {item.label}
+                      {item.href === '/leads' && newLeadsCount > 0 && (
+                        <span style={{
+                          marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
+                          background: '#ef4444', color: '#fff',
+                          fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          padding: '0 5px',
+                        }}>
+                          {newLeadsCount > 99 ? '99+' : newLeadsCount}
+                        </span>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
+            ))}
 
-            {venueItems.map(item => {
+            <div className="nav-section" style={{ marginTop: 8 }}>Datos</div>
+            {datosItems.map(item => {
               const locked = !features.loading && !features[item.feature]
               if (locked) return (
                 <div key={item.href} className="nav-item"
@@ -390,49 +438,42 @@ export default function Sidebar() {
                   style={{ paddingLeft: 20 }}
                 >
                   <Icon d={item.icon} /> {item.label}
-                  {item.href === '/leads' && newLeadsCount > 0 && (
-                    <span style={{
-                      marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
-                      background: '#ef4444', color: '#fff',
-                      fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      padding: '0 5px',
-                    }}>
-                      {newLeadsCount > 99 ? '99+' : newLeadsCount}
-                    </span>
-                  )}
                 </Link>
               )
             })}
-
-            <div className="nav-section" style={{ marginTop: 8 }}>Datos</div>
-            {(() => {
-              const locked = !features.loading && !features[estadisticasItem.feature]
-              if (locked) return (
-                <div className="nav-item"
-                  title="Funcionalidad no disponible en tu plan actual"
-                  style={{ opacity: 0.38, cursor: 'not-allowed', userSelect: 'none' }}
-                >
-                  <Icon d={estadisticasItem.icon} /> {estadisticasItem.label}
-                  <span style={{ marginLeft: 'auto', fontSize: 9 }}>PRO</span>
-                </div>
-              )
-              return (
-                <Link href={estadisticasItem.href}
-                  className={`nav-item ${isActive(estadisticasItem.href) ? 'active' : ''}`}
-                >
-                  <Icon d={estadisticasItem.icon} /> {estadisticasItem.label}
-                </Link>
-              )
-            })()}
             <Link href={facturasItem.href}
               className={`nav-item ${isActive(facturasItem.href) ? 'active' : ''}`}
+              style={{ paddingLeft: 20 }}
             >
               <Icon d={facturasItem.icon} /> {facturasItem.label}
             </Link>
 
-            <div className="nav-section" style={{ marginTop: 8 }}>Ayuda</div>
+            <div className="nav-section" style={{ marginTop: 8 }}>Configuración</div>
+            {configItems.map(item => {
+              const locked = !features.loading && !features[item.feature]
+              if (locked) return (
+                <div key={item.href} className="nav-item"
+                  title="Funcionalidad no disponible en tu plan actual"
+                  style={{ paddingLeft: 20, opacity: 0.38, cursor: 'not-allowed', userSelect: 'none' }}
+                >
+                  <Icon d={item.icon} /> {item.label}
+                  <span style={{ marginLeft: 'auto', fontSize: 9 }}>PRO</span>
+                </div>
+              )
+              return (
+                <Link key={item.href} href={item.href}
+                  className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
+                  style={{ paddingLeft: 20 }}
+                >
+                  <Icon d={item.icon} /> {item.label}
+                </Link>
+              )
+            })}
             {helpItems.map(item => (
-              <Link key={item.href} href={item.href} className={`nav-item ${isActive(item.href) ? 'active' : ''}`}>
+              <Link key={item.href} href={item.href}
+                className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
+                style={{ paddingLeft: 20 }}
+              >
                 <Icon d={item.icon} /> {item.label}
               </Link>
             ))}

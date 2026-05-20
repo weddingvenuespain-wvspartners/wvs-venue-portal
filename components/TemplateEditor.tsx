@@ -305,6 +305,33 @@ export default function TemplateEditor({
   const removeBtn: React.CSSProperties = { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: '2px 4px', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }
 
   // ── Render section content editor ─────────────────────────────────────────
+  // Sections with editable eyebrow labels
+  const EYEBROW_SECTIONS: Record<string, string> = {
+    gallery: 'Galería',
+    inclusions: 'Qué incluye',
+    testimonials: 'Testimonios',
+    collaborators: 'Proveedores de confianza',
+    accommodation: 'Alojamiento',
+    extra_services: 'Servicios adicionales',
+    pricing: 'Paquetes',
+    faq: 'Preguntas frecuentes',
+    schedule_visit: 'Agendar visita',
+    map: 'Ubicación',
+    venue_rental: 'Tarifas de alquiler',
+    season_prices: 'Temporadas',
+  }
+
+  const renderEyebrowInput = (secId: string) => {
+    if (!EYEBROW_SECTIONS[secId]) return null
+    const key = `${secId}_eyebrow`
+    return (
+      <input className="form-input" style={{ fontSize: 11, marginBottom: 8, fontStyle: 'italic' }}
+        placeholder={`Subtítulo (por defecto: ${EYEBROW_SECTIONS[secId]})`}
+        value={(sections as any)[key] ?? ''}
+        onChange={e => { setSections(s => ({ ...s, [key]: e.target.value }) as any); markDirty() }} />
+    )
+  }
+
   const renderSectionContent = (secId: SectionId) => {
     const overrideKey = `${secId}_override`
 
@@ -377,10 +404,16 @@ export default function TemplateEditor({
     )
 
     if (secId === 'availability') return (
-      <textarea className="form-textarea" style={{ minHeight: 60, fontSize: 12 }}
-        placeholder="Ej. Fecha disponible con confirmación prioritaria…"
-        value={sections.availability_message ?? ''}
-        onChange={e => { setSections(s => ({ ...s, availability_message: e.target.value })); markDirty() }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <textarea className="form-textarea" style={{ minHeight: 60, fontSize: 12 }}
+          placeholder="Ej. Fecha disponible con confirmación prioritaria…"
+          value={sections.availability_message ?? ''}
+          onChange={e => { setSections(s => ({ ...s, availability_message: e.target.value })); markDirty() }} />
+        <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.5, display: 'flex', alignItems: 'flex-start', gap: 5 }}>
+          <span style={{ fontSize: 12, flexShrink: 0, marginTop: -1 }}>ℹ️</span>
+          <span>Este es el mensaje por defecto de tu plantilla. Podrás personalizarlo para cada propuesta individual desde el editor de la propuesta.</span>
+        </div>
+      </div>
     )
 
     if (secId === 'venue_specs') {
@@ -389,44 +422,58 @@ export default function TemplateEditor({
       const stats: Array<{ value: string; label: string }> = vs.stats ?? []
       const setStats = (next: Array<{ value: string; label: string }>) => setVs({ stats: next })
       const PRESETS = [
-        { value: '1687', label: 'Año fundación' },
-        { value: '8 Ha', label: 'Extensión' },
-        { value: '350', label: 'Capacidad máxima' },
-        { value: '1', label: 'Sola boda al día' },
-        { value: '12', label: 'Hectáreas de jardines' },
-        { value: '200', label: 'Plazas de parking' },
-        { value: '5', label: 'Espacios exteriores' },
+        { value: '1687', label: 'Año fundación', icon: '🏛️' },
+        { value: '8 Ha', label: 'Extensión', icon: '🌿' },
+        { value: '350', label: 'Capacidad máxima', icon: '👥' },
+        { value: '1', label: 'Sola boda al día', icon: '💍' },
+        { value: '12', label: 'Hectáreas de jardines', icon: '🌳' },
+        { value: '200', label: 'Plazas de parking', icon: '🅿️' },
+        { value: '5', label: 'Espacios exteriores', icon: '✨' },
       ]
+      const MAX_STATS = 6
+      const availablePresets = PRESETS.filter(p => !stats.some(s => s.label === p.label))
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Stat rows */}
           {stats.map((s, i) => (
-            <div key={i} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-              <input className="form-input" style={{ fontSize: 12, width: 80, flexShrink: 0 }} placeholder="Número"
+            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', background: 'var(--surface-alt, #faf8f5)', borderRadius: 8, padding: '6px 8px' }}>
+              <span style={{ fontSize: 11, color: 'var(--warm-gray)', fontWeight: 700, width: 18, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
+              <input className="form-input" style={{ fontSize: 12, width: 72, flexShrink: 0, textAlign: 'center', fontWeight: 600 }} placeholder="Valor"
                 value={s.value} onChange={e => setStats(stats.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
-              <input className="form-input" style={{ fontSize: 12, flex: 1 }} placeholder="Etiqueta"
+              <input className="form-input" style={{ fontSize: 12, flex: 1 }} placeholder="Etiqueta (ej. Capacidad máxima)"
                 value={s.label} onChange={e => setStats(stats.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
               <button type="button" style={removeBtn} onClick={() => setStats(stats.filter((_, j) => j !== i))}><X size={12} /></button>
             </div>
           ))}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+
+          {/* Add button */}
+          {stats.length < MAX_STATS && (
             <button type="button" style={addBtn} onClick={() => setStats([...stats, { value: '', label: '' }])}>+ Añadir dato</button>
-            {stats.length === 0 && (
-              <button type="button" style={{ ...addBtn, color: 'var(--primary)' }} onClick={() => setStats(PRESETS.slice(0, 4))}>Usar presets</button>
-            )}
-          </div>
-          {stats.length > 0 && (
-            <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 2 }}>
-              Presets rápidos:{' '}
-              {PRESETS.filter(p => !stats.some(s => s.label === p.label)).slice(0, 4).map((p, i) => (
-                <button key={i} type="button" onClick={() => setStats([...stats, p])}
-                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 4, fontSize: 10, padding: '2px 6px', cursor: 'pointer', marginRight: 4, color: 'var(--charcoal)' }}>
-                  {p.value} · {p.label}
-                </button>
-              ))}
+          )}
+
+          {/* Presets */}
+          {availablePresets.length > 0 && stats.length < MAX_STATS && (
+            <div style={{ marginTop: 2 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 6 }}>
+                {stats.length === 0 ? 'Empieza con alguno de estos' : 'Añadir rápido'}
+              </div>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {availablePresets.map((p, i) => (
+                  <button key={i} type="button" onClick={() => setStats([...stats, { value: p.value, label: p.label }])}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fff', border: '1px solid var(--border)', borderRadius: 20, fontSize: 11, padding: '4px 10px', cursor: 'pointer', color: 'var(--charcoal)', transition: 'all .15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.background = 'var(--gold-light, #fdf6e3)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = '#fff' }}>
+                    <span>{p.icon}</span> <span style={{ fontWeight: 600 }}>{p.value}</span> <span style={{ color: 'var(--warm-gray)' }}>{p.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
-          <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.55 }}>
-            Estos datos aparecen como estadísticas en la propuesta. Máximo 4-5 elementos recomendados.
+
+          {/* Hint */}
+          <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.5, marginTop: 2, display: 'flex', alignItems: 'flex-start', gap: 5 }}>
+            <span style={{ fontSize: 12, flexShrink: 0, marginTop: -1 }}>💡</span>
+            <span>Aparecen como estadísticas destacadas en la propuesta. Recomendamos entre 3 y 5 datos. Escoge los que mejor definan tu venue.</span>
           </div>
         </div>
       )
@@ -434,6 +481,9 @@ export default function TemplateEditor({
 
     if (secId === 'experience') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <input className="form-input" placeholder="Etiqueta (ej. Nuestra historia, La experiencia…)" style={{ fontSize: 12 }}
+          value={(sections as any).experience_override?.eyebrow ?? ''}
+          onChange={e => { setSections(s => ({ ...s, experience_override: { ...((s as any).experience_override ?? {}), eyebrow: e.target.value } } as any)); markDirty() }} />
         <input className="form-input" placeholder="Título (ej. Una finca del siglo XVII…)" style={{ fontSize: 12 }}
           value={(sections as any).experience_override?.title ?? ''}
           onChange={e => { setSections(s => ({ ...s, experience_override: { ...((s as any).experience_override ?? {}), title: e.target.value } } as any)); markDirty() }} />
@@ -702,17 +752,19 @@ export default function TemplateEditor({
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="ceremony">Ceremonia</SelectItem>
-                                <SelectItem value="cocktail">Coctel</SelectItem>
+                                <SelectItem value="cocktail">Cóctel</SelectItem>
                                 <SelectItem value="banquet">Banquete</SelectItem>
-                                <SelectItem value="party">Fiesta</SelectItem>
+                                <SelectItem value="party">Fiesta / Baile</SelectItem>
+                                <SelectItem value="standing">De pie</SelectItem>
+                                <SelectItem value="seated">Sentados</SelectItem>
+                                <SelectItem value="theater">Teatro</SelectItem>
+                                <SelectItem value="classroom">Aula</SelectItem>
                                 <SelectItem value="other">Otro</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                           <input className="form-input" type="number" placeholder="pax" style={{ width: 72, fontSize: 12 }} value={c.count ?? ''}
                             onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, count: e.target.value ? Number(e.target.value) : undefined } : x))} />
-                          <input className="form-input" placeholder="Etiqueta (opc.)" style={{ flex: 1, fontSize: 12 }} value={c.label ?? ''}
-                            onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, label: e.target.value } : x))} />
                           <button type="button" style={{ ...removeBtn, width: 22, height: 22 }} onClick={() => updateCaps(caps.filter((_: any, j: number) => j !== ci))}><X size={11} /></button>
                         </div>
                       ))}
@@ -735,28 +787,44 @@ export default function TemplateEditor({
                         </Select>
                       </div>
                     </div>
-                    {/* Features — free text chips */}
-                    <div style={{ background: 'var(--cream)', borderRadius: 6, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>Características</div>
-                      {feats.length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                          {feats.map((f: string, fi: number) => (
-                            <span key={fi} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#fdf6ea', border: '1px solid var(--gold, #C4975A)', color: '#8a6020' }}>
-                              {f}
-                              <button type="button" onClick={() => updateItem(overrideKey, i, 'features', feats.filter((_: string, j: number) => j !== fi))}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, lineHeight: 1, fontSize: 12 }}>×</button>
-                            </span>
-                          ))}
+                    {/* Features — chips with presets */}
+                    {(() => {
+                      const FEAT_PRESETS = ['Aire acondicionado', 'Calefacción', 'Equipo de sonido', 'Iluminación regulable', 'Zona de baile', 'WiFi', 'Mobiliario incluido', 'Barra de bar', 'Proyector', 'Acceso catering', 'Vestuarios', 'Parking privado', 'Acceso PMR', 'Cocina industrial']
+                      const availPresets = FEAT_PRESETS.filter(p => !feats.includes(p))
+                      return (
+                        <div style={{ background: 'var(--cream)', borderRadius: 6, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>Características</div>
+                          {feats.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {feats.map((f: string, fi: number) => (
+                                <span key={fi} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#fdf6ea', border: '1px solid var(--gold, #C4975A)', color: '#8a6020' }}>
+                                  {f}
+                                  <button type="button" onClick={() => updateItem(overrideKey, i, 'features', feats.filter((_: string, j: number) => j !== fi))}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, lineHeight: 1, fontSize: 12 }}>×</button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {availPresets.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                              {availPresets.map(p => (
+                                <button key={p} type="button" onClick={() => updateItem(overrideKey, i, 'features', [...feats, p])}
+                                  style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer' }}>
+                                  + {p}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <input className="form-input" style={{ fontSize: 11 }} placeholder="Añadir otra característica (Enter)" onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ',') {
+                              e.preventDefault()
+                              const val = (e.target as HTMLInputElement).value.trim().replace(/,$/, '')
+                              if (val) { updateItem(overrideKey, i, 'features', [...feats, val]);(e.target as HTMLInputElement).value = '' }
+                            }
+                          }} />
                         </div>
-                      )}
-                      <input className="form-input" style={{ fontSize: 11 }} placeholder="Añadir característica (Enter)" onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ',') {
-                          e.preventDefault()
-                          const val = (e.target as HTMLInputElement).value.trim().replace(/,$/, '')
-                          if (val) { updateItem(overrideKey, i, 'features', [...feats, val]);(e.target as HTMLInputElement).value = '' }
-                        }
-                      }} />
-                    </div>
+                      )
+                    })()}
                     <input className="form-input" style={{ fontSize: 12 }} placeholder="Notas adicionales (ej. *Opción haima +coste)" value={z.notes ?? ''} onChange={e => updateItem(overrideKey, i, 'notes', e.target.value)} />
                   </div>
                 </details>
@@ -1897,6 +1965,7 @@ export default function TemplateEditor({
                                 </div>
                               )
                             })()}
+                            {renderEyebrowInput(secId)}
                             {renderSectionContent(secId)}
                           </div>
                         )}

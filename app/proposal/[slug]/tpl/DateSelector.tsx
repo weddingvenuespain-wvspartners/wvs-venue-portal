@@ -10,6 +10,7 @@ type Props = {
   font?: string
   proposalId?: string
   onSelect?: (slotIndex: number | null) => void
+  guestCount?: number
 }
 
 /* ── helpers ────────────────────────────────────── */
@@ -37,8 +38,9 @@ function hexToRgb(hex: string) {
 
 /* ── component ──────────────────────────────────── */
 
-export default function DateSelector({ slots, primary, onPrimary, dark = false, font, proposalId: _pid, onSelect }: Props) {
+export default function DateSelector({ slots, primary, onPrimary, dark = false, font, proposalId: _pid, onSelect, guestCount }: Props) {
   const [selected, setSelected] = useState<number | null>(null)
+  const [showAll, setShowAll] = useState(false)
 
   const textColor  = dark ? '#fff' : '#1a1a1a'
   const subColor   = dark ? 'rgba(255,255,255,.5)' : '#888'
@@ -89,6 +91,14 @@ export default function DateSelector({ slots, primary, onPrimary, dark = false, 
               {samePrice ? 'Indicadnos cuándo os gustaría celebrar vuestra boda' : 'Seleccionad la opción que mejor se adapte'}
             </p>
           )}
+          {guestCount && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 16, padding: '5px 14px', borderRadius: 999, background: `rgba(${r},${g},${b},.06)`, border: `1px solid rgba(${r},${g},${b},.12)` }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              <span style={{ fontSize: '.72rem', fontWeight: 600, color: primary }}>{guestCount} invitados</span>
+            </div>
+          )}
         </div>
 
         {/* ── Interactive: horizontal cards with radio ── */}
@@ -97,7 +107,7 @@ export default function DateSelector({ slots, primary, onPrimary, dark = false, 
             display: 'flex', flexDirection: 'column', gap: 10,
             maxWidth: 540, margin: '0 auto',
           }}>
-            {slots.map((slot, i) => {
+            {(showAll ? slots : slots.slice(0, 2)).map((slot, i) => {
               const isSel = selected === i
               return (
                 <button
@@ -151,6 +161,19 @@ export default function DateSelector({ slots, primary, onPrimary, dark = false, 
                 </button>
               )
             })}
+            {!showAll && slots.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: '.78rem', fontWeight: 600, color: primary,
+                  padding: '8px 0', textAlign: 'center',
+                }}
+              >
+                Ver {slots.length - 2} fecha{slots.length - 2 > 1 ? 's' : ''} más
+              </button>
+            )}
           </div>
         ) : (
           /* ── Non-interactive: single slot display ── */

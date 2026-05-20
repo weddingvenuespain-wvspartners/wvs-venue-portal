@@ -201,46 +201,13 @@ export default function TemplatesPage() {
                         e.currentTarget.style.borderColor = 'var(--gold)'
                         e.currentTarget.style.boxShadow = '0 8px 22px rgba(0,0,0,.1)'
                         e.currentTarget.style.transform = 'translateY(-2px)'
-                        const ov = e.currentTarget.querySelector<HTMLElement>('.sample-card-hover')
-                        if (ov) ov.style.opacity = '1'
                       }}
                       onMouseLeave={e => {
                         e.currentTarget.style.borderColor = 'var(--ivory)'
                         e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,.06)'
                         e.currentTarget.style.transform = 'translateY(0)'
-                        const ov = e.currentTarget.querySelector<HTMLElement>('.sample-card-hover')
-                        if (ov) ov.style.opacity = '0'
                       }}
                     >
-                      {/* Real iframe preview using the sample id route */}
-                      <div style={{ position: 'relative', height: 200, background: '#f9f6f2', borderBottom: '1px solid var(--ivory)', overflow: 'hidden' }}>
-                        <iframe
-                          src={`/proposals/templates/${sample.id}/preview`}
-                          loading="lazy"
-                          title={`Preview ${sample.name}`}
-                          style={{
-                            position: 'absolute', top: 0, left: 0,
-                            width: '400%', height: '400%',
-                            transform: 'scale(0.25)',
-                            transformOrigin: 'top left',
-                            border: 0,
-                            pointerEvents: 'none',
-                          }}
-                        />
-                        <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, fontWeight: 700, background: 'rgba(255,255,255,.85)', color: 'var(--charcoal)', padding: '2px 6px', borderRadius: 10, letterSpacing: '.04em' }}>ESTILO</span>
-                        <div className="sample-card-hover" style={{
-                          position: 'absolute', inset: 0,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                          background: 'rgba(45, 36, 28, 0.65)',
-                          color: '#fff',
-                          opacity: 0,
-                          transition: 'opacity .15s',
-                          pointerEvents: 'none',
-                          fontSize: 12, fontWeight: 600, letterSpacing: '.02em',
-                        }}>
-                          <Pencil size={14} /> Usar como base
-                        </div>
-                      </div>
                       <div style={{ padding: '10px 12px 12px' }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {sample.name}
@@ -291,50 +258,13 @@ export default function TemplatesPage() {
                   e.currentTarget.style.borderColor = 'var(--gold)'
                   e.currentTarget.style.boxShadow = '0 8px 22px rgba(0,0,0,.1)'
                   e.currentTarget.style.transform = 'translateY(-2px)'
-                  const ov = e.currentTarget.querySelector<HTMLElement>('.tpl-card-hover')
-                  if (ov) ov.style.opacity = '1'
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.borderColor = 'var(--ivory)'
                   e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,.06)'
                   e.currentTarget.style.transform = 'translateY(0)'
-                  const ov = e.currentTarget.querySelector<HTMLElement>('.tpl-card-hover')
-                  if (ov) ov.style.opacity = '0'
                 }}
               >
-                {/* Preview thumbnail */}
-                <div style={{ position: 'relative', height: 200, background: '#f9f6f2', borderBottom: '1px solid var(--ivory)', overflow: 'hidden' }}>
-                  <iframe
-                    src={`/proposals/templates/${tpl.id}/preview`}
-                    loading="lazy"
-                    title={`Preview ${tpl.name}`}
-                    style={{
-                      position: 'absolute', top: 0, left: 0,
-                      width: '400%', height: '400%',
-                      transform: 'scale(0.25)',
-                      transformOrigin: 'top left',
-                      border: 0,
-                      pointerEvents: 'none',
-                    }}
-                  />
-                  {/* Hover overlay with edit hint */}
-                  <div className="tpl-card-hover" style={{
-                    position: 'absolute', inset: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(45, 36, 28, 0.55)',
-                    color: '#fff',
-                    opacity: 0,
-                    transition: 'opacity .15s',
-                    pointerEvents: 'none',
-                    fontSize: 12, fontWeight: 600, letterSpacing: '.02em',
-                    gap: 6,
-                  }}>
-                    <Pencil size={14} /> Editar plantilla
-                  </div>
-                  {tpl.is_default && (
-                    <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, fontWeight: 700, background: 'var(--gold)', color: '#fff', padding: '2px 6px', borderRadius: 10, letterSpacing: '.04em' }}>POR DEFECTO</span>
-                  )}
-                </div>
 
                 {/* Footer with name + actions */}
                 <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -383,8 +313,13 @@ export default function TemplatesPage() {
                       </>
                     )}
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--warm-gray)', opacity: .7 }}>
-                    Actualizada {new Date(tpl.updated_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', opacity: .7, flex: 1 }}>
+                      Actualizada {new Date(tpl.updated_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                    {tpl.is_default && (
+                      <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--gold)', color: '#fff', padding: '2px 6px', borderRadius: 10, letterSpacing: '.04em', flexShrink: 0 }}>POR DEFECTO</span>
+                    )}
                   </div>
                 </div>
               </div>

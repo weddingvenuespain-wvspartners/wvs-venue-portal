@@ -628,7 +628,13 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                       {/* Event details — from active/latest lead */}
                       {lead && (
                         <>
-                          <SectionLabel>Detalles del evento</SectionLabel>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <SectionLabel>Detalles del evento</SectionLabel>
+                            <button onClick={() => router.push(`/leads?open=${lead.id}`)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--gold)', padding: 0, fontFamily: 'Inter, sans-serif' }}>
+                              <Edit2 size={11} /> Editar en Leads
+                            </button>
+                          </div>
                           {isBudget && <InfoRow icon={<CalendarCheck size={14} />} label="Fechas confirmadas" value={budgetDatesLabel(lead)} />}
                           {isActive && <InfoRow icon={<Calendar size={14} />} label="Fechas propuestas" value={weddingLabel(lead)} />}
                           {lead.wedding_duration_days && lead.wedding_duration_days > 1 && (
@@ -638,25 +644,27 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                             <InfoRow icon={<FileText size={14} />} label="Fecha solicitada originalmente" value={originalDatesLabel(lead)} />
                           )}
                           {isNewPhase && <InfoRow icon={<Calendar size={14} />} label="Fecha deseada" value={weddingLabel(lead)} />}
-                          {(lead.guests || lead.guests_adults) && (
-                            <InfoRow icon={<Users size={14} />} label="Invitados" value={
-                              lead.guests_adults
-                                ? `${(lead.guests_adults || 0) + (lead.guests_children || 0)} total · ${lead.guests_adults} adultos${lead.guests_children ? `, ${lead.guests_children} niños` : ''}`
-                                : `${lead.guests}`
-                            } />
-                          )}
-                          {lead.budget && lead.budget !== 'sin_definir' && (
-                            <InfoRow icon={<Banknote size={14} />} label="Presupuesto orientativo" value={BUDGET_LABEL[lead.budget] || lead.budget} />
-                          )}
-                          {lead.ceremony_type && lead.ceremony_type !== 'sin_definir' && (
-                            <InfoRow icon={<Heart size={14} />} label="Ceremonia" value={{ civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica', mixta: 'Mixta' }[lead.ceremony_type] || lead.ceremony_type} />
-                          )}
-                          {lead.catering_needed && lead.catering_needed !== 'sin_definir' && (
-                            <InfoRow icon={<UtensilsCrossed size={14} />} label="Catering" value={{ incluido: 'Incluido en el venue', externo: 'Traen catering externo', por_definir: 'Por definir' }[lead.catering_needed] || lead.catering_needed} />
-                          )}
-                          {lead.country  && <InfoRow icon={<MapPin  size={14} />} label="País"           value={lead.country} />}
-                          {lead.language && <InfoRow icon={<Globe   size={14} />} label="Idioma"          value={lead.language} />}
-                          {lead.style    && <InfoRow icon={<Palette size={14} />} label="Estilo buscado"  value={lead.style} />}
+                          <InfoRow icon={<Users size={14} />} label="Invitados" value={
+                            lead.guests_adults || lead.guests_children
+                              ? `${(lead.guests_adults || 0) + (lead.guests_children || 0)} total · ${lead.guests_adults || 0} adultos · ${lead.guests_children || 0} niños`
+                              : lead.guests ? `${lead.guests}` : '—'
+                          } />
+                          <InfoRow icon={<Heart size={14} />} label="Ceremonia" value={
+                            lead.ceremony_type && lead.ceremony_type !== 'sin_definir'
+                              ? ({ civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica', mixta: 'Mixta' }[lead.ceremony_type] || lead.ceremony_type)
+                              : '—'
+                          } />
+                          <InfoRow icon={<UtensilsCrossed size={14} />} label="Catering" value={
+                            lead.catering_needed && lead.catering_needed !== 'sin_definir'
+                              ? ({ incluido: 'Incluido en el venue', externo: 'Traen catering externo', por_definir: 'Por definir' }[lead.catering_needed] || lead.catering_needed)
+                              : '—'
+                          } />
+                          <InfoRow icon={<Banknote size={14} />} label="Presupuesto orientativo" value={
+                            lead.budget && lead.budget !== 'sin_definir' ? (BUDGET_LABEL[lead.budget] || lead.budget) : '—'
+                          } />
+                          <InfoRow icon={<Globe   size={14} />} label="Idioma" value={lead.language || '—'} />
+                          <InfoRow icon={<MapPin  size={14} />} label="País"   value={lead.country  || '—'} />
+                          {lead.style && <InfoRow icon={<Palette size={14} />} label="Estilo buscado" value={lead.style} />}
                           {lead.tags && lead.tags.length > 0 && (
                             <div style={{ padding: '9px 0', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                               <div style={{ color: 'var(--warm-gray)', flexShrink: 0, marginTop: 1 }}><Tag size={14} /></div>

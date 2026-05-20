@@ -9,7 +9,7 @@ import {
   extractData, formatDate, formatPrice, isDark, toRgb,
   FadeUp, FadeIn, useReveal,
   FloatingWhatsApp, AvailabilityBanner, Gallery,
-  IcoCalendar, IcoUsers, IcoBuilding, IcoChat,
+  IcoCalendar, IcoUsers, IcoBuilding, IcoChat, IcoPin,
   formatZoneCapacities, formatZoneFeatures, formatZonePrice, ivaLabel,
   InclusionIcon, StarRating, resolveContact, VenueRentalGrid,
   TplVenueSpecs, TplSingleSpace,
@@ -137,9 +137,12 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, sec: string, se
   .t4-inner { max-width: 1180px; margin: 0 auto; padding: 0 48px }
   .t4-section-head { text-align: center; margin-bottom: 48px }
   .t4-section-label {
-    display: block; text-align: center;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
     font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-    color: ${sec}; margin-bottom: 12px;
+    color: ${pri}; margin-bottom: 14px;
+  }
+  .t4-section-label::before, .t4-section-label::after {
+    content: ''; width: 20px; height: 1.5px; background: ${pri}; opacity: .4;
   }
   .t4-section-title {
     font-family: ${font}; font-weight: 400;
@@ -680,23 +683,20 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             return (
               <div className="t4-hero-content">
                 <FadeIn>
-                  <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '.72rem', fontWeight: 600, letterSpacing: '.14em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>
-                    Propuesta exclusiva para
-                  </p>
-                  <h1 className="t4-hero-couple" style={{ color: heroTitleColor }}>{data.couple_name}</h1>
-                </FadeIn>
-                <FadeIn delay={0.3}>
-                  <div className="t4-hero-meta">
-                    {data.wedding_date && (
-                      <span className="t4-hero-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: heroSubColor, borderColor: `${heroSubColor}33`, background: `${heroSubColor}26` }}><IcoCalendar width={12} height={12} /> {formatDate(data.wedding_date)}</span>
-                    )}
-                    {data.guest_count && (
-                      <span className="t4-hero-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: heroSubColor, borderColor: `${heroSubColor}33`, background: `${heroSubColor}26` }}><IcoUsers width={12} height={12} /> {data.guest_count} invitados</span>
-                    )}
-                    {data.show_price_estimate && data.price_estimate && (
-                      <span className="t4-hero-pill pri-pill">Desde {formatPrice(data.price_estimate)}{ivaLabel(sec, true) ? ` · ${ivaLabel(sec, true)}` : ''}</span>
-                    )}
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', borderRadius: 999, background: 'rgba(0,0,0,.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+                      <span style={{ fontFamily: "'Inter',sans-serif", fontSize: '.68rem', fontWeight: 600, letterSpacing: '.14em', textTransform: 'uppercase', color: '#fff' }}>
+                        Propuesta exclusiva
+                      </span>
+                      {data.venue?.name && (
+                        <>
+                          <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,.3)' }} />
+                          <span style={{ fontFamily: "'Inter',sans-serif", fontSize: '.68rem', fontWeight: 500, color: 'rgba(255,255,255,.85)' }}>{data.venue.name}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
+                  <h1 className="t4-hero-couple" style={{ color: heroTitleColor }}>{data.couple_name}</h1>
                 </FadeIn>
               </div>
             )
@@ -709,12 +709,12 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
 
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
-        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />
+        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} guestCount={guests} weddingDate={data.wedding_date} />
       )}
 
       {/* ── DATE SELECTOR ── */}
       {on('date_slots') && dateSlots && dateSlots.length > 0 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
-        <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
+        <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />
       )}
 
       {/* TESTIMONIALS — first content section */}
@@ -722,7 +722,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         <section className="t4-section t4-tests-bg">
           <div className="t4-inner">
             <FadeUp>
-              <span className="t4-section-label">Lo que dicen las parejas</span>
+              <span className="t4-section-label">{(sec as any).testimonials_eyebrow || 'Testimonios'}</span>
               <h2 className="t4-section-title">Historias reales de amor</h2>
               <div className="t4-divider" />
             </FadeUp>
@@ -740,7 +740,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         <section className="t4-gallery-bg">
           <div className="t4-gallery-header">
             <FadeUp>
-              <span className="t4-section-label">Bodas en este espacio</span>
+              <span className="t4-section-label">{(sec as any).gallery_eyebrow || 'Galería'}</span>
               <h2 className="t4-section-title" style={{ color: '#fff' }}>Momentos que nos han confiado</h2>
               <div className="t4-divider" />
             </FadeUp>
@@ -802,7 +802,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           <div className="t4-exp-grid">
             <FadeUp>
               <div className="t4-exp-text">
-                <span className="t4-section-label">La experiencia</span>
+                <span className="t4-section-label">{(expShow as any).eyebrow || 'La experiencia'}</span>
                 <h2 className="t4-section-title">{expShow.title}</h2>
                 <div className="t4-divider" />
                 <p className="t4-exp-body">{expShow.body}</p>
@@ -822,7 +822,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         <section className="t4-section t4-inclusions-bg">
           <div className="t4-inner">
             <FadeUp>
-              <span className="t4-section-label">Qué está incluido</span>
+              <span className="t4-section-label">{(sec as any).inclusions_eyebrow || 'Qué incluye'}</span>
               <h2 className="t4-section-title">Todo lo que necesitáis</h2>
               <div className="t4-divider" />
             </FadeUp>
@@ -848,7 +848,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         <section className="t4-section">
           <div className="t4-inner">
             <FadeUp>
-              <span className="t4-section-label">Paquetes y precios</span>
+              <span className="t4-section-label">{(sec as any).pricing_eyebrow || 'Paquetes'}</span>
               <h2 className="t4-section-title">Adaptado a vuestra boda</h2>
               <div className="t4-divider" />
             </FadeUp>
@@ -907,7 +907,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           bg={WARM}
           fg={INK}
           font={font}
-          label="Vuestro espacio"
+          label="El espacio"
         />
       )}
 
@@ -916,7 +916,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         <section className="t4-section" style={{ background: WARM }}>
           <div className="t4-inner">
             <FadeUp>
-              <span className="t4-section-label">{(sec as any).zones_header?.label || 'Los espacios'}</span>
+              <span className="t4-section-label">{(sec as any).zones_header?.label || 'Espacios'}</span>
               <h2 className="t4-section-title">{(sec as any).zones_header?.title || 'Cada rincón, una historia'}</h2>
               <div className="t4-divider" />
             </FadeUp>
@@ -985,7 +985,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             pricingBlock={(() => {
               const blocks: React.ReactNode[] = []
               if (on('date_slots') && dateSlots && dateSlots.length > 0) {
-                blocks.push(<DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />)
+                blocks.push(<DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />)
               }
               if (on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0) {
                 blocks.push(
@@ -1024,7 +1024,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         <section className="t4-section" style={{ background: SAND }}>
           <div className="t4-inner">
             <FadeUp>
-              <span className="t4-section-label">Tarifas por temporada</span>
+              <span className="t4-section-label">{(sec as any).season_prices_eyebrow || 'Temporadas'}</span>
               <h2 className="t4-section-title">Precios según la fecha</h2>
               <div className="t4-divider" />
             </FadeUp>
@@ -1065,7 +1065,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         <section className="t4-section" style={{ background: CREAM }}>
           <div className="t4-inner">
             <FadeUp>
-              <span className="t4-section-label">Alojamiento</span>
+              <span className="t4-section-label">{(sec as any).accommodation_eyebrow || 'Alojamiento'}</span>
               <h2 className="t4-section-title">Quedaos a dormir</h2>
               <div className="t4-divider" />
             </FadeUp>
@@ -1130,7 +1130,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         <section className="t4-section" style={{ background: WARM }}>
           <div className="t4-inner">
             <FadeUp>
-              <span className="t4-section-label">Personaliza</span>
+              <span className="t4-section-label">{(sec as any).extra_services_eyebrow || 'Servicios adicionales'}</span>
               <h2 className="t4-section-title">Servicios adicionales</h2>
               <div className="t4-divider" />
             </FadeUp>
@@ -1164,7 +1164,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         <section className="t4-section" style={{ background: CREAM }}>
           <div className="t4-inner">
             <FadeUp>
-              <span className="t4-section-label">Proveedores de confianza</span>
+              <span className="t4-section-label">{(sec as any).collaborators_eyebrow || 'Proveedores de confianza'}</span>
               <h2 className="t4-section-title">Nuestros colaboradores</h2>
               <div className="t4-divider" />
             </FadeUp>
@@ -1198,7 +1198,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
         <section className="t4-section t4-faq-bg">
           <div className="t4-inner">
             <FadeUp>
-              <span className="t4-section-label">Preguntas frecuentes</span>
+              <span className="t4-section-label">{(sec as any).faq_eyebrow || 'Preguntas frecuentes'}</span>
               <h2 className="t4-section-title">Resolvemos vuestras dudas</h2>
               <div className="t4-divider" />
             </FadeUp>
@@ -1234,7 +1234,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
                         <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                       </svg>
                     </div>
-                    <span className="t4-section-label">Visita</span>
+                    <span className="t4-section-label">{(sec as any).schedule_visit_eyebrow || 'Agendar visita'}</span>
                     <h2 className="t4-section-title" style={{ marginBottom: 16 }}>{svTitle}</h2>
                     <p style={{ fontSize: '.95rem', color: MUTED, lineHeight: 1.7, marginBottom: 36 }}>{svSub}</p>
                     {visitDone ? (
@@ -1270,7 +1270,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
             <div className="t4-inner">
               <FadeUp>
                 <div style={{ maxWidth: 720, marginLeft: 'auto', marginRight: 'auto', marginBottom: 28, textAlign: 'center' }}>
-                  <span className="t4-section-label">Visita</span>
+                  <span className="t4-section-label">{(sec as any).schedule_visit_eyebrow || 'Agendar visita'}</span>
                   <h2 className="t4-section-title" style={{ marginBottom: 16 }}>{svTitle}</h2>
                   <p style={{ fontSize: '.95rem', color: MUTED, lineHeight: 1.7 }}>{svSub}</p>
                 </div>
@@ -1310,7 +1310,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
           <section className="t4-section" style={{ background: SAND }}>
             <div className="t4-inner">
               <FadeUp>
-                <span className="t4-section-label">Ubicación</span>
+                <span className="t4-section-label">{(sec as any).map_eyebrow || 'Ubicación'}</span>
                 <h2 className="t4-section-title">Cómo llegar</h2>
                 <div className="t4-divider" />
                 {address && <p style={{ textAlign: 'center', fontSize: 14, color: MUTED, marginTop: 18 }}>{address}</p>}

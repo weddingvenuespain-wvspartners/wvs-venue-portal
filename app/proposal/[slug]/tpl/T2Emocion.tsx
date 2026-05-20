@@ -89,6 +89,8 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
     /* Typography */
     .serif{font-family:Satoshi,Georgia,serif}
     .sans{font-family:Inter,system-ui,sans-serif}
+    .t2-eyebrow{display:flex;align-items:center;justify-content:center;gap:12px;font-family:Inter,sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${primary};margin-bottom:18px}
+    .t2-eyebrow::before,.t2-eyebrow::after{content:'';width:20px;height:1px;background:rgba(${rgb},.25)}
     /* Hero animations */
     @keyframes hf{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
     .hc1{animation:hf 1s .3s both}.hc2{animation:hf 1s .6s both}.hc3{animation:hf 1s .9s both}
@@ -178,37 +180,35 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           const subLabel = `rgba(${sr},${sg},${sb},.6)`
           return (
             <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', padding: '0 24px' }}>
-              <div className="hc1 sans" style={{ fontSize: 10, letterSpacing: '.3em', textTransform: 'uppercase', color: subLabel, marginBottom: 20 }}>
-                Una propuesta especial para
+              <div className="hc1" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', borderRadius: 999, background: 'rgba(0,0,0,.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', marginBottom: 22 }}>
+                <span style={{ fontFamily: "'Inter',sans-serif", fontSize: '.68rem', fontWeight: 600, letterSpacing: '.14em', textTransform: 'uppercase', color: '#fff' }}>
+                  Propuesta exclusiva
+                </span>
+                {venue?.name && (
+                  <>
+                    <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,.3)' }} />
+                    <span style={{ fontFamily: "'Inter',sans-serif", fontSize: '.68rem', fontWeight: 500, color: 'rgba(255,255,255,.85)' }}>{venue.name}</span>
+                  </>
+                )}
               </div>
-              <h1 className="hc2 serif" style={{ fontSize: 'clamp(52px,9vw,96px)', fontWeight: 300, color: heroTitleColor, lineHeight: 1.0, letterSpacing: '-.01em', marginBottom: 28, fontStyle: 'italic', textShadow: '0 2px 24px rgba(0,0,0,.5)' }}>
+              <h1 className="hc2 serif" style={{ fontSize: 'clamp(52px,9vw,96px)', fontWeight: 300, color: heroTitleColor, lineHeight: 1.0, letterSpacing: '-.01em', marginBottom: 24, fontStyle: 'italic', textShadow: '0 2px 24px rgba(0,0,0,.5)' }}>
                 {couple_name}
               </h1>
-              <div className="hc3" style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 20 }}>
-                {wDate && <span className="sans" style={{ fontSize: 13, color: subFull, fontStyle: 'normal' }}>{wDate}</span>}
-                {guest_count && <span className="sans" style={{ fontSize: 13, color: subFull }}>· {guest_count} invitados</span>}
-                {venue?.name && <span className="sans" style={{ fontSize: 13, color: subFull }}>· {venue.name}{venue.city?`, ${venue.city}`:''}</span>}
-              </div>
             </div>
           )
         })()}
 
-        {/* Scroll indicator */}
-        <div style={{ position: 'absolute', bottom: 36, left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 1, height: 56, background: 'rgba(255,255,255,.3)' }} />
-          <span className="sans" style={{ fontSize: 9, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)' }}>Desliza</span>
-        </div>
       </section>
 
 
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
-        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} />
+        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} guestCount={guests} weddingDate={wedding_date} />
       )}
 
       {/* ── DATE SELECTOR ── */}
       {on('date_slots') && dateSlots && dateSlots.length > 0 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
-        <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
+        <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />
       )}
 
       {/* ══════════════════════════════════════════
@@ -287,7 +287,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 52 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 20 }}>La experiencia</div>
+                <div className="t2-eyebrow">{(expShow as any).eyebrow || 'La experiencia'}</div>
                 <h2 className="serif" style={{ fontSize: 'clamp(32px,5vw,56px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic', lineHeight: 1.1 }}>
                   {(expShow as any).title || 'Vuestro día especial'}
                 </h2>
@@ -326,7 +326,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           bg="#fff"
           fg="#2c2418"
           font={font}
-          label="Vuestro espacio"
+          label="El espacio"
         />
       )}
 
@@ -338,7 +338,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           <div className="w-full">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 56 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>{(sec as any).zones_header?.label || 'Los espacios'}</div>
+                <div className="t2-eyebrow">{(sec as any).zones_header?.label || 'Espacios'}</div>
                 <h2 className="serif" style={{ fontSize: 'clamp(30px,4vw,46px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>{(sec as any).zones_header?.title || 'Cada rincón del venue'}</h2>
               </div>
             </FadeUp>
@@ -405,12 +405,12 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             pricingBlock={(() => {
               const blocks: React.ReactNode[] = []
               if (on('date_slots') && dateSlots && dateSlots.length > 0) {
-                blocks.push(<DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />)
+                blocks.push(<DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />)
               }
               if (on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0) {
                 blocks.push(
                   <div key="vr">
-                    <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.5)`, marginBottom: 14 }}>{sec.venue_rental.title || 'Elegid vuestra fecha'}</div>
+                    <div className="t2-eyebrow">{sec.venue_rental.title || 'Elegid vuestra fecha'}</div>
                     <VenueRentalGrid data={sec.venue_rental} primary={primary} />
                   </div>
                 )
@@ -429,7 +429,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>{sec.venue_rental.title || 'Tarifas de alquiler'}</div>
+                <div className="t2-eyebrow">{sec.venue_rental.title || 'Tarifas de alquiler'}</div>
                 <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Elegid vuestra fecha</h2>
               </div>
             </FadeUp>
@@ -448,7 +448,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Temporadas</div>
+                <div className="t2-eyebrow">{(sec as any).season_prices_eyebrow || 'Temporadas'}</div>
                 <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Precios según la fecha</h2>
               </div>
             </FadeUp>
@@ -478,7 +478,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 64 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Lo que dicen las parejas</div>
+                <div className="t2-eyebrow">{(sec as any).testimonials_eyebrow || 'Testimonios'}</div>
                 <h2 className="serif" style={{ fontSize: 'clamp(30px,4.5vw,48px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>
                   Bodas en {venue?.name ?? 'nuestro espacio'}
                 </h2>
@@ -516,7 +516,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 56 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Qué incluye</div>
+                <div className="t2-eyebrow">{(sec as any).inclusions_eyebrow || 'Qué incluye'}</div>
                 <h2 className="serif" style={{ fontSize: 'clamp(30px,4vw,46px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Todo para vuestra boda perfecta</h2>
               </div>
             </FadeUp>
@@ -546,7 +546,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 56 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Paquetes</div>
+                <div className="t2-eyebrow">{(sec as any).pricing_eyebrow || 'Paquetes'}</div>
                 <h2 className="serif" style={{ fontSize: 'clamp(30px,4vw,48px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Nuestra propuesta para vosotros</h2>
               </div>
             </FadeUp>
@@ -608,7 +608,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Alojamiento</div>
+                <div className="t2-eyebrow">{(sec as any).accommodation_eyebrow || 'Alojamiento'}</div>
                 <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Quedaos a dormir</h2>
               </div>
             </FadeUp>
@@ -674,8 +674,8 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Servicios adicionales</div>
-                <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Personaliza tu celebración</h2>
+                <div className="t2-eyebrow">{(sec as any).extra_services_eyebrow || 'Servicios adicionales'}</div>
+                <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Servicios adicionales</h2>
               </div>
             </FadeUp>
             {extrasShow.map((svc: any, i: number) => {
@@ -709,7 +709,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           <div className="w-full">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Proveedores de confianza</div>
+                <div className="t2-eyebrow">{(sec as any).collaborators_eyebrow || 'Proveedores de confianza'}</div>
                 <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Nuestros colaboradores</h2>
               </div>
             </FadeUp>
@@ -746,7 +746,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Dudas frecuentes</div>
+                <div className="t2-eyebrow">{(sec as any).faq_eyebrow || 'Preguntas frecuentes'}</div>
                 <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Preguntas y respuestas</h2>
               </div>
             </FadeUp>
@@ -867,7 +867,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             <div className="w">
               <FadeUp>
                 <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                  <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: `rgba(${rgb},.6)`, marginBottom: 16 }}>Ubicación</div>
+                  <div className="t2-eyebrow">{(sec as any).map_eyebrow || 'Ubicación'}</div>
                   <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Cómo llegar</h2>
                   {address && <p className="sans" style={{ fontSize: 13, color: '#8a7060', marginTop: 14 }}>{address}</p>}
                 </div>

@@ -29,16 +29,20 @@ function newSpace(): VenueSpaceItem {
   return { name: '', description: '', price: '', price_label: '' }
 }
 
-function TagsInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) => void }) {
+const TAG_PRESETS = ['Exterior', 'Interior', 'Climatizado', 'Vistas al mar', 'Jardín', 'Terraza', 'Piscina', 'Techado', 'Iluminación ambiental', 'Zona de baile', 'Acceso directo', 'Parking']
+
+function TagsInput({ tags, onChange, label, placeholder, presets }: { tags: string[]; onChange: (t: string[]) => void; label?: string; placeholder?: string; presets?: string[] }) {
   const [input, setInput] = useState('')
-  const add = () => {
-    const t = input.trim()
-    if (!t || tags.includes(t)) { setInput(''); return }
-    onChange([...tags, t]); setInput('')
+  const add = (val?: string) => {
+    const t = (val ?? input).trim()
+    if (!t || tags.includes(t)) { if (!val) setInput(''); return }
+    onChange([...tags, t]); if (!val) setInput('')
   }
+  const chips = presets ?? TAG_PRESETS
+  const available = chips.filter(p => !tags.includes(p))
   return (
     <div>
-      <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Pills de info</div>
+      <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>{label ?? 'Etiquetas'}</div>
       {tags.length > 0 && (
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 5 }}>
           {tags.map((tag, ti) => (
@@ -50,11 +54,23 @@ function TagsInput({ tags, onChange }: { tags: string[]; onChange: (t: string[])
           ))}
         </div>
       )}
+      {available.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 5 }}>
+          {available.map(p => (
+            <button key={p} type="button" onClick={() => add(p)}
+              style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', transition: 'all .15s' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.color = 'var(--charcoal)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--warm-gray)' }}>
+              + {p}
+            </button>
+          ))}
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 5 }}>
-        <input className="form-input" placeholder="Ej: Exterior, Climatizado…" style={{ fontSize: 11, flex: 1 }}
+        <input className="form-input" placeholder={placeholder ?? 'Escribe y pulsa Enter…'} style={{ fontSize: 11, flex: 1 }}
           value={input} onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }} />
-        <button type="button" onClick={add}
+        <button type="button" onClick={() => add()}
           style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--cream)', cursor: 'pointer', color: 'var(--charcoal)', fontWeight: 600, flexShrink: 0 }}>
           + Añadir
         </button>
@@ -140,21 +156,75 @@ export default function SpaceGroupEditor({ groups, onChange, uploadImage, isTemp
                         El precio se añadirá automáticamente desde tus tarifas al crear una propuesta
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <input className="form-input" placeholder="Precio  (ej. +500€)" style={{ fontSize: 12, flex: 1 }}
-                          value={s.price ?? ''} onChange={e => updateSpace(gi, si, { price: e.target.value })} />
-                        <input className="form-input" placeholder="Etiqueta  (ej. hasta 80 pax)" style={{ fontSize: 12, flex: 1 }}
-                          value={s.price_label ?? ''} onChange={e => updateSpace(gi, si, { price_label: e.target.value })} />
-                        <input className="form-input" type="number" placeholder="Máx. pax" style={{ fontSize: 12, width: 90, flexShrink: 0 }}
-                          value={s.capacity_max ?? ''} onChange={e => updateSpace(gi, si, { capacity_max: e.target.value ? Number(e.target.value) : undefined })} />
-                      </div>
+                      <input className="form-input" placeholder="Precio  (ej. +500€)" style={{ fontSize: 12 }}
+                        value={s.price ?? ''} onChange={e => updateSpace(gi, si, { price: e.target.value })} />
                     )}
+
+                    {/* Capacity */}
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Capacidad</div>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                        <input className="form-input" type="number" placeholder="Mín." style={{ fontSize: 12, width: 80 }}
+                          value={s.capacity_min ?? ''} onChange={e => updateSpace(gi, si, { capacity_min: e.target.value ? Number(e.target.value) : undefined })} />
+                        <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>—</span>
+                        <input className="form-input" type="number" placeholder="Máx." style={{ fontSize: 12, width: 80 }}
+                          value={s.capacity_max ?? ''} onChange={e => updateSpace(gi, si, { capacity_max: e.target.value ? Number(e.target.value) : undefined })} />
+                        <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>pax</span>
+                      </div>
+                    </div>
 
                     {/* Tags */}
                     <TagsInput
                       tags={s.tags ?? []}
                       onChange={tags => updateSpace(gi, si, { tags })}
                     />
+
+                    {/* Features — checklist-style amenities */}
+                    <TagsInput
+                      label="Características (se muestran con ✓)"
+                      tags={(s as any).features ?? []}
+                      onChange={(features: string[]) => updateSpace(gi, si, { features } as any)}
+                      presets={['Aire acondicionado', 'Equipo de sonido', 'Iluminación regulable', 'Zona de baile', 'Acceso catering', 'WiFi', 'Mobiliario incluido', 'Barra de bar', 'Proyector / pantalla', 'Vestuarios']}
+                    />
+
+                    {/* Highlights — key stats */}
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginBottom: 4 }}>Datos destacados (emoji + etiqueta + valor)</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {((s as any).highlights ?? []).map((h: { icon?: string; label: string; value: string }, hi: number) => (
+                          <div key={hi} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <input className="form-input" placeholder="🏛️" style={{ fontSize: 12, width: 40, textAlign: 'center', flexShrink: 0 }}
+                              value={h.icon ?? ''} onChange={e => {
+                                const arr = [...((s as any).highlights ?? [])]
+                                arr[hi] = { ...arr[hi], icon: e.target.value }
+                                updateSpace(gi, si, { highlights: arr } as any)
+                              }} />
+                            <input className="form-input" placeholder="Etiqueta" style={{ fontSize: 12, flex: 1 }}
+                              value={h.label} onChange={e => {
+                                const arr = [...((s as any).highlights ?? [])]
+                                arr[hi] = { ...arr[hi], label: e.target.value }
+                                updateSpace(gi, si, { highlights: arr } as any)
+                              }} />
+                            <input className="form-input" placeholder="Valor" style={{ fontSize: 12, flex: 1 }}
+                              value={h.value} onChange={e => {
+                                const arr = [...((s as any).highlights ?? [])]
+                                arr[hi] = { ...arr[hi], value: e.target.value }
+                                updateSpace(gi, si, { highlights: arr } as any)
+                              }} />
+                            <button type="button" style={removeBtn} onClick={() => {
+                              const arr = ((s as any).highlights ?? []).filter((_: any, j: number) => j !== hi)
+                              updateSpace(gi, si, { highlights: arr } as any)
+                            }}><X size={11} /></button>
+                          </div>
+                        ))}
+                        {((s as any).highlights ?? []).length < 6 && (
+                          <button type="button" style={{ ...addBtn, padding: '4px 8px', fontSize: 10 }} onClick={() => {
+                            const arr = [...((s as any).highlights ?? []), { icon: '', label: '', value: '' }]
+                            updateSpace(gi, si, { highlights: arr } as any)
+                          }}>+ Añadir dato</button>
+                        )}
+                      </div>
+                    </div>
 
                     {/* Recommended toggle — proposal level only */}
                     {!isTemplate && (

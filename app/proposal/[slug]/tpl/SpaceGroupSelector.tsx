@@ -206,168 +206,315 @@ const sliderCard: React.CSSProperties = isMobile ? { minWidth: 240, maxWidth: 24
 
     const handleSelect = () => { toggleSpace(gi, si, mode, max); closeModal() }
 
+    // Gallery: combine photos array (from editor), gallery_urls, and photo_url — deduplicated
+    const rawPhotos = [...(Array.isArray((space as any).photos) ? (space as any).photos : []), ...(space.gallery_urls ?? []), space.photo_url].filter(Boolean) as string[]
+    const allPhotos = [...new Set(rawPhotos)]
+    const hasGallery = allPhotos.length > 1
+    const features = space.features ?? []
+    const highlights = space.highlights ?? []
+
+    // Gallery state
+    const [galleryIdx, setGalleryIdx] = useState(0)
+    const galRef = useRef<HTMLDivElement>(null)
+
+    const capText = space.capacity_min && space.capacity_max
+      ? `${space.capacity_min}–${space.capacity_max}`
+      : space.capacity_max ? `Hasta ${space.capacity_max}` : space.capacity_min ? `Desde ${space.capacity_min}` : null
+
+    const hasMeta = !!(capText || price || tierTable)
+
     return (
       <div
-        style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '20px' }}
+        style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '24px' }}
         onMouseDown={e => { if (e.target === e.currentTarget) closeModal() }}
       >
         {/* Backdrop */}
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)' }} onClick={closeModal} />
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }} onClick={closeModal} />
 
-        {/* Modal panel — bottom sheet on mobile, centered on desktop */}
+        {/* Modal panel */}
         <div style={{
           position: 'relative', background: modalBg,
-          borderRadius: isMobile ? '20px 20px 0 0' : 20,
-          width: '100%', maxWidth: 560, maxHeight: '92vh',
-          overflow: 'auto', boxShadow: '0 -8px 48px rgba(0,0,0,.3)',
+          borderRadius: isMobile ? '24px 24px 0 0' : 24,
+          width: '100%', maxWidth: 680, maxHeight: isMobile ? '95vh' : '92vh',
+          overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,.4)',
           display: 'flex', flexDirection: 'column',
           margin: '0 auto',
         }}>
-          {/* Drag handle */}
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 0' }}>
-            <div style={{ width: 36, height: 4, borderRadius: 2, background: dark ? 'rgba(255,255,255,.15)' : 'rgba(0,0,0,.12)' }} />
-          </div>
+          {/* Scrollable content */}
+          <div style={{ overflow: 'auto', flex: 1 }}>
 
-          {/* Photo / gradient placeholder */}
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            {space.photo_url
-              ? <img src={space.photo_url} alt={space.name} style={{ width: '100%', height: 240, objectFit: 'cover', display: 'block' }} />
-              : (
+            {/* ── Hero image section ── */}
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              {allPhotos.length > 0 ? (
+                <div style={{ position: 'relative', overflow: 'hidden' }}>
+                  {/* Gallery scroll container */}
+                  <div ref={galRef} style={{
+                    display: 'flex', overflowX: hasGallery ? 'auto' : 'hidden', scrollSnapType: 'x mandatory',
+                    scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+                  }}
+                    onScroll={() => {
+                      if (!galRef.current) return
+                      const idx = Math.round(galRef.current.scrollLeft / galRef.current.offsetWidth)
+                      setGalleryIdx(idx)
+                    }}
+                  >
+                    {allPhotos.map((url, i) => (
+                      <img key={i} src={url} alt={`${space.name} ${i + 1}`} style={{
+                        width: '100%', height: isMobile ? 280 : 360, objectFit: 'cover', display: 'block',
+                        flexShrink: 0, scrollSnapAlign: 'start',
+                      }} />
+                    ))}
+                  </div>
+
+                  {/* Gallery dots */}
+                  {hasGallery && (
+                    <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6, padding: '6px 12px', borderRadius: 999, background: 'rgba(0,0,0,.35)', backdropFilter: 'blur(8px)' }}>
+                      {allPhotos.map((_, i) => (
+                        <button key={i} type="button" onClick={() => galRef.current?.scrollTo({ left: galRef.current.offsetWidth * i, behavior: 'smooth' })}
+                          style={{ width: i === galleryIdx ? 18 : 7, height: 7, borderRadius: 4, border: 'none', padding: 0, background: i === galleryIdx ? '#fff' : 'rgba(255,255,255,.45)', cursor: 'pointer', transition: 'all .25s' }} />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Gallery counter */}
+                  {hasGallery && (
+                    <div style={{ position: 'absolute', top: 16, left: 16, padding: '4px 10px', borderRadius: 8, background: 'rgba(0,0,0,.4)', backdropFilter: 'blur(6px)', fontSize: '.68rem', fontWeight: 600, color: '#fff', letterSpacing: '.03em' }}>
+                      {galleryIdx + 1} / {allPhotos.length}
+                    </div>
+                  )}
+
+                  {/* Gradient overlay at bottom for text readability */}
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: 'linear-gradient(to top, rgba(0,0,0,.55), transparent)', pointerEvents: 'none' }} />
+
+                  {/* Name + badges on hero */}
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 28px 24px', zIndex: 2 }}>
+                    {space.recommended && (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 999, background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', marginBottom: 8 }}>
+                        <svg viewBox="0 0 10 10" width={10} height={10} fill="none"><path d="M5 1l1.2 2.5L9 4.1 7 6l.5 3L5 7.8 2.5 9 3 6 1 4.1l2.8-.6z" stroke="#fbbf24" strokeWidth="1.4" strokeLinejoin="round"/></svg>
+                        <span style={{ fontSize: '.68rem', fontWeight: 700, color: '#fbbf24', letterSpacing: '.05em' }}>Recomendado para vosotros</span>
+                      </div>
+                    )}
+                    <h2 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '1.8rem', fontWeight: 700, color: '#fff', fontFamily: font, lineHeight: 1.15, textShadow: '0 2px 12px rgba(0,0,0,.3)' }}>
+                      {space.name}
+                    </h2>
+                  </div>
+                </div>
+              ) : (
+                /* No photo placeholder */
                 <div style={{
-                  height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: `linear-gradient(135deg, ${primary}22 0%, ${primary}08 100%)`,
-                  borderBottom: `1px solid ${primary}18`,
+                  height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                  background: `linear-gradient(135deg, ${primary}25 0%, ${primary}08 100%)`,
                 }}>
-                  <span style={{ fontSize: '4rem', fontWeight: 200, color: primary, opacity: 0.25, fontFamily: font }}>
+                  <span style={{ fontSize: '5rem', fontWeight: 200, color: primary, opacity: 0.18, fontFamily: font }}>
                     {space.name.trim()[0]?.toUpperCase()}
                   </span>
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 28px 20px' }}>
+                    {space.recommended && (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 999, background: dark ? 'rgba(161,117,34,.18)' : '#fef3c7', border: '1px solid rgba(161,117,34,.4)', marginBottom: 8 }}>
+                        <svg viewBox="0 0 10 10" width={10} height={10} fill="none"><path d="M5 1l1.2 2.5L9 4.1 7 6l.5 3L5 7.8 2.5 9 3 6 1 4.1l2.8-.6z" stroke="#a17522" strokeWidth="1.4" strokeLinejoin="round"/></svg>
+                        <span style={{ fontSize: '.68rem', fontWeight: 700, color: '#a17522', letterSpacing: '.05em' }}>Recomendado para vosotros</span>
+                      </div>
+                    )}
+                    <h2 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '1.8rem', fontWeight: 700, color: textColor, fontFamily: font, lineHeight: 1.15 }}>
+                      {space.name}
+                    </h2>
+                  </div>
                 </div>
-              )
-            }
-            {/* Close button */}
-            <button
-              type="button" onClick={closeModal}
-              style={{
-                position: 'absolute', top: 12, right: 12,
-                width: 32, height: 32, borderRadius: '50%',
-                background: 'rgba(0,0,0,.4)', border: 'none', color: '#fff',
-                fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                backdropFilter: 'blur(4px)',
-              }}
-              aria-label="Cerrar"
-            >✕</button>
-          </div>
-
-          {/* Content */}
-          <div style={{ padding: '24px 28px 32px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-            {/* Group context */}
-            {groupName && (
-              <span style={{ fontSize: '.62rem', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: primary, opacity: 0.7 }}>
-                {groupName}
-              </span>
-            )}
-
-            {/* Recommended badge */}
-            {space.recommended && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 999, background: dark ? 'rgba(161,117,34,.18)' : '#fef3c7', border: '1px solid rgba(161,117,34,.4)', alignSelf: 'flex-start' }}>
-                <svg viewBox="0 0 10 10" width={10} height={10} fill="none"><path d="M5 1l1.2 2.5L9 4.1 7 6l.5 3L5 7.8 2.5 9 3 6 1 4.1l2.8-.6z" stroke="#a17522" strokeWidth="1.4" strokeLinejoin="round"/></svg>
-                <span style={{ fontSize: '.68rem', fontWeight: 700, color: '#a17522', letterSpacing: '.05em' }}>Recomendado para vosotros</span>
-              </div>
-            )}
-
-            {/* Name + price row */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-              <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: textColor, fontFamily: font, lineHeight: 1.2, flex: 1 }}>
-                {space.name}
-              </h3>
-              {price && (
-                <span style={{ fontSize: '1.1rem', fontWeight: 700, color: primary, flexShrink: 0 }}>{price}</span>
               )}
+
+              {/* Close button */}
+              <button
+                type="button" onClick={closeModal}
+                style={{
+                  position: 'absolute', top: 16, right: 16, zIndex: 5,
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: 'rgba(0,0,0,.35)', backdropFilter: 'blur(8px)', border: 'none', color: '#fff',
+                  fontSize: '1.05rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'background .2s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,.55)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,0,0,.35)')}
+                aria-label="Cerrar"
+              >✕</button>
             </div>
 
-            {/* Tier pricing table */}
-            {tierTable && (
-              <div style={{ borderRadius: 10, overflow: 'hidden', border: `1px solid ${dark ? 'rgba(255,255,255,.08)' : '#e8e0d4'}` }}>
-                {tierTable.map((t, ti) => (
-                  <div key={ti} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 14px', background: ti % 2 === 0 ? (dark ? 'rgba(255,255,255,.03)' : '#faf8f5') : 'transparent', borderTop: ti > 0 ? `1px solid ${dark ? 'rgba(255,255,255,.05)' : '#f0ebe3'}` : 'none' }}>
-                    <span style={{ fontSize: '.82rem', color: subColor }}>{t.label}</span>
-                    <span style={{ fontSize: '.9rem', fontWeight: 700, color: primary }}>{fmtEur(t.price)}</span>
+            {/* ── Quick stats bar ── */}
+            {hasMeta && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 0, padding: '0', flexWrap: 'wrap',
+                borderBottom: `1px solid ${dark ? 'rgba(255,255,255,.08)' : '#ede8e0'}`,
+                background: dark ? 'rgba(255,255,255,.03)' : '#faf8f5',
+              }}>
+                {capText && (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '16px 20px', borderRight: `1px solid ${dark ? 'rgba(255,255,255,.08)' : '#ede8e0'}` }}>
+                    <svg viewBox="0 0 16 16" width={15} height={15} fill="none" stroke={primary} strokeWidth="1.4">
+                      <circle cx="6" cy="5" r="2.5"/><path d="M1 13c0-2.8 2.2-5 5-5s5 2.2 5 5"/>
+                      <circle cx="12" cy="5" r="2" opacity=".5"/><path d="M14 13c0-2-1.3-3.7-3-4.4" opacity=".5"/>
+                    </svg>
+                    <div>
+                      <div style={{ fontSize: '.68rem', fontWeight: 600, color: subColor, letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 1 }}>Capacidad</div>
+                      <div style={{ fontSize: '.88rem', fontWeight: 700, color: !inRange ? '#b45309' : textColor }}>
+                        {capText} pax
+                        {!inRange && guestCount ? <span style={{ fontSize: '.72rem', fontWeight: 500, color: '#b45309' }}> · No ajusta</span> : ''}
+                      </div>
+                    </div>
                   </div>
-                ))}
+                )}
+                {price && (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '16px 20px' }}>
+                    <svg viewBox="0 0 16 16" width={15} height={15} fill="none" stroke={primary} strokeWidth="1.4">
+                      <circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v7M6 6c0-.8.9-1.5 2-1.5s2 .7 2 1.5-.9 1.5-2 1.5-2 .7-2 1.5.9 1.5 2 1.5 2-.7 2-1.5"/>
+                    </svg>
+                    <div>
+                      <div style={{ fontSize: '.68rem', fontWeight: 600, color: subColor, letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 1 }}>{space.price_label || 'Precio'}</div>
+                      <div style={{ fontSize: '.95rem', fontWeight: 700, color: primary }}>{price}</div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Capacity */}
-            {(space.capacity_min || space.capacity_max) && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, background: dark ? 'rgba(255,255,255,.05)' : '#f5f0ea', border: `1px solid ${dark ? 'rgba(255,255,255,.08)' : '#e8e0d4'}`, alignSelf: 'flex-start' }}>
-                <svg viewBox="0 0 16 16" width={13} height={13} fill="none" stroke={subColor} strokeWidth="1.5">
-                  <circle cx="6" cy="5" r="2.5"/><path d="M1 13c0-2.8 2.2-5 5-5s5 2.2 5 5"/>
-                  <circle cx="12" cy="5" r="2" opacity=".5"/><path d="M14 13c0-2-1.3-3.7-3-4.4" opacity=".5"/>
-                </svg>
-                <span style={{ fontSize: '.78rem', fontWeight: 600, color: !inRange ? '#b45309' : textColor }}>
-                  {space.capacity_min && space.capacity_max
-                    ? `${space.capacity_min}–${space.capacity_max} pax`
-                    : space.capacity_max ? `Hasta ${space.capacity_max} pax` : `Desde ${space.capacity_min} pax`}
-                  {!inRange && guestCount ? ` · No ajusta a ${guestCount} pax` : ''}
+            {/* ── Body content ── */}
+            <div style={{ padding: isMobile ? '24px 24px 120px' : '28px 32px 120px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+              {/* Group context line */}
+              {groupName && (
+                <span style={{ fontSize: '.62rem', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: primary, opacity: 0.65 }}>
+                  {groupName}
                 </span>
-              </div>
-            )}
+              )}
 
-            {/* Description */}
-            {space.description && (
-              <p style={{ margin: 0, fontSize: '.86rem', color: subColor, lineHeight: 1.65 }}>
-                {space.description}
-              </p>
-            )}
+              {/* Highlights grid */}
+              {highlights.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+                  {highlights.map((h, hi) => (
+                    <div key={hi} style={{ padding: '14px 16px', borderRadius: 14, background: dark ? 'rgba(255,255,255,.04)' : `${primary}08`, border: `1px solid ${dark ? 'rgba(255,255,255,.07)' : `${primary}15`}`, textAlign: 'center' }}>
+                      {h.icon && <div style={{ fontSize: '1.3rem', marginBottom: 4 }}>{h.icon}</div>}
+                      <div style={{ fontSize: '.68rem', fontWeight: 600, color: subColor, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 2 }}>{h.label}</div>
+                      <div style={{ fontSize: '.88rem', fontWeight: 700, color: textColor }}>{h.value}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-            {/* Tags */}
-            {space.tags && space.tags.length > 0 && (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {space.tags.map((tag, ti) => (
-                  <span key={ti} style={{ fontSize: '.72rem', fontWeight: 600, padding: '3px 10px', borderRadius: 999, background: dark ? 'rgba(255,255,255,.07)' : `${primary}0e`, border: `1px solid ${dark ? 'rgba(255,255,255,.1)' : `${primary}28`}`, color: dark ? 'rgba(255,255,255,.65)' : primary, letterSpacing: '.03em' }}>
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
+              {/* Description */}
+              {space.description && (
+                <div>
+                  <div style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: primary, marginBottom: 10, opacity: 0.7 }}>Sobre este espacio</div>
+                  <p style={{ margin: 0, fontSize: '.88rem', color: subColor, lineHeight: 1.75, whiteSpace: 'pre-line' }}>
+                    {space.description}
+                  </p>
+                </div>
+              )}
 
-            {/* Status badges */}
-            {(included || isSelected) && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {included && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '.68rem', fontWeight: 700, padding: '4px 12px', borderRadius: 999, background: dark ? 'rgba(46,125,50,.2)' : '#e8f5e9', color: '#2e7d32', border: '1px solid rgba(46,125,50,.3)' }}>
-                    <svg viewBox="0 0 10 8" width={9} height={9} fill="none"><path d="M1 4l3 3 5-6" stroke="#2e7d32" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    Incluida en vuestra celebración
-                  </span>
-                )}
-                {!included && isSelected && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '.68rem', fontWeight: 700, padding: '4px 12px', borderRadius: 999, background: `${primary}18`, color: primary, border: `1px solid ${primary}40` }}>
-                    <svg viewBox="0 0 10 8" width={9} height={9} fill="none"><path d="M1 4l3 3 5-6" stroke={primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    Elegida
-                  </span>
-                )}
-              </div>
-            )}
+              {/* Features */}
+              {features.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: primary, marginBottom: 12, opacity: 0.7 }}>Características</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px 20px' }}>
+                    {features.map((f, fi) => (
+                      <div key={fi} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,.05)' : '#f0ebe3'}` }}>
+                        <div style={{ width: 22, height: 22, borderRadius: '50%', background: dark ? `${primary}20` : `${primary}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <svg viewBox="0 0 10 8" width={9} height={9} fill="none"><path d="M1 4l3 3 5-6" stroke={primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </div>
+                        <span style={{ fontSize: '.82rem', color: textColor, fontWeight: 500 }}>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-            {/* CTA */}
-            {interactive && !included && (
-              <div style={{ marginTop: 4 }}>
+              {/* Tier pricing table */}
+              {tierTable && (
+                <div>
+                  <div style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: primary, marginBottom: 12, opacity: 0.7 }}>Tarifas</div>
+                  <div style={{ borderRadius: 14, overflow: 'hidden', border: `1px solid ${dark ? 'rgba(255,255,255,.08)' : '#e8e0d4'}` }}>
+                    {tierTable.map((t, ti) => (
+                      <div key={ti} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', background: ti % 2 === 0 ? (dark ? 'rgba(255,255,255,.03)' : '#faf8f5') : 'transparent', borderTop: ti > 0 ? `1px solid ${dark ? 'rgba(255,255,255,.05)' : '#f0ebe3'}` : 'none' }}>
+                        <span style={{ fontSize: '.84rem', color: subColor, fontWeight: 500 }}>{t.label}</span>
+                        <span style={{ fontSize: '.95rem', fontWeight: 700, color: primary }}>{fmtEur(t.price)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tags */}
+              {space.tags && space.tags.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {space.tags.map((tag, ti) => (
+                    <span key={ti} style={{ fontSize: '.74rem', fontWeight: 600, padding: '5px 14px', borderRadius: 999, background: dark ? 'rgba(255,255,255,.06)' : `${primary}0a`, border: `1px solid ${dark ? 'rgba(255,255,255,.1)' : `${primary}20`}`, color: dark ? 'rgba(255,255,255,.6)' : primary, letterSpacing: '.03em' }}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Status badges */}
+              {(included || isSelected) && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {included && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '.72rem', fontWeight: 700, padding: '6px 16px', borderRadius: 999, background: dark ? 'rgba(46,125,50,.2)' : '#e8f5e9', color: '#2e7d32', border: '1px solid rgba(46,125,50,.3)' }}>
+                      <svg viewBox="0 0 10 8" width={10} height={10} fill="none"><path d="M1 4l3 3 5-6" stroke="#2e7d32" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Incluida en vuestra celebración
+                    </span>
+                  )}
+                  {!included && isSelected && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '.72rem', fontWeight: 700, padding: '6px 16px', borderRadius: 999, background: `${primary}18`, color: primary, border: `1px solid ${primary}40` }}>
+                      <svg viewBox="0 0 10 8" width={10} height={10} fill="none"><path d="M1 4l3 3 5-6" stroke={primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Seleccionada
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Sticky CTA bar ── */}
+          {interactive && !included && (
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              padding: '16px 28px', paddingBottom: isMobile ? 'max(16px, env(safe-area-inset-bottom))' : '16px',
+              background: `linear-gradient(to top, ${modalBg} 70%, transparent)`,
+              backdropFilter: 'blur(8px)',
+              display: 'flex', alignItems: 'center', gap: 12, zIndex: 3,
+            }}>
+              {price && (
+                <div style={{ flex: 'none' }}>
+                  <div style={{ fontSize: '.62rem', fontWeight: 600, color: subColor, textTransform: 'uppercase', letterSpacing: '.04em' }}>{space.price_label || 'Precio'}</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: primary }}>{price}</div>
+                </div>
+              )}
+              <div style={{ flex: 1 }}>
                 {isSelected ? (
                   <button type="button" onClick={handleSelect}
-                    style={{ width: '100%', padding: '14px', borderRadius: 14, border: `1.5px solid ${cardBorder}`, background: 'transparent', color: subColor, fontSize: '.85rem', fontWeight: 600, cursor: 'pointer' }}>
+                    style={{ width: '100%', padding: '15px', borderRadius: 14, border: `1.5px solid ${cardBorder}`, background: 'transparent', color: subColor, fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', transition: 'all .2s' }}>
                     Quitar selección
                   </button>
                 ) : (
                   <button type="button" onClick={handleSelect}
-                    style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: primary, color: onPrimary, fontSize: '.88rem', fontWeight: 700, cursor: 'pointer', letterSpacing: '.05em' }}>
+                    style={{ width: '100%', padding: '15px', borderRadius: 14, border: 'none', background: primary, color: onPrimary, fontSize: '.88rem', fontWeight: 700, cursor: 'pointer', letterSpacing: '.04em', boxShadow: `0 4px 16px ${primary}40`, transition: 'all .2s' }}>
                     {atMax ? 'Seleccionar (reemplaza actual)' : 'Seleccionar esta zona'}
                   </button>
                 )}
               </div>
-            )}
+            </div>
+          )}
 
-          </div>
+          {/* Non-interactive included footer */}
+          {!interactive && included && (
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              padding: '16px 28px', paddingBottom: isMobile ? 'max(16px, env(safe-area-inset-bottom))' : '16px',
+              background: `linear-gradient(to top, ${modalBg} 70%, transparent)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 14, background: dark ? 'rgba(46,125,50,.15)' : '#e8f5e9', border: '1px solid rgba(46,125,50,.25)' }}>
+                <svg viewBox="0 0 10 8" width={12} height={12} fill="none"><path d="M1 4l3 3 5-6" stroke="#2e7d32" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <span style={{ fontSize: '.82rem', fontWeight: 700, color: '#2e7d32' }}>Este espacio está incluido en vuestra celebración</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -589,10 +736,10 @@ const sliderCard: React.CSSProperties = isMobile ? { minWidth: 240, maxWidth: 24
               const modeBadge = isNone
                 ? { label: 'Todas incluidas', color: '#2e7d32', bg: dark ? 'rgba(46,125,50,.18)' : '#e8f5e9', border: 'rgba(46,125,50,.3)' }
                 : isITP
-                  ? { label: `Incluidas + elige ${group.pick_n_min ?? 1}`, color: '#6d4c41', bg: dark ? 'rgba(109,76,65,.2)' : '#fdf3e7', border: 'rgba(109,76,65,.3)' }
+                  ? { label: 'Personaliza tu espacio', color: '#6d4c41', bg: dark ? 'rgba(109,76,65,.2)' : '#fdf3e7', border: 'rgba(109,76,65,.3)' }
                   : mode === 'pick_one'
-                    ? { label: 'Elige 1', color: dark ? '#90caf9' : '#1565c0', bg: dark ? 'rgba(144,202,249,.12)' : '#e3f2fd', border: 'rgba(21,101,192,.25)' }
-                    : { label: `Elige ${group.pick_n_min ?? 1}${group.pick_n_max && group.pick_n_max !== group.pick_n_min ? `–${group.pick_n_max}` : ''}`, color: dark ? '#90caf9' : '#1565c0', bg: dark ? 'rgba(144,202,249,.12)' : '#e3f2fd', border: 'rgba(21,101,192,.25)' }
+                    ? { label: 'Elige tu espacio', color: dark ? '#90caf9' : '#1565c0', bg: dark ? 'rgba(144,202,249,.12)' : '#e3f2fd', border: 'rgba(21,101,192,.25)' }
+                    : { label: `Elige ${group.pick_n_min ?? 1}${group.pick_n_max && group.pick_n_max !== group.pick_n_min ? `–${group.pick_n_max}` : ''} ${(group.pick_n_min ?? 1) === 1 ? 'espacio' : 'espacios'}`, color: dark ? '#90caf9' : '#1565c0', bg: dark ? 'rgba(144,202,249,.12)' : '#e3f2fd', border: 'rgba(21,101,192,.25)' }
 
               return (
                 <div key={gi} style={{ borderRadius: 18, overflow: 'hidden', border: `1px solid ${divider}`, background: dark ? 'rgba(255,255,255,.02)' : '#fff', boxShadow: '0 2px 16px rgba(0,0,0,.04)' }}>
@@ -699,7 +846,7 @@ const sliderCard: React.CSSProperties = isMobile ? { minWidth: 240, maxWidth: 24
                                     <svg viewBox="0 0 10 8" width={9} height={9} fill="none"><path d="M1 4l3 3 5-6" stroke="#2e7d32" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                   </div>
                                   <span style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: '#2e7d32' }}>
-                                    Siempre incluidas
+                                    Incluidas en vuestra celebración
                                   </span>
                                 </div>
                                 <CardSlider minW={200}>

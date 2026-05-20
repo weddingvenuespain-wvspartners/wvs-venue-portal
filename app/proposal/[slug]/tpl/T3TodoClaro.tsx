@@ -15,7 +15,7 @@ import DateSelector from './DateSelector'
 
 const SECTIONS_ALL = [
   { id: 'experience',    label: 'La experiencia' },
-  { id: 'zones',         label: 'Los espacios' },
+  { id: 'zones',         label: 'Espacios' },
   { id: 'inclusions',    label: 'Qué incluye' },
   { id: 'packages',      label: 'Precios' },
   { id: 'venue_rental',  label: 'Tarifas de alquiler' },
@@ -168,7 +168,8 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
     .side-box-val-price{font-family:${font};font-size:28px;font-weight:300;color:${primary};line-height:1}
     .side-box-val-n{font-family:Inter,sans-serif;font-size:17px;font-weight:600;color:#1a1614}
     /* Section number */
-    .sec-n{font-family:Inter,sans-serif;font-size:10px;font-weight:700;letter-spacing:.2em;color:#C8C3BE;margin-bottom:8px}
+    .sec-n{font-family:Inter,sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${primary};margin-bottom:10px;display:flex;align-items:center;gap:8px}
+    .sec-n::before{content:'';width:16px;height:1.5px;background:${primary};opacity:.45}
     .sec-h{font-family:Satoshi,serif;font-size:clamp(28px,3.5vw,42px);font-weight:400;color:#181410;margin-bottom:36px;line-height:1.1}
     /* Inputs */
     .inp{width:100%;padding:12px 14px;border:1.5px solid #E2DDD8;border-radius:8px;
@@ -222,12 +223,6 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           <div style={{ position: 'absolute', inset: 0, background: primary }} />
         )}
 
-        {/* Top bar — price estimate only */}
-        {show_price_estimate && price_estimate && (
-          <div style={{ position: 'absolute', top: 0, right: 0, zIndex: 10, padding: '24px 48px' }}>
-            <span style={{ fontFamily: font, fontSize: 20, fontWeight: 300, color: '#fff' }}>{formatPrice(price_estimate)}</span>
-          </div>
-        )}
 
         {(() => {
           const heroTitleColor = (sec as any).hero_title_color ?? '#ffffff'
@@ -237,13 +232,16 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           const subLabel = `rgba(${sr},${sg},${sb},.6)`
           return (
             <div style={{ position: 'relative', zIndex: 10, padding: '0 48px 44px', maxWidth: 900 }}>
-              <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: subLabel, marginBottom: 12 }}>Propuesta exclusiva</div>
-              <h1 style={{ fontFamily: font, fontSize: 'clamp(38px,6vw,72px)', fontWeight: 300, color: heroTitleColor, lineHeight: 1.05, letterSpacing: '-.01em', marginBottom: 16 }}>{couple_name}</h1>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, fontFamily: 'Inter,sans-serif', fontSize: 13, color: subFull }}>
-                {venue?.name && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IcoPin width={12} height={12} /> {venue.name}{venue.city?`, ${venue.city}`:''}</span>}
-                {wDate && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IcoCalendar width={12} height={12} /> {wDate}</span>}
-                {guest_count && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IcoUsers width={12} height={12} /> {guest_count} invitados</span>}
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', borderRadius: 999, background: 'rgba(0,0,0,.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', marginBottom: 16 }}>
+                <span style={{ fontFamily: 'Inter,sans-serif', fontSize: '.68rem', fontWeight: 600, letterSpacing: '.14em', textTransform: 'uppercase', color: '#fff' }}>Propuesta exclusiva</span>
+                {venue?.name && (
+                  <>
+                    <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,.3)' }} />
+                    <span style={{ fontFamily: 'Inter,sans-serif', fontSize: '.68rem', fontWeight: 500, color: 'rgba(255,255,255,.85)' }}>{venue.name}</span>
+                  </>
+                )}
               </div>
+              <h1 style={{ fontFamily: font, fontSize: 'clamp(38px,6vw,72px)', fontWeight: 300, color: heroTitleColor, lineHeight: 1.05, letterSpacing: '-.01em', marginBottom: 16 }}>{couple_name}</h1>
             </div>
           )
         })()}
@@ -252,12 +250,12 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
 
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
-        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} />
+        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} guestCount={guests} weddingDate={wedding_date} />
       )}
 
       {/* ── DATE SELECTOR ── */}
       {on('date_slots') && dateSlots && dateSlots.length > 0 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
-        <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
+        <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />
       )}
 
       {/* ══════════════════════════════════════════
@@ -283,13 +281,6 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
 
           {/* Key info box */}
           <div className="side-box">
-            {show_price_estimate && price_estimate && (
-              <div style={{ marginBottom: 14 }}>
-                <div className="side-box-lbl">Estimación</div>
-                <div className="side-box-val-price">{formatPrice(price_estimate)}</div>
-                {ivaLabel(sec, true) && <div style={{ fontSize: 10, color: '#9a9590', marginTop: 3, letterSpacing: '.05em' }}>{ivaLabel(sec, true)}</div>}
-              </div>
-            )}
             {guest_count && (
               <div>
                 <div className="side-box-lbl">Invitados</div>
@@ -322,7 +313,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           {on('experience') && expShow && (expShow as any).body && (
             <div className="sec" ref={el => { sectionRefs.current['experience'] = el }} id="exp-section">
               <FadeUp>
-                <div className="sec-n">{secLbl('experience', 'La experiencia')}</div>
+                <div className="sec-n">{secLbl('experience', (expShow as any).eyebrow || 'La experiencia')}</div>
                 <h2 className="sec-h">{(expShow as any).title || 'Vuestro día especial'}</h2>
                 <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 15, color: '#64605C', lineHeight: 1.9, maxWidth: 560 }}>{(expShow as any).body}</p>
               </FadeUp>
@@ -408,7 +399,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 bg="#fff"
                 fg="#1a1614"
                 font={font}
-                label="Vuestro espacio"
+                label="El espacio"
               />
             </div>
           )}
@@ -417,7 +408,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           {on('zones') && (zonesShow.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['zones'] = el }}>
               <FadeUp>
-                <div className="sec-n">{(sec as any).zones_header?.label || secLbl('zones', 'Los espacios')}</div>
+                <div className="sec-n">{(sec as any).zones_header?.label || secLbl('zones', 'Espacios')}</div>
                 <h2 className="sec-h">{(sec as any).zones_header?.title || 'Cada rincón, un escenario'}</h2>
               </FadeUp>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
@@ -482,7 +473,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
                 pricingBlock={(() => {
                   const blocks: React.ReactNode[] = []
                   if (on('date_slots') && dateSlots && dateSlots.length > 0) {
-                    blocks.push(<DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />)
+                    blocks.push(<DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />)
                   }
                   if (on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0) {
                     blocks.push(
@@ -502,7 +493,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           {on('inclusions') && (inclusionsShow.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['inclusions'] = el }}>
               <FadeUp>
-                <div className="sec-n">{secLbl('inclusions', 'Qué incluye')}</div>
+                <div className="sec-n">{secLbl('inclusions', (sec as any).inclusions_eyebrow || 'Qué incluye')}</div>
                 <h2 className="sec-h">Todo incluido</h2>
               </FadeUp>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 0 }} className="two-col">
@@ -676,7 +667,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
             <div className="sec" ref={el => { sectionRefs.current['extras'] = el }}>
               <FadeUp>
                 <div className="sec-n">{secLbl('extras', 'Servicios adicionales')}</div>
-                <h2 className="sec-h">Personaliza tu celebración</h2>
+                <h2 className="sec-h">Servicios adicionales</h2>
               </FadeUp>
               {extrasShow.map((svc:any, i:number) => {
                 const isSel = !!selectedExtraSvcs[svc.name]
@@ -764,7 +755,7 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
           {on('faq') && (faqShow.length > 0 ? (
             <div className="sec" ref={el => { sectionRefs.current['faq'] = el }}>
               <FadeUp>
-                <div className="sec-n">{secLbl('faq', 'Dudas frecuentes')}</div>
+                <div className="sec-n">{secLbl('faq', (sec as any).faq_eyebrow || 'Preguntas frecuentes')}</div>
                 <h2 className="sec-h">Preguntas y respuestas</h2>
               </FadeUp>
               <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #EDEAE6', overflow: 'hidden' }}>

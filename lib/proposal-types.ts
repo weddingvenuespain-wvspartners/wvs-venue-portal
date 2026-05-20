@@ -122,12 +122,15 @@ export type VenueSpaceItem = {
   name: string
   description?: string
   photo_url?: string
+  gallery_urls?: string[]  // additional photos for zone dossier modal
   capacity_min?: number
   capacity_max?: number
   price?: string
   price_label?: string
   price_tiers?: PriceTier[]
   tags?: string[]        // small info pills shown on the card (e.g. "Exterior", "Climatizado")
+  features?: string[]    // amenities/features list (e.g. "Aire acondicionado", "Vistas al mar")
+  highlights?: { icon?: string; label: string; value: string }[]  // key stats (e.g. "Superficie: 200m²")
   recommended?: boolean  // "Recomendado" badge — set per-proposal by the venue
 }
 

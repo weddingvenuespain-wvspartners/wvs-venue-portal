@@ -41,7 +41,7 @@ export function getSectionLabel(secId: string, spaceType: SpaceType, fallback: s
     case 'single_space':
       return 'Tu espacio'
     case 'zones':
-      if (spaceType === 'single_with_supplements') return 'Zonas opcionales con suplemento'
+      if (spaceType === 'single_with_supplements') return 'Espacios y zonas'
       return 'Los espacios'
     case 'space_groups':
       return 'Los espacios'

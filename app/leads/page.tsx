@@ -12,6 +12,7 @@ import { expandLeadDates, expandBudgetDates, pad } from '@/lib/lead-dates'
 import { LeadDatesSection } from '@/components/LeadDatesSection'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { renderPayload } from '@/components/InquiriesPanel'
+import { CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS, type ClientType } from '@/lib/clients'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -20,7 +21,7 @@ import {
   ExternalLink, Edit2, Trash2, Clock, Filter, FileText, Download,
   AlertTriangle, PartyPopper, Snowflake, Sparkles, Eye, Landmark, XCircle,
   Sprout, Sun, Leaf, Zap, LockKeyhole, OctagonAlert, Flower2, Info,
-  List, LayoutGrid, Receipt, ChevronDown, ChevronUp, Paperclip, Upload, CheckCircle2, CalendarDays, Package, Inbox, SlidersHorizontal,
+  List, LayoutGrid, Receipt, ChevronDown, ChevronUp, Paperclip, Upload, CheckCircle2, CalendarDays, Package, Inbox, SlidersHorizontal, Link2, Unlink,
 } from 'lucide-react'
 
 // ── Types & config ─────────────────────────────────────────────────────────────
@@ -331,6 +332,8 @@ const emptyForm = {
   language: 'es', style: '',
   country: '', guests_adults: '', guests_children: '',
   catering_needed: 'sin_definir', tags: [] as string[],
+  // linked client (optional — WP, empresa, etc.)
+  client_id: '' as string,
   // budget attachment (set when passing to presupuesto)
   budget_file_url: '', budget_file_name: '',
   budget_files: [] as { url: string; name: string }[],
@@ -1072,6 +1075,7 @@ function LeadsPageInner() {
       budget_date: lead.budget_date || '',
       budget_date_to: lead.budget_date_to || '',
       budget_date_ranges: lead.budget_date_ranges || [],
+      client_id: lead.client_id || '',
     })
     setEditLead(lead); setDetailLead(null); setShowForm(true)
   }
@@ -1119,6 +1123,7 @@ function LeadsPageInner() {
       budget_date_to:          form.budget_date_flexibility === 'range' ? (form.budget_date_to || null) : null,
       budget_date_flexibility: form.budget_date_flexibility || null,
       budget_date_ranges:      form.budget_date_flexibility === 'multi_range' ? form.budget_date_ranges.filter((r: any) => r.from) : null,
+      client_id:               form.client_id || null,
     }
 
     // Auto-populate original_* when creating or editing a 'new' lead without original dates
@@ -1152,6 +1157,10 @@ function LeadsPageInner() {
         const { budget_files: _bf, ...d5 } = data
         ;({ data: res, error } = await table.update(d5).eq('id', match.id).select().single())
       }
+      if (error?.message?.includes('client_id')) {
+        const { client_id: _cid, ...d6 } = data
+        ;({ data: res, error } = await table.update(d6).eq('id', match.id).select().single())
+      }
       return { data: res, error }
     }
     const safeInsert = async (table: any, data: any) => {
@@ -1171,6 +1180,10 @@ function LeadsPageInner() {
       if (error?.message?.includes('budget_files')) {
         const { budget_files: _bf, ...d5 } = data
         ;({ data: res, error } = await table.insert(d5).select().single())
+      }
+      if (error?.message?.includes('client_id')) {
+        const { client_id: _cid, ...d6 } = data
+        ;({ data: res, error } = await table.insert(d6).select().single())
       }
       return { data: res, error }
     }
@@ -5832,6 +5845,154 @@ function LanguagePicker({ value, onChange }: { value: string; onChange: (v: stri
   )
 }
 
+// ── Client Link Selector ──────────────────────────────────────────────────────
+function ClientLinkSelector({ venueId, clientId, onChange }: { venueId: string; clientId: string; onChange: (id: string) => void }) {
+  const [clients, setClients] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded]   = useState(false)
+  const [query, setQuery]     = useState('')
+  const [open, setOpen]       = useState(false)
+  const wrapRef               = useRef<HTMLDivElement>(null)
+
+  // Load clients on first open
+  const loadClients = async () => {
+    if (loaded) return
+    setLoading(true)
+    const supabase = createClient()
+    const { data } = await supabase.from('clients').select('id,name,email,phone,client_type')
+      .eq('venue_id', venueId).order('name')
+    setClients(data || [])
+    setLoaded(true)
+    setLoading(false)
+  }
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const selected = clients.find(c => c.id === clientId)
+  const filtered = clients.filter(c => {
+    if (!query) return true
+    const q = query.toLowerCase()
+    return c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.phone?.includes(q)
+  })
+
+  // If we have a clientId but haven't loaded yet, load to resolve the name
+  useEffect(() => {
+    if (clientId && !loaded) loadClients()
+  }, [clientId])
+
+  if (clientId && selected) {
+    const colors = CLIENT_TYPE_COLORS[selected.client_type as ClientType] || CLIENT_TYPE_COLORS.otro
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: colors.bg, border: `1px solid ${colors.border}` }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: colors.color }}>{selected.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>
+            {CLIENT_TYPE_LABELS[selected.client_type as ClientType] || 'Cliente'}
+            {selected.email ? ` · ${selected.email}` : ''}
+          </div>
+        </div>
+        <button type="button" onClick={() => onChange('')}
+          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#b91c1c' }}>
+          <Unlink size={11} /> Desvincular
+        </button>
+      </div>
+    )
+  }
+
+  if (clientId && !selected && loaded) {
+    // client_id set but not found (maybe deleted)
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fca5a5' }}>
+        <span style={{ fontSize: 12, color: '#b91c1c', flex: 1 }}>Cliente vinculado no encontrado</span>
+        <button type="button" onClick={() => onChange('')}
+          style={{ padding: '3px 8px', borderRadius: 6, background: '#fff', border: '1px solid #fca5a5', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#b91c1c' }}>
+          Limpiar
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <div
+        onClick={() => { setOpen(true); loadClients() }}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '9px 12px', borderRadius: 10,
+          background: '#fafaf8', border: '1px solid var(--ivory)',
+          cursor: 'pointer', fontSize: 13, color: 'var(--warm-gray)',
+        }}
+      >
+        <Link2 size={13} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+        <span style={{ flex: 1 }}>Buscar cliente del CRM…</span>
+        <ChevronDown size={13} style={{ color: 'var(--warm-gray)' }} />
+      </div>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+          marginTop: 4, borderRadius: 10, background: '#fff',
+          border: '1px solid var(--ivory)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          maxHeight: 260, display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--ivory)' }}>
+            <input
+              autoFocus
+              className="form-input"
+              style={{ fontSize: 12, padding: '6px 10px' }}
+              placeholder="Buscar por nombre, email o teléfono…"
+              value={query} onChange={e => setQuery(e.target.value)}
+            />
+          </div>
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {loading && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--warm-gray)' }}>Cargando…</div>}
+            {!loading && filtered.length === 0 && (
+              <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--warm-gray)' }}>
+                {query ? 'Sin resultados' : 'No hay clientes en el CRM'}
+              </div>
+            )}
+            {!loading && filtered.map(c => {
+              const colors = CLIENT_TYPE_COLORS[c.client_type as ClientType] || CLIENT_TYPE_COLORS.otro
+              return (
+                <button key={c.id} type="button"
+                  onClick={() => { onChange(c.id); setOpen(false); setQuery('') }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                    padding: '8px 14px', border: 'none', background: 'none',
+                    cursor: 'pointer', textAlign: 'left', fontSize: 13,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', padding: '2px 8px',
+                    borderRadius: 6, fontSize: 10, fontWeight: 600,
+                    background: colors.bg, color: colors.color, border: `1px solid ${colors.border}`,
+                    whiteSpace: 'nowrap', flexShrink: 0,
+                  }}>
+                    {CLIENT_TYPE_LABELS[c.client_type as ClientType] || 'Cliente'}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+                    {c.email && <div style={{ fontSize: 11, color: 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</div>}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Form Modal ─────────────────────────────────────────────────────────────────
 function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onClose, userId, venueId, onEditVisit, onDeleteVisit, onChangeDates, onChangeBudgetDates, onReturnToCalendar }: {
   form: any; setForm: (f: any) => void; isEdit: boolean; editLead?: any | null
@@ -6983,6 +7144,19 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 </span>
               </div>
             )}
+          </div>
+
+          {/* Divider */}
+          <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
+
+          {/* Section: Vincular cliente */}
+          <div style={{ marginBottom: 22 }}>
+            <SectionTitle icon={<Link2 size={14} />} title="Vincular a un cliente" hint="Opcional — enlaza este lead con cualquier cliente del CRM" />
+            <ClientLinkSelector
+              venueId={venueId}
+              clientId={form.client_id || ''}
+              onChange={(id) => set('client_id', id)}
+            />
           </div>
 
           {/* Divider */}

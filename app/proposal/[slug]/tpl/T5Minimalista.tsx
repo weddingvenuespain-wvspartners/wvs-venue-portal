@@ -38,6 +38,13 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) =
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
 
+  .t5-eyebrow {
+    display: flex; align-items: center; gap: 10px;
+    font-size: .68rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+    color: ${pri}; margin-bottom: 14px;
+  }
+  .t5-eyebrow::before { content: ''; width: 18px; height: 1.5px; background: ${pri}; opacity: .45 }
+
   .t5 {
     font-family: 'DM Sans', sans-serif;
     background: ${WHITE};
@@ -88,10 +95,6 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) =
     display: flex; flex-direction: column; justify-content: center;
     padding: 80px 72px 80px 80px;
     background: ${WHITE};
-  }
-  .t5-hero-tag {
-    font-size: .68rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
-    color: ${pri}; margin-bottom: 24px;
   }
   .t5-hero-couple {
     font-family: ${font}; font-size: clamp(2.8rem, 5vw, 4.4rem);
@@ -528,7 +531,15 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         {/* Left */}
         <FadeIn>
           <div className="t5-hero-left">
-            <p className="t5-hero-tag">Propuesta personalizada · {venueName}</p>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 999, background: `${pri}12`, border: `1px solid ${pri}22`, marginBottom: 22 }}>
+              <span style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: pri }}>Propuesta exclusiva</span>
+              {venue?.name && (
+                <>
+                  <span style={{ width: 1, height: 12, background: `${pri}33` }} />
+                  <span style={{ fontSize: '.68rem', fontWeight: 500, color: '#6b635a' }}>{venue.name}</span>
+                </>
+              )}
+            </div>
             <h1 className="t5-hero-couple">
               {data.couple_name.includes('&') || data.couple_name.includes(' y ') || data.couple_name.includes(' + ')
                 ? data.couple_name.split(/(&| y | \+ )/).map((part, i) =>
@@ -550,26 +561,6 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
                 <button className="t5-hero-btn-secondary" onClick={() => document.getElementById('t5-pkg')?.scrollIntoView({ behavior: 'smooth' })}>
                   Ver paquetes y precios
                 </button>
-              )}
-            </div>
-            <div className="t5-hero-data">
-              {data.wedding_date && (
-                <div className="t5-hero-datum">
-                  <span className="t5-hero-datum-val">{new Date(data.wedding_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
-                  <span className="t5-hero-datum-lbl">Fecha propuesta</span>
-                </div>
-              )}
-              {data.guest_count && (
-                <div className="t5-hero-datum">
-                  <span className="t5-hero-datum-val">{data.guest_count}</span>
-                  <span className="t5-hero-datum-lbl">Invitados</span>
-                </div>
-              )}
-              {data.show_price_estimate && data.price_estimate && (
-                <div className="t5-hero-datum">
-                  <span className="t5-hero-datum-val" style={{ color: primary }}>{formatPrice(data.price_estimate)}</span>
-                  <span className="t5-hero-datum-lbl">Precio estimado</span>
-                </div>
               )}
             </div>
           </div>
@@ -597,12 +588,12 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
 
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
-        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />
+        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} guestCount={guests} weddingDate={data.wedding_date} />
       )}
 
       {/* ── DATE SELECTOR ── */}
       {on('date_slots') && dateSlots && dateSlots.length > 0 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
-        <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />
+        <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />
       )}
 
       {/* URGENCY BAR */}
@@ -623,7 +614,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         <section id="sec-welcome" style={{ padding: '80px 32px', background: WHITE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
           <FadeUp>
             <div style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
-              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 18 }}>Un mensaje para vosotros</p>
+              <p className="t5-eyebrow">Un mensaje para vosotros</p>
               <p style={{ fontFamily: font, fontSize: 'clamp(1.1rem,2vw,1.4rem)', fontWeight: 300, color: INK, lineHeight: 1.75 }}>{displayMsg}</p>
               {data.venue?.name && (
                 <div style={{ fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: MUTED, marginTop: 22 }}>— {data.venue.name}</div>
@@ -672,7 +663,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         <section style={{ padding: '80px 0', background: WHITE }}>
           <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
-              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>La experiencia</p>
+              <p className="t5-eyebrow">{(expShow as any).eyebrow || 'La experiencia'}</p>
               <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 24 }}>{(expShow as any).title || 'Vuestro día especial'}</h2>
               <p style={{ fontSize: '1rem', color: MUTED, lineHeight: 1.85, whiteSpace: 'pre-wrap' }}>{(expShow as any).body}</p>
             </FadeUp>
@@ -708,7 +699,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
           bg="#fafafa"
           fg={INK}
           font={font}
-          label="Vuestro espacio"
+          label="El espacio"
         />
       )}
 
@@ -717,7 +708,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         <section style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
-              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>{(sec as any).zones_header?.label || 'Los espacios'}</p>
+              <p className="t5-eyebrow">{(sec as any).zones_header?.label || 'Espacios'}</p>
               <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 48 }}>{(sec as any).zones_header?.title || 'Cada rincón del venue'}</h2>
             </FadeUp>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 1, background: LINE, border: `1px solid ${LINE}` }}>
@@ -783,12 +774,12 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             pricingBlock={(() => {
               const blocks: React.ReactNode[] = []
               if (on('date_slots') && dateSlots && dateSlots.length > 0) {
-                blocks.push(<DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} />)
+                blocks.push(<DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />)
               }
               if (on('venue_rental') && sec.venue_rental?.rows && sec.venue_rental.rows.length > 0) {
                 blocks.push(
                   <div key="vr">
-                    <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>{sec.venue_rental.title || 'Elegid vuestra fecha'}</p>
+                    <p className="t5-eyebrow">{sec.venue_rental.title || 'Elegid vuestra fecha'}</p>
                     <VenueRentalGrid data={sec.venue_rental} primary={primary} />
                   </div>
                 )
@@ -937,7 +928,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         <section style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
-              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>{sec.venue_rental.title || 'Tarifas de alquiler'}</p>
+              <p className="t5-eyebrow">{sec.venue_rental.title || 'Tarifas de alquiler'}</p>
               <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Elegid vuestra fecha</h2>
             </FadeUp>
             <FadeUp delay={.1}>
@@ -952,7 +943,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         <section style={{ padding: '80px 0', background: WHITE }}>
           <div style={{ maxWidth: 780, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
-              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Temporadas</p>
+              <p className="t5-eyebrow">{(sec as any).season_prices_eyebrow || 'Temporadas'}</p>
               <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Precios según la fecha</h2>
             </FadeUp>
             <div style={{ border: `1px solid ${LINE}` }}>
@@ -978,7 +969,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         <section style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 40px' }}>
             <FadeUp>
-              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>FAQ</p>
+              <p className="t5-eyebrow">{(sec as any).faq_eyebrow || 'Preguntas frecuentes'}</p>
               <h2 style={{ fontFamily: font, fontSize: '2rem', color: INK, marginBottom: 40 }}>Preguntas frecuentes</h2>
             </FadeUp>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -1026,7 +1017,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         <section style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
-              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Alojamiento</p>
+              <p className="t5-eyebrow">{(sec as any).accommodation_eyebrow || 'Alojamiento'}</p>
               <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Quedaos a dormir</h2>
             </FadeUp>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 32, alignItems: 'start' }}>
@@ -1090,8 +1081,8 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         <section style={{ padding: '80px 0', background: WHITE }}>
           <div style={{ maxWidth: 780, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
-              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Servicios adicionales</p>
-              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Personaliza tu celebración</h2>
+              <p className="t5-eyebrow">{(sec as any).extra_services_eyebrow || 'Servicios adicionales'}</p>
+              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Servicios adicionales</h2>
             </FadeUp>
             <div>
               {extrasShow.map((svc: any, i: number) => {
@@ -1123,7 +1114,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         <section style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
-              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Lo dicen las parejas</p>
+              <p className="t5-eyebrow">{(sec as any).testimonials_eyebrow || 'Testimonios'}</p>
               <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Experiencias reales</h2>
             </FadeUp>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
@@ -1154,7 +1145,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         <section style={{ padding: '80px 0', background: WHITE }}>
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
-              <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Colaboradores</p>
+              <p className="t5-eyebrow">{(sec as any).collaborators_eyebrow || 'Colaboradores'}</p>
               <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Proveedores de confianza</h2>
             </FadeUp>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 1, background: LINE, border: `1px solid ${LINE}`, maxWidth: 960, margin: '0 auto' }}>
@@ -1279,7 +1270,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
           <section style={{ padding: '80px 0', background: OFF }}>
             <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 56px' }}>
               <FadeUp>
-                <p style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, marginBottom: 14 }}>Ubicación</p>
+                <p className="t5-eyebrow">{(sec as any).map_eyebrow || 'Ubicación'}</p>
                 <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: address ? 10 : 32 }}>Cómo llegar</h2>
                 {address && <p style={{ fontSize: 14, color: MUTED, marginBottom: 32 }}>{address}</p>}
               </FadeUp>

@@ -398,7 +398,9 @@ export default function EstructuraPage() {
   const [pricesCollapsed, setPricesCollapsed] = useState<Set<string>>(new Set())
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [editingGroupName, setEditingGroupName] = useState<string | null>(null)
-  const [zonesCollapsed, setZonesCollapsed]   = useState(false)
+  const [zonesCollapsed, setZonesCollapsed]   = useState(true)
+  const [sgCollapsed, setSgCollapsed]         = useState(true)
+  const [configSubTab, setConfigSubTab]       = useState<'zones' | 'modalities'>('modalities')
   const [recentlySavedId, setRecentlySavedId] = useState<string | null>(null)
   const [error, setError]                     = useState('')
   const [commercialConfig, setCommercialConfig] = useState<CommercialConfig | null>(null)
@@ -966,7 +968,7 @@ export default function EstructuraPage() {
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 4 }}>Configuración comercial</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {[
-                      { single: 'Un espacio único', single_with_supplements: 'Un espacio + suplementos', multiple_independent: 'Varias zonas independientes' }[commercialConfig.space_type],
+                      { single: 'Precio único', single_with_supplements: 'Base + zonas a elegir', multiple_independent: 'Grupos de espacios' }[commercialConfig.space_type],
                       { rental: 'Alquiler del espacio', per_person: 'Por persona', package: 'Paquetes' }[commercialConfig.price_model],
                       commercialConfig.menu_included === true ? 'Menú incluido' : commercialConfig.menu_included === false ? 'Menú aparte' : null,
                       commercialConfig.has_menu_types === true ? 'Varios menús' : null,
@@ -999,6 +1001,32 @@ export default function EstructuraPage() {
             </div>
           )}
 
+          {/* ── Sub-tabs: Zonas y grupos | Modalidades y tarifas ── */}
+          {(['multiple_independent', 'single_with_supplements'] as const).includes(commercialConfig?.space_type as any) && (
+            <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--ivory)', marginBottom: 16 }}>
+              {([
+                { key: 'zones' as const, label: 'Zonas y grupos', count: zones.length },
+                { key: 'modalities' as const, label: 'Modalidades y tarifas', count: modalities.length },
+              ]).map(tab => (
+                <button key={tab.key} type="button" onClick={() => setConfigSubTab(tab.key)}
+                  style={{
+                    padding: '10px 20px', fontSize: 13, fontWeight: configSubTab === tab.key ? 700 : 500,
+                    color: configSubTab === tab.key ? 'var(--charcoal)' : 'var(--warm-gray)',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    borderBottom: configSubTab === tab.key ? '2px solid var(--gold)' : '2px solid transparent',
+                    marginBottom: -2, transition: 'all .15s', display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                  {tab.label}
+                  {tab.count > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 20, background: configSubTab === tab.key ? 'var(--gold)' : 'var(--cream)', color: configSubTab === tab.key ? '#fff' : 'var(--warm-gray)', border: configSubTab === tab.key ? 'none' : '1px solid var(--ivory)' }}>{tab.count}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ── Tab: Zonas y grupos ── */}
+          {(configSubTab === 'zones' || !(['multiple_independent', 'single_with_supplements'] as const).includes(commercialConfig?.space_type as any)) && <>
           {/* Zones panel — multiple_independent or single_with_supplements */}
           {(['multiple_independent', 'single_with_supplements'] as const).includes(commercialConfig?.space_type as any) && (
             <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
@@ -1050,24 +1078,24 @@ export default function EstructuraPage() {
             const assignedZoneIds = new Set(spaceGroups.flatMap(g => g.spaces.map(s => s.id)))
             const unassignedZones = zones.filter(z => !assignedZoneIds.has(z.id))
             return (
-            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, padding: '16px 20px', marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Layers size={14} style={{ color: 'var(--gold)' }} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)' }}>Grupos de espacios</span>
-                  {spaceGroups.length > 0 && (
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--warm-gray)' }}>{spaceGroups.length}</span>
-                  )}
-                </div>
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
+              <button type="button" onClick={() => setSgCollapsed(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: sgCollapsed ? 'none' : '1px solid var(--ivory)', width: '100%', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: sgCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', flexShrink: 0, color: 'var(--warm-gray)' }}>
+                  <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <Layers size={13} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)' }}>Grupos de espacios</span>
+                {spaceGroups.length > 0 && (
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--warm-gray)' }}>{spaceGroups.length}</span>
+                )}
                 {unassignedZones.length > 0 && (
-                  <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#FEF9EC', border: '1px solid #FDE68A', color: '#92400E', fontWeight: 500 }}>
-                    {unassignedZones.length} zona{unassignedZones.length > 1 ? 's' : ''} sin grupo
+                  <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#FEF9EC', border: '1px solid #FDE68A', color: '#92400E', fontWeight: 500, marginLeft: 'auto' }}>
+                    {unassignedZones.length} sin grupo
                   </span>
                 )}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 16 }}>
-                Agrupa las zonas para que la pareja pueda elegir. Cada grupo tendrá su propio precio en las tarifas.
-              </div>
+              </button>
+              {!sgCollapsed && <div style={{ padding: '12px 20px 16px' }}>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
                 {spaceGroups.map((g, gi) => {
@@ -1154,7 +1182,7 @@ export default function EstructuraPage() {
 
                       {isSuppType ? (
                         <span style={{ fontSize: 12, padding: '5px 10px', border: '1px solid var(--ivory)', borderRadius: 6, background: 'var(--cream)', color: 'var(--warm-gray)', flexShrink: 0 }}>
-                          Incluidas + elegir
+                          Fijas + elegir extra
                         </span>
                       ) : (
                         <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -1162,9 +1190,9 @@ export default function EstructuraPage() {
                             onChange={e => updateGroup({ selection_mode: e.target.value as any, pick_n_min: undefined, pick_n_max: undefined, included_zone_ids: undefined })}
                             style={{ fontSize: 12, padding: '5px 28px 5px 10px', border: '1px solid var(--ivory)', borderRadius: 6, background: '#fff', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer', color: 'var(--charcoal)' }}>
                             <option value="none">Todas incluidas</option>
-                            <option value="pick_one">Elegir 1</option>
-                            <option value="pick_n">Elegir X</option>
-                            <option value="included_then_pick">Incluidas + elegir</option>
+                            <option value="pick_one">Elegir 1 espacio</option>
+                            <option value="pick_n">Elegir varios</option>
+                            <option value="included_then_pick">Fijas + elegir extra</option>
                           </select>
                           <ChevronDown size={13} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--warm-gray)' }} />
                         </div>
@@ -1351,6 +1379,7 @@ export default function EstructuraPage() {
                   </button>
                 )}
               </div>
+              </div>}
             </div>
             )
           })()}
@@ -1383,7 +1412,10 @@ export default function EstructuraPage() {
           )}
 
           {/* Stats now inline in commercial config banner */}
+          </>}
 
+          {/* ── Tab: Modalidades y tarifas ── */}
+          {(configSubTab === 'modalities' || !(['multiple_independent', 'single_with_supplements'] as const).includes(commercialConfig?.space_type as any)) && <>
           {/* Empty state */}
           {modalities.length === 0 && (
             <div style={{ textAlign: 'center', padding: '80px 24px' }}>
@@ -1734,6 +1766,8 @@ export default function EstructuraPage() {
               )
             })}
           </div>
+
+          </>}
 
           </>}
 
@@ -2520,9 +2554,9 @@ export default function EstructuraPage() {
 
         const cardOpts = (q: WizardQuestion) => {
           if (q === 'space_type') return [
-            { key: 'single',               icon: Building2, label: 'Un único espacio',                   sub: 'Solo un evento a la vez, sin posibilidad de reservar zonas adicionales',                          color: '#2E6DB4', bg: '#FDF8F0' },
-            { key: 'single_with_supplements', icon: Layers, label: 'Espacio principal + zonas opcionales', sub: 'El cliente contrata el espacio base y puede añadir zonas extra con suplemento (jardín, terraza…)', color: '#7C3AED', bg: '#F5F3FF' },
-            { key: 'multiple_independent', icon: LayoutGrid, label: 'Varias zonas del venue',              sub: 'El cliente puede escoger una zona o combinar varias. Cada zona tiene su propio precio',            color: '#2563EB', bg: '#EFF6FF' },
+            { key: 'single',               icon: Building2, label: 'Precio único por todo',                   sub: 'El presupuesto incluye todas las zonas del venue. El cliente no elige ni paga zonas por separado.',                          color: '#2E6DB4', bg: '#FDF8F0' },
+            { key: 'single_with_supplements', icon: Layers, label: 'Espacio base + zonas a elegir', sub: 'Hay zonas fijas incluidas y otras donde el cliente elige. Pueden ser gratuitas o tener suplemento.', color: '#7C3AED', bg: '#F5F3FF' },
+            { key: 'multiple_independent', icon: LayoutGrid, label: 'Grupos de espacios',              sub: 'Organiza tus zonas en grupos flexibles: el cliente puede elegir una, varias, o tener algunas incluidas y escoger entre otras. Ideal para venues con múltiples configuraciones.',            color: '#2563EB', bg: '#EFF6FF' },
           ] as { key: string; icon: any; label: string; sub: string; color: string; bg: string }[]
           if (q === 'price_model') return [
             { key: 'rental',     icon: CreditCard, label: 'Alquiler del espacio', sub: 'Precio fijo por el alquiler del espacio',                        color: '#059669', bg: '#ECFDF5' },

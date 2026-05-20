@@ -1208,13 +1208,30 @@ export function PricingTable({ packages, primary, dark = true, font }: { package
 }
 
 // ─── Availability Banner ───────────────────────────────────────────────────────
-export function AvailabilityBanner({ message, primary, onPrimary }: {
-  message: string; primary: string; onPrimary: string
+export function AvailabilityBanner({ message, primary, onPrimary, guestCount, weddingDate }: {
+  message: string; primary: string; onPrimary: string; guestCount?: number; weddingDate?: string
 }) {
+  const fmtDate = weddingDate
+    ? new Date(weddingDate + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null
   return (
     <div style={{ background: primary, padding: '12px 48px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       <span style={{ width: 8, height: 8, borderRadius: '50%', background: onPrimary, opacity: .7, flexShrink: 0, animation: 'pulse 2s infinite' }} />
       <span style={{ fontSize: '.8rem', fontWeight: 500, color: onPrimary, opacity: .9 }}>{message}</span>
+      {(fmtDate || guestCount) && (
+        <div style={{ display: 'flex', gap: 8, marginLeft: 'auto', alignItems: 'center', flexWrap: 'wrap' }}>
+          {fmtDate && (
+            <span style={{ fontSize: '.7rem', fontWeight: 600, color: primary, background: onPrimary, padding: '3px 10px', borderRadius: 999, opacity: .85 }}>
+              📅 {fmtDate}
+            </span>
+          )}
+          {guestCount && (
+            <span style={{ fontSize: '.7rem', fontWeight: 600, color: primary, background: onPrimary, padding: '3px 10px', borderRadius: 999, opacity: .85 }}>
+              👥 {guestCount} invitados
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }

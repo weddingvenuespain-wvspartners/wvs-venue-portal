@@ -1921,17 +1921,19 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                                       <SelectTrigger><SelectValue /></SelectTrigger>
                                                       <SelectContent>
                                                         <SelectItem value="ceremony">Ceremonia</SelectItem>
-                                                        <SelectItem value="cocktail">Coctel</SelectItem>
+                                                        <SelectItem value="cocktail">Cóctel</SelectItem>
                                                         <SelectItem value="banquet">Banquete</SelectItem>
-                                                        <SelectItem value="party">Fiesta</SelectItem>
+                                                        <SelectItem value="party">Fiesta / Baile</SelectItem>
+                                                        <SelectItem value="standing">De pie</SelectItem>
+                                                        <SelectItem value="seated">Sentados</SelectItem>
+                                                        <SelectItem value="theater">Teatro</SelectItem>
+                                                        <SelectItem value="classroom">Aula</SelectItem>
                                                         <SelectItem value="other">Otro</SelectItem>
                                                       </SelectContent>
                                                     </Select>
                                                   </div>
                                                   <input className="form-input" type="number" placeholder="pax" style={{ width: 80 }} value={c.count ?? ''}
                                                     onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, count: e.target.value ? Number(e.target.value) : undefined } : x))} />
-                                                  <input className="form-input" placeholder="Etiqueta (opc.)" style={{ flex: 1 }} value={c.label ?? ''}
-                                                    onChange={e => updateCaps(caps.map((x: any, j: number) => j === ci ? { ...x, label: e.target.value } : x))} />
                                                   <button type="button" style={{ ...removeBtn, width: 22, height: 22 }} onClick={() => updateCaps(caps.filter((_: any, j: number) => j !== ci))}><X size={11} /></button>
                                                 </div>
                                               ))}
@@ -1954,28 +1956,44 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                                 </Select>
                                               </div>
                                             </div>
-                                            {/* Features — free text chips */}
-                                            <div style={{ background: 'var(--cream)', borderRadius: 6, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                              <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>Características</div>
-                                              {feats.length > 0 && (
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                                  {feats.map((f: string, fi: number) => (
-                                                    <span key={fi} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#fdf6ea', border: '1px solid var(--gold)', color: '#8a6020' }}>
-                                                      {f}
-                                                      <button type="button" onClick={() => updateOverrideItem(overrideKey, i, 'features', feats.filter((_: string, j: number) => j !== fi))}
-                                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, lineHeight: 1, fontSize: 12 }}>×</button>
-                                                    </span>
-                                                  ))}
+                                            {/* Features — chips with presets */}
+                                            {(() => {
+                                              const FEAT_PRESETS = ['Aire acondicionado', 'Calefacción', 'Equipo de sonido', 'Iluminación regulable', 'Zona de baile', 'WiFi', 'Mobiliario incluido', 'Barra de bar', 'Proyector', 'Acceso catering', 'Vestuarios', 'Parking privado', 'Acceso PMR', 'Cocina industrial']
+                                              const availPresets = FEAT_PRESETS.filter(p => !feats.includes(p))
+                                              return (
+                                                <div style={{ background: 'var(--cream)', borderRadius: 6, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                                  <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>Características</div>
+                                                  {feats.length > 0 && (
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                                      {feats.map((f: string, fi: number) => (
+                                                        <span key={fi} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#fdf6ea', border: '1px solid var(--gold)', color: '#8a6020' }}>
+                                                          {f}
+                                                          <button type="button" onClick={() => updateOverrideItem(overrideKey, i, 'features', feats.filter((_: string, j: number) => j !== fi))}
+                                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, lineHeight: 1, fontSize: 12 }}>×</button>
+                                                        </span>
+                                                      ))}
+                                                    </div>
+                                                  )}
+                                                  {availPresets.length > 0 && (
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                                                      {availPresets.map(p => (
+                                                        <button key={p} type="button" onClick={() => updateOverrideItem(overrideKey, i, 'features', [...feats, p])}
+                                                          style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer' }}>
+                                                          + {p}
+                                                        </button>
+                                                      ))}
+                                                    </div>
+                                                  )}
+                                                  <input className="form-input" style={{ fontSize: 12 }} placeholder="Añadir otra característica (Enter)" onKeyDown={e => {
+                                                    if (e.key === 'Enter' || e.key === ',') {
+                                                      e.preventDefault()
+                                                      const val = (e.target as HTMLInputElement).value.trim().replace(/,$/, '')
+                                                      if (val) { updateOverrideItem(overrideKey, i, 'features', [...feats, val]);(e.target as HTMLInputElement).value = '' }
+                                                    }
+                                                  }} />
                                                 </div>
-                                              )}
-                                              <input className="form-input" style={{ fontSize: 12 }} placeholder="Añadir característica (Enter)" onKeyDown={e => {
-                                                if (e.key === 'Enter' || e.key === ',') {
-                                                  e.preventDefault()
-                                                  const val = (e.target as HTMLInputElement).value.trim().replace(/,$/, '')
-                                                  if (val) { updateOverrideItem(overrideKey, i, 'features', [...feats, val]);(e.target as HTMLInputElement).value = '' }
-                                                }
-                                              }} />
-                                            </div>
+                                              )
+                                            })()}
                                             <input className="form-input" placeholder="Notas adicionales (ej. *Opción haima +coste)" value={z.notes ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'notes', e.target.value)} />
                                           </div>
                                         </details>
