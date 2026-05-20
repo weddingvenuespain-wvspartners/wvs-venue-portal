@@ -531,11 +531,11 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         {/* Left */}
         <FadeIn>
           <div className="t5-hero-left">
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 999, background: `${pri}12`, border: `1px solid ${pri}22`, marginBottom: 22 }}>
-              <span style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: pri }}>Propuesta exclusiva</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 999, background: `${primary}12`, border: `1px solid ${primary}22`, marginBottom: 22 }}>
+              <span style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: primary }}>Propuesta exclusiva</span>
               {venue?.name && (
                 <>
-                  <span style={{ width: 1, height: 12, background: `${pri}33` }} />
+                  <span style={{ width: 1, height: 12, background: `${primary}33` }} />
                   <span style={{ fontSize: '.68rem', fontWeight: 500, color: '#6b635a' }}>{venue.name}</span>
                 </>
               )}
