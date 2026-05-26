@@ -205,14 +205,8 @@ function LoginPageInner() {
 
   // Prevent page scroll — login must fit in one screen
   useEffect(() => {
-    const html = document.documentElement
-    const body = document.body
-    html.style.overflow = 'hidden'
-    body.style.overflow = 'hidden'
-    return () => {
-      html.style.overflow = ''
-      body.style.overflow = ''
-    }
+    document.documentElement.classList.add('login-no-scroll')
+    return () => { document.documentElement.classList.remove('login-no-scroll') }
   }, [])
 
   const rawRedirect = searchParams.get('redirect') || ''
@@ -417,8 +411,8 @@ function LoginPageInner() {
         /* Hero panel sizing — flex: 1 so it matches the form panel */
         .fe-hero { flex: 1; display: flex; min-width: 0; }
 
-        /* Lock page scroll — login must fit in one screen */
-        html, body { overflow: hidden; height: 100%; }
+        /* Lock page scroll — login must fit in one screen (scoped via class so it cleans up on navigation) */
+        html.login-no-scroll, html.login-no-scroll body { overflow: hidden; height: 100%; }
 
         /* Hide right-panel brand on desktop (hero already shows it) */
         .fe-form-brand { display: none; }

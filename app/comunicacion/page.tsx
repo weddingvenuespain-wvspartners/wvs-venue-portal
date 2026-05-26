@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
+import NoVenueState from '@/components/NoVenueState'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import {
   MessageCircle, Mail, FileText, Plus, Trash2, Send, X,
@@ -597,6 +598,10 @@ export default function ComunicacionPage() {
   ] as const
 
   if (isBlocked) return null
+
+  if (!authLoading && !activeVenue) {
+    return <><Sidebar /><div className="main-layout" style={{ padding: '24px 28px' }}><NoVenueState /></div></>
+  }
 
   if (authLoading || loading) return (
     <div style={{ display: 'flex' }}>

@@ -294,30 +294,35 @@ function VenueDashboard() {
       return
     }
 
+    if (!activeVenue) return
+
     const supabase = createClient()
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
 
+    // Use venue_id for all lead queries so shared venue data is included
+    const vid = activeVenue.id
+
     // Fetch last 5 leads for the list
-    supabase.from('leads').select('*').eq('user_id', user.id)
+    supabase.from('leads').select('*').eq('venue_id', vid)
       .order('created_at', { ascending: false }).limit(5)
       .then(({ data }) => { if (data) setLeads(data); setLeadsLoaded(true) })
 
     // KPI counts (independent queries — must NOT be derived from the limit(5) list above)
     supabase.from('leads').select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id).gte('created_at', monthStart)
+      .eq('venue_id', vid).gte('created_at', monthStart)
       .then(({ count }) => { setLeadsMonthCount(count ?? 0) })
 
     supabase.from('leads').select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id).eq('status', 'new')
+      .eq('venue_id', vid).eq('status', 'new')
       .then(({ count }) => { setKpiNew(count ?? 0) })
 
     supabase.from('leads').select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .eq('venue_id', vid)
       .in('status', ['contacted', 'proposal_sent', 'visit_scheduled', 'post_visit', 'budget_sent', 'qualified', 'proposal'])
       .then(({ count }) => { setKpiActive(count ?? 0) })
 
     supabase.from('leads').select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .eq('venue_id', vid)
       .in('status', ['won', 'booked'])
       .then(({ count }) => { setKpiBooked(count ?? 0) })
 
@@ -332,7 +337,7 @@ function VenueDashboard() {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 6000)
       fetch(
-        `https://foreventos.com/wp-json/wp/v2/venues/${wpVenueId}?acf_format=standard`,
+        `https://weddingvenuesspain.com/wp-json/wp/v2/venues/${wpVenueId}?acf_format=standard`,
         { cache: 'no-store', signal: controller.signal }
       )
         .then(r => r.ok ? r.json() : null)

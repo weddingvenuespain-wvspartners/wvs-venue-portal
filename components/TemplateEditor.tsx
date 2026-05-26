@@ -34,8 +34,9 @@ export const ALL_SECTION_IDS = [
   'hero', 'availability', 'venue_specs', 'sticky_nav',
   'welcome', 'welcome_light', 'welcome_split', 'welcome_editorial',
   'experience', 'gallery',
-  'single_space', 'zones', 'space_groups', 'venue_rental', 'inclusions', 'testimonials',
-  'collaborators', 'accommodation', 'extra_services',
+  'single_space', 'zones', 'space_groups', 'venue_rental', 'inclusions',
+  'collaborators',
+  'testimonials', 'accommodation', 'extra_services',
   'pricing',
   'faq', 'schedule_visit', 'map', 'floating_contact',
 ] as const
@@ -307,16 +308,11 @@ export default function TemplateEditor({
   // ── Render section content editor ─────────────────────────────────────────
   // Sections with editable eyebrow labels
   const EYEBROW_SECTIONS: Record<string, string> = {
-    gallery: 'Galería',
-    inclusions: 'Qué incluye',
     testimonials: 'Testimonios',
-    collaborators: 'Proveedores de confianza',
     accommodation: 'Alojamiento',
     extra_services: 'Servicios adicionales',
     pricing: 'Paquetes',
     faq: 'Preguntas frecuentes',
-    schedule_visit: 'Agendar visita',
-    map: 'Ubicación',
     venue_rental: 'Tarifas de alquiler',
     season_prices: 'Temporadas',
   }
@@ -437,7 +433,12 @@ export default function TemplateEditor({
           {/* Stat rows */}
           {stats.map((s, i) => (
             <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', background: 'var(--surface-alt, #faf8f5)', borderRadius: 8, padding: '6px 8px' }}>
-              <span style={{ fontSize: 11, color: 'var(--warm-gray)', fontWeight: 700, width: 18, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
+                <button type="button" disabled={i === 0} onClick={() => { const n = [...stats]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; setStats(n) }}
+                  style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', padding: 0, fontSize: 10, color: i === 0 ? 'var(--border)' : 'var(--warm-gray)', lineHeight: 1 }}>▲</button>
+                <button type="button" disabled={i === stats.length - 1} onClick={() => { const n = [...stats]; [n[i], n[i + 1]] = [n[i + 1], n[i]]; setStats(n) }}
+                  style={{ background: 'none', border: 'none', cursor: i === stats.length - 1 ? 'default' : 'pointer', padding: 0, fontSize: 10, color: i === stats.length - 1 ? 'var(--border)' : 'var(--warm-gray)', lineHeight: 1 }}>▼</button>
+              </div>
               <input className="form-input" style={{ fontSize: 12, width: 72, flexShrink: 0, textAlign: 'center', fontWeight: 600 }} placeholder="Valor"
                 value={s.value} onChange={e => setStats(stats.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
               <input className="form-input" style={{ fontSize: 12, flex: 1 }} placeholder="Etiqueta (ej. Capacidad máxima)"
@@ -874,13 +875,13 @@ export default function TemplateEditor({
       }
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Title + subtitle */}
+          {/* Eyebrow + title */}
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Título</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Etiqueta</div>
             <input className="form-input" style={{ fontSize: 12, marginBottom: 8 }} placeholder="Qué incluye"
               value={(sections as any).inclusions_title ?? ''}
               onChange={e => { setSections(s => ({ ...s, inclusions_title: e.target.value } as any)); markDirty() }} />
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Subtítulo</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Título</div>
             <input className="form-input" style={{ fontSize: 12 }} placeholder="Todo lo que necesitáis, sin sorpresas"
               value={(sections as any).inclusions_subtitle ?? ''}
               onChange={e => { setSections(s => ({ ...s, inclusions_subtitle: e.target.value } as any)); markDirty() }} />
@@ -1061,32 +1062,65 @@ export default function TemplateEditor({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <input className="form-input" style={{ fontSize: 12 }} placeholder="Etiqueta superior (ej. Proveedores de confianza)" value={collabMeta.eyebrow ?? ''} onChange={e => setCollabMeta({ eyebrow: e.target.value })} />
           <input className="form-input" style={{ fontSize: 12 }} placeholder="Título (ej. Nuestros colaboradores)" value={collabMeta.title ?? ''} onChange={e => setCollabMeta({ title: e.target.value })} />
-          <input className="form-input" style={{ fontSize: 12 }} placeholder="Subtítulo (ej. Trabajamos sin exclusividad…)" value={collabMeta.subtitle ?? ''} onChange={e => setCollabMeta({ subtitle: e.target.value })} />
+          <input className="form-input" style={{ fontSize: 12 }} placeholder="Descripción (ej. Trabajamos sin exclusividad…)" value={collabMeta.subtitle ?? ''} onChange={e => setCollabMeta({ subtitle: e.target.value })} />
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
           {getOverride(overrideKey).map((c: any, i: number) => (
-            <div key={i} style={{ border: `1px solid ${c.exclusive ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 7, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5, background: c.exclusive ? 'rgba(var(--primary-rgb, 180,130,80), 0.04)' : 'transparent' }}>
+            <div key={i} style={{ border: `1px solid ${c.exclusive ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 7, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6, background: c.exclusive ? 'rgba(var(--primary-rgb, 180,130,80), 0.04)' : 'transparent' }}>
               <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-                <input className="form-input" placeholder="Nombre *" style={{ fontSize: 12 }} value={c.name ?? ''} onChange={e => updateItem(overrideKey, i, 'name', e.target.value)} />
-                <input className="form-input" style={{ width: 130, flexShrink: 0, fontSize: 12 }} placeholder="Categoría" value={c.category ?? ''} onChange={e => updateItem(overrideKey, i, 'category', e.target.value)} />
-                <button type="button" style={removeBtn} onClick={() => removeItem(overrideKey, i)}><X size={12} /></button>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase' }}>Nombre</span>
+                  <input className="form-input" placeholder="Nombre del proveedor *" style={{ fontSize: 12 }} value={c.name ?? ''} onChange={e => updateItem(overrideKey, i, 'name', e.target.value)} />
+                </div>
+                <div style={{ width: 130, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase' }}>Categoría</span>
+                  <input className="form-input" style={{ fontSize: 12 }} placeholder="Ej. Catering" value={c.category ?? ''} onChange={e => updateItem(overrideKey, i, 'category', e.target.value)} />
+                </div>
+                <button type="button" style={{ ...removeBtn, marginTop: 14 }} onClick={() => removeItem(overrideKey, i)}><X size={12} /></button>
               </div>
-              <input className="form-input" placeholder="Descripción" style={{ fontSize: 12 }} value={c.description ?? ''} onChange={e => updateItem(overrideKey, i, 'description', e.target.value)} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase' }}>Descripción</span>
+                <input className="form-input" placeholder="Breve descripción del proveedor" style={{ fontSize: 12 }} value={c.description ?? ''} onChange={e => updateItem(overrideKey, i, 'description', e.target.value)} />
+              </div>
               <div style={{ display: 'flex', gap: 5 }}>
-                <input className="form-input" style={{ fontSize: 12 }} placeholder="Web (opcional)" value={c.website ?? ''} onChange={e => updateItem(overrideKey, i, 'website', e.target.value)} />
-                <input className="form-input" style={{ fontSize: 12, width: 130, flexShrink: 0 }} placeholder="@instagram" value={c.instagram ?? ''} onChange={e => updateItem(overrideKey, i, 'instagram', e.target.value)} />
-                <input className="form-input" style={{ fontSize: 12, width: 160, flexShrink: 0 }} placeholder="Email" value={c.email ?? ''} onChange={e => updateItem(overrideKey, i, 'email', e.target.value)} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase' }}>Contacto</span>
+                  <input className="form-input" style={{ fontSize: 12 }} placeholder="Web (opcional)" value={c.website ?? ''} onChange={e => updateItem(overrideKey, i, 'website', e.target.value)} />
+                </div>
+                <input className="form-input" style={{ fontSize: 12, width: 130, flexShrink: 0, marginTop: 'auto' }} placeholder="@instagram" value={c.instagram ?? ''} onChange={e => updateItem(overrideKey, i, 'instagram', e.target.value)} />
+                <input className="form-input" style={{ fontSize: 12, width: 160, flexShrink: 0, marginTop: 'auto' }} placeholder="Email" value={c.email ?? ''} onChange={e => updateItem(overrideKey, i, 'email', e.target.value)} />
               </div>
               <div style={{ display: 'flex', gap: 5 }}>
                 <input className="form-input" style={{ fontSize: 12, width: 160, flexShrink: 0 }} placeholder="Teléfono" value={c.phone ?? ''} onChange={e => updateItem(overrideKey, i, 'phone', e.target.value)} />
                 <input className="form-input" style={{ fontSize: 12 }} placeholder="Info precios orientativa" value={c.price_info ?? ''} onChange={e => updateItem(overrideKey, i, 'price_info', e.target.value)} />
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: c.exclusive ? 'var(--primary)' : 'var(--warm-gray)' }}>
-                <input type="checkbox" checked={!!c.exclusive} onChange={e => updateItem(overrideKey, i, 'exclusive', e.target.checked)} style={{ accentColor: 'var(--primary)' }} />
-                Exclusividad
-              </label>
+              <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: c.exclusive ? 'var(--primary)' : 'var(--warm-gray)' }}>
+                  <input type="checkbox" checked={!!c.exclusive} onChange={e => updateItem(overrideKey, i, 'exclusive', e.target.checked)} style={{ accentColor: 'var(--primary)' }} />
+                  Exclusividad
+                </label>
+                {c.exclusive && (
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+                    <input type="number" placeholder="Precio" value={c.exclusivity_price ?? ''}
+                      onChange={e => updateItem(overrideKey, i, 'exclusivity_price', e.target.value)}
+                      style={{ width: 80, textAlign: 'right', fontSize: 11, padding: '5px 4px 5px 8px', border: 'none', outline: 'none', background: 'transparent', MozAppearance: 'textfield' }} />
+                    <span style={{ fontSize: 11, color: '#999', padding: '5px 8px 5px 2px', background: '#f9f8f6', borderLeft: '1px solid var(--border)', fontWeight: 600, lineHeight: 1 }}>€</span>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
           <button type="button" style={addBtn} onClick={() => addItem(overrideKey, { name: '', category: '', description: '' })}>+ Añadir colaborador</button>
+          {/* Generic exclusivity price */}
+          <div style={{ marginTop: 8, padding: '10px 12px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 6 }}>Precio genérico no-exclusividad</div>
+            <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
+              <input type="number" placeholder="500" value={collabMeta.generic_exclusivity_price ?? ''}
+                onChange={e => setCollabMeta({ generic_exclusivity_price: e.target.value })}
+                style={{ flex: 1, textAlign: 'right', fontSize: 12, padding: '6px 4px 6px 10px', border: 'none', outline: 'none', background: 'transparent', MozAppearance: 'textfield' }} />
+              <span style={{ fontSize: 12, color: '#999', padding: '6px 10px 6px 4px', background: '#f9f8f6', borderLeft: '1px solid var(--border)', fontWeight: 600, lineHeight: 1 }}>€</span>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4, lineHeight: 1.4 }}>Precio que pagan si traen proveedores externos.</div>
+          </div>
         </div>
       )
     }
@@ -1298,15 +1332,46 @@ export default function TemplateEditor({
     }
 
     if (secId === 'map') {
-      const m: any = (sections as any).map_override ?? {}
-      const p = (patch: any) => { setSections(s => ({ ...s, map_override: { ...((s as any).map_override ?? {}), ...patch } } as any)); markDirty() }
       const extractSrc = (raw: string) => { const match = raw.match(/src\s*=\s*["']([^"']+)["']/i); return match ? match[1] : raw }
+      const mapMeta: any = (sections as any).map_meta ?? {}
+      const setMapMeta = (patch: any) => { setSections(s => ({ ...s, map_meta: { ...((s as any).map_meta ?? {}), ...patch } } as any)); markDirty() }
+      const mapAddr = (sections as any).map_address ?? ''
+      const mapEmbed = (sections as any).map_embed_url ?? ''
+      const previewSrc = mapEmbed || (mapAddr ? `https://maps.google.com/maps?q=${encodeURIComponent(mapAddr)}&t=&z=15&ie=UTF8&iwloc=B&output=embed` : null)
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>URL o código iframe de Google Maps</div>
-          <textarea className="form-textarea" style={{ minHeight: 56, fontSize: 11, fontFamily: 'monospace' }} placeholder="Pega la URL o el <iframe> de Google Maps…" value={m.embed_url ?? ''} onChange={e => p({ embed_url: extractSrc(e.target.value) })} />
-          <input className="form-input" placeholder="Dirección" style={{ fontSize: 12 }} value={m.address ?? ''} onChange={e => p({ address: e.target.value })} />
-          <input className="form-input" placeholder="Notas de ubicación (opcional)" style={{ fontSize: 12 }} value={m.notes ?? ''} onChange={e => p({ notes: e.target.value })} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Etiqueta</label>
+            <input className="form-input" placeholder="Ubicación" style={{ fontSize: 12 }} value={mapMeta.eyebrow ?? ''} onChange={e => setMapMeta({ eyebrow: e.target.value })} />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Título</label>
+            <input className="form-input" placeholder="Cómo llegar" style={{ fontSize: 12 }} value={mapMeta.title ?? ''} onChange={e => setMapMeta({ title: e.target.value })} />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Descripción</label>
+            <input className="form-input" placeholder="Estamos en el corazón de…" style={{ fontSize: 12 }} value={mapMeta.subtitle ?? ''} onChange={e => setMapMeta({ subtitle: e.target.value })} />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Dirección del venue</label>
+            <input className="form-input" placeholder="Ej. Camí de Can Riera 12, Sant Cugat del Vallès" style={{ fontSize: 12 }} value={mapAddr} onChange={e => { setSections(s => ({ ...s, map_address: e.target.value } as any)); markDirty() }} />
+          </div>
+          {previewSrc && (
+            <div style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
+              <iframe src={previewSrc} width="100%" height="180" style={{ border: 'none', display: 'block' }} loading="lazy" />
+            </div>
+          )}
+          <details style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+            <summary style={{ cursor: 'pointer', userSelect: 'none' }}>Avanzado: código embed personalizado</summary>
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <textarea className="form-textarea" style={{ minHeight: 56, fontSize: 11, fontFamily: 'ui-monospace, monospace' }}
+                placeholder={'Pega aquí el <iframe src="..."> de Google Maps (opcional)'}
+                value={mapEmbed} onChange={e => { setSections(s => ({ ...s, map_embed_url: extractSrc(e.target.value) } as any)); markDirty() }} />
+              <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                Si lo dejas vacío, se genera automáticamente con la dirección.
+              </div>
+            </div>
+          </details>
         </div>
       )
     }
@@ -1403,131 +1468,61 @@ export default function TemplateEditor({
     if (secId === 'schedule_visit') {
       const sv: any = (sections as any).schedule_visit ?? {}
       const p = (patch: any) => { setSections(s => ({ ...s, schedule_visit: { ...((s as any).schedule_visit ?? {}), ...patch } } as any)); markDirty() }
-      const visitStyleConfig = SECTION_STYLES.schedule_visit
-      const activeVariantId = getActiveStyle(sections, 'schedule_visit')
-      const selectVariant = (variantId: string) => {
-        setSections(s => setActiveStyle(s, 'schedule_visit', variantId) as SectionsData)
-        markDirty()
-      }
-      const defaultKinds: Array<{ id: string; label: string }> = [
-        { id: 'visit', label: 'Visitar el venue' },
-        { id: 'call',  label: 'Llamada telefónica' },
-        { id: 'video', label: 'Videollamada' },
-        { id: 'menu',  label: 'Pregunta sobre menú' },
-        { id: 'other', label: 'Otro' },
-      ]
-      const kinds: Array<{ id: string; label: string }> = Array.isArray(sv.kinds) && sv.kinds.length > 0 ? sv.kinds : defaultKinds
-      const updateKinds = (next: Array<{ id: string; label: string }>) => p({ kinds: next })
-      const updateKind = (i: number, label: string) => updateKinds(kinds.map((k, idx) => idx === i ? { ...k, label } : k))
-      const removeKind = (i: number) => updateKinds(kinds.filter((_, idx) => idx !== i))
-      const moveKind = (i: number, dir: -1 | 1) => {
-        const j = i + dir
-        if (j < 0 || j >= kinds.length) return
-        const next = [...kinds]
-        ;[next[i], next[j]] = [next[j], next[i]]
-        updateKinds(next)
-      }
-      const addKind = () => {
-        const newId = `custom_${Math.random().toString(36).slice(2, 8)}`
-        updateKinds([...kinds, { id: newId, label: 'Nueva opción' }])
-      }
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {/* Variant picker */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Tipo de sección</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-              {visitStyleConfig.variants.map(v => {
-                const sel = activeVariantId === v.id
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => selectVariant(v.id)}
-                    style={{
-                      textAlign: 'left',
-                      padding: '10px 12px',
-                      border: `1.5px solid ${sel ? 'var(--gold)' : 'var(--border)'}`,
-                      borderRadius: 8,
-                      background: sel ? 'rgba(196,151,90,0.08)' : '#fff',
-                      cursor: 'pointer',
-                      transition: 'all .15s',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: sel ? 'var(--gold)' : 'var(--charcoal)' }}>{v.label}</span>
-                      {sel && <Check size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />}
-                    </div>
-                    {v.description && (
-                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{v.description}</div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>Título</label>
+            <input className="form-input" placeholder="Visitadnos en persona" style={{ fontSize: 12 }} value={sv.title ?? ''} onChange={e => p({ title: e.target.value })} />
           </div>
-
-          <input className="form-input" placeholder="Título (ej. Agendar visita)" style={{ fontSize: 12 }} value={sv.title ?? ''} onChange={e => p({ title: e.target.value })} />
-          <textarea className="form-textarea" style={{ minHeight: 60, fontSize: 12 }} placeholder="Subtítulo / descripción breve…" value={sv.subtitle ?? ''} onChange={e => p({ subtitle: e.target.value })} />
-
-          {activeVariantId === 'cta' ? (
-            <>
-              <input className="form-input" placeholder="URL Calendly / Cal.com (opcional)" style={{ fontSize: 12 }} value={sv.url ?? ''} onChange={e => p({ url: e.target.value })} />
-              <input className="form-input" placeholder="Texto del botón (ej. Reservar visita →)" style={{ fontSize: 12 }} value={sv.cta_label ?? ''} onChange={e => p({ cta_label: e.target.value })} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <label style={{ fontSize: 11, color: 'var(--warm-gray)', flex: 1 }}>Color del texto del botón</label>
-                <input type="color" value={sv.cta_text_color || '#ffffff'} onChange={e => p({ cta_text_color: e.target.value })}
-                  style={{ width: 32, height: 28, padding: 2, border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', background: 'none' }} />
-                {sv.cta_text_color && (
-                  <button type="button" onClick={() => p({ cta_text_color: '' })}
-                    style={{ fontSize: 10, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px' }}>
-                    Reset
-                  </button>
-                )}
-              </div>
-              <input className="form-input" placeholder="Nota pequeña (horarios, duración…)" style={{ fontSize: 12 }} value={sv.note ?? ''} onChange={e => p({ note: e.target.value })} />
-              <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.5, marginTop: 2 }}>
-                Si dejas la URL vacía, el botón abre el calendario con horarios disponibles configurados en el venue.
-              </div>
-            </>
-          ) : (
-            <div style={{ marginTop: 2 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Opciones del formulario</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {kinds.map((k, i) => (
-                  <div key={k.id} style={{ display: 'flex', alignItems: 'center', gap: 4, border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--surface)' }}>
-                    <button type="button" onClick={() => moveKind(i, -1)} disabled={i === 0}
-                      title="Subir"
-                      style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: 'var(--warm-gray)', padding: 2, opacity: i === 0 ? 0.3 : 1 }}>
-                      <ChevronDown size={11} style={{ transform: 'rotate(180deg)' }} />
-                    </button>
-                    <button type="button" onClick={() => moveKind(i, 1)} disabled={i === kinds.length - 1}
-                      title="Bajar"
-                      style={{ background: 'none', border: 'none', cursor: i === kinds.length - 1 ? 'default' : 'pointer', color: 'var(--warm-gray)', padding: 2, opacity: i === kinds.length - 1 ? 0.3 : 1 }}>
-                      <ChevronDown size={11} />
-                    </button>
-                    <input className="form-input" style={{ flex: 1, fontSize: 12, padding: '4px 8px', border: 'none', background: 'transparent' }}
-                      value={k.label}
-                      onChange={e => updateKind(i, e.target.value)}
-                      placeholder="Etiqueta de la opción" />
-                    {k.id === 'visit' ? (
-                      <span title="Esta opción abre el calendario para reservar visita"
-                        style={{ fontSize: 9, fontWeight: 700, color: 'var(--gold)', background: 'rgba(196,151,90,.12)', padding: '2px 6px', borderRadius: 99, letterSpacing: '.04em' }}>
-                        VISITA
-                      </span>
-                    ) : (
-                      <button type="button" style={removeBtn} onClick={() => removeKind(i)} title="Eliminar opción">
-                        <X size={11} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <button type="button" style={{ ...addBtn, marginTop: 6 }} onClick={addKind}>+ Añadir opción</button>
-              <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4, lineHeight: 1.5 }}>
-                La opción <strong>Visitar el venue</strong> abre el calendario con horarios disponibles. El resto envían el formulario al inbox de Consultas.
-              </div>
-            </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>Subtítulo</label>
+            <textarea className="form-textarea" style={{ minHeight: 60, fontSize: 12 }} placeholder="Ven a conocer el espacio, sin compromiso. Nuestro equipo estará encantado de enseñaros el venue." value={sv.subtitle ?? ''} onChange={e => p({ subtitle: e.target.value })} />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>URL para agendar (Calendly, Cal.com…)</label>
+            <input className="form-input" placeholder="https://calendly.com/..." style={{ fontSize: 12 }} value={sv.url ?? ''} onChange={e => p({ url: e.target.value })} />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>Texto del botón</label>
+            <input className="form-input" placeholder="Reservar visita gratuita →" style={{ fontSize: 12 }} value={sv.cta_label ?? ''} onChange={e => p({ cta_label: e.target.value })} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 11, color: 'var(--warm-gray)', flex: 1 }}>Color del texto del botón</label>
+            <input type="color" value={sv.cta_text_color || '#ffffff'} onChange={e => p({ cta_text_color: e.target.value })}
+              style={{ width: 32, height: 28, padding: 2, border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', background: 'none' }} />
+            {sv.cta_text_color && (
+              <button type="button" onClick={() => p({ cta_text_color: '' })}
+                style={{ fontSize: 10, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px' }}>
+                Reset
+              </button>
+            )}
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>Nota pequeña (opcional)</label>
+            <input className="form-input" placeholder="Visitas de lunes a viernes · Duración aprox. 45 min" style={{ fontSize: 12 }} value={sv.note ?? ''} onChange={e => p({ note: e.target.value })} />
+          </div>
+          {/* CTA buttons config */}
+          <div style={{ marginTop: 4, padding: '10px 12px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Botones a mostrar</div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--charcoal)', cursor: 'pointer', marginBottom: 6 }}>
+              <input type="checkbox" checked={(sv.cta_buttons ?? ['visit']).includes('visit')} onChange={e => {
+                const current = sv.cta_buttons ?? ['visit']
+                const next = e.target.checked ? [...current.filter((b: string) => b !== 'visit'), 'visit'] : current.filter((b: string) => b !== 'visit')
+                p({ cta_buttons: next.length ? next : ['visit'] })
+              }} style={{ accentColor: 'var(--gold)' }} />
+              Agendar visita
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--charcoal)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={(sv.cta_buttons ?? ['visit']).includes('budget')} onChange={e => {
+                const current = sv.cta_buttons ?? ['visit']
+                const next = e.target.checked ? [...current.filter((b: string) => b !== 'budget'), 'budget'] : current.filter((b: string) => b !== 'budget')
+                p({ cta_buttons: next.length ? next : ['visit'] })
+              }} style={{ accentColor: 'var(--gold)' }} />
+              Solicitar presupuesto
+            </label>
+          </div>
+          {(sv.cta_buttons ?? []).includes('budget') && (
+            <input className="form-input" placeholder="Texto del botón de presupuesto (ej. Solicitar presupuesto →)" style={{ fontSize: 12 }} value={sv.budget_cta_label ?? ''} onChange={e => p({ budget_cta_label: e.target.value })} />
           )}
         </div>
       )
@@ -1821,10 +1816,11 @@ export default function TemplateEditor({
                       ? 'Ninguna activa'
                       : activeSpaceIds.map(id => getSectionLabel(id, commercialConfig?.space_type as any, SECTION_LABELS[id as SectionId])).join(' · ')
                     const renderSpaceGroupHeader = () => (
-                      <div key="__sg_header" style={{ borderBottom: '1px solid var(--border)', background: 'rgba(196,151,90,0.06)' }}>
+                      <div key="__sg_header" className="sec-row" style={{ background: 'rgba(196,151,90,0.06)' }}>
                         <div
+                          className="sec-header"
                           onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('__space_group') ? n.delete('__space_group') : n.add('__space_group'); return n })}
-                          style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', cursor: 'pointer' }}
+                          style={{ alignItems: 'flex-start' }}
                         >
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1853,10 +1849,11 @@ export default function TemplateEditor({
                       const activeVariant = welcomeStyleConfig.variants.find(v => v.id === activeWelcomeVariantId)
                       const activeVariantLabel = welcomeGroupOn ? (activeVariant?.label ?? '—') : 'Desactivada'
                       return (
-                        <div key="welcome-group" style={{ borderBottom: '1px solid var(--border)', opacity: welcomeGroupOn ? 1 : 0.5, transition: 'opacity .15s', background: 'rgba(196,151,90,0.06)' }}>
+                        <div key="welcome-group" className="sec-row" style={{ opacity: welcomeGroupOn ? 1 : 0.5, background: 'rgba(196,151,90,0.06)' }}>
                           <div
+                            className="sec-header"
                             onClick={() => setOpenSecs(s => { const n = new Set(s); n.has('welcome') ? n.delete('welcome') : n.add('welcome'); return n })}
-                            style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', cursor: 'pointer' }}
+                            style={{ alignItems: 'flex-start' }}
                           >
                             <div onClick={e => { e.stopPropagation(); toggleWelcomeGroup(!welcomeGroupOn) }} style={{ marginTop: 2 }}>
                               <Toggle value={welcomeGroupOn} onChange={v => toggleWelcomeGroup(v)} />
@@ -1871,7 +1868,7 @@ export default function TemplateEditor({
                             <ChevronDown size={13} style={{ color: 'var(--warm-gray)', transform: isWelcomeOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0, marginTop: 2 }} />
                           </div>
                           {isWelcomeOpen && (
-                            <div style={{ padding: '12px 14px 14px', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
+                            <div className="sec-open-content" style={{ padding: '12px 14px 14px' }}>
                               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Estilo visual</div>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 16 }}>
                                 {welcomeStyleConfig.variants.map(v => {
@@ -1916,34 +1913,38 @@ export default function TemplateEditor({
                     return (
                       <Fragment key={secId}>
                       {isInSpaceGroup && isFirstSpaceVisible && renderSpaceGroupHeader()}
-                      {/* Menu row — appears after inclusions when catering is enabled */}
-                      {secId === 'testimonials' && hasCatering && (
-                        <div style={{ borderBottom: '1px solid var(--border)', background: 'rgba(196,151,90,0.04)' }}>
+                      {/* Menu row — appears after inclusions, before collaborators */}
+                      {secId === 'collaborators' && hasCatering && (
+                        <div className="sec-row" style={{ background: 'rgba(196,151,90,0.04)' }}>
                           <div
+                            className="sec-header"
                             onClick={() => setActiveTab('menus' as any)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', transition: 'background .15s' }}
                           >
                             <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0, opacity: .6 }} />
-                            <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: 'var(--gold)', userSelect: 'none' }}>Menús y catering</span>
+                            <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--gold)', userSelect: 'none' }}>Menús y catering</span>
                             <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Ir al tab →</span>
                           </div>
                         </div>
                       )}
-                      <div style={{ borderBottom: isLast ? 'none' : '1px solid var(--border)', opacity: isOn ? 1 : 0.5, transition: 'opacity .15s', ...(isInSpaceGroup ? { paddingLeft: 14, borderLeft: '2px solid rgba(196,151,90,0.25)', background: 'rgba(196,151,90,0.02)' } : {}) }}>
+                      <div
+                        className={isInSpaceGroup ? undefined : 'sec-row'}
+                        style={isInSpaceGroup
+                          ? { paddingLeft: 14, borderLeft: '2px solid rgba(196,151,90,0.25)', background: 'rgba(196,151,90,0.02)', opacity: isOn ? 1 : 0.5, transition: 'opacity .15s' }
+                          : { opacity: isOn ? 1 : 0.5 }}>
                         {/* Row header */}
                         <div
+                          className="sec-header"
                           onClick={() => setOpenSecs(s => { const n = new Set(s); n.has(secId) ? n.delete(secId) : n.add(secId); return n })}
-                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: isOpen ? 'var(--cream)' : 'var(--surface)', transition: 'background .15s' }}
                         >
                           <div onClick={e => { e.stopPropagation(); toggleSection(secId, !isOn) }}>
                             <Toggle value={isOn} onChange={v => toggleSection(secId, v)} />
                           </div>
-                          <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', userSelect: 'none' }}>{getSectionLabel(secId, commercialConfig?.space_type as any, SECTION_LABELS[secId])}</span>
-                          <ChevronDown size={13} style={{ color: 'var(--warm-gray)', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
+                          <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--charcoal)', userSelect: 'none' }}>{getSectionLabel(secId, commercialConfig?.space_type as any, SECTION_LABELS[secId])}</span>
+                          <ChevronDown size={14} style={{ color: 'var(--warm-gray)', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
                         </div>
                         {/* Expandable content editor */}
                         {isOpen && (
-                          <div style={{ padding: '12px 14px 14px', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
+                          <div className="sec-open-content" style={{ padding: '12px 14px 14px' }}>
                             {SECTION_SPACE_TYPES[secId] && (() => {
                               const spaceType = commercialConfig?.space_type as any
                               const allowedTypes = SECTION_SPACE_TYPES[secId]

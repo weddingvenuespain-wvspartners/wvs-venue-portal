@@ -201,6 +201,7 @@ export type SectionsData = {
   sections_enabled?: Record<string, boolean>
   iva_included?: boolean
   show_menu_prices?: boolean        // default true; false = menus shown without price (price comes from proposal estimate)
+  menu_pick_limit?: number | null   // how many menus couple can pick: 1 = single choice, 2+ = pick N, null/undefined = unlimited
   menu_sections_visible?: { cocktail?: boolean; menus?: boolean; night?: boolean; event_extras?: boolean }
   // Visual branding (used by templates; copied to proposal branding on apply)
   primary_color?: string
@@ -274,7 +275,7 @@ export type SectionsData = {
   // Content template that was last applied to this proposal
   content_template_id?: string
   // Sections — new blocks
-  schedule_visit?: { title?: string; subtitle?: string; url?: string; cta_label?: string; note?: string } | null
+  schedule_visit?: { title?: string; subtitle?: string; url?: string; cta_label?: string; cta_text_color?: string; note?: string; cta_buttons?: ('visit' | 'budget')[]; budget_cta_label?: string } | null
   sticky_nav?: { links?: Array<{ label: string; anchor: string }> } | null
   welcome_light?: { image_url?: string } | null
   welcome_split?: { image_url?: string; image_side?: 'left' | 'right' } | null

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendNewLeadEmail } from '@/lib/mailer'
+import { findOrCreateClientWithClient } from '@/lib/clients'
 
 function getServiceClient() {
   return createClient(
@@ -64,16 +65,33 @@ export async function POST(req: NextRequest) {
     // Look up the user_venues row so we can store venue_id on the lead
     const { data: venueRow } = await svc
       .from('user_venues')
-      .select('id, name')
+      .select('id, name, canonical_venue_id')
       .eq('user_id', userId)
       .eq('wp_venue_id', wp_venue_id)
       .maybeSingle()
 
+    // Use canonical_venue_id for data queries (shared venue support)
+    const effectiveVenueId = venueRow?.canonical_venue_id || venueRow?.id || null
+
     const wedding_date = parseDate(date)
+
+    // Auto-link or create CRM contact for this lead
+    let clientId: string | null = null
+    if (effectiveVenueId && (name || email || phone)) {
+      try {
+        clientId = await findOrCreateClientWithClient(svc, effectiveVenueId, {
+          name: name || '', email: email || null, phone: phone || null,
+          whatsapp: null, language: null, country: null,
+          source: 'wedding_venues_spain',
+        })
+      } catch (err) {
+        console.warn('[leads/create] client auto-link failed:', err)
+      }
+    }
 
     const { data, error } = await svc.from('leads').insert({
       user_id:               userId,
-      venue_id:              venueRow?.id ?? null,
+      venue_id:              effectiveVenueId,
       status:                'new',
       source:                'wedding_venues_spain',
       name:                  name    || '',
@@ -86,6 +104,7 @@ export async function POST(req: NextRequest) {
       language:              null,
       wants_wedding_planner: wants_wedding_planner === true || wants_wedding_planner === 'true' || false,
       whatsapp_consent:      whatsapp_consent === true || whatsapp_consent === 'true' || false,
+      client_id:             clientId,
     }).select().single()
 
     if (error) {

@@ -39,8 +39,8 @@ export default function Sidebar() {
     if (!user || isAdmin || isPlanner) return
     const supabase = createClient()
     let q = supabase.from('leads').select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id).eq('status', 'new')
-    // Multi-venue: only count leads for the active venue
+      .eq('status', 'new')
+    // Filter by venue_id (canonical) — shared venue data included
     if (activeVenue?.id) q = q.eq('venue_id', activeVenue.id)
     q.then(({ count }) => setNewLeadsCount(count ?? 0))
   }
@@ -144,7 +144,7 @@ export default function Sidebar() {
   // ── Venue owner nav groups ──────────────────────────────────────────────────
   const comercialItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
     { href: '/leads',        label: 'Leads',                                          icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', feature: 'leads'        },
-    { href: '/crm',          label: 'CRM',                                           icon: 'M1 12s2-4 7-4 7 4 7 4M8 8a3 3 0 100-6 3 3 0 000 6zM15 12s-1-2.5-3.5-3.5M12.5 5.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z', feature: 'leads' },
+    { href: '/crm',          label: 'Contactos',                                     icon: 'M1 12s2-4 7-4 7 4 7 4M8 8a3 3 0 100-6 3 3 0 000 6zM15 12s-1-2.5-3.5-3.5M12.5 5.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z', feature: 'leads' },
     { href: '/calendario',   label: isMultiVenue ? 'Calendarios'    : 'Calendario',  icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
   ]
   const propuestasItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
@@ -209,7 +209,7 @@ export default function Sidebar() {
   return (
     <div className="sidebar">
       <div className="sidebar-logo">
-        <span className="brand">Wedding Venues Spain</span>
+        <span className="brand">FOREVENTOS</span>
         <span className="venue-name">{portalLabel}</span>
 
         {/* Venue switcher — only for venue owners with an active venue */}
@@ -256,24 +256,24 @@ export default function Sidebar() {
               }}>
                 {userVenues.map(v => (
                   <button
-                    key={v.id}
+                    key={v.row_id}
                     onMouseDown={(e) => {
                       e.stopPropagation()
-                      switchVenue(v.id)
+                      switchVenue(v.row_id)
                       setVenueOpen(false)
                     }}
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 8,
                       padding: '9px 12px', background: 'none', border: 'none',
-                      color: v.id === activeVenue?.id ? 'var(--gold)' : 'rgba(255,255,255,0.8)',
-                      fontSize: 12, fontWeight: v.id === activeVenue?.id ? 600 : 400,
+                      color: v.row_id === activeVenue?.row_id ? 'var(--gold)' : 'rgba(255,255,255,0.8)',
+                      fontSize: 12, fontWeight: v.row_id === activeVenue?.row_id ? 600 : 400,
                       cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left',
                     }}
                   >
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {v.name ?? `Venue ${v.wp_venue_id}`}
                     </span>
-                    {v.id === activeVenue?.id && <Check size={11} />}
+                    {v.row_id === activeVenue?.row_id && <Check size={11} />}
                   </button>
                 ))}
               </div>

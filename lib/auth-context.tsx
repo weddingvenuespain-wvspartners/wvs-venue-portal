@@ -3,7 +3,8 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 
 export type UserVenue = {
-  id:          string
+  id:          string   // effective venue_id for data queries (= canonical_venue_id || row_id)
+  row_id:      string   // actual PK from user_venues table
   wp_venue_id: number
   name:        string | null
   is_primary:  boolean
@@ -29,11 +30,11 @@ const ACTIVE_VENUE_KEY = 'wvs_active_venue_id'
 
 function resolveActiveVenue(venues: UserVenue[]): UserVenue | null {
   if (!venues.length) return null
-  // Try to restore from localStorage
+  // Try to restore from localStorage (stored key is row_id)
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem(ACTIVE_VENUE_KEY)
     if (stored) {
-      const match = venues.find(v => v.id === stored)
+      const match = venues.find(v => v.row_id === stored)
       if (match) return match
     }
   }
@@ -47,7 +48,7 @@ async function fetchProfileAndVenues(userId: string) {
   // Fetch venues via browser client (RLS: user sees own venues)
   const venuesResult = await supabase
     .from('user_venues')
-    .select('id, wp_venue_id, name, is_primary')
+    .select('id, wp_venue_id, name, is_primary, canonical_venue_id')
     .eq('user_id', userId)
 
   // Fetch profile via service-role API to bypass RLS.
@@ -81,10 +82,17 @@ async function fetchProfileAndVenues(userId: string) {
     // No subscription found → profile.plan stays undefined → basic/restricted access
   }
 
-  return {
-    profile,
-    userVenues: (venuesResult.data ?? []) as UserVenue[],
-  }
+  // Map raw rows: id becomes the effective venue_id for data queries,
+  // row_id keeps the actual PK for venue switching / localStorage.
+  const mappedVenues: UserVenue[] = (venuesResult.data ?? []).map((v: any) => ({
+    row_id:      v.id,
+    id:          v.canonical_venue_id || v.id,
+    wp_venue_id: v.wp_venue_id,
+    name:        v.name,
+    is_primary:  v.is_primary,
+  }))
+
+  return { profile, userVenues: mappedVenues }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -98,15 +106,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadedUserIdRef = useRef<string | null>(null)
 
   const switchVenue = (venueId: string) => {
-    const venue = userVenues.find(v => v.id === venueId)
+    // venueId is always a row_id (actual PK from user_venues)
+    const venue = userVenues.find(v => v.row_id === venueId)
     if (!venue) return
     setActiveVenue(venue)
     if (typeof window !== 'undefined') {
-      localStorage.setItem(ACTIVE_VENUE_KEY, venueId)
+      localStorage.setItem(ACTIVE_VENUE_KEY, venue.row_id)
     }
     // Re-fetch subscription for the new venue (only matters for multi-venue accounts)
     if (userVenues.length > 1) {
-      fetch(`/api/auth/subscription?venue_id=${venueId}`)
+      fetch(`/api/auth/subscription?venue_id=${venue.row_id}`)
         .then(r => r.json())
         .then(({ subscription }) => {
           setProfile((prev: any) => {
@@ -147,7 +156,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { profile: p, userVenues: v } = await fetchProfileAndVenues(u.id)
       setProfile(p)
       setUserVenues(v)
-      setActiveVenue(resolveActiveVenue(v))
+      const initialVenue = resolveActiveVenue(v)
+      setActiveVenue(initialVenue)
+
+      // Multi-venue: if current venue's trial is expired, try switching to one with active subscription
+      if (v.length > 1 && initialVenue && p) {
+        const subStatus = (p as any).subscription_status
+        const trialEnd = (p as any).trial_end_date
+        const isExpired = subStatus === 'trial_expired' ||
+          (subStatus === 'trial' && trialEnd && new Date(trialEnd) <= new Date())
+        if (isExpired) {
+          // Try each other venue to find one with active/valid-trial subscription
+          for (const ov of v) {
+            if (ov.row_id === initialVenue.row_id) continue
+            try {
+              const res = await fetch(`/api/auth/subscription?venue_id=${ov.row_id}`)
+              const { subscription: sub } = await res.json()
+              if (sub && (sub.status === 'active' || (sub.status === 'trial' && sub.trial_end_date && new Date(sub.trial_end_date) > new Date()))) {
+                setActiveVenue(ov)
+                setProfile((prev: any) => prev ? { ...prev, plan: sub.plan, subscription_status: sub.status, trial_end_date: sub.trial_end_date } : prev)
+                if (typeof window !== 'undefined') localStorage.setItem(ACTIVE_VENUE_KEY, ov.row_id)
+                break
+              }
+            } catch { /* ignore */ }
+          }
+        }
+      }
     } catch (err) {
       console.warn('[auth] loadForUser failed:', err)
       loadedUserIdRef.current = null  // allow retry on next auth event
@@ -165,7 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setActiveVenue(prev => {
       // Keep the same venue if still available, otherwise re-resolve
       if (prev) {
-        const still = v.find(x => x.id === prev.id)
+        const still = v.find(x => x.row_id === prev.row_id)
         if (still) return still
       }
       return resolveActiveVenue(v)

@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
+import NoVenueState from '@/components/NoVenueState'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import {
   Plus, ChevronDown, ChevronUp, Pencil, Trash2, Copy,
@@ -902,6 +903,10 @@ export default function EstructuraPage() {
   // ── Guards ─────────────────────────────────────────────────────────────────
 
   if (isBlocked) return null
+
+  if (!authLoading && !activeVenue) {
+    return <><Sidebar /><div className="main-layout" style={{ padding: '24px 28px' }}><NoVenueState /></div></>
+  }
 
   if (authLoading || loading) return (
     <div style={{ display: 'flex' }}><Sidebar />

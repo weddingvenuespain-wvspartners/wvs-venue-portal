@@ -83,6 +83,7 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
   const [taxRate, setTaxRate] = useState<number>(21)
   const [taxIncluded, setTaxIncluded] = useState(true)
   const [password, setPassword] = useState('')
+  const [includesText, setIncludesText] = useState('')
   const [dossierResponses, setDossierResponses] = useState<DossierResponse[]>([])
   const [paymentPlan, setPaymentPlan] = useState<PaymentInstallment[]>([])
 
@@ -120,6 +121,7 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
     setTaxIncluded(bud.tax_included ?? true)
     setPaymentPlan(bud.payment_plan || [])
     setPassword(bud.password ?? '')
+    setIncludesText(bud.includes_text ?? '')
     setLeadId(bud.lead_id)
     if (t) setTemplates(t as PaymentTemplate[])
     if (m) setModalities(m)
@@ -198,19 +200,20 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
       discount_amount: discountAmount || null,
       discount_label: discountLabel || null,
       password: password || null,
+      includes_text: includesText || null,
       lead_id: leadId,
       updated_at: new Date().toISOString(),
     }).eq('id', budget.id)
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 2000)
-  }, [budget, coupleName, coupleEmail, weddingDate, guestCount, notes, validUntil, groups, paymentPlan, total, taxRate, taxIncluded, discountType, discountAmount, discountLabel, password, leadId])
+  }, [budget, coupleName, coupleEmail, weddingDate, guestCount, notes, validUntil, groups, paymentPlan, total, taxRate, taxIncluded, discountType, discountAmount, discountLabel, password, includesText, leadId])
 
   // Auto-save on changes (debounced)
   useEffect(() => {
     if (!budget || loading) return
     const t = setTimeout(() => { saveBudget() }, 1500)
     return () => clearTimeout(t)
-  }, [coupleName, coupleEmail, weddingDate, guestCount, notes, validUntil, groups, paymentPlan, taxRate, taxIncluded, discountType, discountAmount, discountLabel, password, leadId])
+  }, [coupleName, coupleEmail, weddingDate, guestCount, notes, validUntil, groups, paymentPlan, taxRate, taxIncluded, discountType, discountAmount, discountLabel, password, includesText, leadId])
 
   // Group operations
   const addGroup = () => {
@@ -520,11 +523,11 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
 
           {/* ── Datos de la pareja ─────────────────────────────── */}
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Datos de la pareja</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Datos del cliente</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Nombre</label>
-                <input className="form-input" value={coupleName} onChange={e => setCoupleName(e.target.value)} placeholder="Laura y Carlos" />
+                <label className="form-label">Titulo / Nombre del cliente</label>
+                <input className="form-input" value={coupleName} onChange={e => setCoupleName(e.target.value)} placeholder="Ej: Laura y Carlos, Boda Laura, Cena corporativa..." />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Email</label>
@@ -805,13 +808,43 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
                       </div>
                     )}
                     {d.visit_request && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--ivory)' }}>
-                        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 65 }}>Visita</span>
-                        <span style={{ fontSize: 11 }}>
-                          {(d.visit_request as any)?.date ? new Date((d.visit_request as any).date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : ''}
-                          {(d.visit_request as any)?.time ? ` a las ${(d.visit_request as any).time}` : ''}
-                        </span>
-                      </div>
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--ivory)' }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 65 }}>Visita</span>
+                          <span style={{ fontSize: 11 }}>
+                            {(d.visit_request as any)?.date ? new Date((d.visit_request as any).date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : ''}
+                            {(d.visit_request as any)?.time ? ` a las ${(d.visit_request as any).time}` : ''}
+                          </span>
+                        </div>
+                        {Array.isArray((d.visit_request as any)?.selected_spaces) && (d.visit_request as any).selected_spaces.length > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 6 }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 65 }}>Espacios</span>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                              {(d.visit_request as any).selected_spaces.map((s: any, i: number) => (
+                                <span key={i} style={{ fontSize: 10, background: 'var(--ivory)', padding: '1px 6px', borderRadius: 4 }}>
+                                  {[s.group_name, s.space_name].filter(Boolean).join(': ')}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {Array.isArray((d.visit_request as any)?.selected_menus) && (d.visit_request as any).selected_menus.length > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 6 }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 65 }}>Menús</span>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                              {(d.visit_request as any).selected_menus.map((m: string, i: number) => (
+                                <span key={i} style={{ fontSize: 10, background: 'var(--ivory)', padding: '1px 6px', borderRadius: 4 }}>{m}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {(d.visit_request as any)?.message && (
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 6 }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 65 }}>Mensaje</span>
+                            <span style={{ fontSize: 11, fontStyle: 'italic', color: 'var(--warm-gray)' }}>{(d.visit_request as any).message}</span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -839,6 +872,22 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
               </div>
             </div>
             {password && <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 6 }}>La pareja necesitará esta contraseña para ver el presupuesto.</div>}
+          </div>
+
+          {/* ── Qué incluye ─────────────────── */}
+          <div style={{ marginBottom: 20 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">¿Qué incluye tu presupuesto?</label>
+              <textarea
+                className="form-input"
+                rows={4}
+                value={includesText}
+                onChange={e => setIncludesText(e.target.value)}
+                placeholder="Ej: Cocktail de bienvenida, menú degustación, barra libre 5h, coordinador del evento, montaje y desmontaje..."
+                style={{ resize: 'vertical', fontSize: 12 }}
+              />
+              <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4 }}>Visible en la pestaña "Espacio" del presupuesto público.</div>
+            </div>
           </div>
 
         </div>

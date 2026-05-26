@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
+import NoVenueState from '@/components/NoVenueState'
 import { Eye, MousePointerClick, MessageSquare, TrendingUp } from 'lucide-react'
 import Spinner from '@/components/Spinner'
 
@@ -65,6 +66,10 @@ export default function EstadisticasPage() {
   const newLeadsMonth = leads.filter(l => l.created_at >= thisMonthStart).length
 
   if (isBlocked) return null
+
+  if (!authLoading && !activeVenue) {
+    return <><Sidebar /><div className="main-layout" style={{ padding: '24px 28px' }}><NoVenueState /></div></>
+  }
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

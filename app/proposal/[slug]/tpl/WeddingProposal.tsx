@@ -3,7 +3,7 @@
 // menú (con cursos variables), estaciones/ceremonia/AV, invitados y comentarios.
 // Muestra total en vivo. Submit registra la selección y notifica al venue.
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { ProposalData } from '../page'
 import type { Menu, MenuCourse, MenuExtra, AppetizerGroup } from './shared'
 import { toRgb, FadeUp, ivaLabel } from './shared'
@@ -72,11 +72,19 @@ const COCKTAIL_CATS: MenuExtra['category'][] = ['station']
 const NIGHT_CATS:    MenuExtra['category'][] = ['resopon', 'open_bar']
 const EVENT_CATS:    MenuExtra['category'][] = ['ceremony', 'music', 'audiovisual', 'other']
 
+// ─── Cart summary type (shared with visit/budget modals) ──────────────────────
+export type CartSummary = {
+  guests: number
+  menuItems: Array<{ name: string; guests: number; courseSelections: string[] }>
+  extras: Array<{ name: string; category: string; guests?: number }>
+  total: number
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export function WeddingProposal({
   data, menus: menusInput, extras, appetizers, legacyMenus,
-  primary, onPrimary, dark = false, previewOnly = false, onMenusChange,
+  primary, onPrimary, dark = false, previewOnly = false, onMenusChange, onTotalChange, onValidationChange, onCartChange, validationWarning = null,
 }: {
   data: ProposalData
   menus: Menu[] | null
@@ -85,10 +93,15 @@ export function WeddingProposal({
   legacyMenus?: Array<{ name: string; price_per_person: string; description?: string; min_guests?: number }>
   primary: string; onPrimary: string; dark?: boolean; previewOnly?: boolean
   onMenusChange?: (names: string[]) => void
+  onTotalChange?: (total: number) => void
+  onValidationChange?: (errors: string[]) => void
+  onCartChange?: (cart: CartSummary) => void
+  validationWarning?: string | null
 }) {
   const rgb = toRgb(primary)
   const sd = data.sections_data ?? null
   const showMenuPrices = sd?.show_menu_prices !== false
+  const menuPickLimit = sd?.menu_pick_limit ?? null  // null = unlimited
 
   const menus: Menu[] = useMemo(() => {
     if (menusInput?.length) return menusInput
@@ -191,6 +204,9 @@ export function WeddingProposal({
     return menuTotal + extrasTotal
   }, [menus, effectiveAllocations, weddingDate, extras, selectedExtras, courseChoices, guests, extraGuestCounts, barraExtraHours, barraExtraPeople])
 
+  // Notify parent of total changes
+  useEffect(() => { onTotalChange?.(total) }, [total, onTotalChange])
+
   const missingChoices = useMemo<string[]>(() => {
     const missing: string[] = []
     menus.forEach((m, i) => {
@@ -205,6 +221,62 @@ export function WeddingProposal({
     })
     return missing
   }, [menus, effectiveAllocations, courseChoices])
+
+  // Notify parent of validation state
+  useEffect(() => {
+    if (!onValidationChange) return
+    const errors: string[] = []
+    const allocatedMenus = menus.filter((m, i) => (effectiveAllocations[menuId(m, i)] || 0) > 0)
+    if (menus.length > 0 && !allocatedMenus.length) {
+      errors.push('Asigna comensales a al menos un menú')
+    } else if (menus.length > 1 && totalAllocated > 0 && totalAllocated !== guestTarget) {
+      errors.push(`Reparte todos los comensales: ${totalAllocated} de ${guestTarget} asignados`)
+    }
+    missingChoices.forEach(mc => errors.push(`Falta selección en: ${mc}`))
+    menuViolations.forEach(v => errors.push(v.type === 'min' ? `${v.menuName}: mínimo ${v.limit} comensales` : `${v.menuName}: máximo ${v.limit} comensales`))
+    onValidationChange(errors)
+  }, [onValidationChange, menus, effectiveAllocations, missingChoices, menuViolations, totalAllocated, guestTarget])
+
+  // Report full cart summary to parent — use refs for unstable object props to avoid infinite loops
+  const extrasRef = useRef(extras)
+  extrasRef.current = extras
+  const menusRef = useRef(menus)
+  menusRef.current = menus
+  const allocRef = useRef(effectiveAllocations)
+  allocRef.current = effectiveAllocations
+
+  // Stable serialised key that changes only when user actually changes allocations
+  const allocKey = useMemo(() => JSON.stringify(effectiveAllocations), [effectiveAllocations])
+
+  useEffect(() => {
+    if (!onCartChange) return
+    const currentMenus = menusRef.current
+    const currentExtras = extrasRef.current
+    const currentAlloc = allocRef.current
+    const menuItems = currentMenus
+      .map((m, i) => {
+        const id = menuId(m, i)
+        const count = currentAlloc[id] || 0
+        if (!count) return null
+        const courseSelections: string[] = []
+        ;(m.courses ?? []).forEach((c, ci) => {
+          const picks = courseChoices[`${id}-c${ci}`] || []
+          if (picks.length > 0) courseSelections.push(`${c.label}: ${picks.join(', ')}`)
+        })
+        return { name: m.name, guests: count, courseSelections }
+      })
+      .filter(Boolean) as CartSummary['menuItems']
+
+    const extraItems: CartSummary['extras'] = []
+    ;(currentExtras ?? []).forEach((e, i) => {
+      const key = extraId(e, i)
+      if (!selectedExtras[key]) return
+      const gc = extraGuestCounts[key]
+      extraItems.push({ name: e.name, category: CATEGORY_LABELS[e.category] || e.category, guests: gc || undefined })
+    })
+
+    onCartChange({ guests: guestTarget, menuItems, extras: extraItems, total })
+  }, [onCartChange, allocKey, courseChoices, selectedExtras, extraGuestCounts, guestTarget, total])
 
   const extrasByCategory = useMemo(() => {
     if (!extras) return null
@@ -231,6 +303,7 @@ export function WeddingProposal({
     setError(null)
     const allocatedMenus = menus.filter((m, i) => (effectiveAllocations[menuId(m, i)] || 0) > 0)
     if (menus.length > 0 && !allocatedMenus.length) { setError('Asigna invitados a al menos un menú'); return }
+    if (menus.length > 1 && totalAllocated !== guestTarget) { setError(`El total de comensales asignados (${totalAllocated}) debe ser igual al número de invitados (${guestTarget})`); return }
     if (menuViolations.length) { setError(menuViolations.map(v => v.type === 'min' ? `${v.menuName}: mínimo ${v.limit} comensales (tienes ${v.count})` : `${v.menuName}: máximo ${v.limit} comensales (tienes ${v.count})`).join('. ')); return }
     if (missingChoices.length) { setError(`Faltan opciones en: ${missingChoices.join(', ')}`); return }
     setSending(true)
@@ -455,9 +528,23 @@ export function WeddingProposal({
         {menus.length > 0 && (
           <FadeUp>
             <div className={styles.wpSection}>
-              <div className={styles.wpSectionN}>
+              <div className={styles.wpSectionN} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 {menus.length > 1 ? 'Paso 1 · Elegid vuestros menús' : 'Paso 1 · Elegid vuestro menú'}
+                <span style={{ fontSize: '.55rem', fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: dark ? 'rgba(239,68,68,.15)' : '#ffebee', color: dark ? '#fca5a5' : '#c62828', border: `1px solid ${dark ? 'rgba(239,68,68,.3)' : '#ffcdd2'}`, letterSpacing: '.06em' }}>OBLIGATORIO</span>
               </div>
+
+              {/* Validation warning from parent */}
+              {validationWarning && (
+                <div id="wp-validation-warning" style={{
+                  padding: '10px 16px', borderRadius: 10, marginBottom: 16,
+                  background: dark ? 'rgba(239,68,68,.12)' : 'rgba(239,68,68,.06)',
+                  border: `1.5px solid ${dark ? 'rgba(239,68,68,.3)' : 'rgba(239,68,68,.2)'}`,
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                  <span style={{ fontSize: '.95rem' }}>⚠️</span>
+                  <span style={{ fontSize: '.8rem', color: dark ? '#fca5a5' : '#b91c1c', fontWeight: 600 }}>{validationWarning}</span>
+                </div>
+              )}
 
               {/* ── SINGLE MENU ─────────────────────────────────────────── */}
               {menus.length === 1 && (() => {
@@ -500,8 +587,16 @@ export function WeddingProposal({
               {/* ── MULTI MENU — split pane ──────────────────────────────── */}
               {menus.length > 1 && (() => {
                 const selMenu = menus[Math.min(selectedMenuIdx, menus.length - 1)]
+                const menusWithGuests = menus.filter((m, i) => (menuAllocations[menuId(m, i)] || 0) > 0).length
+                const atPickLimit = menuPickLimit !== null && menusWithGuests >= menuPickLimit
                 return (
                   <>
+                    {/* Pick limit hint */}
+                    {menuPickLimit !== null && (
+                      <div style={{ fontSize: '.78rem', color: 'var(--wp-text-soft)', textAlign: 'center', marginBottom: 12 }}>
+                        {menuPickLimit === 1 ? 'Elige 1 menú para todos los comensales' : `Podéis elegir hasta ${menuPickLimit} menús y repartir los comensales`}
+                      </div>
+                    )}
                     <div className={styles.wpMenuPane}>
                       {/* Sidebar */}
                       <div className={styles.wpMenuSidebar}>
@@ -511,10 +606,22 @@ export function WeddingProposal({
                           const isSel = selectedMenuIdx === i
                           const mPrice = showMenuPrices ? getMenuPrice(m, weddingDate) : null
                           const maxG = (m as any).max_guests as number | undefined
+                          // Disable adding to this menu if pick limit reached and this menu has 0
+                          const lockedByLimit = atPickLimit && count === 0
                           return (
                             <div key={id}
                               className={cx(styles.wpMenuSidebarItem, isSel && styles.wpMenuSidebarItemSel)}
-                              onClick={() => setSelectedMenuIdx(i)}>
+                              style={lockedByLimit ? { opacity: 0.45 } : undefined}
+                              onClick={() => {
+                                setSelectedMenuIdx(i)
+                                // Single pick mode: clicking a menu selects it with all guests
+                                if (menuPickLimit === 1) {
+                                  const allZero: Record<string, number> = {}
+                                  menus.forEach((mm, mi) => { allZero[menuId(mm, mi)] = 0 })
+                                  allZero[id] = guestTarget
+                                  setMenuAllocations(allZero)
+                                }
+                              }}>
                               <div className={styles.wpMenuSidebarInfo}>
                                 <div className={styles.wpMenuSidebarName}>{m.name}</div>
                                 {mPrice && mPrice !== '' && <div className={styles.wpMenuSidebarPrice}>{mPrice} /persona</div>}
@@ -522,9 +629,21 @@ export function WeddingProposal({
                                 <div className={styles.wpMenuSidebarAlloc} onClick={e => e.stopPropagation()}>
                                   <button type="button" className={styles.wpMenuSidebarStepBtn}
                                     onClick={() => setMenuAllocations(p => ({ ...p, [id]: Math.max(0, (p[id] || 0) - 1) }))}>−</button>
-                                  <input type="number" className={styles.wpStepperInput} style={{ width: 40, fontSize: '.82rem', lineHeight: '20px', borderLeft: '1px solid var(--wp-border)', borderRight: '1px solid var(--wp-border)' }} min={0} value={count} onChange={e => { const v = Math.max(0, parseInt(e.target.value) || 0); if (!maxG || v <= maxG) setMenuAllocations(p => ({ ...p, [id]: v })) }} />
+                                  <input type="number" className={styles.wpStepperInput} style={{ width: 40, fontSize: '.82rem', lineHeight: '20px', borderLeft: '1px solid var(--wp-border)', borderRight: '1px solid var(--wp-border)' }} min={0} value={count}
+                                    onChange={e => {
+                                      const v = Math.max(0, parseInt(e.target.value) || 0)
+                                      if (maxG && v > maxG) return
+                                      // Block adding to new menu if at pick limit
+                                      if (v > 0 && count === 0 && atPickLimit) return
+                                      setMenuAllocations(p => ({ ...p, [id]: v }))
+                                    }} />
                                   <button type="button" className={styles.wpMenuSidebarStepBtn}
-                                    onClick={() => { const next = (menuAllocations[id] || 0) + 1; if (!maxG || next <= maxG) setMenuAllocations(p => ({ ...p, [id]: next })) }}>+</button>
+                                    onClick={() => {
+                                      const next = (menuAllocations[id] || 0) + 1
+                                      if (maxG && next > maxG) return
+                                      if (count === 0 && atPickLimit) return
+                                      setMenuAllocations(p => ({ ...p, [id]: next }))
+                                    }}>+</button>
                                   <span style={{ fontSize: '.72rem', color: 'var(--wp-text-dim)', marginLeft: 2 }}>pax</span>
                                 </div>
                                 {count > 0 && m.min_guests && count < m.min_guests && (
@@ -581,7 +700,10 @@ export function WeddingProposal({
           return (
             <FadeUp>
               <div className={styles.wpSection}>
-                <div className={styles.wpSectionN}>Noche y madrugada</div>
+                <div className={styles.wpSectionN} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  Noche y madrugada
+                  <span style={{ fontSize: '.55rem', fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: dark ? 'rgba(251,191,36,.12)' : '#fffbeb', color: dark ? '#fbbf24' : '#92400e', border: `1px solid ${dark ? 'rgba(251,191,36,.3)' : '#fde68a'}`, letterSpacing: '.06em' }}>OPCIONAL</span>
+                </div>
                 <h3 className={styles.wpSectionH}>Que la fiesta no pare</h3>
                 {resoponItems.length > 0 && (
                   <div className={hasBoth ? styles.wpXcat : undefined}>
@@ -693,7 +815,10 @@ export function WeddingProposal({
         {extrasByCategory && EVENT_CATS.some(cat => extrasByCategory[cat]?.length) && (
           <FadeUp>
             <div className={styles.wpSection}>
-              <div className={styles.wpSectionN}>{menus.length > 0 ? 'Paso 2 · Extras del evento' : 'Extras del evento'}</div>
+              <div className={styles.wpSectionN} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                {menus.length > 0 ? 'Paso 2 · Extras del evento' : 'Extras del evento'}
+                <span style={{ fontSize: '.55rem', fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: dark ? 'rgba(251,191,36,.12)' : '#fffbeb', color: dark ? '#fbbf24' : '#92400e', border: `1px solid ${dark ? 'rgba(251,191,36,.3)' : '#fde68a'}`, letterSpacing: '.06em' }}>OPCIONAL</span>
+              </div>
               <h3 className={styles.wpSectionH}>Personaliza vuestro día</h3>
               {EVENT_CATS.filter(cat => extrasByCategory![cat]?.length).map(cat => (
                 <div key={cat} className={styles.wpXcat}>
@@ -737,21 +862,6 @@ export function WeddingProposal({
           <FadeUp>
             <div className={styles.wpSection}>
               <div className={styles.wpSectionN}>{menus.length > 0 ? 'Paso 3 · Detalles finales' : 'Detalles finales'}</div>
-              {dateIsFlexible && (
-                <div style={{ marginBottom: 24 }}>
-                  <DatePicker
-                    label="Fecha de la boda"
-                    value={localDate}
-                    onChange={setLocalDate}
-                    accent={primary}
-                    dark={dark}
-                    placeholder="Selecciona la fecha"
-                  />
-                  {hasSeasonPrices && (
-                    <div className={styles.wpDateNote} style={{ marginTop: 6 }}>{localDate ? 'Precio actualizado según la fecha elegida' : 'Selecciona una fecha — el precio puede variar por temporada'}</div>
-                  )}
-                </div>
-              )}
               {menus.length === 0 && (
                 <div style={{ marginBottom: 24 }}>
                   <label className={styles.wpLabel}>Número de invitados</label>
@@ -773,7 +883,7 @@ export function WeddingProposal({
 
         {/* Resumen + Total */}
         <FadeUp>
-          <div className={styles.wpFooter}>
+          <div id="wp-submit-section" className={styles.wpFooter}>
             <div className={styles.wpSumLines}>
               {menus.filter((m, i) => (effectiveAllocations[menuId(m, i)] || 0) > 0).map(m => {
                 const i = menus.indexOf(m); const id = menuId(m, i)

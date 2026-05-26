@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, X, Check, Loader2 } from 'lucide-react'
 
@@ -22,12 +22,18 @@ type DateSlotOption = {
   price_per_person?: string
 }
 
+type MenuCartItem = { name: string; guests: number; courseSelections: string[] }
+type CartSummary = { guests: number; menuItems: MenuCartItem[]; extras: Array<{ name: string; category: string; guests?: number }>; total: number }
+
 type Props = {
   proposalId: string
   coupleName: string
   primaryColor?: string
   selectedSpaces?: Array<{ group_name: string; space_name: string }>
   selectedMenus?: string[]
+  menuCart?: CartSummary | null
+  guestCount?: number
+  weddingDate?: string
   selectedExtraSvcs?: string[]
   spaceGroups?: Array<{ name: string; selection_mode?: string; optional?: boolean; requires_selection?: boolean }>
   dateSlots?: DateSlotOption[]
@@ -36,9 +42,11 @@ type Props = {
   onSuccess: () => void
 }
 
-// step groups → which "paso" they belong to
-type Step = 'type' | 'info' | 'calendar' | 'time' | 'confirm'
+// Steps: date_pick → type → info → calendar → time → confirm
+// date_pick only shown if multiple proposed dates
+type Step = 'date_pick' | 'type' | 'info' | 'calendar' | 'time' | 'confirm'
 function stepNum(s: Step) {
+  if (s === 'date_pick') return 0 // pre-step, not counted
   if (s === 'type') return 1
   if (s === 'info') return 2
   return 3
@@ -48,21 +56,39 @@ const TOTAL_STEPS = 3
 
 export default function VisitBookingModal({
   proposalId, coupleName, primaryColor = '#2E6DB4',
-  selectedSpaces = [], selectedMenus = [], selectedExtraSvcs = [], spaceGroups,
+  selectedSpaces = [], selectedMenus = [], menuCart, guestCount, weddingDate,
+  selectedExtraSvcs = [], spaceGroups,
   dateSlots = [], preSelectedDateSlot = null,
   onClose, onSuccess,
 }: Props) {
   const [slots, setSlots] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
 
-  const [step, setStep] = useState<Step>('type')
+  // Build flat list of all proposed dates
+  const allProposedDates: Array<{ iso: string; slotIdx: number; price: string; label?: string }> = []
+  ;(dateSlots ?? []).forEach((slot, si) => {
+    if (!slot || !Array.isArray(slot.dates)) return
+    const price = slot.price_rental || slot.price_per_person || ''
+    slot.dates.forEach(d => allProposedDates.push({ iso: d, slotIdx: si, price, label: slot.label }))
+  })
+  allProposedDates.sort((a, b) => a.iso.localeCompare(b.iso))
+
+  const multiDates = allProposedDates.length > 1
+  const singleDate = allProposedDates.length === 1
+
+  // Auto-select if single date
+  const [preferredDateSlot, setPreferredDateSlot] = useState<number | null>(
+    singleDate ? allProposedDates[0]?.slotIdx ?? preSelectedDateSlot : preSelectedDateSlot
+  )
+  const [preferredWeddingDate, setPreferredWeddingDate] = useState<string | null>(
+    singleDate ? allProposedDates[0]?.iso ?? null : null
+  )
+
+  // Start on date_pick if multiple dates, otherwise type
+  const [step, setStep] = useState<Step>(multiDates ? 'date_pick' : 'type')
   const [visitType, setVisitType] = useState<'presencial' | 'online' | null>(null)
 
-  // Preferred wedding date — picked in step 2
-  const [preferredDateSlot, setPreferredDateSlot] = useState<number | null>(preSelectedDateSlot)
-  const [preferredWeddingDate, setPreferredWeddingDate] = useState<string | null>(null)
-
-  // Visit scheduling — step 3
+  // Visit scheduling
   const [viewYear, setViewYear] = useState(new Date().getFullYear())
   const [viewMonth, setViewMonth] = useState(new Date().getMonth())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -73,15 +99,6 @@ export default function VisitBookingModal({
   const [error, setError] = useState('')
 
   const today = todayIso()
-
-  // Build flat list of all individual proposed dates for the picker
-  const allProposedDates: Array<{ iso: string; slotIdx: number; price: string }> = []
-  dateSlots.forEach((slot, si) => {
-    const price = slot.price_rental || slot.price_per_person || ''
-    slot.dates.forEach(d => allProposedDates.push({ iso: d, slotIdx: si, price }))
-  })
-  // Sort chronologically
-  allProposedDates.sort((a, b) => a.iso.localeCompare(b.iso))
 
   useEffect(() => {
     fetch(`/api/proposals/${proposalId}/visit-slots`)
@@ -102,27 +119,19 @@ export default function VisitBookingModal({
   }
 
   const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
-  const missingRequiredGroups = (spaceGroups ?? []).filter(g => {
-    const isOptional = g.optional || g.selection_mode === 'optional' || g.selection_mode === 'none' || g.requires_selection === false
-    if (isOptional) return false
-    return !selectedSpaces.some(s => s.group_name === g.name)
-  })
 
   const goBack = () => {
     if (step === 'confirm') setStep('time')
     else if (step === 'time') setStep('calendar')
     else if (step === 'calendar') setStep('info')
     else if (step === 'info') setStep('type')
+    else if (step === 'type' && multiDates) setStep('date_pick')
   }
 
   const submit = async () => {
     if (!selectedDate || !selectedTime) return
     if (!email.trim()) { setError('Indica tu email'); return }
     if (!isValidEmail(email)) { setError('Email no válido'); return }
-    if (missingRequiredGroups.length > 0) {
-      setError(`Selecciona una opción en: ${missingRequiredGroups.map(g => g.name).join(', ')}`)
-      return
-    }
     setSubmitting(true); setError('')
     try {
       const res = await fetch(`/api/proposals/${proposalId}/visit-request`, {
@@ -150,31 +159,45 @@ export default function VisitBookingModal({
     fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)',
     textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3,
   }
+  const cardBg: React.CSSProperties = {
+    background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)',
+    borderRadius: 10, padding: '12px 16px',
+  }
 
   // ── Step indicator ────────────────────────────────────────────────────────────
   const currentStep = stepNum(step)
+  const displayStep = currentStep === 0 ? 0 : currentStep
   const StepBar = () => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-      {Array.from({ length: TOTAL_STEPS }, (_, i) => {
-        const n = i + 1
-        const active = n === currentStep
-        const done = n < currentStep
-        return (
-          <div key={n} style={{
-            height: 4, borderRadius: 2,
-            width: active ? 24 : 8,
-            background: active ? primaryColor : done ? `${primaryColor}55` : 'rgba(255,255,255,.15)',
-            transition: 'all .3s',
-          }} />
-        )
-      })}
-      <span style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', marginLeft: 4, letterSpacing: '.04em' }}>
-        Paso {currentStep} de {TOTAL_STEPS}
-      </span>
+      {displayStep === 0 ? (
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', letterSpacing: '.04em' }}>
+          Antes de empezar…
+        </span>
+      ) : (
+        <>
+          {Array.from({ length: TOTAL_STEPS }, (_, i) => {
+            const n = i + 1
+            const active = n === displayStep
+            const done = n < displayStep
+            return (
+              <div key={n} style={{
+                height: 4, borderRadius: 2,
+                width: active ? 24 : 8,
+                background: active ? primaryColor : done ? `${primaryColor}55` : 'rgba(255,255,255,.15)',
+                transition: 'all .3s',
+              }} />
+            )
+          })}
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', marginLeft: 4, letterSpacing: '.04em' }}>
+            Paso {displayStep} de {TOTAL_STEPS}
+          </span>
+        </>
+      )}
     </div>
   )
 
   const stepTitle = () => {
+    if (step === 'date_pick') return '¿Qué fecha preferís para la boda?'
     if (step === 'type') return '¿Cómo preferís la visita?'
     if (step === 'info') return 'Confirmad vuestra información'
     if (step === 'calendar') return 'Elige un día para la visita'
@@ -193,7 +216,12 @@ export default function VisitBookingModal({
         {/* ── Header ─────────────────────────────────────────────────────────── */}
         <div style={{ padding: '20px 24px 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div style={{ flex: 1 }}>
-            {step !== 'type' && (
+            {step !== 'date_pick' && step !== 'type' && (
+              <button onClick={goBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.5)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '0 0 8px' }}>
+                <ChevronLeft size={14} /> Atrás
+              </button>
+            )}
+            {step === 'type' && multiDates && (
               <button onClick={goBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.5)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '0 0 8px' }}>
                 <ChevronLeft size={14} /> Atrás
               </button>
@@ -211,6 +239,57 @@ export default function VisitBookingModal({
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,.3)' }}>
               <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
               <div style={{ marginTop: 8, fontSize: 12 }}>Cargando disponibilidad…</div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════════
+              PRE-STEP — Pick wedding date (only if multiple)
+          ══════════════════════════════════════════════════════════════════ */}
+          {!loading && step === 'date_pick' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.45)', marginBottom: 4, lineHeight: 1.5 }}>
+                Se os han propuesto varias fechas. Elegid la que más os guste:
+              </div>
+              {allProposedDates.map(({ iso, slotIdx, price, label }) => {
+                const sel = preferredWeddingDate === iso
+                return (
+                  <button key={iso} type="button"
+                    onClick={() => {
+                      setPreferredWeddingDate(iso)
+                      setPreferredDateSlot(slotIdx)
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '14px 16px', borderRadius: 12,
+                      border: `1.5px solid ${sel ? primaryColor : 'rgba(255,255,255,.1)'}`,
+                      background: sel ? `${primaryColor}18` : 'rgba(255,255,255,.03)',
+                      color: '#fff', cursor: 'pointer', transition: 'all .15s', textAlign: 'left',
+                    }}>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: sel ? 600 : 400 }}>{dateLabelShort(iso)}</div>
+                      {label && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>{label}</div>}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {price && <span style={{ fontSize: 13, color: sel ? primaryColor : 'rgba(255,255,255,.4)', fontWeight: 600 }}>{price}</span>}
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${sel ? primaryColor : 'rgba(255,255,255,.2)'}`, background: sel ? primaryColor : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {sel && <Check size={11} color="#fff" strokeWidth={3} />}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+              <button type="button"
+                onClick={() => setStep('type')}
+                disabled={!preferredWeddingDate}
+                style={{
+                  marginTop: 8, padding: '14px 0', borderRadius: 10, border: 'none', fontSize: 15, fontWeight: 700,
+                  background: preferredWeddingDate ? primaryColor : 'rgba(255,255,255,.1)',
+                  color: preferredWeddingDate ? '#fff' : 'rgba(255,255,255,.3)',
+                  cursor: preferredWeddingDate ? 'pointer' : 'not-allowed',
+                  transition: 'all .2s',
+                }}>
+                Siguiente →
+              </button>
             </div>
           )}
 
@@ -268,135 +347,142 @@ export default function VisitBookingModal({
           )}
 
           {/* ══════════════════════════════════════════════════════════════════
-              PASO 2 — Fecha de boda + resumen de selecciones
+              PASO 2 — Resumen completo (carrito)
           ══════════════════════════════════════════════════════════════════ */}
-          {!loading && step === 'info' && (() => {
-            const needsDatePick = allProposedDates.length > 1
-            const canContinue = !needsDatePick || !!preferredWeddingDate
+          {!loading && step === 'info' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-            // Auto-select if only 1 proposed date
-            if (allProposedDates.length === 1 && !preferredWeddingDate) {
-              setPreferredWeddingDate(allProposedDates[0].iso)
-              setPreferredDateSlot(allProposedDates[0].slotIdx)
-            }
+              {/* Helper text */}
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', lineHeight: 1.5, marginBottom: 2 }}>
+                Si queréis cambiar algo, cerrad este modal y modificadlo en el dosier.
+              </div>
 
-            return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Visit type chip */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>
+                  {visitType === 'online' ? '📹 Videollamada' : '🏠 Visita presencial'}
+                </span>
+                <button type="button" onClick={() => setStep('type')}
+                  style={{ fontSize: 11, color: primaryColor, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                  cambiar
+                </button>
+              </div>
 
-                {/* ── Visit type chip ─── */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>
-                    {visitType === 'online' ? '📹 Videollamada' : '🏠 Visita presencial'}
-                  </span>
-                  <button type="button" onClick={() => setStep('type')}
-                    style={{ fontSize: 11, color: primaryColor, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
-                    cambiar
-                  </button>
-                </div>
-
-                {/* ── Date picker (proposed wedding dates) ─── */}
-                {allProposedDates.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.35)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>
-                      {needsDatePick ? 'Fecha de boda — elige una *' : 'Fecha de boda'}
-                    </div>
-                    {allProposedDates.length === 1 ? (
-                      /* Single date — show as confirmed */
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, border: `1.5px solid ${primaryColor}`, background: `${primaryColor}18` }}>
-                        <Check size={14} color={primaryColor} strokeWidth={3} />
-                        <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{dateLabelShort(allProposedDates[0].iso)}</span>
-                        {allProposedDates[0].price && (
-                          <span style={{ fontSize: 13, color: primaryColor, fontWeight: 600, marginLeft: 'auto' }}>{allProposedDates[0].price}</span>
-                        )}
-                      </div>
-                    ) : (
-                      /* Multiple dates — pick one */
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {allProposedDates.map(({ iso, slotIdx, price }) => {
-                          const sel = preferredWeddingDate === iso
-                          return (
-                            <button key={iso} type="button"
-                              onClick={() => { setPreferredWeddingDate(iso); setPreferredDateSlot(slotIdx) }}
-                              style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                padding: '12px 16px', borderRadius: 10,
-                                border: `1.5px solid ${sel ? primaryColor : 'rgba(255,255,255,.1)'}`,
-                                background: sel ? `${primaryColor}18` : 'rgba(255,255,255,.03)',
-                                color: '#fff', cursor: 'pointer', transition: 'all .15s',
-                              }}>
-                              <span style={{ fontSize: 14, fontWeight: sel ? 600 : 400 }}>{dateLabelShort(iso)}</span>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                {price && <span style={{ fontSize: 13, color: sel ? primaryColor : 'rgba(255,255,255,.4)', fontWeight: 600 }}>{price}</span>}
-                                <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${sel ? primaryColor : 'rgba(255,255,255,.2)'}`, background: sel ? primaryColor : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                  {sel && <Check size={10} color="#fff" strokeWidth={3} />}
-                                </div>
-                              </div>
-                            </button>
-                          )
-                        })}
-                        {!preferredWeddingDate && (
-                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', marginTop: 2 }}>
-                            Podéis cambiarla más adelante
-                          </div>
+              {/* Wedding date + guests row */}
+              {(preferredWeddingDate || weddingDate || guestCount) && (
+                <div style={cardBg}>
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    {(preferredWeddingDate || weddingDate) && (
+                      <div style={{ flex: 1, minWidth: 140 }}>
+                        <div style={rowLabel}>Fecha de boda</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>
+                          {dateLabelShort(preferredWeddingDate || weddingDate!)}
+                        </div>
+                        {preferredDateSlot !== null && dateSlots[preferredDateSlot]?.price_rental && (
+                          <div style={{ fontSize: 12, color: primaryColor, fontWeight: 600, marginTop: 2 }}>{dateSlots[preferredDateSlot].price_rental}</div>
                         )}
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* ── Menus summary ─── */}
-                {selectedMenus.length > 0 && (
-                  <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 16px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.35)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>
-                      Menú{selectedMenus.length > 1 ? 's' : ''}
-                    </div>
-                    {selectedMenus.map((m, i) => (
-                      <div key={i} style={{ fontSize: 14, color: '#fff', fontWeight: 500, paddingTop: i > 0 ? 4 : 0 }}>{m}</div>
-                    ))}
-                  </div>
-                )}
-
-                {/* ── Extra services summary ─── */}
-                {selectedExtraSvcs.length > 0 && (
-                  <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 16px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.35)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>
-                      Servicios adicionales
-                    </div>
-                    {selectedExtraSvcs.map((s, i) => (
-                      <div key={i} style={{ fontSize: 14, color: '#fff', fontWeight: 500, paddingTop: i > 0 ? 4 : 0 }}>{s}</div>
-                    ))}
-                  </div>
-                )}
-
-                {/* ── Spaces summary ─── */}
-                {selectedSpaces.length > 0 && (
-                  <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 16px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.35)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>
-                      Espacios
-                    </div>
-                    {selectedSpaces.map((s, i) => (
-                      <div key={i} style={{ fontSize: 13, color: 'rgba(255,255,255,.75)', paddingTop: i > 0 ? 4 : 0 }}>
-                        {s.group_name}: <strong style={{ color: '#fff' }}>{s.space_name}</strong>
+                    {guestCount && (
+                      <div>
+                        <div style={rowLabel}>Invitados</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{guestCount} personas</div>
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
+                </div>
+              )}
 
-                <button type="button"
-                  onClick={() => setStep('calendar')}
-                  disabled={!canContinue}
-                  style={{
-                    padding: '14px 0', borderRadius: 10, border: 'none', fontSize: 15, fontWeight: 700,
-                    background: canContinue ? primaryColor : 'rgba(255,255,255,.1)',
-                    color: canContinue ? '#fff' : 'rgba(255,255,255,.3)',
-                    cursor: canContinue ? 'pointer' : 'not-allowed',
-                    transition: 'all .2s',
-                  }}>
-                  {needsDatePick && !preferredWeddingDate ? 'Elige una fecha para continuar' : 'Siguiente →'}
-                </button>
-              </div>
-            )
-          })()}
+              {/* Spaces */}
+              {selectedSpaces.length > 0 && (
+                <div style={cardBg}>
+                  <div style={rowLabel}>Espacios</div>
+                  {selectedSpaces.map((s, i) => (
+                    <div key={i} style={{ fontSize: 13, color: 'rgba(255,255,255,.75)', paddingTop: i > 0 ? 4 : 0 }}>
+                      <span style={{ color: 'rgba(255,255,255,.4)' }}>{s.group_name}:</span>{' '}
+                      <strong style={{ color: '#fff' }}>{s.space_name}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Menus — rich cart from WeddingProposal */}
+              {menuCart && menuCart.menuItems.length > 0 ? (
+                <div style={cardBg}>
+                  <div style={rowLabel}>Menú</div>
+                  {menuCart.menuItems.map((m, i) => (
+                    <div key={i} style={{ paddingTop: i > 0 ? 10 : 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{m.name}</span>
+                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,.45)' }}>{m.guests} pers.</span>
+                      </div>
+                      {m.courseSelections.length > 0 && (
+                        <div style={{ marginTop: 4, paddingLeft: 8, borderLeft: `2px solid ${primaryColor}33` }}>
+                          {m.courseSelections.map((cs, j) => (
+                            <div key={j} style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', lineHeight: 1.6 }}>{cs}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {menuCart.total > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,.08)' }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.5)' }}>Total menú estimado</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: primaryColor }}>{menuCart.total.toLocaleString('es-ES')} €</span>
+                    </div>
+                  )}
+                </div>
+              ) : selectedMenus.length > 0 ? (
+                /* Fallback: just names */
+                <div style={cardBg}>
+                  <div style={rowLabel}>Menú</div>
+                  {selectedMenus.map((m, i) => (
+                    <div key={i} style={{ fontSize: 14, color: '#fff', fontWeight: 500, paddingTop: i > 0 ? 4 : 0 }}>✓ {m}</div>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* Extras from menu (noche/madrugada, añadidos, etc.) */}
+              {menuCart && menuCart.extras.length > 0 && (
+                <div style={cardBg}>
+                  <div style={rowLabel}>Extras del evento</div>
+                  {menuCart.extras.map((e, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#fff', paddingTop: i > 0 ? 3 : 0 }}>
+                      <span>✓ {e.name}</span>
+                      {e.guests && <span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>{e.guests} pers.</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Extra services (zone supplements, etc.) */}
+              {selectedExtraSvcs.length > 0 && (
+                <div style={cardBg}>
+                  <div style={rowLabel}>Servicios adicionales</div>
+                  {selectedExtraSvcs.map((s, i) => (
+                    <div key={i} style={{ fontSize: 13, color: '#fff', fontWeight: 500, paddingTop: i > 0 ? 3 : 0 }}>✓ {s}</div>
+                  ))}
+                </div>
+              )}
+
+              {/* No selections */}
+              {selectedSpaces.length === 0 && selectedMenus.length === 0 && selectedExtraSvcs.length === 0 && !(menuCart?.extras.length) && !preferredWeddingDate && !weddingDate && (
+                <div style={{ ...cardBg, textAlign: 'center', color: 'rgba(255,255,255,.35)', fontSize: 13, padding: '20px 16px' }}>
+                  No habéis seleccionado opciones todavía.<br/>
+                  <span style={{ fontSize: 11 }}>Podéis hacerlo desde el dosier digital.</span>
+                </div>
+              )}
+
+              <button type="button"
+                onClick={() => setStep('calendar')}
+                style={{
+                  marginTop: 4, padding: '14px 0', borderRadius: 10, border: 'none', fontSize: 15, fontWeight: 700,
+                  background: primaryColor, color: '#fff', cursor: 'pointer', transition: 'all .2s',
+                }}>
+                Siguiente →
+              </button>
+            </div>
+          )}
 
           {/* ══════════════════════════════════════════════════════════════════
               PASO 3 — Calendario, hora y envío
@@ -485,7 +571,7 @@ export default function VisitBookingModal({
           {!loading && step === 'confirm' && selectedDate && selectedTime && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Summary */}
-              <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ ...cardBg, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div>
                   <div style={rowLabel}>Tipo de visita</div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{visitType === 'online' ? '📹 Videollamada' : '🏠 Presencial'}</div>
@@ -494,31 +580,6 @@ export default function VisitBookingModal({
                   <div style={rowLabel}>Fecha y hora de la visita</div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>{dateLabel(selectedDate)} · {selectedTime}h</div>
                 </div>
-                {preferredWeddingDate && (
-                  <div>
-                    <div style={rowLabel}>Fecha de boda preferida</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>
-                      {dateLabelShort(preferredWeddingDate)}
-                      {preferredDateSlot !== null && dateSlots[preferredDateSlot]?.price_rental && (
-                        <span style={{ color: primaryColor, marginLeft: 8 }}>{dateSlots[preferredDateSlot].price_rental}</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {selectedSpaces.length > 0 && (
-                  <div>
-                    <div style={rowLabel}>Espacios</div>
-                    {selectedSpaces.map((s, i) => (
-                      <div key={i} style={{ fontSize: 13, color: 'rgba(255,255,255,.7)' }}>{s.group_name}: <strong style={{ color: '#fff' }}>{s.space_name}</strong></div>
-                    ))}
-                  </div>
-                )}
-                {selectedMenus.length > 0 && (
-                  <div>
-                    <div style={rowLabel}>Menús</div>
-                    {selectedMenus.map((m, i) => <div key={i} style={{ fontSize: 13, color: 'rgba(255,255,255,.7)' }}>{m}</div>)}
-                  </div>
-                )}
               </div>
 
               <div>

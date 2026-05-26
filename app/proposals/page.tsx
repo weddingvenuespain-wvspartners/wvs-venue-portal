@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
+import NoVenueState from '@/components/NoVenueState'
 import { Plus, Copy, ExternalLink, X, Check, Eye, Send, Pencil, Trash2, AlertCircle, AlertTriangle, Loader2, FileText, LayoutTemplate, ChevronLeft, ChevronRight, Search, Inbox } from 'lucide-react'
 import { renderPayload } from '@/components/InquiriesPanel'
 import FeatureGate from '@/components/FeatureGate'
@@ -252,6 +253,10 @@ function PropuestasPageContent() {
   }, [searchQuery, statusFilter, dateFilter, sortBy])
 
   if (isBlocked) return null
+
+  if (!authLoading && !activeVenue) {
+    return <><Sidebar /><div className="main-layout" style={{ padding: '24px 28px' }}><NoVenueState /></div></>
+  }
 
   if (features.loading || !features.propuestas) return (
     <FeatureGate
@@ -604,8 +609,8 @@ function PropuestasPageContent() {
       {responseModalProposal && (() => {
         const rp = responseModalProposal
         const pInq = inquiries.filter(i => i.proposal_id === rp.id).sort((a: any, b: any) => b.created_at.localeCompare(a.created_at))
-        const KIND_LABEL: Record<string, string> = { visit: 'Visita solicitada', call: 'Llamada', video: 'Videollamada', menu: 'Pregunta sobre menú', menu_selection: 'Selección de menú', date_pick: 'Fecha confirmada', other: 'Consulta' }
-        const KIND_EMOJI: Record<string, string> = { visit: '📍', call: '📞', video: '🎥', menu: '🍽️', menu_selection: '✅', date_pick: '📅', other: '💬' }
+        const KIND_LABEL: Record<string, string> = { visit: 'Visita solicitada', call: 'Llamada', video: 'Videollamada', menu: 'Pregunta sobre menú', menu_selection: 'Selección de menú', date_pick: 'Fecha confirmada', provider_selection: 'Proveedores propios', other: 'Consulta' }
+        const KIND_EMOJI: Record<string, string> = { visit: '📍', call: '📞', video: '🎥', menu: '🍽️', menu_selection: '✅', date_pick: '📅', provider_selection: '🤝', other: '💬' }
         return (
           <div className="modal-overlay" onClick={() => setResponseModalProposal(null)}>
             <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>

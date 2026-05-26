@@ -36,10 +36,10 @@ export default async function BudgetPublicPage({ params, searchParams }: {
   // Strip password from budget before sending to client
   const safeBudget = { ...budget, password: null }
 
-  // Get venue branding
+  // Get venue branding + info for Espacio tab
   const { data: venue } = await supabase
     .from('venue_onboarding')
-    .select('name, logo_url, contact_email, contact_phone')
+    .select('name, contact_email, contact_phone, description, short_bio, photo_urls, features, capacity_min, capacity_max, city, address, website')
     .eq('user_id', budget.user_id)
     .maybeSingle()
 

@@ -742,7 +742,7 @@ const sliderCard: React.CSSProperties = isMobile ? { minWidth: 240, maxWidth: 24
                     : { label: `Elige ${group.pick_n_min ?? 1}${group.pick_n_max && group.pick_n_max !== group.pick_n_min ? `–${group.pick_n_max}` : ''} ${(group.pick_n_min ?? 1) === 1 ? 'espacio' : 'espacios'}`, color: dark ? '#90caf9' : '#1565c0', bg: dark ? 'rgba(144,202,249,.12)' : '#e3f2fd', border: 'rgba(21,101,192,.25)' }
 
               return (
-                <div key={gi} style={{ borderRadius: 18, overflow: 'hidden', border: `1px solid ${divider}`, background: dark ? 'rgba(255,255,255,.02)' : '#fff', boxShadow: '0 2px 16px rgba(0,0,0,.04)' }}>
+                <div key={gi} id={`space-group-${gi}`} style={{ borderRadius: 18, overflow: 'hidden', border: `1px solid ${divider}`, background: dark ? 'rgba(255,255,255,.02)' : '#fff', boxShadow: '0 2px 16px rgba(0,0,0,.04)' }}>
 
                   {/* ── Group header ── */}
                   <div style={{ padding: '24px 28px 20px', borderBottom: `1px solid ${divider}` }}>
@@ -755,9 +755,13 @@ const sliderCard: React.CSSProperties = isMobile ? { minWidth: 240, maxWidth: 24
                           <span style={{ fontSize: '.65rem', fontWeight: 600, letterSpacing: '.05em', padding: '3px 10px', borderRadius: 999, color: modeBadge.color, background: modeBadge.bg, border: `1px solid ${modeBadge.border}` }}>
                             {modeBadge.label}
                           </span>
-                          {isOptional && (
+                          {isOptional ? (
                             <span style={{ fontSize: '.62rem', fontWeight: 600, letterSpacing: '.05em', padding: '3px 10px', borderRadius: 999, color: dark ? '#fbbf24' : '#92400e', background: dark ? 'rgba(251,191,36,.12)' : '#fffbeb', border: `1px solid ${dark ? 'rgba(251,191,36,.3)' : '#fde68a'}` }}>
                               Opcional
+                            </span>
+                          ) : (mode === 'pick_one' || mode === 'pick_n') && (
+                            <span style={{ fontSize: '.62rem', fontWeight: 600, letterSpacing: '.05em', padding: '3px 10px', borderRadius: 999, color: dark ? '#ef9a9a' : '#b71c1c', background: dark ? 'rgba(239,154,154,.1)' : '#ffebee', border: `1px solid ${dark ? 'rgba(239,154,154,.25)' : '#ffcdd2'}` }}>
+                              Obligatorio *
                             </span>
                           )}
                         </div>

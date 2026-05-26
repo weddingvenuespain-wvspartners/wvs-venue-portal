@@ -410,7 +410,10 @@ export default function ProposalMenuEditor({
                 {/* Sub-block: Estaciones opcionales */}
                 <div style={subBlock}>
                   <div style={subBlockHeader}>
-                    <div style={subBlockTitle}>Estaciones opcionales</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={subBlockTitle}>Estaciones opcionales</div>
+                      <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' }}>Opcional</span>
+                    </div>
                     <div style={subBlockHint}>Añadidos que los invitados pueden contratar: ostras, foie, quesos, buffet de jamón…</div>
                   </div>
                   <div style={subBlockBody}>
@@ -454,9 +457,39 @@ export default function ProposalMenuEditor({
               </button>
             </div>
 
+            {/* Menu pick limit */}
+            {menus.length > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>¿Cuántos menús puede elegir la pareja?</div>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>
+                    El total de comensales se repartirá entre los menús seleccionados
+                  </div>
+                </div>
+                <select
+                  className="form-input"
+                  style={{ width: 120, fontSize: 12, textAlign: 'center' }}
+                  value={sections.menu_pick_limit ?? ''}
+                  onChange={e => {
+                    const v = e.target.value
+                    setSections(s => ({ ...s, menu_pick_limit: v === '' ? null : parseInt(v) }))
+                  }}
+                >
+                  <option value="">Sin límite</option>
+                  <option value="1">Solo 1</option>
+                  {Array.from({ length: Math.min(menus.length, 5) - 1 }, (_, i) => i + 2).map(n => (
+                    <option key={n} value={n}>Hasta {n}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div style={subBlock}>
               <div style={subBlockHeader}>
-                <div style={subBlockTitle}>Menús ({menus.length})</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={subBlockTitle}>Menús ({menus.length})</div>
+                  <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: '#ffebee', color: '#b71c1c', border: '1px solid #ffcdd2' }}>Obligatorio</span>
+                </div>
                 <div style={subBlockHint}>Crea cada menú con sus platos. Para platos que la pareja debe elegir, usa <strong>"Escoger 1"</strong> o <strong>"Escoger N"</strong>.</div>
               </div>
               <div style={subBlockBody}>
@@ -581,6 +614,16 @@ export default function ProposalMenuEditor({
                           <GripVertical size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
                           <input className="form-input" placeholder="Ej. Primer plato" value={c.label}
                             onChange={e => updateCourse(mi, ci, { label: e.target.value })} style={{ flex: 1 }} />
+                          {(c.mode === 'pick_one' || c.mode === 'pick_n') && (
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: '#ffebee', color: '#b71c1c', border: '1px solid #ffcdd2', whiteSpace: 'nowrap' }}>
+                              Obligatorio
+                            </span>
+                          )}
+                          {c.mode === 'fixed' && (
+                            <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', whiteSpace: 'nowrap' }}>
+                              Fijo
+                            </span>
+                          )}
                           <div style={{ width: 160, flexShrink: 0 }}>
                             <Select value={c.mode ?? 'fixed'} onValueChange={(v) => updateCourse(mi, ci, { mode: v as MenuCourse['mode'] })}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -635,6 +678,7 @@ export default function ProposalMenuEditor({
             <div style={sectionHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggle('night_extras')}>
                 <span style={sectionTitle}>Noche y madrugada ({nightExtras.length})</span>
+                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' }}>Opcional</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <VisToggle skey="night" />
@@ -667,6 +711,7 @@ export default function ProposalMenuEditor({
             <div style={sectionHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggle('event_extras')}>
                 <span style={sectionTitle}>Extras del evento ({eventExtras.length})</span>
+                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' }}>Opcional</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <VisToggle skey="event_extras" />

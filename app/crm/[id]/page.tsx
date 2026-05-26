@@ -63,7 +63,7 @@ type Lead = {
   updated_at?: string | null
 }
 
-type Tab = 'info' | 'peticiones' | 'oferta' | 'notas' | 'colaboracion'
+type Tab = 'info' | 'peticiones' | 'oferta' | 'notas' | 'historial' | 'colaboracion'
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -238,7 +238,7 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
   useEffect(() => {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
-    if (!activeVenue) return
+    if (!activeVenue) { setLoading(false); return }
     loadData()
   }, [user, authLoading, activeVenue?.id, id]) // eslint-disable-line
 
@@ -439,7 +439,7 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
         <div className="topbar" style={{ gap: 12 }}>
           <button onClick={() => router.push('/crm')}
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', fontSize: 13, padding: 0, fontFamily: 'Inter, sans-serif' }}>
-            <ChevronLeft size={15} /> CRM
+            <ChevronLeft size={15} /> Contactos
           </button>
           <span style={{ color: '#d1cac3' }}>·</span>
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)' }}>{client.name}</span>
@@ -570,9 +570,9 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
               {/* ── Tabs ──────────────────────────────────────────────────── */}
               <div>
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--ivory)', gap: 0 }}>
-                  {([...(['info', 'peticiones', 'oferta', 'notas'] as Tab[]), ...(isWP ? ['colaboracion' as Tab] : [])]).map(t => (
+                  {([...(['info', 'peticiones', 'oferta', 'notas', 'historial'] as Tab[]), ...(isWP ? ['colaboracion' as Tab] : [])]).map(t => (
                     <button key={t} onClick={() => setTab(t)} style={tabStyle(tab === t)}>
-                      {{ info: 'Info', peticiones: `Peticiones (${clientLeads.length})`, oferta: `Oferta (${proposals.length + docFiles.length})`, notas: 'Notas', colaboracion: 'Colaboración' }[t]}
+                      {{ info: 'Info', peticiones: `Peticiones (${clientLeads.length})`, oferta: `Oferta (${proposals.length + docFiles.length})`, notas: 'Notas', historial: 'Historial', colaboracion: 'Colaboración' }[t]}
                     </button>
                   ))}
                 </div>
@@ -819,6 +819,63 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                       <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 6 }}>
                         Guardado automático
                       </div>
+                    </>
+                  )}
+
+                  {/* ── Tab: Historial ────────────────────────────── */}
+                  {tab === 'historial' && (
+                    <>
+                      <SectionLabel>Línea de tiempo</SectionLabel>
+                      {(() => {
+                        // Build timeline events from leads, proposals, and client creation
+                        const events: { date: string; type: string; label: string; detail?: string; color: string }[] = []
+
+                        // Client created
+                        events.push({ date: client.created_at, type: 'contact', label: 'Contacto creado', color: '#6366f1' })
+
+                        // Leads
+                        for (const l of clientLeads) {
+                          events.push({ date: l.created_at, type: 'lead', label: `Petición recibida`, detail: l.name || undefined, color: '#f59e0b' })
+                          if (l.status === 'won') {
+                            events.push({ date: l.updated_at || l.created_at, type: 'won', label: 'Confirmado', detail: l.name || undefined, color: '#10b981' })
+                          }
+                          if (l.status === 'lost') {
+                            events.push({ date: l.updated_at || l.created_at, type: 'lost', label: 'Perdido', detail: l.name || undefined, color: '#ef4444' })
+                          }
+                          if (l.visit_date) {
+                            events.push({ date: l.visit_date, type: 'visit', label: 'Visita agendada', detail: l.name || undefined, color: '#059669' })
+                          }
+                        }
+
+                        // Proposals
+                        for (const p of proposals) {
+                          events.push({ date: p.created_at, type: 'proposal', label: 'Dosier creado', detail: p.couple_name || undefined, color: '#8b5cf6' })
+                        }
+
+                        events.sort((a, b) => b.date.localeCompare(a.date))
+
+                        if (events.length === 0) {
+                          return <p style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin actividad registrada</p>
+                        }
+
+                        return (
+                          <div style={{ position: 'relative', paddingLeft: 24 }}>
+                            {/* Vertical line */}
+                            <div style={{ position: 'absolute', left: 7, top: 4, bottom: 4, width: 2, background: 'var(--ivory)' }} />
+                            {events.map((ev, i) => (
+                              <div key={i} style={{ position: 'relative', paddingBottom: i < events.length - 1 ? 20 : 0, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                                {/* Dot */}
+                                <div style={{ position: 'absolute', left: -20, top: 3, width: 12, height: 12, borderRadius: '50%', background: ev.color, border: '2px solid #fff', zIndex: 1 }} />
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)' }}>{ev.label}</div>
+                                  {ev.detail && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 1 }}>{ev.detail}</div>}
+                                  <div style={{ fontSize: 10, color: '#bbb', marginTop: 2 }}>{fmtDate(ev.date)}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })()}
                     </>
                   )}
 

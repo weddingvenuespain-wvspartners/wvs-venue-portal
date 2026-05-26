@@ -69,6 +69,7 @@ export type Budget = {
   first_viewed_at: string | null
   last_viewed_at: string | null
   password: string | null
+  includes_text: string | null
   open_count: number
   created_at: string
   updated_at: string

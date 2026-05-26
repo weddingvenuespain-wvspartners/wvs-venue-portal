@@ -317,12 +317,15 @@ function CreateUserModal({
 // ─── Detail panel ─────────────────────────────────────────────────────────────
 
 function UserPanel({
-  profile, wpVenues, plans, subscriptions, userVenues, saving,
+  profile, wpVenues, wpVenuesLoading = false, wpVenuesError = '', onRetryWpVenues, plans, subscriptions, userVenues, saving,
   initialTab, onClose, onSaveProfile, onAssignVenue, onRemoveVenue,
   onSaveSubscription, onRegisterPayment, trialConfig,
 }: {
   profile: Profile
   wpVenues: any[]
+  wpVenuesLoading?: boolean
+  wpVenuesError?: string
+  onRetryWpVenues?: () => void
   plans: Plan[]
   subscriptions: Subscription[]
   userVenues: UserVenue[]
@@ -393,7 +396,14 @@ function UserPanel({
     .filter(s => s.user_id === profile.user_id && (
       profileVenues.length <= 1 || s.venue_id === effectiveVenueId || s.venue_id == null
     ))
-    .sort((a, b) => (STATUS_PRIO[a.status] ?? 9) - (STATUS_PRIO[b.status] ?? 9))[0]
+    .sort((a, b) => {
+      const p = (STATUS_PRIO[a.status] ?? 9) - (STATUS_PRIO[b.status] ?? 9)
+      if (p !== 0) return p
+      // Same priority: prefer latest trial_end_date or renewal_date
+      const dateA = a.trial_end_date || a.renewal_date || a.start_date || ''
+      const dateB = b.trial_end_date || b.renewal_date || b.start_date || ''
+      return dateB.localeCompare(dateA)
+    })[0]
   const subPlan   = plans.find(p => p.id === activeSub?.plan_id)
   const daysLeft  = trialDaysLeft(activeSub?.trial_end_date || null)
   const badge     = trialBadge(daysLeft)
@@ -449,7 +459,7 @@ function UserPanel({
       service_end_date:     activeSub?.service_end_date  || '',
       notes:                activeSub?.notes             || '',
     })
-  }, [effectiveVenueId, activeSub?.id]) // eslint-disable-line
+  }, [effectiveVenueId, activeSub?.id, activeSub?.trial_end_date, activeSub?.status, activeSub?.plan_id, activeSub?.renewal_date]) // eslint-disable-line
 
   // Plan selected in venue assignment
   const selPlanNew = plans.find(p => p.id === newPlanId)
@@ -469,9 +479,9 @@ function UserPanel({
     }
   }, [subForm.start_date, subForm.billing_cycle]) // eslint-disable-line
 
-  // Auto trial_end_date — uses global trial_config days
+  // Auto trial_end_date — only when creating a new trial (no existing date)
   useEffect(() => {
-    if (subForm.status === 'trial' && subForm.start_date) {
+    if (subForm.status === 'trial' && subForm.start_date && !activeSub?.trial_end_date) {
       const days = trialConfig.trial_days || 14
       const d = new Date(subForm.start_date)
       d.setDate(d.getDate() + days)
@@ -933,15 +943,26 @@ function UserPanel({
                 </div>
                 <div className="form-group">
                   <label className="form-label">Venue (WordPress) *</label>
-                  <Select value={newVenueId} onValueChange={setNewVenueId} disabled={wpVenues.length === 0}>
-                    <SelectTrigger><SelectValue placeholder={wpVenues.length === 0 ? 'Cargando WP...' : 'Selecciona venue...'} /></SelectTrigger>
+                  <Select value={newVenueId} onValueChange={setNewVenueId} disabled={wpVenuesLoading || wpVenues.length === 0}>
+                    <SelectTrigger><SelectValue placeholder={wpVenuesLoading ? 'Cargando venues de WP...' : wpVenuesError ? 'Error al cargar' : wpVenues.length === 0 ? 'Sin venues en WP' : 'Selecciona venue...'} /></SelectTrigger>
                     <SelectContent>
                       {wpVenues.map(v => (
                         <SelectItem key={v.id} value={String(v.id)}>{v.acf?.H1_Venue || v.title?.rendered} (#{v.id})</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {wpVenues.length === 0 && (
+                  {wpVenuesError && (
+                    <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <AlertTriangle size={12} /> {wpVenuesError}
+                      {onRetryWpVenues && (
+                        <button onClick={onRetryWpVenues}
+                          style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                          Reintentar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {!wpVenuesError && !wpVenuesLoading && wpVenues.length === 0 && (
                     <div style={{ fontSize: 11, color: '#b45309', marginTop: 4 }}>
                       <AlertTriangle size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Si el venue aún no está en WordPress, aprueba primero el onboarding para que se publique.
                     </div>
@@ -1618,6 +1639,8 @@ export default function AdminPage() {
   const [loading, setLoading]             = useState(true)
   const [profiles, setProfiles]           = useState<Profile[]>([])
   const [wpVenues, setWpVenues]           = useState<any[]>([])
+  const [wpVenuesLoading, setWpVenuesLoading] = useState(true)
+  const [wpVenuesError, setWpVenuesError]     = useState('')
   const [plans, setPlans]                 = useState<Plan[]>([])
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [userVenues, setUserVenues]       = useState<UserVenue[]>([])
@@ -1692,18 +1715,42 @@ export default function AdminPage() {
       trialConfig: trialRes?.config || null,
     }))
 
-    // ── WP venues: background, non-blocking ──
-    const wpController = new AbortController()
-    const wpTimeout = setTimeout(() => wpController.abort(), 6000)
-    fetch('https://foreventos.com/wp-json/wp/v2/venues?per_page=100&acf_format=standard&_fields=id,title,acf,link', { cache: 'no-store', signal: wpController.signal })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (Array.isArray(d)) { setWpVenues(d); sessionStorage.setItem('wvs_wp_venues', JSON.stringify(d)) } })
-      .catch(() => {})
-      .finally(() => clearTimeout(wpTimeout))
+    // ── WP venues: via server proxy to avoid CORS ──
+    setWpVenuesLoading(true)
+    setWpVenuesError('')
+    fetch('/api/admin/wp-venues')
+      .then(r => r.json())
+      .then(d => {
+        if (d.venues && Array.isArray(d.venues)) {
+          setWpVenues(d.venues)
+          sessionStorage.setItem('wvs_wp_venues', JSON.stringify(d.venues))
+        } else {
+          setWpVenuesError(d.error || 'No se pudieron cargar los venues de WP')
+        }
+      })
+      .catch(() => setWpVenuesError('Error de conexion al cargar venues de WP'))
+      .finally(() => setWpVenuesLoading(false))
   }
 
   // Only run once when auth finishes loading — not on every user/profile state change
   useEffect(() => { if (!authLoading) loadData() }, [authLoading]) // eslint-disable-line
+
+  const retryWpVenues = () => {
+    setWpVenuesLoading(true)
+    setWpVenuesError('')
+    fetch('/api/admin/wp-venues')
+      .then(r => r.json())
+      .then(d => {
+        if (d.venues && Array.isArray(d.venues)) {
+          setWpVenues(d.venues)
+          sessionStorage.setItem('wvs_wp_venues', JSON.stringify(d.venues))
+        } else {
+          setWpVenuesError(d.error || 'Error')
+        }
+      })
+      .catch(() => setWpVenuesError('Error de conexion'))
+      .finally(() => setWpVenuesLoading(false))
+  }
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -2414,6 +2461,9 @@ export default function AdminPage() {
           key={selected.user_id}
           profile={selected}
           wpVenues={wpVenues}
+          wpVenuesLoading={wpVenuesLoading}
+          wpVenuesError={wpVenuesError}
+          onRetryWpVenues={retryWpVenues}
           plans={plans}
           subscriptions={subscriptions}
           userVenues={userVenues}

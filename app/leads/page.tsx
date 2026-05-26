@@ -6,13 +6,14 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
+import NoVenueState from '@/components/NoVenueState'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import ImportLeadsModal from '@/components/ImportLeadsModal'
 import { expandLeadDates, expandBudgetDates, pad } from '@/lib/lead-dates'
 import { LeadDatesSection } from '@/components/LeadDatesSection'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { renderPayload } from '@/components/InquiriesPanel'
-import { CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS, type ClientType } from '@/lib/clients'
+import { CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS, type ClientType, findOrCreateClient } from '@/lib/clients'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -21,7 +22,7 @@ import {
   ExternalLink, Edit2, Trash2, Clock, Filter, FileText, Download,
   AlertTriangle, PartyPopper, Snowflake, Sparkles, Eye, Landmark, XCircle,
   Sprout, Sun, Leaf, Zap, LockKeyhole, OctagonAlert, Flower2, Info,
-  List, LayoutGrid, Receipt, ChevronDown, ChevronUp, Paperclip, Upload, CheckCircle2, CalendarDays, Package, Inbox, SlidersHorizontal, Link2, Unlink,
+  List, LayoutGrid, Receipt, ChevronDown, ChevronUp, Paperclip, Upload, CheckCircle2, CalendarDays, Package, Inbox, SlidersHorizontal, Link2, Unlink, UserPlus, Loader2,
 } from 'lucide-react'
 
 // ── Types & config ─────────────────────────────────────────────────────────────
@@ -368,9 +369,18 @@ function LeadsPageInner() {
   const [hidePast,    setHidePast]    = useState(false)
   const [filterSrc,   setFilterSrc]   = useState('all')
   const [filterBudget,setFilterBudget]= useState('all')
+  const [filterContactType, setFilterContactType] = useState('all')
   const [filterDateFrom, setFilterDateFrom] = useState<string>('')
   const [filterDateTo,   setFilterDateTo]   = useState<string>('')
   const [viewMode,    setViewMode]    = useState<'list' | 'kanban'>('list')
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkProcessing, setBulkProcessing] = useState(false)
+
+  // Client name map for WP leads (client_id → client name)
+  const [clientNames, setClientNames] = useState<Record<string, string>>({})
+  const [clientTypes, setClientTypes] = useState<Record<string, string>>({})
 
   // Modals
   const [showForm,   setShowForm]   = useState(false)
@@ -538,6 +548,21 @@ function LeadsPageInner() {
           }
         }
       }
+
+      // Fetch client names for leads with client_id (to show WP name)
+      const clientIds = [...new Set(data.filter((l: any) => l.client_id).map((l: any) => l.client_id))]
+      if (clientIds.length > 0) {
+        const { data: clientsData } = await supabase
+          .from('clients').select('id, name, client_type')
+          .in('id', clientIds)
+        if (clientsData) {
+          const nameMap: Record<string, string> = {}
+          const typeMap: Record<string, string> = {}
+          clientsData.forEach((c: any) => { nameMap[c.id] = c.name || ''; typeMap[c.id] = c.client_type || '' })
+          setClientNames(nameMap)
+          setClientTypes(typeMap)
+        }
+      }
     }
     setLoading(false)
   }
@@ -569,6 +594,44 @@ function LeadsPageInner() {
     return c
   }, [leads])
 
+  // Stale leads: in "new" status for >48h
+  const staleLeads = useMemo(() => {
+    const threshold = Date.now() - 48 * 3600_000
+    return leads.filter(l => l.status === 'new' && l.created_at && new Date(l.created_at).getTime() < threshold)
+  }, [leads])
+
+  // WP priority leads: leads that came from wedding planners with linked contacts
+  const wpPriorityLeads = useMemo(() => {
+    return leads.filter(l => l.status === 'new' && l.source === 'wedding_planner')
+  }, [leads])
+
+  // Bulk actions
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+  const toggleSelectAll = () => {
+    if (selectedIds.size === visibleLeads.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(visibleLeads.map(l => l.id)))
+    }
+  }
+  const bulkMoveTo = async (status: DbStatus) => {
+    if (selectedIds.size === 0) return
+    setBulkProcessing(true)
+    const supabase = createClient()
+    const ids = Array.from(selectedIds)
+    await supabase.from('leads').update({ status }).in('id', ids)
+    setLeads(prev => prev.map(l => ids.includes(l.id) ? { ...l, status } : l))
+    setSelectedIds(new Set())
+    setBulkProcessing(false)
+    showToast(`${ids.length} lead${ids.length > 1 ? 's' : ''} actualizado${ids.length > 1 ? 's' : ''}`)
+  }
+
   // Tabs visible based on plan (leads_new_only → only 'Nuevos' tab)
   const visibleTabs = features.leads_new_only
     ? TABS.filter(t => t.key === 'new')
@@ -584,6 +647,12 @@ function LeadsPageInner() {
       if (features.leads_date_filter && hidePast && isLeadDatePast(l)) return false
       if (filterSrc !== 'all' && l.source !== filterSrc) return false
       if (filterBudget !== 'all' && l.budget !== filterBudget) return false
+      if (filterContactType !== 'all') {
+        const ct = l.client_id ? clientTypes[l.client_id] : null
+        const isWP = ct === 'wedding_planner' || l.source === 'wedding_planner'
+        if (filterContactType === 'wedding_planner' && !isWP) return false
+        if (filterContactType === 'no_wp' && isWP) return false
+      }
       if (filterDateFrom || filterDateTo) {
         const dates = expandLeadDates(l)
         if (dates.length === 0) return false
@@ -596,7 +665,7 @@ function LeadsPageInner() {
           !l.email?.toLowerCase().includes(search.toLowerCase())) return false
       return true
     })
-  }, [leads, activeTab, hidePast, filterSrc, filterBudget, filterDateFrom, filterDateTo, search, features.leads_new_only, features.leads_date_filter])
+  }, [leads, activeTab, hidePast, filterSrc, filterBudget, filterContactType, clientTypes, filterDateFrom, filterDateTo, search, features.leads_new_only, features.leads_date_filter])
 
   // CSV export — all leads with related data
   const [exporting, setExporting] = useState(false)
@@ -1196,11 +1265,24 @@ function LeadsPageInner() {
       showToast('Lead actualizado')
     } else {
       // Al crear: guardar también las fechas originales como referencia permanente (= lo que pide la pareja)
+      // Auto-link CRM contact if user didn't manually link one
+      let autoClientId = payload.client_id || null
+      if (!autoClientId && activeVenue?.id && payload.name) {
+        try {
+          autoClientId = await findOrCreateClient(activeVenue.id, {
+            name: payload.name, email: payload.email || null,
+            phone: payload.phone || payload.whatsapp || null,
+            whatsapp: payload.whatsapp || null,
+          })
+        } catch { /* non-fatal */ }
+      }
+
       const insertPayload = {
         ...payload,
         user_id: user!.id,
         venue_id: activeVenue?.id ?? null,
         status: 'new',
+        client_id: autoClientId,
         original_date_flexibility:    payload.date_flexibility,
         original_wedding_date:        payload.wedding_date,
         original_wedding_date_to:     payload.wedding_date_to,
@@ -1220,6 +1302,10 @@ function LeadsPageInner() {
 
 
   if (isBlocked) return null
+
+  if (!authLoading && !activeVenue) {
+    return <><Sidebar /><div className="main-layout" style={{ padding: '24px 28px' }}><NoVenueState /></div></>
+  }
 
   if (loading) return (
     <div style={{ display: 'flex' }}>
@@ -1283,6 +1369,16 @@ function LeadsPageInner() {
                   </SelectContent>
                 </Select>
               </div>
+              <div style={{ minWidth: 180 }}>
+                <Select value={filterContactType} onValueChange={(v) => setFilterContactType(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Contacto: Todos</SelectItem>
+                    <SelectItem value="wedding_planner">👑 Wedding Planner</SelectItem>
+                    <SelectItem value="no_wp">Sin Wedding Planner</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {/* Date range filter */}
               <FilterDateRangePicker
                 from={filterDateFrom} to={filterDateTo}
@@ -1297,8 +1393,8 @@ function LeadsPageInner() {
                   <Clock size={13} /> Ocultar pasadas
                 </button>
               )}
-              {(filterSrc !== 'all' || filterBudget !== 'all' || filterDateFrom || filterDateTo) && (
-                <button onClick={() => { setFilterSrc('all'); setFilterBudget('all'); setFilterDateFrom(''); setFilterDateTo('') }}
+              {(filterSrc !== 'all' || filterBudget !== 'all' || filterContactType !== 'all' || filterDateFrom || filterDateTo) && (
+                <button onClick={() => { setFilterSrc('all'); setFilterBudget('all'); setFilterContactType('all'); setFilterDateFrom(''); setFilterDateTo('') }}
                   style={{ padding: '8px 10px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--warm-gray)', fontSize: 12, textDecoration: 'underline', whiteSpace: 'nowrap' }}>
                   Limpiar
                 </button>
@@ -1312,6 +1408,71 @@ function LeadsPageInner() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: 'var(--cream)', border: '1px solid var(--gold-light)', borderRadius: 8, marginBottom: 16, fontSize: 12, color: 'var(--charcoal)' }}>
               <AlertTriangle size={12} style={{ color: 'var(--gold)' }} />
               <span>Tu plan <strong>{features.planName}</strong> muestra únicamente los leads nuevos recibidos. <a href="/perfil" style={{ color: 'var(--gold)', fontWeight: 600 }}>Actualiza tu plan</a> para acceder a todo el CRM de leads.</span>
+            </div>
+          )}
+
+          {/* Stale leads warning */}
+          {staleLeads.length > 0 && activeTab === 'new' && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
+              background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, marginBottom: 10, fontSize: 12,
+            }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Clock size={16} style={{ color: '#dc2626' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, color: '#dc2626' }}>
+                  {staleLeads.length} lead{staleLeads.length !== 1 ? 's' : ''} sin responder hace más de 48h
+                </div>
+                <div style={{ color: '#b91c1c', fontSize: 11, marginTop: 1 }}>
+                  Responder rápido aumenta la conversión. Considera contactar o marcar como perdido.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* WP priority leads */}
+          {wpPriorityLeads.length > 0 && activeTab === 'new' && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
+              background: '#f5f3ff', border: '1px solid #d8b4fe', borderRadius: 8, marginBottom: 10, fontSize: 12,
+            }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: 16 }}>👑</span>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, color: '#6b21a8' }}>
+                  {wpPriorityLeads.length} lead{wpPriorityLeads.length !== 1 ? 's' : ''} de Wedding Planners
+                </div>
+                <div style={{ color: '#7c3aed', fontSize: 11, marginTop: 1 }}>
+                  Prioridad alta — provienen de planners con los que colaboras
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bulk action bar */}
+          {selectedIds.size > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
+              background: 'var(--espresso)', borderRadius: 8, marginBottom: 10,
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
+                {selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+              </span>
+              <div style={{ flex: 1 }} />
+              <button onClick={() => bulkMoveTo('contacted')} disabled={bulkProcessing}
+                style={{ padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#fff', background: '#3b82f6', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: bulkProcessing ? 0.5 : 1 }}>
+                Mover a En seguimiento
+              </button>
+              <button onClick={() => bulkMoveTo('lost')} disabled={bulkProcessing}
+                style={{ padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#fff', background: '#ef4444', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: bulkProcessing ? 0.5 : 1 }}>
+                Marcar perdidos
+              </button>
+              <button onClick={() => setSelectedIds(new Set())}
+                style={{ padding: '5px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', display: 'flex' }}>
+                <X size={16} />
+              </button>
             </div>
           )}
 
@@ -1413,6 +1574,17 @@ function LeadsPageInner() {
 
           {/* List content */}
           <div style={{ marginTop: 8 }}>
+            {/* Select all toggle */}
+            {visibleLeads.length > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, paddingLeft: 4 }}>
+                <input type="checkbox" checked={selectedIds.size === visibleLeads.length && visibleLeads.length > 0}
+                  onChange={toggleSelectAll}
+                  style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--gold)' }} />
+                <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Seleccionar todos ({visibleLeads.length})</span>
+              </div>
+            )}
+          </div>
+          <div>
             {/* Visit sub-filter pills */}
             {activeTab === 'visit' && visibleLeads.length > 0 && (() => {
               const nScheduled = visibleLeads.filter(l => l.status === 'visit_scheduled').length
@@ -1456,7 +1628,9 @@ function LeadsPageInner() {
                     visitSubFilter === 'scheduled' ? l.status === 'visit_scheduled' :
                     visitSubFilter === 'post'      ? l.status === 'post_visit' : true
                   )
-                  return filtered.map(lead => <LeadRow key={lead.id} lead={lead} {...rowProps} inquiries={inquiriesByLead[lead.id]} />)
+                  return filtered.map(lead => <LeadRow key={lead.id} lead={lead} {...rowProps} inquiries={inquiriesByLead[lead.id]}
+                    selected={selectedIds.has(lead.id)} onToggleSelect={toggleSelect}
+                    clientName={lead.client_id ? clientNames[lead.client_id] : undefined} />)
                 })() : visibleLeads.map(lead => (
                   <LeadRow key={lead.id} lead={lead} tab={activeTab}
                     onMove={moveToStatusWithVisitCheck} onEdit={openEdit}
@@ -1464,7 +1638,9 @@ function LeadsPageInner() {
                     onDateConfirm={triggerStatusChangeWithVisitCheck}
                     onPdfDigital={(l: any) => { setPdfDigitalLead(l); setPdfDigitalKey(k => k + 1) }}
                     inquiries={inquiriesByLead[lead.id]}
-                    onInquiries={(l: any) => setInquiryModalLead(l)} />
+                    onInquiries={(l: any) => setInquiryModalLead(l)}
+                    selected={selectedIds.has(lead.id)} onToggleSelect={toggleSelect}
+                    clientName={lead.client_id ? clientNames[lead.client_id] : undefined} />
                 ))}
               </div>
             )}
@@ -1478,6 +1654,12 @@ function LeadsPageInner() {
                     !l.email?.toLowerCase().includes(search.toLowerCase())) return false
                 if (filterSrc !== 'all' && l.source !== filterSrc) return false
                 if (filterBudget !== 'all' && l.budget !== filterBudget) return false
+                if (filterContactType !== 'all') {
+                  const ct = l.client_id ? clientTypes[l.client_id] : null
+                  const isWP = ct === 'wedding_planner' || l.source === 'wedding_planner'
+                  if (filterContactType === 'wedding_planner' && !isWP) return false
+                  if (filterContactType === 'no_wp' && isWP) return false
+                }
                 if (filterDateFrom || filterDateTo) {
                   const dates = expandLeadDates(l)
                   if (dates.length === 0) return false
@@ -1809,8 +1991,8 @@ function LeadsPageInner() {
       {/* Inquiry detail modal */}
       {inquiryModalLead && (() => {
         const lInq = (inquiriesByLead[inquiryModalLead.id] || []).sort((a: any, b: any) => b.created_at.localeCompare(a.created_at))
-        const KIND_LABEL: Record<string, string> = { visit: 'Visita solicitada', call: 'Llamada', video: 'Videollamada', menu: 'Pregunta sobre menú', menu_selection: 'Selección de menú', date_pick: 'Fecha confirmada', other: 'Consulta' }
-        const KIND_EMOJI: Record<string, string> = { visit: '📍', call: '📞', video: '🎥', menu: '🍽️', menu_selection: '✅', date_pick: '📅', other: '💬' }
+        const KIND_LABEL: Record<string, string> = { visit: 'Visita solicitada', call: 'Llamada', video: 'Videollamada', menu: 'Pregunta sobre menú', menu_selection: 'Selección de menú', date_pick: 'Fecha confirmada', provider_selection: 'Proveedores propios', other: 'Consulta' }
+        const KIND_EMOJI: Record<string, string> = { visit: '📍', call: '📞', video: '🎥', menu: '🍽️', menu_selection: '✅', date_pick: '📅', provider_selection: '🤝', other: '💬' }
         return (
           <div className="modal-overlay" onClick={() => setInquiryModalLead(null)}>
             <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
@@ -3693,7 +3875,7 @@ function timeAgo(dateStr: string): { text: string; urgent: boolean; warning: boo
 }
 
 // ── Lead Row ───────────────────────────────────────────────────────────────────
-function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm, onPdfDigital, inquiries, onInquiries }: {
+function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm, onPdfDigital, inquiries, onInquiries, selected, onToggleSelect, clientName }: {
   lead: any; tab: Tab
   onMove: (id: string, s: DbStatus) => void
   onEdit: (l: any) => void
@@ -3703,191 +3885,206 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
   onPdfDigital?: (lead: any) => void
   inquiries?: any[]
   onInquiries?: (lead: any) => void
+  selected?: boolean
+  onToggleSelect?: (id: string) => void
+  clientName?: string
 }) {
 
   // Fresh lead highlight: < 2h old in the "new" tab
   const isRecent = tab === 'new' && lead.created_at && (Date.now() - new Date(lead.created_at).getTime()) < 2 * 3600_000
+  const isPlanner = lead.source === 'wedding_planner'
+  const isStale = tab === 'new' && lead.created_at && (Date.now() - new Date(lead.created_at).getTime()) > 48 * 3600_000
+
+  const SOURCE_COLORS: Record<string, { bg: string; color: string }> = {
+    wedding_venues_spain: { bg: 'rgba(201,150,58,0.12)', color: '#92400e' },
+    web:                 { bg: 'rgba(59,130,246,0.1)',  color: '#2563eb' },
+    whatsapp:            { bg: 'rgba(22,163,74,0.1)',   color: '#16a34a' },
+    instagram:           { bg: 'rgba(219,39,119,0.1)', color: '#db2777' },
+    bodas_net:           { bg: 'rgba(236,72,153,0.1)', color: '#db2777' },
+    referral:            { bg: 'rgba(14,165,233,0.1)', color: '#0284c7' },
+    email:               { bg: 'rgba(99,102,241,0.1)', color: '#4f46e5' },
+    wedding_planner:     { bg: 'rgba(139,92,246,0.12)', color: '#7c3aed' },
+  }
 
   return (
-    <div className="card" style={{ padding: 0, overflow: 'visible', ...(isRecent ? { boxShadow: '0 0 0 2px #16a34a44, 0 2px 12px rgba(22,163,106,0.10)' } : {}) }}>
-      <div style={{ display: 'flex', alignItems: 'stretch', borderRadius: 10 }}>
+    <div className="card" style={{ padding: 0, overflow: 'visible', ...(isStale ? { boxShadow: '0 0 0 1.5px rgba(239,68,68,0.25), 0 2px 8px rgba(239,68,68,0.06)' } : isRecent ? { boxShadow: '0 0 0 2px #16a34a44, 0 2px 12px rgba(22,163,106,0.10)' } : isPlanner ? { boxShadow: '0 0 0 1.5px rgba(139,92,246,0.25), 0 2px 8px rgba(139,92,246,0.08)' } : {}) }}>
+      {/* Main clickable area */}
+      <div style={{ display: 'flex', gap: 12, padding: '14px 16px 12px', cursor: 'pointer', alignItems: 'flex-start' }}
+        onClick={() => onEdit(lead)}>
+
+        {/* Checkbox */}
+        {onToggleSelect && (
+          <div style={{ display: 'flex', alignItems: 'center', paddingTop: 2, flexShrink: 0 }}
+            onClick={e => { e.stopPropagation(); onToggleSelect(lead.id) }}>
+            <input type="checkbox" checked={!!selected} readOnly
+              style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--gold)' }} />
+          </div>
+        )}
+
         {/* Urgency stripe */}
         {(() => {
           const days = lead.date_flexibility === 'exact' || !lead.date_flexibility ? (lead.wedding_date ? Math.ceil((new Date(lead.wedding_date + 'T12:00:00').getTime() - Date.now()) / 86400000) : null) : null
           const color = days !== null && days > 0 ? urgencyColor(days) : 'var(--ivory)'
-          return <div style={{ width: 4, background: isRecent ? '#16a34a' : color, flexShrink: 0, borderRadius: '10px 0 0 10px' }} />
+          const stripeColor = isStale ? '#ef4444' : isRecent ? '#16a34a' : isPlanner ? '#7c3aed' : color
+          return <div style={{ width: 4, borderRadius: 3, background: stripeColor, flexShrink: 0, alignSelf: 'stretch' }} />
         })()}
 
+        {/* Content */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Info row — clickable */}
-          <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer', minWidth: 0 }}
-            onClick={() => onEdit(lead)}>
-
-            {/* Name + badges */}
-            <div style={{ minWidth: 160, maxWidth: 200, flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                {isRecent && (
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a', flexShrink: 0, animation: 'pulse-dot 2s ease-in-out infinite' }} />
-                )}
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.name}</div>
-                {tab === 'new' && lead.created_at && (() => {
-                  const ta = timeAgo(lead.created_at)
-                  return (
-                    <span style={{
-                      fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap',
-                      padding: '2px 8px', borderRadius: 10,
-                      background: ta.urgent ? 'rgba(225,29,72,0.1)' : ta.warning ? 'rgba(217,119,6,0.1)' : isRecent ? 'rgba(22,163,74,0.1)' : 'var(--ivory)',
-                      color: ta.urgent ? 'var(--rose)' : ta.warning ? '#b45309' : isRecent ? '#16a34a' : 'var(--warm-gray)',
-                    }}>
-                      {ta.text}
-                    </span>
-                  )
-                })()}
-              </div>
-              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                {tab === 'new' && lead.source && (() => {
-                  const sc: Record<string, { bg: string; color: string }> = {
-                    wedding_venues_spain: { bg: 'rgba(201,150,58,0.12)', color: '#92400e' },
-                    wedding_planner:     { bg: 'rgba(139,92,246,0.1)',  color: '#7c3aed' },
-                    web:                 { bg: 'rgba(59,130,246,0.1)',  color: '#2563eb' },
-                    whatsapp:            { bg: 'rgba(22,163,74,0.1)',   color: '#16a34a' },
-                    instagram:           { bg: 'rgba(219,39,119,0.1)', color: '#db2777' },
-                    bodas_net:           { bg: 'rgba(236,72,153,0.1)', color: '#db2777' },
-                    referral:            { bg: 'rgba(14,165,233,0.1)', color: '#0284c7' },
-                    email:               { bg: 'rgba(99,102,241,0.1)', color: '#4f46e5' },
-                  }
-                  const s = sc[lead.source] || { bg: 'var(--ivory)', color: 'var(--charcoal)' }
-                  return (
-                    <span style={{ fontSize: 10, background: s.bg, color: s.color, padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
-                      {SOURCE_LABEL[lead.source] || lead.source}
-                    </span>
-                  )
-                })()}
-                {(tab === 'en_seguimiento' || tab === 'budget') && (
-                  <span style={{ fontSize: 10, background: 'var(--gold-light)', color: 'var(--espresso)', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
-                    {SUB_STATUS_LABEL[lead.status as DbStatus]}
-                  </span>
-                )}
-                {tab === 'visit' && (
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
-                    background: lead.status === 'post_visit' ? 'rgba(99,102,241,0.1)' : 'rgba(22,163,74,0.1)',
-                    color: lead.status === 'post_visit' ? '#4f46e5' : '#16a34a',
-                  }}>
-                    {lead.status === 'post_visit' ? 'Post-visita' : 'Visita agendada'}
-                  </span>
-                )}
-                {lead.tags?.length > 0 && lead.tags.slice(0, 3).map((t: string) => (
-                  <span key={t} style={{ fontSize: 10, background: 'rgba(99,102,241,0.08)', color: '#4f46e5', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
-                    {t}
-                  </span>
-                ))}
-              </div>
+          {/* Row 1: Name + time ago + source */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+              {lead.name || 'Pareja sin nombre'}
             </div>
+            {tab === 'new' && lead.created_at && (() => {
+              const ta = timeAgo(lead.created_at)
+              return (
+                <span style={{
+                  fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap',
+                  padding: '2px 8px', borderRadius: 10,
+                  background: ta.urgent ? 'rgba(225,29,72,0.1)' : ta.warning ? 'rgba(217,119,6,0.1)' : isRecent ? 'rgba(22,163,74,0.1)' : 'var(--ivory)',
+                  color: ta.urgent ? 'var(--rose)' : ta.warning ? '#b45309' : isRecent ? '#16a34a' : 'var(--warm-gray)',
+                  flexShrink: 0,
+                }}>
+                  {ta.text}
+                </span>
+              )
+            })()}
+            {/* Stale indicator */}
+            {isStale && (
+              <span style={{ fontSize: 10, background: 'rgba(239,68,68,0.1)', color: '#dc2626', padding: '2px 8px', borderRadius: 10, fontWeight: 700, flexShrink: 0 }}>
+                ⚠ Sin responder
+              </span>
+            )}
+          </div>
 
-            {/* Date */}
-            <div style={{ minWidth: 130, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {(() => {
-                const { line1, line2, color } = formatLeadDate(lead)
-                return (
-                  <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Calendar size={12} style={{ color: color || 'var(--warm-gray)', flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, fontWeight: 500, color: color || 'var(--charcoal)' }}>{line1}</span>
-                    </div>
-                    {line2 && (
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: color || 'var(--warm-gray)', padding: '2px 8px', borderRadius: 10, lineHeight: 1.2, alignSelf: 'flex-start', marginLeft: 17 }}>
-                        {line2}
-                      </span>
-                    )}
-                  </>
-                )
-              })()}
-              {(tab === 'visit' || tab === 'budget') && lead.visit_date && (() => {
-                const vDate = new Date(lead.visit_date + 'T12:00:00')
-                const isPast = lead.status === 'post_visit'
-                const daysUntil = Math.ceil((vDate.getTime() - Date.now()) / 86400000)
-                return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Landmark size={12} style={{ color: isPast ? '#4f46e5' : '#16a34a', flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: isPast ? '#4f46e5' : '#16a34a' }}>
-                        {vDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                      </span>
-                    </div>
-                    {!isPast && daysUntil >= 0 && (
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: daysUntil <= 2 ? 'var(--rose)' : '#16a34a', padding: '2px 8px', borderRadius: 10, lineHeight: 1.2 }}>
-                        {daysUntil === 0 ? 'Hoy' : daysUntil === 1 ? 'Mañana' : `${daysUntil}d`}
-                      </span>
-                    )}
-                  </div>
-                )
-              })()}
-              {tab === 'confirmed' && lead.wedding_date && (
-                <div style={{ fontSize: 12, color: 'var(--sage)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <PartyPopper size={11} /> {new Date(lead.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </div>
-              )}
-              {tab === 'confirmed' && lead.visit_date && lead.visit_date >= todayIso() && (
-                <div style={{ fontSize: 11, color: 'var(--sage)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Landmark size={11} /> Visita: {new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                </div>
-              )}
-            </div>
-
-            {/* Guests */}
-            <div style={{ minWidth: 70, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {lead.guests && (
-                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Users size={12} style={{ color: 'var(--gold)', flexShrink: 0 }} /> {lead.guests} inv.
-                </div>
-              )}
-              {(lead.budget_files?.length > 0 || lead.budget_file_url) && (
-                <div style={{ fontSize: 10, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
-                  <Paperclip size={10} /> {lead.budget_files?.length > 1 ? `${lead.budget_files.length} docs` : 'PDF'}
-                </div>
-              )}
-            </div>
-
-            {/* Inquiries badge */}
+          {/* Row 2: Metadata pills */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {/* Source badge */}
+            {lead.source && (() => {
+              const s = SOURCE_COLORS[lead.source] || { bg: 'var(--ivory)', color: 'var(--charcoal)' }
+              return (
+                <span style={{ fontSize: 10, background: s.bg, color: s.color, padding: '2px 8px', borderRadius: 10, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  {lead.source === 'wedding_planner' && '👑 '}{clientName || SOURCE_LABEL[lead.source] || lead.source}
+                </span>
+              )
+            })()}
+            {/* Sub-status badge */}
+            {(tab === 'en_seguimiento' || tab === 'budget') && (
+              <span style={{ fontSize: 10, background: 'var(--gold-light)', color: 'var(--espresso)', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+                {SUB_STATUS_LABEL[lead.status as DbStatus]}
+              </span>
+            )}
+            {tab === 'visit' && (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                background: lead.status === 'post_visit' ? 'rgba(99,102,241,0.1)' : 'rgba(22,163,74,0.1)',
+                color: lead.status === 'post_visit' ? '#4f46e5' : '#16a34a',
+              }}>
+                {lead.status === 'post_visit' ? 'Post-visita' : 'Visita agendada'}
+              </span>
+            )}
+            {/* Tags */}
+            {lead.tags?.length > 0 && lead.tags.slice(0, 3).map((t: string) => (
+              <span key={t} style={{ fontSize: 10, background: 'rgba(99,102,241,0.08)', color: '#4f46e5', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+                {t}
+              </span>
+            ))}
+            {/* Inquiries inline */}
             {inquiries && inquiries.length > 0 && (
-              <div style={{ minWidth: 50, flexShrink: 0, display: 'flex', alignItems: 'center' }}
-                onClick={e => { e.stopPropagation(); onInquiries?.(lead) }}>
-                <button className="btn btn-ghost btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', position: 'relative' }}>
-                  <Inbox size={12} style={{ color: 'var(--gold)' }} />
-                  <span style={{ fontWeight: 600 }}>{inquiries.length}</span>
-                  {(() => {
-                    const newCount = inquiries.filter(i => i.status === 'new').length
-                    return newCount > 0 ? (
-                      <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 99, background: 'var(--gold)', color: '#fff', fontWeight: 700 }}>{newCount} new</span>
-                    ) : null
-                  })()}
-                </button>
+              <span
+                onClick={e => { e.stopPropagation(); onInquiries?.(lead) }}
+                style={{ fontSize: 10, background: 'rgba(201,150,58,0.12)', color: '#92400e', padding: '2px 8px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <Inbox size={10} /> {inquiries.length} consulta{inquiries.length > 1 ? 's' : ''}
+                {(() => {
+                  const newCount = inquiries.filter(i => i.status === 'new').length
+                  return newCount > 0 ? (
+                    <span style={{ fontSize: 9, padding: '0px 5px', borderRadius: 99, background: 'var(--gold)', color: '#fff', fontWeight: 700, marginLeft: 2 }}>{newCount}</span>
+                  ) : null
+                })()}
+              </span>
+            )}
+            {/* PDF attached */}
+            {(lead.budget_files?.length > 0 || lead.budget_file_url) && (
+              <span style={{ fontSize: 10, color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+                <Paperclip size={10} /> {lead.budget_files?.length > 1 ? `${lead.budget_files.length} docs` : 'PDF'}
+              </span>
+            )}
+          </div>
+
+          {/* Row 3: Key info — date, guests, contact */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
+            {/* Wedding date */}
+            {(() => {
+              const { line1, line2, color } = formatLeadDate(lead)
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Calendar size={12} style={{ color: color || 'var(--warm-gray)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 500, color: color || 'var(--charcoal)' }}>{line1}</span>
+                  {line2 && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: color || 'var(--warm-gray)', padding: '1px 7px', borderRadius: 10, lineHeight: 1.2 }}>
+                      {line2}
+                    </span>
+                  )}
+                </div>
+              )
+            })()}
+            {/* Visit date */}
+            {(tab === 'visit' || tab === 'budget') && lead.visit_date && (() => {
+              const vDate = new Date(lead.visit_date + 'T12:00:00')
+              const isPast = lead.status === 'post_visit'
+              const daysUntil = Math.ceil((vDate.getTime() - Date.now()) / 86400000)
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Landmark size={12} style={{ color: isPast ? '#4f46e5' : '#16a34a', flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: isPast ? '#4f46e5' : '#16a34a' }}>
+                    {vDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                  </span>
+                  {!isPast && daysUntil >= 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: daysUntil <= 2 ? 'var(--rose)' : '#16a34a', padding: '1px 7px', borderRadius: 10, lineHeight: 1.2 }}>
+                      {daysUntil === 0 ? 'Hoy' : daysUntil === 1 ? 'Mañana' : `${daysUntil}d`}
+                    </span>
+                  )}
+                </div>
+              )
+            })()}
+            {tab === 'confirmed' && lead.wedding_date && (
+              <div style={{ fontSize: 12, color: 'var(--sage)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <PartyPopper size={11} /> {new Date(lead.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
               </div>
             )}
-
-            {/* Email + phone */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {lead.email && (
-                <div style={{ fontSize: 12, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Mail size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} /> {lead.email}
-                </div>
-              )}
-              {lead.phone && (
-                <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Phone size={10} style={{ flexShrink: 0 }} /> {lead.phone}
-                </div>
-              )}
-            </div>
-
-            <ChevronRight size={14} style={{ color: 'var(--stone)', flexShrink: 0 }} />
-          </div>
-
-          {/* Actions row */}
-          <div style={{ padding: '7px 14px 10px', background: 'var(--cream)', borderTop: '1px solid var(--ivory)', borderRadius: '0 0 13px 13px' }}>
-            <QuickActions lead={lead} tab={tab} onMove={onMove} onEdit={onEdit} onDelete={onDelete} onDateConfirm={onDateConfirm} onPdfDigital={onPdfDigital} />
+            {/* Divider dot */}
+            {lead.guests && <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--stone)', flexShrink: 0 }} />}
+            {/* Guests */}
+            {lead.guests && (
+              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Users size={12} style={{ color: 'var(--gold)', flexShrink: 0 }} /> {lead.guests} inv.
+              </div>
+            )}
+            {/* Divider dot */}
+            {(lead.email || lead.phone) && <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--stone)', flexShrink: 0 }} />}
+            {/* Email */}
+            {lead.email && (
+              <div style={{ fontSize: 12, color: 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, maxWidth: 200 }}>
+                <Mail size={11} style={{ flexShrink: 0 }} /> {lead.email}
+              </div>
+            )}
+            {/* Phone */}
+            {lead.phone && !lead.email && (
+              <div style={{ fontSize: 12, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Phone size={11} style={{ flexShrink: 0 }} /> {lead.phone}
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Chevron */}
+        <ChevronRight size={16} style={{ color: 'var(--stone)', flexShrink: 0, marginTop: 12 }} />
+      </div>
+
+      {/* Actions row */}
+      <div style={{ padding: '7px 14px 10px', background: 'var(--cream)', borderTop: '1px solid var(--ivory)', borderRadius: '0 0 13px 13px' }}>
+        <QuickActions lead={lead} tab={tab} onMove={onMove} onEdit={onEdit} onDelete={onDelete} onDateConfirm={onDateConfirm} onPdfDigital={onPdfDigital} />
       </div>
     </div>
   )
@@ -4178,7 +4375,14 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
         <SheetTitle className="sr-only">{lead.name}</SheetTitle>
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, fontWeight: 600, color: 'var(--espresso)' }}>{lead.name}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, fontWeight: 600, color: 'var(--espresso)' }}>{lead.name}</div>
+              {lead.source === 'wedding_planner' && (
+                <span style={{ fontSize: 10, background: 'rgba(139,92,246,0.12)', color: '#7c3aed', padding: '3px 8px', borderRadius: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' }}>
+                  👑 Planner
+                </span>
+              )}
+            </div>
             <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 4 }}>
               {SUB_STATUS_LABEL[lead.status as DbStatus]} · {SOURCE_LABEL[lead.source] || lead.source}
             </div>
@@ -4450,6 +4654,7 @@ function KanbanColumn({ col, leads, isOver, draggingId, onDragOver, onDragLeave,
         {leads.map(lead => {
           const isDragging = draggingId === lead.id
           const isRecent = col.key === 'new' && lead.created_at && (Date.now() - new Date(lead.created_at).getTime()) < 2 * 3600_000
+          const isPlanner = lead.source === 'wedding_planner'
           return (
             <div
               key={lead.id}
@@ -4458,21 +4663,22 @@ function KanbanColumn({ col, leads, isOver, draggingId, onDragOver, onDragLeave,
               onDragEnd={onDragEnd}
               onClick={() => onDetail(lead)}
               style={{
-                background: isDragging ? 'var(--cream)' : isRecent ? '#f0fdf4' : 'var(--cream)',
-                border: isRecent ? '1px solid #86efac' : '1px solid var(--ivory)',
+                background: isDragging ? 'var(--cream)' : isRecent ? '#f0fdf4' : isPlanner ? 'rgba(139,92,246,0.04)' : 'var(--cream)',
+                border: isRecent ? '1px solid #86efac' : isPlanner ? '1px solid rgba(139,92,246,0.2)' : '1px solid var(--ivory)',
                 borderRadius: 8,
                 padding: '9px 10px',
                 marginBottom: 5,
                 cursor: isDragging ? 'grabbing' : 'grab',
                 opacity: isDragging ? 0.35 : 1,
                 transition: 'box-shadow 0.15s, opacity 0.15s',
-                boxShadow: isRecent ? '0 0 8px rgba(22,163,106,0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
+                boxShadow: isRecent ? '0 0 8px rgba(22,163,106,0.12)' : isPlanner ? '0 1px 4px rgba(139,92,246,0.1)' : '0 1px 2px rgba(0,0,0,0.03)',
               }}
-              onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 12px rgba(22,163,106,0.2)' : '0 3px 10px rgba(0,0,0,0.07)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 8px rgba(22,163,106,0.12)' : '0 1px 2px rgba(0,0,0,0.03)' }}
+              onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 12px rgba(22,163,106,0.2)' : isPlanner ? '0 3px 10px rgba(139,92,246,0.15)' : '0 3px 10px rgba(0,0,0,0.07)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 8px rgba(22,163,106,0.12)' : isPlanner ? '0 1px 4px rgba(139,92,246,0.1)' : '0 1px 2px rgba(0,0,0,0.03)' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600, color: 'var(--espresso)', fontSize: 12.5, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {isRecent && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', flexShrink: 0, animation: 'pulse-dot 2s ease-in-out infinite' }} />}
+                {isPlanner && !isRecent && <span style={{ fontSize: 9 }}>👑</span>}
                 {lead.name}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
@@ -5846,12 +6052,28 @@ function LanguagePicker({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 // ── Client Link Selector ──────────────────────────────────────────────────────
-function ClientLinkSelector({ venueId, clientId, onChange }: { venueId: string; clientId: string; onChange: (id: string) => void }) {
+// Modes: idle (two buttons) → 'search' (dropdown) or 'create' (type picker + confirm)
+const CLIENT_TYPES_FOR_PICKER: { value: ClientType; label: string; icon: string }[] = [
+  { value: 'pareja',          label: 'Pareja',          icon: '💍' },
+  { value: 'wedding_planner', label: 'Wedding Planner', icon: '👑' },
+  { value: 'organizador',     label: 'Organizador',     icon: '📋' },
+  { value: 'empresa',         label: 'Empresa',         icon: '🏢' },
+  { value: 'otro',            label: 'Otro',            icon: '👤' },
+]
+
+function ClientLinkSelector({ venueId, clientId, onChange, leadInfo }: {
+  venueId: string; clientId: string; onChange: (id: string) => void
+  leadInfo?: { name?: string; email?: string; phone?: string; whatsapp?: string; source?: string }
+}) {
   const [clients, setClients] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded]   = useState(false)
   const [query, setQuery]     = useState('')
-  const [open, setOpen]       = useState(false)
+  const [mode, setMode]       = useState<'idle' | 'search' | 'create'>('idle')
+  const [creating, setCreating] = useState(false)
+  const [newType, setNewType] = useState<ClientType>(
+    leadInfo?.source === 'wedding_planner' ? 'wedding_planner' : 'pareja'
+  )
   const wrapRef               = useRef<HTMLDivElement>(null)
 
   // Load clients on first open
@@ -5866,10 +6088,31 @@ function ClientLinkSelector({ venueId, clientId, onChange }: { venueId: string; 
     setLoading(false)
   }
 
-  // Close dropdown on outside click
+  // Create new client from lead info
+  const createContact = async () => {
+    if (!leadInfo?.name || creating) return
+    setCreating(true)
+    const supabase = createClient()
+    const { data, error } = await supabase.from('clients').insert({
+      venue_id: venueId,
+      name: leadInfo.name,
+      email: leadInfo.email || null,
+      phone: leadInfo.phone || null,
+      whatsapp: leadInfo.whatsapp || null,
+      client_type: newType,
+    }).select('id,name,email,phone,client_type').single()
+    if (!error && data) {
+      setClients(prev => [...prev, data])
+      onChange(data.id)
+      setMode('idle')
+    }
+    setCreating(false)
+  }
+
+  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setMode('idle')
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -5882,11 +6125,9 @@ function ClientLinkSelector({ venueId, clientId, onChange }: { venueId: string; 
     return c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.phone?.includes(q)
   })
 
-  // If we have a clientId but haven't loaded yet, load to resolve the name
-  useEffect(() => {
-    if (clientId && !loaded) loadClients()
-  }, [clientId])
+  useEffect(() => { if (clientId && !loaded) loadClients() }, [clientId])
 
+  // ── Already linked ──
   if (clientId && selected) {
     const colors = CLIENT_TYPE_COLORS[selected.client_type as ClientType] || CLIENT_TYPE_COLORS.otro
     return (
@@ -5894,7 +6135,7 @@ function ClientLinkSelector({ venueId, clientId, onChange }: { venueId: string; 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: colors.color }}>{selected.name}</div>
           <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>
-            {CLIENT_TYPE_LABELS[selected.client_type as ClientType] || 'Cliente'}
+            {CLIENT_TYPE_LABELS[selected.client_type as ClientType] || 'Contacto'}
             {selected.email ? ` · ${selected.email}` : ''}
           </div>
         </div>
@@ -5907,10 +6148,9 @@ function ClientLinkSelector({ venueId, clientId, onChange }: { venueId: string; 
   }
 
   if (clientId && !selected && loaded) {
-    // client_id set but not found (maybe deleted)
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fca5a5' }}>
-        <span style={{ fontSize: 12, color: '#b91c1c', flex: 1 }}>Cliente vinculado no encontrado</span>
+        <span style={{ fontSize: 12, color: '#b91c1c', flex: 1 }}>Contacto vinculado no encontrado</span>
         <button type="button" onClick={() => onChange('')}
           style={{ padding: '3px 8px', borderRadius: 6, background: '#fff', border: '1px solid #fca5a5', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#b91c1c' }}>
           Limpiar
@@ -5919,27 +6159,90 @@ function ClientLinkSelector({ venueId, clientId, onChange }: { venueId: string; 
     )
   }
 
+  // ── Not linked yet ──
   return (
-    <div ref={wrapRef} style={{ position: 'relative' }}>
-      <div
-        onClick={() => { setOpen(true); loadClients() }}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '9px 12px', borderRadius: 10,
-          background: '#fafaf8', border: '1px solid var(--ivory)',
-          cursor: 'pointer', fontSize: 13, color: 'var(--warm-gray)',
-        }}
-      >
-        <Link2 size={13} style={{ color: 'var(--gold)', flexShrink: 0 }} />
-        <span style={{ flex: 1 }}>Buscar cliente del CRM…</span>
-        <ChevronDown size={13} style={{ color: 'var(--warm-gray)' }} />
+    <div ref={wrapRef}>
+
+      {/* Two action buttons — always visible */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: mode !== 'idle' ? 10 : 0 }}>
+        {leadInfo?.name && (
+          <button type="button" onClick={() => setMode(mode === 'create' ? 'idle' : 'create')}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '10px 14px', borderRadius: 10,
+              background: mode === 'create' ? 'var(--espresso)' : 'var(--gold)', border: 'none',
+              cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#fff',
+              transition: 'background 0.15s',
+            }}
+          >
+            <UserPlus size={14} /> Crear contacto nuevo
+          </button>
+        )}
+        <button type="button" onClick={() => { if (mode === 'search') { setMode('idle'); setQuery('') } else { setMode('search'); loadClients() } }}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '10px 14px', borderRadius: 10,
+            background: mode === 'search' ? 'var(--espresso)' : '#fafaf8',
+            border: mode === 'search' ? 'none' : '1px solid var(--ivory)',
+            cursor: 'pointer', fontSize: 13, fontWeight: 500,
+            color: mode === 'search' ? '#fff' : 'var(--charcoal)',
+            transition: 'all 0.15s',
+          }}
+        >
+          <Link2 size={14} style={{ color: mode === 'search' ? '#fff' : 'var(--gold)' }} /> Vincular existente
+        </button>
       </div>
 
-      {open && (
+      {/* Create mode: type picker + confirm */}
+      {mode === 'create' && leadInfo?.name && (
+        <div style={{ padding: '14px', borderRadius: 10, border: '1px solid var(--ivory)', background: '#fafaf8' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--espresso)', marginBottom: 10 }}>
+            Tipo de contacto
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+            {CLIENT_TYPES_FOR_PICKER.map(ct => {
+              const isActive = newType === ct.value
+              const colors = CLIENT_TYPE_COLORS[ct.value]
+              return (
+                <button key={ct.value} type="button" onClick={() => setNewType(ct.value)}
+                  style={{
+                    padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+                    fontSize: 11.5, fontWeight: isActive ? 700 : 500,
+                    background: isActive ? colors.bg : '#fff',
+                    color: isActive ? colors.color : 'var(--warm-gray)',
+                    border: `1.5px solid ${isActive ? colors.border : 'var(--ivory)'}`,
+                    transition: 'all 0.12s',
+                  }}
+                >
+                  {ct.icon} {ct.label}
+                </button>
+              )
+            })}
+          </div>
+          {/* Preview */}
+          <div style={{ padding: '8px 12px', borderRadius: 8, background: '#fff', border: '1px solid var(--ivory)', marginBottom: 12, fontSize: 12 }}>
+            <div style={{ fontWeight: 600, color: 'var(--espresso)' }}>{leadInfo.name}</div>
+            {leadInfo.email && <div style={{ color: 'var(--warm-gray)', fontSize: 11, marginTop: 2 }}>{leadInfo.email}</div>}
+            {leadInfo.phone && <div style={{ color: 'var(--warm-gray)', fontSize: 11, marginTop: 1 }}>{leadInfo.phone}</div>}
+          </div>
+          <button type="button" onClick={createContact} disabled={creating}
+            style={{
+              width: '100%', padding: '8px 14px', borderRadius: 8,
+              background: 'var(--gold)', border: 'none',
+              cursor: creating ? 'wait' : 'pointer', fontSize: 12, fontWeight: 600, color: '#fff',
+              opacity: creating ? 0.7 : 1,
+            }}
+          >
+            {creating ? 'Creando…' : 'Crear y vincular'}
+          </button>
+        </div>
+      )}
+
+      {/* Search mode: inline dropdown below buttons */}
+      {mode === 'search' && (
         <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-          marginTop: 4, borderRadius: 10, background: '#fff',
-          border: '1px solid var(--ivory)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          borderRadius: 10, background: '#fff',
+          border: '1px solid var(--ivory)', boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
           maxHeight: 260, display: 'flex', flexDirection: 'column',
         }}>
           <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--ivory)' }}>
@@ -5955,14 +6258,14 @@ function ClientLinkSelector({ venueId, clientId, onChange }: { venueId: string; 
             {loading && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--warm-gray)' }}>Cargando…</div>}
             {!loading && filtered.length === 0 && (
               <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--warm-gray)' }}>
-                {query ? 'Sin resultados' : 'No hay clientes en el CRM'}
+                {query ? 'Sin resultados' : 'No hay contactos en el CRM'}
               </div>
             )}
             {!loading && filtered.map(c => {
               const colors = CLIENT_TYPE_COLORS[c.client_type as ClientType] || CLIENT_TYPE_COLORS.otro
               return (
                 <button key={c.id} type="button"
-                  onClick={() => { onChange(c.id); setOpen(false); setQuery('') }}
+                  onClick={() => { onChange(c.id); setMode('idle'); setQuery('') }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                     padding: '8px 14px', border: 'none', background: 'none',
@@ -5977,7 +6280,7 @@ function ClientLinkSelector({ venueId, clientId, onChange }: { venueId: string; 
                     background: colors.bg, color: colors.color, border: `1px solid ${colors.border}`,
                     whiteSpace: 'nowrap', flexShrink: 0,
                   }}>
-                    {CLIENT_TYPE_LABELS[c.client_type as ClientType] || 'Cliente'}
+                    {CLIENT_TYPE_LABELS[c.client_type as ClientType] || 'Contacto'}
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
@@ -6007,7 +6310,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
   const setOrig = (k: string, v: any) => setForm((f: any) => ({ ...f, [`original_${k}`]: v }))
   const [editingOriginal,  setEditingOriginal]  = useState(false)
   const [showOriginal,     setShowOriginal]     = useState(false)   // Lo que pidió — collapsed by default
-  const [activeModalTab,   setActiveModalTab]   = useState<'fechas' | 'detalles' | 'oferta' | 'contacto'>(isEdit ? 'fechas' : 'contacto')
+  const [activeModalTab,   setActiveModalTab]   = useState<'fechas' | 'detalles' | 'oferta' | 'contacto' | 'respuesta'>(isEdit ? 'fechas' : 'contacto')
   const { propuestas: canPropuesta } = usePlanFeatures()
   // Budget file upload (budget_sent and visit leads)
   const [budgetUploading,   setBudgetUploading]   = useState(false)
@@ -6016,10 +6319,57 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
   const [budgetFileSaving,  setBudgetFileSaving]  = useState(false)
   const [budgetFileSaved,   setBudgetFileSaved]   = useState(false)
   const budgetInputRef = useRef<HTMLInputElement>(null)
+  const [proposalResponse, setProposalResponse] = useState<any>(null)
+  const [loadingResponse, setLoadingResponse] = useState(false)
   const initials = getInitials(form.name || '')
   // Lead phase — drives copy + ordering of date sections
   const leadStatus = editLead?.status as DbStatus | undefined
   const isNewPhase = !isEdit || !leadStatus || leadStatus === 'new' || leadStatus === 'lost'
+
+  // Fetch proposal response data when editing a lead
+  useEffect(() => {
+    if (!isEdit || !editLead?.id) return
+    const loadResponse = async () => {
+      setLoadingResponse(true)
+      try {
+        const supabase = createClient()
+        // Find proposal linked to this lead
+        const { data: proposal } = await supabase
+          .from('proposals')
+          .select('id, slug, couple_name')
+          .eq('lead_id', editLead.id)
+          .eq('venue_id', venueId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (!proposal) { setProposalResponse(null); return }
+        // Fetch latest menu selection
+        const { data: menuSel } = await supabase
+          .from('proposal_menu_selections')
+          .select('*')
+          .eq('proposal_id', proposal.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        // Fetch inquiries
+        const { data: inquiries } = await supabase
+          .from('proposal_inquiries')
+          .select('*')
+          .eq('proposal_id', proposal.id)
+          .order('created_at', { ascending: false })
+        setProposalResponse({
+          proposal,
+          menuSelection: menuSel,
+          inquiries: inquiries || [],
+        })
+      } catch (err) {
+        console.warn('[lead modal] failed to load proposal response:', err)
+      } finally {
+        setLoadingResponse(false)
+      }
+    }
+    loadResponse()
+  }, [isEdit, editLead?.id, venueId])
 
   const dateSectionTitle = isNewPhase ? 'Fecha que quiere la pareja' : 'Fechas propuestas a la pareja'
   const dateSectionHint  = isNewPhase
@@ -6124,7 +6474,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, fontWeight: 700, color: 'var(--espresso)', lineHeight: 1.2, textTransform: 'capitalize' }}>
-                {isEdit ? (form.name || 'Sin nombre') : (form.name ? form.name : 'Nueva pareja interesada')}
+                {isEdit ? (form.name || 'Sin nombre') : (form.name ? form.name : 'Nuevo cliente potencial')}
               </div>
               {isEdit && leadStatus && (() => {
                 const STATUS_INFO: Record<string, { label: string; bg: string; border: string; color: string; icon: React.ReactNode }> = {
@@ -6183,14 +6533,16 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               { key: 'fechas',   label: 'Fechas',    icon: <CalendarDays      size={12} /> },
               { key: 'detalles', label: 'Detalles',  icon: <SlidersHorizontal size={12} /> },
               { key: 'oferta',   label: 'Comercial', icon: <Receipt           size={12} /> },
+              ...(proposalResponse ? [{ key: 'respuesta' as const, label: 'Respuesta', icon: <Inbox size={12} /> }] : []),
               { key: 'contacto', label: 'Contacto',  icon: <Users             size={12} /> },
             ]
             return [
               { key: 'fechas',   label: 'Fechas',    icon: <CalendarDays      size={12} /> },
               { key: 'detalles', label: 'Detalles',  icon: <SlidersHorizontal size={12} /> },
+              ...(proposalResponse ? [{ key: 'respuesta' as const, label: 'Respuesta', icon: <Inbox size={12} /> }] : []),
               { key: 'contacto', label: 'Contacto',  icon: <Users             size={12} /> },
             ]
-          })() as { key: 'fechas' | 'detalles' | 'oferta' | 'contacto'; label: string; icon: React.ReactNode }[]).map(t => {
+          })() as { key: 'fechas' | 'detalles' | 'oferta' | 'contacto' | 'respuesta'; label: string; icon: React.ReactNode }[]).map(t => {
             const isActive = activeModalTab === t.key
             return (
               <button key={t.key} type="button" onClick={() => setActiveModalTab(t.key)} style={{
@@ -7149,13 +7501,14 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
           {/* Divider */}
           <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
 
-          {/* Section: Vincular cliente */}
+          {/* Section: Vincular contacto */}
           <div style={{ marginBottom: 22 }}>
-            <SectionTitle icon={<Link2 size={14} />} title="Vincular a un cliente" hint="Opcional — enlaza este lead con cualquier cliente del CRM" />
+            <SectionTitle icon={<Link2 size={14} />} title={form.client_id ? 'Contacto vinculado' : 'Vincular a un contacto'} hint={form.client_id ? undefined : 'Opcional — enlaza este lead con un contacto del CRM o crea uno nuevo'} />
             <ClientLinkSelector
               venueId={venueId}
               clientId={form.client_id || ''}
               onChange={(id) => set('client_id', id)}
+              leadInfo={{ name: form.name, email: form.email, phone: form.phone || form.whatsapp, whatsapp: form.whatsapp, source: form.source }}
             />
           </div>
 
@@ -7202,6 +7555,179 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
           </div>
 
           </>)}
+
+          {/* ── TAB: RESPUESTA ─────────────────────────────────────────────────── */}
+          {activeModalTab === 'respuesta' && proposalResponse && (
+            <div>
+              {loadingResponse ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--warm-gray)', fontSize: 12, padding: '20px 0' }}>
+                  <Loader2 size={14} className="animate-spin" /> Cargando respuesta...
+                </div>
+              ) : (
+                <>
+                  {/* Link to proposal */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                      Respuestas del dosier digital
+                    </div>
+                    <a href={`/proposals/${proposalResponse.proposal.id}/edit`}
+                      style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <ExternalLink size={10} /> Ver dosier
+                    </a>
+                  </div>
+
+                  {/* Menu selection */}
+                  {proposalResponse.menuSelection && (() => {
+                    const ms = proposalResponse.menuSelection
+                    return (
+                      <div style={{ background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <FileText size={11} /> Selección de menú
+                        </div>
+
+                        {/* Menu name */}
+                        {ms.selected_menu_name && (
+                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)', marginBottom: 6 }}>
+                            {ms.selected_menu_name}
+                          </div>
+                        )}
+
+                        {/* Multi-menu allocations */}
+                        {ms.menu_allocations?.length > 0 && (
+                          <div style={{ marginBottom: 8 }}>
+                            {ms.menu_allocations.map((ma: any, i: number) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: i < ms.menu_allocations.length - 1 ? '1px solid var(--ivory)' : 'none' }}>
+                                <span style={{ fontSize: 12, color: 'var(--charcoal)' }}>{ma.menu_name || `Menú ${i + 1}`}</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--espresso)' }}>{ma.guests} inv.</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Guest count */}
+                        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
+                          {ms.guest_count && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <Users size={12} style={{ color: 'var(--gold)' }} />
+                              <span style={{ fontSize: 12, color: 'var(--charcoal)' }}>{ms.guest_count} invitados</span>
+                              {ms.guest_count_changed && ms.original_guest_count && (
+                                <span style={{ fontSize: 10, color: '#b45309', background: 'rgba(217,119,6,0.1)', padding: '1px 6px', borderRadius: 8 }}>
+                                  antes: {ms.original_guest_count}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {ms.estimated_total != null && (
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--espresso)' }}>
+                              Total estimado: {ms.estimated_total.toLocaleString('es-ES')} €
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Course choices */}
+                        {ms.course_choices && Object.keys(ms.course_choices).length > 0 && (
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Platos elegidos</div>
+                            {Object.entries(ms.course_choices).map(([course, choice]: [string, any]) => (
+                              <div key={course} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 12 }}>
+                                <span style={{ color: 'var(--warm-gray)' }}>{course}</span>
+                                <span style={{ color: 'var(--charcoal)', fontWeight: 500 }}>{typeof choice === 'string' ? choice : JSON.stringify(choice)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Selected extras */}
+                        {ms.selected_extras?.length > 0 && (
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Extras seleccionados</div>
+                            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                              {ms.selected_extras.map((ext: string, i: number) => (
+                                <span key={i} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 8, background: 'rgba(99,102,241,0.08)', color: '#4f46e5', fontWeight: 500 }}>
+                                  {ext}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Comments */}
+                        {ms.comments && (
+                          <div style={{ marginTop: 8, padding: '8px 10px', background: '#fff', borderRadius: 8, border: '1px solid var(--ivory)' }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Comentarios</div>
+                            <div style={{ fontSize: 12, color: 'var(--charcoal)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{ms.comments}</div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Visit request */}
+                  {proposalResponse.inquiries.filter((i: any) => i.kind === 'visit').length > 0 && (() => {
+                    const visit = proposalResponse.inquiries.find((i: any) => i.kind === 'visit')
+                    const p = visit.payload || {}
+                    return (
+                      <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <Landmark size={11} /> Visita solicitada
+                        </div>
+                        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12 }}>
+                          {p.date && <div><span style={{ color: '#6ee7b7' }}>Fecha:</span> <span style={{ fontWeight: 600, color: '#047857' }}>{new Date(p.date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>}
+                          {p.time && <div><span style={{ color: '#6ee7b7' }}>Hora:</span> <span style={{ fontWeight: 600, color: '#047857' }}>{p.time}</span></div>}
+                        </div>
+                        {visit.message && (
+                          <div style={{ marginTop: 8, fontSize: 12, color: '#065f46', fontStyle: 'italic' }}>"{visit.message}"</div>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Date selection */}
+                  {proposalResponse.inquiries.filter((i: any) => i.kind === 'date_pick').length > 0 && (() => {
+                    const dp = proposalResponse.inquiries.find((i: any) => i.kind === 'date_pick')
+                    const p = dp.payload || {}
+                    return (
+                      <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <Calendar size={11} /> Fecha seleccionada
+                        </div>
+                        {p.wedding_date && (
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#312e81' }}>
+                            {new Date(p.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* No data state */}
+                  {!proposalResponse.menuSelection && proposalResponse.inquiries.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--warm-gray)' }}>
+                      <Inbox size={24} style={{ opacity: 0.3, marginBottom: 8 }} />
+                      <div style={{ fontSize: 13 }}>La pareja aún no ha respondido al dosier</div>
+                    </div>
+                  )}
+
+                  {/* Create budget button */}
+                  {proposalResponse.menuSelection && (
+                    <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
+                      <a href={`/budgets/new?lead_id=${editLead?.id}&from_proposal=1`}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 8,
+                          padding: '10px 24px', borderRadius: 10,
+                          background: 'var(--gold)', color: '#fff',
+                          fontSize: 13, fontWeight: 700, textDecoration: 'none',
+                          boxShadow: '0 2px 8px rgba(201,150,58,0.3)',
+                          transition: 'all 0.15s',
+                        }}>
+                        <Receipt size={14} /> Crear presupuesto desde selección
+                      </a>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
         </div>
 

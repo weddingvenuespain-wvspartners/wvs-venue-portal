@@ -4,16 +4,173 @@
 // Secciones: Hero → Historia → Galería → Espacios → Paquetes → Temporadas
 //            → Qué incluye → Testimoniales → Colaboradores → Extras → FAQ → CTA
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, formatZonePrice, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, TestimonialsFeatured, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, StarRating, resolveContact, replacePlaceholders, ZoneSlider, type ProposalData } from './shared'
 import InquiryForm from '@/components/InquiryForm'
 import VisitBookingModal from '@/components/VisitBookingModal'
 import { buildSingleFontUrl } from '@/lib/fonts'
-import { WeddingProposal } from './WeddingProposal'
+import dynamic from 'next/dynamic'
+
+const VenueMap = dynamic(() => import('@/components/VenueMap'), { ssr: false })
+import { WeddingProposal, type CartSummary } from './WeddingProposal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 import DateSelector from './DateSelector'
 import { getActiveStyle, isSectionGroupEnabled } from '@/lib/section-styles'
 
+
+function BudgetRequestForm({ proposalId, selectedSpaces, selectedMenus, selectedExtraSvcs, menuCart, guestCount, weddingDate, primary, btnTextColor, dark, fg, onSuccess, onClose }: {
+  proposalId: string; selectedSpaces: any[]; selectedMenus: string[]; selectedExtraSvcs: string[]
+  menuCart?: CartSummary | null; guestCount?: number; weddingDate?: string
+  primary: string; btnTextColor: string; dark: boolean; fg: (a: number) => string
+  onSuccess: () => void; onClose: () => void
+}) {
+  const [message, setMessage] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async () => {
+    setSubmitting(true); setError('')
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/budget-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: message || null,
+          selected_spaces: selectedSpaces,
+          selected_menus: selectedMenus,
+          selected_extra_svcs: selectedExtraSvcs,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || 'Error al enviar'); setSubmitting(false); return }
+      onSuccess()
+    } catch { setError('Error de conexión'); setSubmitting(false) }
+  }
+
+  const effectiveGuests = menuCart?.guests || guestCount
+  const hasSelections = selectedSpaces.length > 0 || (menuCart && menuCart.menuItems.length > 0) || selectedMenus.length > 0 || selectedExtraSvcs.length > 0 || (menuCart && menuCart.extras.length > 0) || !!weddingDate || !!effectiveGuests
+  const cardStyle: React.CSSProperties = { background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', border: `1px solid ${fg(.08)}`, borderRadius: 10, padding: '12px 16px' }
+  const labelStyle: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: fg(.35), textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }
+
+  const formatWeddingDate = (iso?: string) => {
+    if (!iso) return null
+    try { return new Date(iso + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) } catch { return iso }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Help text */}
+      <div style={{ fontSize: 12, color: fg(.45), lineHeight: 1.5 }}>
+        Si queréis cambiar algo, cerrad este modal y modificadlo en el dosier.
+      </div>
+
+      {/* Summary of selections — cart style */}
+      {hasSelections && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Wedding date */}
+          {weddingDate && (
+            <div style={cardStyle}>
+              <div style={labelStyle}>Fecha de la boda</div>
+              <div style={{ fontSize: 14, color: fg(.9), fontWeight: 600 }}>{formatWeddingDate(weddingDate)}</div>
+            </div>
+          )}
+          {/* Guests */}
+          {effectiveGuests && (
+            <div style={cardStyle}>
+              <div style={labelStyle}>Invitados</div>
+              <div style={{ fontSize: 14, color: fg(.9), fontWeight: 600 }}>{effectiveGuests} personas</div>
+            </div>
+          )}
+          {/* Spaces */}
+          {selectedSpaces.length > 0 && (
+            <div style={cardStyle}>
+              <div style={labelStyle}>Espacios</div>
+              {selectedSpaces.map((s, i) => (
+                <div key={i} style={{ fontSize: 13, color: fg(.7), paddingTop: i > 0 ? 3 : 0 }}>
+                  {s.group_name}: <strong style={{ color: fg(.9) }}>{s.space_name}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Menus — rich detail from cart */}
+          {menuCart && menuCart.menuItems.length > 0 ? (
+            <div style={cardStyle}>
+              <div style={labelStyle}>Menú{menuCart.menuItems.length > 1 ? 's' : ''}</div>
+              {menuCart.menuItems.map((m, i) => (
+                <div key={i} style={{ marginTop: i > 0 ? 10 : 0, paddingTop: i > 0 ? 10 : 0, borderTop: i > 0 ? `1px solid ${fg(.08)}` : 'none' }}>
+                  <div style={{ fontSize: 14, color: fg(.9), fontWeight: 600 }}>{m.name}</div>
+                  <div style={{ fontSize: 12, color: fg(.5), marginTop: 2 }}>{m.guests} pers.</div>
+                  {m.courseSelections.length > 0 && (
+                    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {m.courseSelections.map((cs, ci) => (
+                        <div key={ci} style={{ fontSize: 12, color: fg(.65) }}>{cs}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : selectedMenus.length > 0 && (
+            <div style={cardStyle}>
+              <div style={labelStyle}>Menú{selectedMenus.length > 1 ? 's' : ''}</div>
+              {selectedMenus.map((m, i) => (
+                <div key={i} style={{ fontSize: 13, color: fg(.9), fontWeight: 500, paddingTop: i > 0 ? 3 : 0 }}>{m}</div>
+              ))}
+            </div>
+          )}
+          {/* Menu extras from cart */}
+          {menuCart && menuCart.extras.length > 0 && (
+            <div style={cardStyle}>
+              <div style={labelStyle}>Extras del menú</div>
+              {menuCart.extras.map((e, i) => (
+                <div key={i} style={{ fontSize: 13, color: fg(.7), paddingTop: i > 0 ? 3 : 0 }}>
+                  {e.category}: <strong style={{ color: fg(.9) }}>{e.name}</strong>{e.guests ? <span style={{ color: fg(.5) }}> · {e.guests} pers.</span> : null}
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Extra services */}
+          {selectedExtraSvcs.length > 0 && (
+            <div style={cardStyle}>
+              <div style={labelStyle}>Servicios adicionales</div>
+              {selectedExtraSvcs.map((s, i) => (
+                <div key={i} style={{ fontSize: 13, color: fg(.9), fontWeight: 500, paddingTop: i > 0 ? 3 : 0 }}>{s}</div>
+              ))}
+            </div>
+          )}
+          {/* Total */}
+          {menuCart && menuCart.total > 0 && (
+            <div style={{ ...cardStyle, background: `${primary}12`, border: `1px solid ${primary}33`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 13, color: fg(.7), fontWeight: 600 }}>Total menú estimado</div>
+              <div style={{ fontSize: 15, color: primary, fontWeight: 700 }}>{menuCart.total.toLocaleString('es-ES')} €</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Comments */}
+      <div>
+        <label style={{ fontSize: 11, fontWeight: 600, color: fg(.4), display: 'block', marginBottom: 4 }}>Dudas o comentarios (opcional)</label>
+        <textarea
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          placeholder="¿Alguna pregunta sobre el presupuesto?"
+          rows={3}
+          style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: `1px solid ${fg(.12)}`, background: dark ? 'rgba(255,255,255,0.05)' : '#f9f9f9', color: fg(.85), fontSize: '.85rem', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+        />
+      </div>
+      {error && <div style={{ fontSize: '.8rem', color: '#ef4444', marginBottom: 10 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button onClick={onClose} style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: `1px solid ${fg(.12)}`, background: 'transparent', color: fg(.5), fontSize: '.85rem', fontWeight: 600, cursor: 'pointer' }}>
+          Cancelar
+        </button>
+        <button onClick={submit} disabled={submitting} style={{ flex: 2, padding: '10px 16px', borderRadius: 8, border: 'none', background: primary, color: btnTextColor, fontSize: '.85rem', fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? 0.7 : 1 }}>
+          {submitting ? 'Enviando…' : 'Enviar solicitud'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function EmptySec({ label: _label }: { label: string }) {
   return null
@@ -23,10 +180,11 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const _preview = !!(data as any)._preview
   const { couple_name, personal_message, guest_count, wedding_date,
           price_estimate, show_price_estimate, venue, branding } = data
+  const extracted = useMemo(() => extractData(data), [data])
   const { sec, on, hasCatering, packagesShow, inclusionsShow, extrasShow, faqShow,
           testsShow, zonesShow, zonesMode, seasonsShow, collabsShow, menuShow,
           menusStructured, menuExtras, appetizersBase,
-          expShow, techspecs, accom, spaceGroups, dateSlots } = extractData(data)
+          expShow, techspecs, accom, spaceGroups, dateSlots } = extracted
 
   // Use template default message as fallback when no personal message yet
   const displayMsg = replacePlaceholders(personal_message || (sec as any).welcome_default || null, data)
@@ -59,8 +217,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     document.getElementById(target)?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const [scrolled, setScrolled]     = useState(false)
-  const [ctaBar, setCtaBar]         = useState(false)
+  const navRef = useRef<HTMLElement>(null)
+  const sbarRef = useRef<HTMLDivElement>(null)
   const [openFaq, setOpenFaq]       = useState<number | null>(null)
   const [selectedSpaces, setSelectedSpaces] = useState<SpaceSelection[]>([])
   const [selectedDatePriceIdx, setSelectedDatePriceIdx] = useState<number | null>(null)
@@ -73,10 +231,47 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   })
   const [visitModalOpen, setVisitModalOpen] = useState(false)
   const [visitDone, setVisitDone]           = useState(false)
-  const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(null)
+  const [budgetRequestOpen, setBudgetRequestOpen] = useState(false)
+  const [budgetRequestDone, setBudgetRequestDone] = useState(false)
+  const [selectedDateSlotIdx, setSelectedDateSlotIdx] = useState<number | null>(
+    // Auto-select when single date slot
+    dateSlots && dateSlots.length === 1 ? 0 : null
+  )
   const [selectedExtraSvcs, setSelectedExtraSvcs] = useState<Record<string, boolean>>({})
   const [selectedZoneSupplements, setSelectedZoneSupplements] = useState<Record<number, boolean>>({})
   const [selectedMenus, setSelectedMenus] = useState<string[]>([])
+  const [menuTotal, setMenuTotal] = useState(0)
+  const [menuValidationErrors, setMenuValidationErrors] = useState<string[]>([])
+  const menuCartRef = useRef<CartSummary | null>(null)
+  const setMenuCart = (c: CartSummary) => { menuCartRef.current = c }
+  const [validationError, setValidationError] = useState<string | null>(null)
+  // Collaborator own-provider selections: { [category]: { useOwn: bool, providerName: string } }
+  const [ownProviders, setOwnProviders] = useState<Record<string, { useOwn: boolean; providerName: string }>>({})
+  const [providerSubmitting, setProviderSubmitting] = useState(false)
+  const [providerSubmitted, setProviderSubmitted] = useState(false)
+
+  const submitOwnProviders = async () => {
+    const active = Object.entries(ownProviders).filter(([, v]) => v.useOwn)
+    if (active.length === 0) return
+    setProviderSubmitting(true)
+    try {
+      const cm: any = (sec as any).collaborators_meta ?? {}
+      const selections = active.map(([key, val]) => {
+        if (key === '__generic_exclusivity') {
+          return { category: 'Proveedor externo', provider_name: val.providerName || undefined, type: 'generic' as const, price: cm.generic_exclusivity_price }
+        }
+        const collab = collabsShow.find((c: any) => (c.category || `collab-${collabsShow.indexOf(c)}`) === key)
+        return { category: key, provider_name: val.providerName || undefined, type: 'per_collaborator' as const, price: collab?.exclusivity_price }
+      })
+      await fetch(`/api/proposals/${data.id}/provider-selection`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selections, couple_name: data.couple_name }),
+      })
+      setProviderSubmitted(true)
+    } catch (e) { console.error(e) }
+    setProviderSubmitting(false)
+  }
 
   // Dynamic price: updates when couple selects a date slot
   const selectedSlot = selectedDateSlotIdx !== null && dateSlots ? dateSlots[selectedDateSlotIdx] : null
@@ -88,21 +283,47 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   useEffect(() => {
     const fn = () => {
       const y = window.scrollY
-      setScrolled(y > 60)
-      setCtaBar(y > window.innerHeight * 0.6)
+      // Direct DOM updates — no React re-render on scroll
+      if (navRef.current) {
+        const shouldScroll = y > 60
+        navRef.current.classList.toggle('scrolled', shouldScroll)
+      }
+      if (sbarRef.current) {
+        const shouldShow = y > window.innerHeight * 0.6
+        sbarRef.current.classList.toggle('active', shouldShow)
+      }
       if (heroRef.current) heroRef.current.style.transform = `translateY(${y * 0.22}px)`
     }
     window.addEventListener('scroll', fn, { passive: true })
     return () => window.removeEventListener('scroll', fn)
   }, [])
 
-  // Load branded font from Google Fonts when it changes
+  // Load branded font from Google Fonts — preload + wait before showing text
+  const [fontReady, setFontReady] = useState(false)
   useEffect(() => {
-    const url = buildSingleFontUrl(FONT); if (!url) return
-    const ex = document.querySelector('link[data-gf-p]')
-    if (ex) { ex.setAttribute('href', url); return }
-    const l = document.createElement('link'); l.rel='stylesheet'; l.href=url; l.setAttribute('data-gf-p','1')
-    document.head.appendChild(l)
+    const url = buildSingleFontUrl(FONT)
+    if (!url) { setFontReady(true); return }
+    setFontReady(false)
+    // Insert stylesheet
+    const ex = document.querySelector('link[data-gf-p]') as HTMLLinkElement | null
+    if (ex) { ex.href = url } else { const l = document.createElement('link'); l.rel='stylesheet'; l.href=url; l.setAttribute('data-gf-p','1'); document.head.appendChild(l) }
+    // Wait for the actual font face to finish loading
+    const fontName = FONT.replace(/["']/g, '').split(',')[0].trim()
+    let cancelled = false
+    const check = () => {
+      try { return document.fonts.check(`16px "${fontName}"`) } catch { return false }
+    }
+    // Immediate check (font may be cached)
+    if (check()) { setFontReady(true); return }
+    // Use document.fonts.load() to actively trigger + await the font
+    document.fonts.load(`16px "${fontName}"`).then(() => {
+      if (!cancelled) setFontReady(true)
+    }).catch(() => {
+      if (!cancelled) setFontReady(true) // show fallback font on error
+    })
+    // Safety timeout — show text after 2s max even if font hasn't loaded
+    const tm = setTimeout(() => { if (!cancelled) setFontReady(true) }, 2000)
+    return () => { cancelled = true; clearTimeout(tm) }
   }, [FONT])
 
   const photos       = venue?.photo_urls ?? []
@@ -142,7 +363,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   // foreground (text/border) with opacity — warm-tinted in light mode
   const fg = (o: number) => lightMode ? `rgba(42,37,32,${o})` : `rgba(255,255,255,${o})`
 
-  const css = `
+  const css = useMemo(() => `
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html{scroll-behavior:smooth} body{-webkit-font-smoothing:antialiased}
@@ -179,9 +400,10 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       display:flex;align-items:center;justify-content:space-between;
       padding:14px 48px;
       box-shadow:0 -6px 32px rgba(${rgb},.5);
-      transform:translateY(${ctaBar ? '0' : '100%'});
+      transform:translateY(100%);
       transition:transform .4s cubic-bezier(.22,1,.36,1);
     }
+    .t1-sbar.active{transform:translateY(0)}
 
     /* ── Hero ── */
     .t1-hero{position:relative;height:100svh;min-height:620px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;background:radial-gradient(circle at 30% 40%,rgba(${rgb},.35),${pal.heroFade} 65%)}
@@ -306,6 +528,13 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-collab-links{display:flex;gap:12px;margin-top:auto;padding-top:14px;flex-wrap:wrap}
     .t1-collab-links a{font-size:.72rem;color:${primary};text-decoration:none;display:inline-flex;align-items:center;gap:3px;transition:opacity .15s}
     .t1-collab-links a:hover{opacity:.7}
+    .t1-collab-excl-price{font-size:.72rem;font-weight:600;color:${primary};margin-top:10px;padding:8px 12px;background:${lightMode ? 'rgba(196,151,90,0.08)' : 'rgba(255,255,255,0.05)'};border-radius:8px;border:1px dashed ${primary}40}
+    .t1-collab-own-btn{font-size:.72rem;color:${fg(.45)};margin-top:6px;padding:6px 10px;background:none;border:1px solid ${fg(.1)};border-radius:6px;cursor:pointer;transition:all .2s;width:100%;text-align:left}
+    .t1-collab-own-btn:hover{border-color:${primary};color:${primary}}
+    .t1-collab-own-active{border-color:${primary};background:${lightMode ? 'rgba(196,151,90,0.06)' : 'rgba(255,255,255,0.04)'}}
+    .t1-collab-own-input{margin-top:6px;width:100%;padding:8px 10px;font-size:.78rem;border:1px solid ${fg(.1)};border-radius:6px;background:${lightMode ? '#fff' : '#111'};color:${fg(.8)};outline:none;font-family:inherit}
+    .t1-collab-own-input:focus{border-color:${primary}}
+    .t1-collab-generic-price{margin-top:32px;padding:20px 24px;background:${lightMode ? pal.surfaceAlt : '#0a0a0a'};border-radius:12px;border:1px solid ${fg(.08)};text-align:center}
 
     /* ── Extra services ── */
     .t1-extra-row{display:flex;justify-content:space-between;align-items:center;padding:18px 0;border-bottom:1px solid ${pal.borderHard};gap:24px}
@@ -432,7 +661,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       .t1-tests{grid-template-columns:1fr}
       .t1-pkgs{grid-template-columns:1fr}
     }
-  `
+  `, [FONT, primary, rgb, onPri, lightMode])
 
   return (
     <div className="t1 tpl-root">
@@ -440,7 +669,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
 
       {/* ── NAV ── */}
       {on('sticky_nav') && (
-        <nav className={`t1-nav ${scrolled ? 'scrolled' : ''}`}>
+        <nav ref={navRef} className="t1-nav">
           {logo
             ? <img src={logo} alt={venue?.name || ''} style={{ height: 28, objectFit: 'contain' }} />
             : <span className="t1-nav-logo">{venue?.name}</span>
@@ -479,21 +708,60 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         const sbarBtnBg = `${sbarC}1a`
         const sbarBtnBorder = `${sbarC}33`
         return (
-          <div className="t1-sbar">
+          <div ref={sbarRef} className="t1-sbar">
             <div>
               <div style={{ fontFamily: FONT, fontSize: '1.1rem', fontWeight: 300, fontStyle: 'italic' }}>{couple_name}</div>
               <div style={{ fontSize: '.62rem', letterSpacing: '.14em', textTransform: 'uppercase', opacity: .6, marginTop: 2 }}>Propuesta exclusiva · {venue?.name}</div>
             </div>
             <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-              {show_price_estimate && displayPrice && (
+              {/* Price display: menu total takes priority over static estimate */}
+              {menuTotal > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1 }}>
+                  <span style={{ fontFamily: FONT, fontSize: '1.5rem', fontWeight: 300 }}>{menuTotal.toLocaleString('es-ES')} €</span>
+                  <span style={{ fontSize: '.6rem', opacity: .6, letterSpacing: '.06em', marginTop: 3 }}>total estimado menú</span>
+                </div>
+              ) : show_price_estimate && displayPrice ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1 }}>
                   <span style={{ fontFamily: FONT, fontSize: '1.5rem', fontWeight: 300 }}>{formatPrice(displayPrice)}</span>
                   {ivaLabel(sec, true) && <span style={{ fontSize: '.65rem', opacity: .8, letterSpacing: '.08em', marginTop: 3 }}>{ivaLabel(sec, true)}</span>}
                 </div>
-              )}
+              ) : null}
               {on('schedule_visit') ? (
                 <button style={{ background: sbarBtnBg, color: sbarC, border: `1px solid ${sbarBtnBorder}`, padding: '9px 20px', fontSize: '.72rem', fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
-                  onClick={() => { document.getElementById('sec-schedule')?.scrollIntoView({ behavior: 'smooth' }); setVisitModalOpen(true) }}>
+                  onClick={() => {
+                    // 1. Check menu validation first (if menus exist)
+                    if (hasCatering && menuValidationErrors.length > 0) {
+                      setValidationError(menuValidationErrors[0])
+                      // Wait a tick for the warning element to render, then scroll to it
+                      setTimeout(() => {
+                        const warn = document.getElementById('wp-validation-warning')
+                        if (warn) warn.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                        else document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }, 50)
+                      setTimeout(() => setValidationError(null), 6000)
+                      return
+                    }
+                    // 2. Check required space groups
+                    const missingGroups = (visibleSpaceGroups ?? []).filter(g => {
+                      const sm = g.selection_mode
+                      const isOpt = g.optional || sm === 'optional' || sm === 'optional_one' || sm === 'optional_any' || sm === 'none' || g.requires_selection === false
+                      if (isOpt) return false
+                      // Skip junk groups without name or spaces
+                      if (!g.name || !g.name.trim()) return false
+                      if (!Array.isArray((g as any).spaces) || (g as any).spaces.length === 0) return false
+                      return !selectedSpaces.some(s => s.group_name === g.name)
+                    })
+                    if (missingGroups.length > 0) {
+                      const firstIdx = visibleSpaceGroups.findIndex(g => g.name === missingGroups[0].name)
+                      const el = document.getElementById(`space-group-${firstIdx}`)
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      setValidationError(`Selecciona una opción en: ${missingGroups.map(g => g.name).join(', ')}`)
+                      setTimeout(() => setValidationError(null), 6000)
+                      return
+                    }
+                    setValidationError(null)
+                    setVisitModalOpen(true)
+                  }}>
                   Agendar visita →
                 </button>
               ) : (hasCatering || contactOn) ? (
@@ -545,7 +813,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                   </>
                 )}
               </div>
-              <h1 className="ha" style={{ fontFamily: FONT, fontSize: 'clamp(3.2rem,10vw,8rem)', fontWeight: 300, lineHeight: .95, letterSpacing: '-.02em', marginBottom: 24, animationDelay: '.35s', color: heroTitleColor }}>
+              <h1 className="ha" style={{ fontFamily: FONT, fontSize: 'clamp(3.2rem,10vw,8rem)', fontWeight: 300, lineHeight: .95, letterSpacing: '-.02em', marginBottom: 24, animationDelay: '.35s', color: heroTitleColor, opacity: fontReady ? 1 : 0, transition: 'opacity .3s ease' }}>
                 {couple_name}
               </h1>
             </div>
@@ -561,7 +829,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           SELECTOR DE FECHAS
       ════════════════════════════════════════════ */}
-      {on('date_slots') && dateSlots && dateSlots.length > 0 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
+      {on('date_slots') && dateSlots && dateSlots.length > 1 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
         <DateSelector
           slots={dateSlots}
           primary={primary}
@@ -902,6 +1170,18 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       ════════════════════════════════════════════ */}
       {on('space_groups') && visibleSpaceGroups.length > 0 ? (
         <div id="sec-space-groups">
+          {/* Validation warning when trying to book without required selections */}
+          {validationError && (
+            <div style={{
+              maxWidth: 700, margin: '0 auto 24px', padding: '14px 20px', borderRadius: 12,
+              background: 'rgba(239,68,68,.08)', border: '1.5px solid rgba(239,68,68,.25)',
+              display: 'flex', alignItems: 'center', gap: 10,
+              animation: 'fadeIn .3s ease',
+            }}>
+              <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+              <span style={{ fontSize: '.82rem', color: '#b91c1c', fontWeight: 600 }}>{validationError}</span>
+            </div>
+          )}
           <SpaceGroupSelector
             groups={visibleSpaceGroups}
             primary={primary}
@@ -914,7 +1194,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               const blocks: React.ReactNode[] = []
 
               // DateSelector (date_slots)
-              if (on('date_slots') && dateSlots && dateSlots.length > 0) {
+              if (on('date_slots') && dateSlots && dateSlots.length > 1) {
                 blocks.push(
                   <DateSelector key="ds" slots={dateSlots} primary={primary} onPrimary={onPri} dark={!lightMode} font={FONT} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />
                 )
@@ -1090,6 +1370,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           CONFIGURA VUESTRA BODA (WeddingProposal)
       ════════════════════════════════════════════ */}
       {on('menu') && (hasCatering && (menusStructured?.length || menuExtras?.length || appetizersBase?.length || menuShow.length > 0) ? (
+        <>
         <WeddingProposal
           data={data}
           menus={menusStructured}
@@ -1100,7 +1381,12 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           onPrimary={onPri}
           dark={!lightMode}
           onMenusChange={setSelectedMenus}
+          onTotalChange={setMenuTotal}
+          onValidationChange={setMenuValidationErrors}
+          onCartChange={setMenuCart}
+          validationWarning={validationError && menuValidationErrors.length > 0 ? validationError : null}
         />
+        </>
       ) : _preview ? <EmptySec label="Menú" /> : null)}
 
       {/* ════════════════════════════════════════════
@@ -1120,7 +1406,10 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
               </FadeUp>
             </div>
             <div className="t1-collabs-grid" style={{ maxWidth: 960, margin: '0 auto' }}>
-              {collabsShow.map((c: any, i: number) => (
+              {collabsShow.map((c: any, i: number) => {
+                const catKey = c.category || `collab-${i}`
+                const own = ownProviders[catKey]
+                return (
                 <FadeUp key={i} delay={(i % 4) * .05}>
                   <div className={`t1-collab${c.exclusive ? ' t1-collab-exclusive' : ''}`}>
                     {c.exclusive && <div className="t1-collab-badge">★ Exclusivo</div>}
@@ -1136,10 +1425,133 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                         {c.email && <a href={`mailto:${c.email}`}>{c.email}</a>}
                       </div>
                     )}
+                    {/* Exclusivity: own provider option with price + toggle */}
+                    {c.exclusive && c.exclusivity_price && (
+                      <div style={{ marginTop: 10, borderTop: `1px solid ${fg(.06)}`, paddingTop: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '.72rem', color: fg(.5), lineHeight: 1.5 }}>
+                              Prefiero traer mi propio proveedor
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '.85rem', fontWeight: 600, color: primary, whiteSpace: 'nowrap' }}>
+                            {Number(c.exclusivity_price).toLocaleString('es-ES')} €
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setOwnProviders(prev => ({
+                              ...prev,
+                              [catKey]: { useOwn: !prev[catKey]?.useOwn, providerName: prev[catKey]?.providerName ?? '' }
+                            }))}
+                            style={{
+                              flexShrink: 0, width: 28, height: 28, borderRadius: '50%',
+                              border: `1.5px solid ${own?.useOwn ? primary : fg(.25)}`,
+                              background: own?.useOwn ? primary : 'transparent',
+                              color: own?.useOwn ? onPri : fg(.5),
+                              fontSize: own?.useOwn ? '.7rem' : '1rem', fontWeight: 600,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: 'pointer', transition: 'all .15s',
+                            }}
+                          >
+                            {own?.useOwn ? '✓' : '+'}
+                          </button>
+                        </div>
+                        {own?.useOwn && (
+                          <input
+                            className="t1-collab-own-input"
+                            placeholder="Nombre del proveedor (opcional)"
+                            value={own.providerName}
+                            onChange={e => setOwnProviders(prev => ({
+                              ...prev,
+                              [catKey]: { ...prev[catKey], providerName: e.target.value }
+                            }))}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 </FadeUp>
-              ))}
+                )
+              })}
             </div>
+            {/* Generic non-exclusivity price — row like extra services */}
+            {cm.generic_exclusivity_price && (() => {
+              const genKey = '__generic_exclusivity'
+              const genOwn = ownProviders[genKey]
+              return (
+              <div className="w" style={{ maxWidth: 960, margin: '32px auto 0' }}>
+                <FadeUp delay={.1}>
+                  <div style={{ borderTop: `1px solid ${fg(.08)}`, paddingTop: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 0' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '.85rem', fontWeight: 600, color: fg(.8) }}>Proveedor externo</div>
+                        <div style={{ fontSize: '.75rem', color: fg(.45), lineHeight: 1.5, marginTop: 2 }}>Suplemento si traéis vuestros propios proveedores</div>
+                      </div>
+                      <span style={{ fontSize: '.95rem', fontWeight: 600, color: primary, whiteSpace: 'nowrap' }}>
+                        {Number(cm.generic_exclusivity_price).toLocaleString('es-ES')} €
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setOwnProviders(prev => ({
+                          ...prev,
+                          [genKey]: { useOwn: !prev[genKey]?.useOwn, providerName: prev[genKey]?.providerName ?? '' }
+                        }))}
+                        style={{
+                          flexShrink: 0, width: 30, height: 30, borderRadius: '50%',
+                          border: `1.5px solid ${genOwn?.useOwn ? primary : fg(.25)}`,
+                          background: genOwn?.useOwn ? primary : 'transparent',
+                          color: genOwn?.useOwn ? onPri : fg(.5),
+                          fontSize: genOwn?.useOwn ? '.75rem' : '1.1rem', fontWeight: 600,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'pointer', transition: 'all .15s', marginLeft: 4,
+                        }}
+                      >
+                        {genOwn?.useOwn ? '✓' : '+'}
+                      </button>
+                    </div>
+                    {genOwn?.useOwn && (
+                      <input
+                        className="t1-collab-own-input"
+                        placeholder="Nombre del proveedor (opcional)"
+                        value={genOwn.providerName}
+                        onChange={e => setOwnProviders(prev => ({
+                          ...prev,
+                          [genKey]: { ...prev[genKey], providerName: e.target.value }
+                        }))}
+                        style={{ marginBottom: 8 }}
+                      />
+                    )}
+                  </div>
+                </FadeUp>
+              </div>
+              )
+            })()}
+            {/* Submit own-provider selections */}
+            {Object.values(ownProviders).some(v => v.useOwn) && (
+              <div className="w" style={{ maxWidth: 960, margin: '24px auto 0', textAlign: 'center' }}>
+                <FadeUp delay={.15}>
+                  {providerSubmitted ? (
+                    <div style={{ fontSize: '.85rem', color: primary, fontWeight: 600, padding: '12px 0' }}>
+                      ✓ Selección enviada al venue
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={submitOwnProviders}
+                      disabled={providerSubmitting}
+                      style={{
+                        padding: '12px 32px', borderRadius: 8, border: 'none',
+                        background: primary, color: onPri, fontSize: '.85rem',
+                        fontWeight: 600, cursor: providerSubmitting ? 'wait' : 'pointer',
+                        opacity: providerSubmitting ? .6 : 1, transition: 'opacity .15s',
+                      }}
+                    >
+                      {providerSubmitting ? 'Enviando…' : 'Confirmar proveedores seleccionados'}
+                    </button>
+                  )}
+                </FadeUp>
+              </div>
+            )}
           </section>
         )
       })() : _preview ? <EmptySec label="Colaboradores" /> : null)}
@@ -1312,6 +1724,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           const svUrl = sv.url
           const svCta = sv.cta_label || 'Reservar visita gratuita →'
           const svTextColor = sv.cta_text_color || undefined
+          const ctaButtons: string[] = Array.isArray(sv.cta_buttons) && sv.cta_buttons.length > 0 ? sv.cta_buttons : ['visit']
           return (
             <section id="sec-schedule" className="t1-sv">
               <FadeUp>
@@ -1323,15 +1736,56 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                   </div>
                   <h2 className="t1-sv-title">{svTitle}</h2>
                   <p className="t1-sv-sub">{svSub}</p>
-                  {visitDone ? (
+                  {visitDone || budgetRequestDone ? (
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: `${primary}22`, border: `1px solid ${primary}55`, borderRadius: 10, padding: '14px 24px', fontSize: '.88rem', color: primary, fontWeight: 600 }}>
                       <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      ¡Solicitud enviada! Os confirmaremos la visita pronto.
+                      {visitDone ? '¡Solicitud enviada! Os confirmaremos la visita pronto.' : '¡Solicitud de presupuesto enviada!'}
                     </div>
-                  ) : svUrl ? (
-                    <a className="t1-sv-btn" style={svTextColor ? { color: svTextColor } : undefined} href={svUrl} target="_blank" rel="noopener">{svCta}</a>
                   ) : (
-                    <button className="t1-sv-btn" style={svTextColor ? { color: svTextColor } : undefined} onClick={() => setVisitModalOpen(true)}>{svCta}</button>
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                      {ctaButtons.includes('visit') && (
+                        svUrl ? (
+                          <a className="t1-sv-btn" style={svTextColor ? { color: svTextColor } : undefined} href={svUrl} target="_blank" rel="noopener">{svCta}</a>
+                        ) : (
+                          <button className="t1-sv-btn" style={svTextColor ? { color: svTextColor } : undefined} onClick={() => {
+                            // Same validation as sticky footer
+                            if (hasCatering && menuValidationErrors.length > 0) {
+                              setValidationError(menuValidationErrors[0])
+                              setTimeout(() => {
+                                const warn = document.getElementById('wp-validation-warning')
+                                if (warn) warn.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                else document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                              }, 50)
+                              setTimeout(() => setValidationError(null), 6000)
+                              return
+                            }
+                            const missingGroups = (visibleSpaceGroups ?? []).filter(g => {
+                              const sm = g.selection_mode
+                              const isOpt = g.optional || sm === 'optional' || sm === 'optional_one' || sm === 'optional_any' || sm === 'none' || g.requires_selection === false
+                              if (isOpt) return false
+                              if (!g.name || !g.name.trim()) return false
+                              if (!Array.isArray((g as any).spaces) || (g as any).spaces.length === 0) return false
+                              return !selectedSpaces.some(s => s.group_name === g.name)
+                            })
+                            if (missingGroups.length > 0) {
+                              const firstIdx = visibleSpaceGroups.findIndex(g => g.name === missingGroups[0].name)
+                              const el = document.getElementById(`space-group-${firstIdx}`)
+                              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                              setValidationError(`Selecciona una opción en: ${missingGroups.map(g => g.name).join(', ')}`)
+                              setTimeout(() => setValidationError(null), 6000)
+                              return
+                            }
+                            setValidationError(null)
+                            setVisitModalOpen(true)
+                          }}>{svCta}</button>
+                        )
+                      )}
+                      {ctaButtons.includes('budget') && (
+                        <button className="t1-sv-btn" style={{ background: 'transparent', border: `2px solid ${primary}`, color: primary }} onClick={() => setBudgetRequestOpen(true)}>
+                          {sv.budget_cta_label || 'Solicitar presupuesto →'}
+                        </button>
+                      )}
+                    </div>
                   )}
                   {sv.note && <div className="t1-sv-note">{sv.note}</div>}
                   <p style={{ marginTop: 20, fontSize: '.76rem', color: `${fg(.4)}`, lineHeight: 1.7, maxWidth: 400 }}>
@@ -1361,6 +1815,22 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         )
       })()}
 
+      {/* Floating validation toast — shows above sticky footer when click blocked */}
+      {validationError && (
+        <div style={{
+          position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9500, maxWidth: 480, width: 'calc(100% - 32px)',
+          padding: '14px 20px', borderRadius: 12,
+          background: '#b91c1c', color: '#fff',
+          boxShadow: '0 10px 40px rgba(0,0,0,.35)',
+          display: 'flex', alignItems: 'center', gap: 10,
+          animation: 'fadeIn .25s ease',
+        }}>
+          <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+          <span style={{ fontSize: '.85rem', fontWeight: 600, lineHeight: 1.4 }}>{validationError}</span>
+        </div>
+      )}
+
       {visitModalOpen && (
         <VisitBookingModal
           proposalId={data.id}
@@ -1368,6 +1838,9 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           primaryColor={primary}
           selectedSpaces={selectedSpaces}
           selectedMenus={selectedMenus}
+          menuCart={menuCartRef.current}
+          guestCount={guests}
+          weddingDate={wedding_date ?? undefined}
           selectedExtraSvcs={[
             ...Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k),
             ...zonesShow.filter((z: any, i: number) => zonesMode === 'zones' && z.price && selectedZoneSupplements[i]).map((z: any) => `${z.name} (${formatZonePrice(z.price)})`),
@@ -1380,24 +1853,78 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
         />
       )}
 
+      {budgetRequestOpen && (() => {
+        const sbarC = (sec as any).sbar_text_color || onPri
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}
+            onClick={() => setBudgetRequestOpen(false)}>
+            <div style={{ background: lightMode ? '#fff' : '#1a1a1a', borderRadius: 16, width: '100%', maxWidth: 440, padding: '28px 24px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
+              onClick={e => e.stopPropagation()}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: fg(.9), marginBottom: 4 }}>Solicitar presupuesto</h3>
+              <p style={{ fontSize: '.82rem', color: fg(.45), marginBottom: 18, lineHeight: 1.5 }}>
+                Revisad vuestras selecciones y enviad la solicitud.
+              </p>
+              <BudgetRequestForm
+                proposalId={data.id}
+                selectedSpaces={selectedSpaces}
+                selectedMenus={selectedMenus}
+                selectedExtraSvcs={[
+                  ...Object.entries(selectedExtraSvcs).filter(([,v]) => v).map(([k]) => k),
+                  ...zonesShow.filter((z: any, i: number) => zonesMode === 'zones' && z.price && selectedZoneSupplements[i]).map((z: any) => `${z.name} (${formatZonePrice(z.price)})`),
+                ]}
+                menuCart={menuCartRef.current}
+                guestCount={guests}
+                weddingDate={wedding_date ?? undefined}
+                primary={primary}
+                btnTextColor={sbarC}
+                dark={!lightMode}
+                fg={fg}
+                onSuccess={() => { setBudgetRequestOpen(false); setBudgetRequestDone(true) }}
+                onClose={() => setBudgetRequestOpen(false)}
+              />
+            </div>
+          </div>
+        )
+      })()}
+
       {/* ════════════════════════════════════════════
           MAPA
       ════════════════════════════════════════════ */}
-      {on('map') && (sec.map_embed_url || (data.venueContent.map_info as any)?.embed_url) && (() => {
-        const embed = sec.map_embed_url || (data.venueContent.map_info as any).embed_url
+      {on('map') && (() => {
+        const mapMeta: any = (sec as any).map_meta ?? {}
         const address = sec.map_address || (data.venueContent.map_info as any)?.address
+        const embedRaw = sec.map_embed_url || (data.venueContent.map_info as any)?.embed_url
+        const venueName = venue?.name ?? ''
+        const venueLocation = address || (venue?.city ? `${venueName}, ${venue.city}${venue.region ? `, ${venue.region}` : ''}` : venueName)
+        if (!venueLocation && !embedRaw) return null
         return (
-          <section className="t1-sec">
+          <section className="t1-sec" style={{ position: 'relative', zIndex: 0 }}>
             <div className="w">
               <FadeUp>
-                <span className="t1-label">{(sec as any).map_eyebrow || 'Ubicación'}</span>
-                <h2 className="t1-h2">Cómo llegar</h2>
-                {address && <p style={{ fontSize: '.92rem', color: fg(.6), marginTop: -32, marginBottom: 40 }}>{address}</p>}
+                <span className="t1-label">{mapMeta.eyebrow || 'Ubicación'}</span>
+                <h2 className="t1-h2">{mapMeta.title || 'Cómo llegar'}</h2>
+                {(mapMeta.subtitle || address) && (
+                  <p style={{ fontSize: '.92rem', color: fg(.5), lineHeight: 1.8, maxWidth: 560, marginBottom: 48, marginTop: -32 }}>
+                    {mapMeta.subtitle || address}
+                  </p>
+                )}
               </FadeUp>
               <FadeUp delay={.1}>
-                <div style={{ overflow: 'hidden', border: `1px solid ${pal.borderHard}`, borderRadius: 4 }}>
-                  <iframe src={embed} width="100%" height="360" style={{ border: 'none', display: 'block', filter: lightMode ? 'none' : 'invert(.92) hue-rotate(180deg)' }} loading="lazy" allowFullScreen />
-                </div>
+                {embedRaw ? (
+                  <div style={{ overflow: 'hidden', border: `1px solid ${pal.borderHard}`, borderRadius: 16 }}>
+                    <iframe src={embedRaw} width="100%" height="400" style={{ border: 'none', display: 'block', filter: lightMode ? 'saturate(.85) contrast(1.05)' : 'invert(.92) hue-rotate(180deg) saturate(.3)' }} loading="lazy" allowFullScreen referrerPolicy="no-referrer-when-downgrade" />
+                  </div>
+                ) : (
+                  <div style={{ border: `1px solid ${pal.borderHard}`, borderRadius: 16, overflow: 'hidden' }}>
+                    <VenueMap address={venueLocation} lightMode={lightMode} height={400} borderRadius={0} />
+                  </div>
+                )}
+                {address && !mapMeta.subtitle && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, color: fg(.5), fontSize: '.82rem' }}>
+                    <span style={{ fontSize: '1.1rem' }}>📍</span>
+                    <span>{address}</span>
+                  </div>
+                )}
               </FadeUp>
             </div>
           </section>

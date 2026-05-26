@@ -55,6 +55,75 @@ export const CLIENT_TYPE_COLORS: Record<ClientType, { bg: string; color: string;
 
 // ── Auto-match: find or create client for a lead ──────────────────────────────
 
+/**
+ * Server-side variant — accepts any Supabase client (service-role or browser).
+ * Matches by email → phone → name, or creates a new client.
+ */
+export async function findOrCreateClientWithClient(
+  supabase: any,
+  venueId: string,
+  lead: { name: string; email?: string | null; phone?: string | null; whatsapp?: string | null; language?: string | null; country?: string | null; source?: string | null },
+): Promise<string | null> {
+  // 1. Match by email
+  if (lead.email) {
+    const { data: byEmail } = await supabase
+      .from('clients').select('id, email, phone, whatsapp, language, country, name').eq('venue_id', venueId).eq('email', lead.email).limit(1).single()
+    if (byEmail) {
+      await enrichClient(supabase, byEmail, lead)
+      return byEmail.id
+    }
+  }
+  // 2. Match by phone
+  if (lead.phone) {
+    const { data: byPhone } = await supabase
+      .from('clients').select('id, email, phone, whatsapp, language, country, name').eq('venue_id', venueId).eq('phone', lead.phone).limit(1).single()
+    if (byPhone) {
+      await enrichClient(supabase, byPhone, lead)
+      return byPhone.id
+    }
+  }
+  // 3. Create new
+  const clientType = lead.source === 'wedding_planner' ? 'wedding_planner' : 'pareja'
+  const { data: newClient, error } = await supabase
+    .from('clients')
+    .insert({
+      venue_id: venueId,
+      name: lead.name || '',
+      email: lead.email || null,
+      phone: lead.phone || null,
+      whatsapp: lead.whatsapp || null,
+      language: lead.language || null,
+      country: lead.country || null,
+      client_type: clientType as ClientType,
+    })
+    .select('id')
+    .single()
+  if (error) { console.error('Error creating client:', error); return null }
+  return newClient?.id ?? null
+}
+
+/**
+ * Auto-enrich: fill in missing fields on an existing client from new lead data.
+ * Only updates null/empty fields — never overwrites existing data.
+ */
+async function enrichClient(
+  supabase: any,
+  existing: { id: string; email?: string | null; phone?: string | null; whatsapp?: string | null; language?: string | null; country?: string | null; name?: string | null },
+  lead: { name?: string | null; email?: string | null; phone?: string | null; whatsapp?: string | null; language?: string | null; country?: string | null },
+) {
+  const updates: Record<string, string> = {}
+  if (!existing.email    && lead.email)    updates.email    = lead.email
+  if (!existing.phone    && lead.phone)    updates.phone    = lead.phone
+  if (!existing.whatsapp && lead.whatsapp) updates.whatsapp = lead.whatsapp
+  if (!existing.language && lead.language) updates.language = lead.language
+  if (!existing.country  && lead.country)  updates.country  = lead.country
+  if (!existing.name     && lead.name)     updates.name     = lead.name
+  if (Object.keys(updates).length > 0) {
+    await supabase.from('clients').update(updates).eq('id', existing.id)
+  }
+}
+
+/** Browser-side variant — uses browser Supabase client */
 export async function findOrCreateClient(
   venueId: string,
   lead: { name: string; email?: string | null; phone?: string | null; whatsapp?: string | null; language?: string | null; country?: string | null }
@@ -65,24 +134,30 @@ export async function findOrCreateClient(
   if (lead.email) {
     const { data: byEmail } = await supabase
       .from('clients')
-      .select('id')
+      .select('id, email, phone, whatsapp, language, country, name')
       .eq('venue_id', venueId)
       .eq('email', lead.email)
       .limit(1)
       .single()
-    if (byEmail) return byEmail.id
+    if (byEmail) {
+      await enrichClient(supabase, byEmail, lead)
+      return byEmail.id
+    }
   }
 
   // 2. Try match by phone
   if (lead.phone) {
     const { data: byPhone } = await supabase
       .from('clients')
-      .select('id')
+      .select('id, email, phone, whatsapp, language, country, name')
       .eq('venue_id', venueId)
       .eq('phone', lead.phone)
       .limit(1)
       .single()
-    if (byPhone) return byPhone.id
+    if (byPhone) {
+      await enrichClient(supabase, byPhone, lead)
+      return byPhone.id
+    }
   }
 
   // 3. No match → create new client

@@ -48,14 +48,31 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user_id)
     const isFirst = (existingCount ?? 0) === 0
 
-    // 2. Upsert user_venues (conflict on user_id + wp_venue_id), marking first as primary.
-    //    venue_name comes from the admin UI (WP venue title) so the sidebar shows a real name.
+    // 2. Check if another user already has this wp_venue_id — derive canonical_venue_id
+    //    so both users share the same leads, proposals, calendar, etc.
+    const { data: existingVenue } = await svc
+      .from('user_venues')
+      .select('id, canonical_venue_id')
+      .eq('wp_venue_id', wp_venue_id)
+      .neq('user_id', user_id)
+      .limit(1)
+      .maybeSingle()
+
+    // Canonical = the original owner's venue_id. All users sharing the same WP venue
+    // point to the same canonical_venue_id so data queries return shared results.
+    const canonicalId = existingVenue
+      ? (existingVenue.canonical_venue_id || existingVenue.id)
+      : null  // will be set to own id after insert
+
+    const upsertPayload: Record<string, any> = {
+      user_id, wp_venue_id, is_primary: isFirst,
+      ...(venue_name ? { name: venue_name } : {}),
+      ...(canonicalId ? { canonical_venue_id: canonicalId } : {}),
+    }
+
     const { data: uvRow, error: uvErr } = await svc
       .from('user_venues')
-      .upsert(
-        { user_id, wp_venue_id, is_primary: isFirst, ...(venue_name ? { name: venue_name } : {}) },
-        { onConflict: 'user_id,wp_venue_id' }
-      )
+      .upsert(upsertPayload, { onConflict: 'user_id,wp_venue_id' })
       .select('id')
       .single()
     if (uvErr || !uvRow) {
@@ -63,6 +80,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: uvErr?.message || 'user_venues error' }, { status: 500 })
     }
     const newVenueId = uvRow.id
+
+    // 2b. If no shared venue exists, set canonical_venue_id to self
+    if (!canonicalId) {
+      await svc.from('user_venues')
+        .update({ canonical_venue_id: newVenueId })
+        .eq('id', newVenueId)
+    }
+
+    // The effective venue_id for data queries is canonical_venue_id (shared) or own id
+    const effectiveVenueId = canonicalId || newVenueId
 
     // 3. Create subscription if plan selected AND trial explicitly requested.
     //    venue_id is now available from the upserted user_venues row.

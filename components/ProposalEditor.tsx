@@ -58,6 +58,7 @@ const PRESET_COLORS = ['#2d4a7a', '#7a5c3c', '#6b2d42', '#2a6b4a', '#4a4a4a', '#
 
 const SECTION_LABELS: Record<string, string> = {
   hero: 'Foto principal',
+  venue_specs: 'Datos del venue',
   date_slots: 'Fechas disponibles',
   availability: 'Disponibilidad',
   sticky_nav: 'Menú de navegación (sticky top)',
@@ -1325,6 +1326,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               'sticky_nav',
               'hero',
               'availability',
+              'venue_specs',
               'date_slots',
               'welcome', 'welcome_light', 'welcome_split', 'welcome_editorial', // grouped
               'experience',
@@ -1334,8 +1336,8 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               'space_groups',
               'venue_rental',
               'inclusions',
-              'testimonials',
               'collaborators',
+              'testimonials',
               'accommodation',
               'extra_services',
               'faq',
@@ -1634,6 +1636,8 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                 const isMixed = vg.selection_mode === 'included_then_pick'
                                 const includedCount = (vg.included_zone_ids ?? []).length
                                 const optionalCount = vg.spaces.length - includedCount
+                                const isOptionalGroup = vg.optional || vg.selection_mode === 'optional'
+                                const isRequired = !isAllIncluded && !isOptionalGroup && (vg.selection_mode === 'pick_one' || vg.selection_mode === 'pick_n' || vg.selection_mode === 'included_then_pick')
                                 const modeLabel = isAllIncluded ? 'Incluidos'
                                   : isMixed ? `${includedCount} incl. + ${optionalCount} opc.`
                                   : vg.selection_mode === 'pick_one' ? 'Elegir 1'
@@ -1647,6 +1651,8 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                     border: `1px solid ${isAllIncluded ? '#bbf7d0' : isMixed ? '#bfdbfe' : '#fde68a'}`,
                                   }}>
                                     {vg.name}: {modeLabel}
+                                    {isRequired && <span style={{ marginLeft: 3, color: '#dc2626' }}>· Obligatorio</span>}
+                                    {isOptionalGroup && <span style={{ marginLeft: 3, color: '#92400e' }}>· Opcional</span>}
                                   </span>
                                 )
                               })}
@@ -2148,32 +2154,86 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                           })()}
 
                           {/* COLLABORATORS */}
-                          {secId === 'collaborators' && (
-                            <div>
+                          {secId === 'collaborators' && (() => {
+                            const collabMeta: any = (sections as any).collaborators_meta ?? {}
+                            const setCollabMeta = (patch: any) => setSections((s: any) => ({ ...s, collaborators_meta: { ...((s as any).collaborators_meta ?? {}), ...patch } }))
+                            return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              <input className="form-input" placeholder="Etiqueta superior (ej. Proveedores de confianza)" value={collabMeta.eyebrow ?? ''} onChange={e => setCollabMeta({ eyebrow: e.target.value })} />
+                              <input className="form-input" placeholder="Título (ej. Nuestros colaboradores)" value={collabMeta.title ?? ''} onChange={e => setCollabMeta({ title: e.target.value })} />
+                              <input className="form-input" placeholder="Descripción (ej. Trabajamos sin exclusividad…)" value={collabMeta.subtitle ?? ''} onChange={e => setCollabMeta({ subtitle: e.target.value })} />
+                              <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                               {(getOverride(overrideKey) ?? []).map((c: any, i: number) => (
-                                <details key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8, overflow: 'hidden', background: 'var(--surface)' }}>
+                                <details key={i} style={{ border: `1px solid ${c.exclusive ? 'var(--gold)' : 'var(--border)'}`, borderRadius: 8, overflow: 'hidden', background: c.exclusive ? 'rgba(196,151,90,0.04)' : 'var(--surface)' }}>
                                   <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--charcoal)', fontWeight: 500, background: 'var(--cream)', listStyle: 'none' }}>
                                     <ChevronDown size={12} style={{ color: 'var(--warm-gray)' }} />
-                                    <span style={{ flex: 1 }}>{c.name || <em style={{ color: 'var(--warm-gray)' }}>Nuevo colaborador</em>}{c.category ? <span style={{ color: 'var(--warm-gray)', fontSize: 11, marginLeft: 6 }}>· {c.category}</span> : null}</span>
+                                    <span style={{ flex: 1 }}>{c.name || <em style={{ color: 'var(--warm-gray)' }}>Nuevo colaborador</em>}{c.category ? <span style={{ color: 'var(--warm-gray)', fontSize: 11, marginLeft: 6 }}>· {c.category}</span> : null}{c.exclusive ? <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--gold)', color: '#fff', padding: '1px 6px', borderRadius: 10, marginLeft: 6 }}>Exclusivo</span> : null}</span>
                                     <button type="button" style={removeBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); removeOverrideItem(overrideKey, i) }}><X size={13} /></button>
                                   </summary>
                                   <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
                                     <div style={{ display: 'flex', gap: 6 }}>
-                                      <input className="form-input" placeholder="Nombre *" value={c.name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'name', e.target.value)} />
-                                      <input className="form-input" style={{ width: 160, flexShrink: 0 }} placeholder="Categoría (ej. Catering)" value={c.category ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'category', e.target.value)} />
+                                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                        <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase' }}>Nombre</span>
+                                        <input className="form-input" placeholder="Nombre del proveedor *" value={c.name ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'name', e.target.value)} />
+                                      </div>
+                                      <div style={{ width: 160, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                        <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase' }}>Categoría</span>
+                                        <input className="form-input" placeholder="Ej. Catering" value={c.category ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'category', e.target.value)} />
+                                      </div>
                                     </div>
-                                    <input className="form-input" placeholder="Descripción" value={c.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
-                                    <input className="form-input" placeholder="Web (opcional)" value={c.website ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'website', e.target.value)} />
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                      <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase' }}>Descripción</span>
+                                      <input className="form-input" placeholder="Breve descripción del proveedor" value={c.description ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'description', e.target.value)} />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                        <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase' }}>Contacto</span>
+                                        <input className="form-input" placeholder="Web (opcional)" value={c.website ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'website', e.target.value)} />
+                                      </div>
+                                      <input className="form-input" style={{ width: 130, flexShrink: 0, marginTop: 'auto' }} placeholder="@instagram" value={c.instagram ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'instagram', e.target.value)} />
+                                      <input className="form-input" style={{ width: 160, flexShrink: 0, marginTop: 'auto' }} placeholder="Email" value={c.email ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'email', e.target.value)} />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                      <input className="form-input" style={{ width: 160, flexShrink: 0 }} placeholder="Teléfono" value={c.phone ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'phone', e.target.value)} />
+                                      <input className="form-input" placeholder="Info precios orientativa" value={c.price_info ?? ''} onChange={e => updateOverrideItem(overrideKey, i, 'price_info', e.target.value)} />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: c.exclusive ? 'var(--gold)' : 'var(--warm-gray)' }}>
+                                        <input type="checkbox" checked={!!c.exclusive} onChange={e => updateOverrideItem(overrideKey, i, 'exclusive', e.target.checked)} style={{ accentColor: 'var(--gold)' }} />
+                                        Exclusividad
+                                      </label>
+                                      {c.exclusive && (
+                                        <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+                                          <input type="number" placeholder="Precio" value={c.exclusivity_price ?? ''}
+                                            onChange={e => updateOverrideItem(overrideKey, i, 'exclusivity_price', e.target.value)}
+                                            style={{ width: 80, textAlign: 'right', fontSize: 12, padding: '5px 4px 5px 8px', border: 'none', outline: 'none', background: 'transparent', MozAppearance: 'textfield' }} />
+                                          <span style={{ fontSize: 12, color: '#999', padding: '5px 8px 5px 2px', background: '#f9f8f6', borderLeft: '1px solid var(--border)', fontWeight: 600, lineHeight: 1 }}>€</span>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </details>
                               ))}
-                              <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { name: '', category: '', description: '', website: '' })}>+ Añadir colaborador</button>
+                              <button type="button" style={addBtn} onClick={() => addOverrideItem(overrideKey, { name: '', category: '', description: '' })}>+ Añadir colaborador</button>
+                              {/* Generic exclusivity price */}
+                              <div style={{ marginTop: 8, padding: '10px 12px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 6 }}>Precio genérico no-exclusividad</div>
+                                <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
+                                  <input type="number" placeholder="500" value={collabMeta.generic_exclusivity_price ?? ''}
+                                    onChange={e => setCollabMeta({ generic_exclusivity_price: e.target.value })}
+                                    style={{ flex: 1, textAlign: 'right', fontSize: 12, padding: '6px 4px 6px 10px', border: 'none', outline: 'none', background: 'transparent', MozAppearance: 'textfield' as any }} />
+                                  <span style={{ fontSize: 12, color: '#999', padding: '6px 10px 6px 4px', background: '#f9f8f6', borderLeft: '1px solid var(--border)', fontWeight: 600, lineHeight: 1 }}>€</span>
+                                </div>
+                                <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4, lineHeight: 1.4 }}>Precio que pagan si traen proveedores externos.</div>
+                              </div>
                             </div>
-                          )}
+                            )
+                          })()}
 
                           {/* EXPERIENCE */}
                           {secId === 'experience' && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              <input className="form-input" placeholder="Etiqueta (ej. La experiencia, Nuestra historia…)" value={(sections as any).experience_override?.eyebrow ?? ''} onChange={e => setOverride('experience_override', { ...((sections as any).experience_override ?? {}), eyebrow: e.target.value })} />
                               <input className="form-input" placeholder="Título (ej. Una finca del siglo XVII...)" value={(sections as any).experience_override?.title ?? ''} onChange={e => setOverride('experience_override', { ...((sections as any).experience_override ?? {}), title: e.target.value })} />
                               <textarea className="form-textarea" style={{ minHeight: 120 }} placeholder="Texto de la experiencia / historia del venue..." value={(sections as any).experience_override?.body ?? ''} onChange={e => setOverride('experience_override', { ...((sections as any).experience_override ?? {}), body: e.target.value })} />
                             </div>
@@ -2213,6 +2273,31 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                               <textarea className="form-textarea" style={{ minHeight: 70 }} placeholder="Ej. Fecha disponible, confirmación prioritaria..." value={sections.availability_message ?? ''} onChange={e => setSections(s => ({ ...s, availability_message: e.target.value }))} />
                             </div>
                           )}
+
+                          {secId === 'venue_specs' && (() => {
+                            const vs: any = (sections as any).venue_specs ?? {}
+                            const setVs = (patch: any) => setSections((s: any) => ({ ...s, venue_specs: { ...((s as any).venue_specs ?? {}), ...patch } }))
+                            const stats: Array<{ value: string; label: string }> = vs.stats ?? []
+                            const setStats = (next: Array<{ value: string; label: string }>) => setVs({ stats: next })
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {stats.map((s, i) => (
+                                  <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', background: 'var(--cream)', borderRadius: 8, padding: '6px 8px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
+                                      <button type="button" disabled={i === 0} onClick={() => { const n = [...stats]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; setStats(n) }}
+                                        style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', padding: 0, fontSize: 10, color: i === 0 ? 'var(--border)' : 'var(--warm-gray)', lineHeight: 1 }}>▲</button>
+                                      <button type="button" disabled={i === stats.length - 1} onClick={() => { const n = [...stats]; [n[i], n[i + 1]] = [n[i + 1], n[i]]; setStats(n) }}
+                                        style={{ background: 'none', border: 'none', cursor: i === stats.length - 1 ? 'default' : 'pointer', padding: 0, fontSize: 10, color: i === stats.length - 1 ? 'var(--border)' : 'var(--warm-gray)', lineHeight: 1 }}>▼</button>
+                                    </div>
+                                    <input className="form-input" style={{ width: 72, flexShrink: 0, textAlign: 'center', fontWeight: 600 }} placeholder="Valor" value={s.value} onChange={e => setStats(stats.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
+                                    <input className="form-input" style={{ flex: 1 }} placeholder="Etiqueta (ej. Capacidad máxima)" value={s.label} onChange={e => setStats(stats.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
+                                    <button type="button" style={removeBtn} onClick={() => setStats(stats.filter((_, j) => j !== i))}><X size={13} /></button>
+                                  </div>
+                                ))}
+                                <button type="button" style={addBtn} onClick={() => setStats([...stats, { value: '', label: '' }])}>+ Añadir dato</button>
+                              </div>
+                            )
+                          })()}
 
                           {secId === 'sticky_nav' && (
                             <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.6, background: 'var(--cream)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border)' }}>
@@ -2257,6 +2342,32 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                   <label className="form-label">Nota pequeña (opcional)</label>
                                   <input className="form-input" placeholder="Visitas de lunes a viernes · Duración aprox. 45 min" value={sv.note ?? ''} onChange={e => setSv({ note: e.target.value })} />
                                 </div>
+                                {/* CTA buttons config */}
+                                <div style={{ marginTop: 8, padding: '10px 12px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 8 }}>Botones a mostrar</div>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--charcoal)', cursor: 'pointer', marginBottom: 6 }}>
+                                    <input type="checkbox" checked={(sv.cta_buttons ?? ['visit']).includes('visit')} onChange={e => {
+                                      const current = sv.cta_buttons ?? ['visit']
+                                      const next = e.target.checked ? [...current.filter((b: string) => b !== 'visit'), 'visit'] : current.filter((b: string) => b !== 'visit')
+                                      setSv({ cta_buttons: next.length ? next : ['visit'] })
+                                    }} style={{ accentColor: 'var(--gold)' }} />
+                                    Agendar visita
+                                  </label>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--charcoal)', cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={(sv.cta_buttons ?? ['visit']).includes('budget')} onChange={e => {
+                                      const current = sv.cta_buttons ?? ['visit']
+                                      const next = e.target.checked ? [...current.filter((b: string) => b !== 'budget'), 'budget'] : current.filter((b: string) => b !== 'budget')
+                                      setSv({ cta_buttons: next.length ? next : ['visit'] })
+                                    }} style={{ accentColor: 'var(--gold)' }} />
+                                    Solicitar presupuesto
+                                  </label>
+                                </div>
+                                {(sv.cta_buttons ?? []).includes('budget') && (
+                                  <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Texto del botón de presupuesto</label>
+                                    <input className="form-input" placeholder="Solicitar presupuesto →" value={sv.budget_cta_label ?? ''} onChange={e => setSv({ budget_cta_label: e.target.value })} />
+                                  </div>
+                                )}
                               </div>
                             )
                           })()}
@@ -2265,30 +2376,50 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                             const extractEmbedSrc = (raw: string): string => {
                               const trimmed = raw.trim()
                               if (!trimmed) return ''
-                              // Si pegan el iframe HTML completo, extraer el src
                               const m = trimmed.match(/src\s*=\s*["']([^"']+)["']/i)
                               if (m) return m[1]
                               return trimmed
                             }
+                            const mapMeta: any = (sections as any).map_meta ?? {}
+                            const setMapMeta = (patch: any) => setSections((s: any) => ({ ...s, map_meta: { ...((s as any).map_meta ?? {}), ...patch } }))
+                            const mapAddr = sections.map_address ?? ''
+                            const mapEmbed = sections.map_embed_url ?? ''
+                            const previewSrc = mapEmbed || (mapAddr ? `https://maps.google.com/maps?q=${encodeURIComponent(mapAddr)}&t=&z=15&ie=UTF8&iwloc=B&output=embed` : null)
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
-                                  <label className="form-label">Código embed de Google Maps</label>
-                                  <textarea className="form-textarea" style={{ minHeight: 70, fontFamily: 'ui-monospace, monospace', fontSize: 11 }}
-                                    placeholder={'Pega aquí el <iframe src="..."> de Google Maps'}
-                                    value={sections.map_embed_url ?? ''}
-                                    onChange={e => setSections(s => ({ ...s, map_embed_url: extractEmbedSrc(e.target.value) }))} />
+                                  <label className="form-label">Etiqueta</label>
+                                  <input className="form-input" placeholder="Ubicación" value={mapMeta.eyebrow ?? ''} onChange={e => setMapMeta({ eyebrow: e.target.value })} />
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
-                                  <label className="form-label">Dirección</label>
-                                  <input className="form-input" placeholder="Calle, ciudad" value={sections.map_address ?? ''} onChange={e => setSections(s => ({ ...s, map_address: e.target.value }))} />
+                                  <label className="form-label">Título</label>
+                                  <input className="form-input" placeholder="Cómo llegar" value={mapMeta.title ?? ''} onChange={e => setMapMeta({ title: e.target.value })} />
                                 </div>
-                                <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.6, background: 'var(--cream)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border)' }}>
-                                  <strong style={{ color: 'var(--charcoal)' }}>Cómo obtener el embed:</strong><br />
-                                  1. Ve a <a href="https://www.google.com/maps" target="_blank" rel="noopener" style={{ color: 'var(--gold)' }}>Google Maps</a> y busca tu venue<br />
-                                  2. Clica <strong>Compartir</strong> → pestaña <strong>Insertar un mapa</strong><br />
-                                  3. Copia el <code style={{ background: 'var(--surface)', padding: '1px 4px', borderRadius: 3 }}>&lt;iframe src="…"&gt;</code> completo y pégalo arriba
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Descripción</label>
+                                  <input className="form-input" placeholder="Estamos en el corazón de…" value={mapMeta.subtitle ?? ''} onChange={e => setMapMeta({ subtitle: e.target.value })} />
                                 </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                  <label className="form-label">Dirección del venue</label>
+                                  <input className="form-input" placeholder="Ej. Camí de Can Riera 12, Sant Cugat del Vallès" value={mapAddr} onChange={e => setSections(s => ({ ...s, map_address: e.target.value }))} />
+                                </div>
+                                {previewSrc && (
+                                  <div style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                                    <iframe src={previewSrc} width="100%" height="180" style={{ border: 'none', display: 'block' }} loading="lazy" />
+                                  </div>
+                                )}
+                                <details style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                                  <summary style={{ cursor: 'pointer', userSelect: 'none' }}>Avanzado: código embed personalizado</summary>
+                                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <textarea className="form-textarea" style={{ minHeight: 56, fontFamily: 'ui-monospace, monospace', fontSize: 11 }}
+                                      placeholder={'Pega aquí el <iframe src="..."> de Google Maps (opcional)'}
+                                      value={mapEmbed}
+                                      onChange={e => setSections(s => ({ ...s, map_embed_url: extractEmbedSrc(e.target.value) }))} />
+                                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
+                                      Si lo dejas vacío, se genera automáticamente con la dirección.
+                                    </div>
+                                  </div>
+                                </details>
                               </div>
                             )
                           })()}
