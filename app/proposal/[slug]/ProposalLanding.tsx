@@ -10,6 +10,7 @@ import T2Emocion     from './tpl/T2Emocion'
 import T3TodoClaro   from './tpl/T3TodoClaro'
 import T4SocialProof from './tpl/T4SocialProof'
 import T5Minimalista from './tpl/T5Minimalista'
+import { applyCommissionToProposalData } from '@/lib/proposal-commission'
 
 export type PreviewMessage = {
   type: 'proposal-preview-update'
@@ -105,7 +106,14 @@ export default function ProposalLanding({ data, preview }: { data: ProposalData;
     }
   }, [data.slug, preview])
 
-  const effective = preview ? liveData : data
+  const rawEffective = preview ? liveData : data
+
+  // Apply WP/organizer commission markup to all prices (only in "neto" mode)
+  const effective: typeof rawEffective = applyCommissionToProposalData(
+    rawEffective,
+    (rawEffective as any).commission_percent,
+    (rawEffective as any).commission_mode,
+  )
 
   // Replace dynamic placeholders in personal_message
   const withPlaceholders: typeof effective = {

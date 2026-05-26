@@ -521,6 +521,14 @@ function LeadsPageInner() {
       }
       setLeads(data)
 
+      // Auto-open lead from URL param ?open=leadId — opens directly in edit mode
+      const openId = new URLSearchParams(window.location.search).get('open')
+      if (openId) {
+        const target = data.find((l: any) => l.id === openId)
+        if (target) openEdit(target)
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+
       // Fetch inquiry data: proposals → proposal_inquiries, indexed by lead_id
       const leadIds = data.map((l: any) => l.id).filter(Boolean)
       if (leadIds.length > 0) {
@@ -868,7 +876,7 @@ function LeadsPageInner() {
 
       updatedLead = { ...lead, visit_date: null, visit_time: null, visit_duration: null }
       setLeads(prev => prev.map(l => l.id === lead.id ? updatedLead : l))
-      if (detailLead?.id === lead.id) setDetailLead(updatedLead)
+      // (detail drawer removed — no sync needed)
     }
 
     if (requiresDateModal) {
@@ -1103,7 +1111,6 @@ function LeadsPageInner() {
       showToast('Lead eliminado definitivamente')
     }
 
-    if (detailLead?.id === deleteConfirmId) setDetailLead(null)
     setDeleteConfirmId(null)
   }
 
@@ -1146,7 +1153,7 @@ function LeadsPageInner() {
       budget_date_ranges: lead.budget_date_ranges || [],
       client_id: lead.client_id || '',
     })
-    setEditLead(lead); setDetailLead(null); setShowForm(true)
+    setEditLead(lead); setShowForm(true)
   }
 
   const handleSubmit = async () => {
@@ -1693,14 +1700,7 @@ function LeadsPageInner() {
         </div>
       )}
 
-      {detailLead && (
-        <DetailDrawer lead={detailLead}
-          tab={(Object.entries(TAB_STATUSES) as [Tab, DbStatus[]][]).find(([,ss]) => ss.includes(detailLead.status))?.[0] || 'new'}
-          onClose={() => setDetailLead(null)}
-          onEdit={openEdit} onDelete={requestDeleteLead} onMove={moveToStatusWithVisitCheck}
-          onDateConfirm={triggerStatusChangeWithVisitCheck}
-          onUpdateLead={(id, updates) => setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))} />
-      )}
+      {/* DetailDrawer rendering removed — detail view disabled */}
 
       <ImportLeadsModal
         open={showImport}
@@ -4351,9 +4351,31 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
   onDateConfirm: (lead: any, s: DbStatus) => void
   onUpdateLead: (id: string, updates: any) => void
 }) {
+  const router = useRouter()
   const { propuestas: canProposal } = usePlanFeatures()
   const [commText, setCommText] = useState('')
   const [commType, setCommType] = useState('nota')
+  const [leadBudgets, setLeadBudgets] = useState<any[]>([])
+  const [leadPayments, setLeadPayments] = useState<any[]>([])
+  const [loadingBudgets, setLoadingBudgets] = useState(true)
+
+  // Fetch budgets + payments for this lead
+  useEffect(() => {
+    if (!lead.id) return
+    setLoadingBudgets(true)
+    const supabase = createClient()
+    Promise.all([
+      supabase.from('budgets').select('id, slug, couple_name, total_amount, status, payment_plan, created_at').eq('lead_id', lead.id).order('created_at', { ascending: false }),
+      supabase.from('budget_payments').select('id, budget_id, installment_index, amount, status, paid_at, payer_name, payer_email, payment_provider').eq('status', 'paid').order('paid_at', { ascending: false }),
+    ]).then(([budgetsRes, paymentsRes]) => {
+      const budgets = budgetsRes.data || []
+      setLeadBudgets(budgets)
+      // Filter payments to only those belonging to this lead's budgets
+      const budgetIds = new Set(budgets.map(b => b.id))
+      setLeadPayments((paymentsRes.data || []).filter(p => budgetIds.has(p.budget_id)))
+      setLoadingBudgets(false)
+    })
+  }, [lead.id])
   const [commSaving, setCommSaving] = useState(false)
 
   const communications: any[] = Array.isArray(lead.communications) ? lead.communications : []
@@ -4469,6 +4491,105 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
             </div>
           )}
 
+          {/* ── Presupuestos y pagos ── */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Presupuestos y pagos</div>
+              <button onClick={() => router.push(`/budgets/new?lead_id=${lead.id}`)}
+                style={{ fontSize: 10, background: 'none', border: '1px solid var(--gold)', color: 'var(--gold)', padding: '3px 8px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+                <Plus size={10} /> Presupuesto
+              </button>
+            </div>
+            {loadingBudgets ? (
+              <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--warm-gray)', fontSize: 12 }}>
+                <Loader2 size={14} className="animate-spin" style={{ display: 'inline' }} />
+              </div>
+            ) : leadBudgets.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--stone)', fontSize: 12, fontStyle: 'italic' }}>
+                Sin presupuestos
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {leadBudgets.map(b => {
+                  const plan = (b.payment_plan || []) as any[]
+                  const paidCount = plan.filter((p: any) => p.status === 'paid').length
+                  const paidPct = plan.length > 0 ? Math.round((paidCount / plan.length) * 100) : 0
+                  const budgetPayments = leadPayments.filter(p => p.budget_id === b.id)
+                  const totalPaid = budgetPayments.reduce((s: number, p: any) => s + Number(p.amount), 0)
+                  const statusLabel: Record<string, string> = { draft: 'Borrador', sent: 'Enviado', viewed: 'Visto', accepted: 'Aceptado', expired: 'Expirado' }
+                  const statusColor: Record<string, string> = { draft: 'var(--warm-gray)', sent: '#2563eb', viewed: '#7c3aed', accepted: '#16a34a', expired: 'var(--rose)' }
+
+                  return (
+                    <div key={b.id} style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden' }}>
+                      {/* Budget header */}
+                      <div
+                        onClick={() => window.location.href = `/budgets/${b.id}`}
+                        style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
+                      >
+                        <Receipt size={14} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {b.couple_name}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 1 }}>
+                            <span style={{ color: statusColor[b.status] || 'var(--warm-gray)', fontWeight: 600 }}>{statusLabel[b.status] || b.status}</span>
+                            {plan.length > 0 && <> · {paidCount}/{plan.length} cuotas</>}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)', whiteSpace: 'nowrap' }}>
+                          {Number(b.total_amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                        </div>
+                        <ExternalLink size={12} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                      </div>
+
+                      {/* Payment progress bar */}
+                      {plan.length > 0 && (
+                        <div style={{ padding: '0 14px 6px' }}>
+                          <div style={{ height: 4, background: 'var(--ivory)', borderRadius: 2, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${paidPct}%`, background: paidPct === 100 ? '#16a34a' : 'var(--gold)', borderRadius: 2 }} />
+                          </div>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 2 }}>
+                            {totalPaid.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} pagado de {Number(b.total_amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Payment history */}
+                      {budgetPayments.length > 0 && (
+                        <div style={{ padding: '4px 14px 10px', borderTop: '1px solid var(--ivory)' }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Historial de pagos
+                          </div>
+                          {budgetPayments.slice(0, 5).map((pay: any) => (
+                            <div key={pay.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 11 }}>
+                              <CheckCircle size={10} style={{ color: '#16a34a', flexShrink: 0 }} />
+                              <div style={{ flex: 1, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {pay.payer_name || pay.payer_email || 'Pago'}
+                              </div>
+                              <div style={{ fontWeight: 600, color: '#16a34a', whiteSpace: 'nowrap' }}>
+                                {Number(pay.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                              </div>
+                              {pay.paid_at && (
+                                <div style={{ fontSize: 9, color: 'var(--stone)', whiteSpace: 'nowrap' }}>
+                                  {new Date(pay.paid_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                          {budgetPayments.length > 5 && (
+                            <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 2 }}>
+                              +{budgetPayments.length - 5} pagos más
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
           {/* ── Log de comunicaciones ── */}
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Comunicaciones</div>
@@ -4581,21 +4702,25 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
               )
             })}
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {canProposal ? (
               <a href={`/proposals/new?lead_id=${lead.id}`}
                 style={{ flex: 1, fontSize: 12, padding: '8px', borderRadius: 6, border: '1px solid var(--gold)', color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 500 }}>
-                <FileText size={12} /> Crear propuesta
+                <FileText size={12} /> Propuesta
               </a>
             ) : (
               <div title="Disponible en plan Premium"
                 style={{ flex: 1, fontSize: 12, padding: '8px', borderRadius: 6, border: '1px solid var(--ivory)', color: '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 500, cursor: 'not-allowed', userSelect: 'none' }}>
-                <FileText size={12} /> Crear propuesta <LockKeyhole size={12} />
+                <FileText size={12} /> Propuesta <LockKeyhole size={12} />
               </div>
             )}
+            <a href={`/budgets/new?lead_id=${lead.id}`}
+              style={{ flex: 1, fontSize: 12, padding: '8px', borderRadius: 6, border: '1px solid var(--gold)', color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 500 }}>
+              <Receipt size={12} /> Presupuesto
+            </a>
             <button onClick={() => onDelete(lead.id)}
               style={{ fontSize: 12, padding: '8px 12px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--stone)', background: 'transparent', color: 'var(--rose)', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Trash2 size={12} /> Eliminar
+              <Trash2 size={12} />
             </button>
           </div>
         </div>
@@ -6321,27 +6446,42 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
   const budgetInputRef = useRef<HTMLInputElement>(null)
   const [proposalResponse, setProposalResponse] = useState<any>(null)
   const [loadingResponse, setLoadingResponse] = useState(false)
+  const [leadProposals, setLeadProposals] = useState<any[]>([])
+  const [leadBudgetsComercial, setLeadBudgetsComercial] = useState<any[]>([])
+  const [comercialDetailModal, setComercialDetailModal] = useState<{ type: 'dosier' | 'budget'; item: any } | null>(null)
+  const [comercialDetailData, setComercialDetailData] = useState<any>(null)
+  const [loadingComercialDetail, setLoadingComercialDetail] = useState(false)
   const initials = getInitials(form.name || '')
   // Lead phase — drives copy + ordering of date sections
   const leadStatus = editLead?.status as DbStatus | undefined
   const isNewPhase = !isEdit || !leadStatus || leadStatus === 'new' || leadStatus === 'lost'
 
-  // Fetch proposal response data when editing a lead
+  // Fetch proposal response data + all proposals/budgets when editing a lead
   useEffect(() => {
     if (!isEdit || !editLead?.id) return
     const loadResponse = async () => {
       setLoadingResponse(true)
       try {
         const supabase = createClient()
-        // Find proposal linked to this lead
-        const { data: proposal } = await supabase
+        // Fetch ALL proposals linked to this lead
+        const { data: allProposals } = await supabase
           .from('proposals')
-          .select('id, slug, couple_name')
+          .select('id, slug, couple_name, status, created_at, wedding_date, guest_count, views, open_count')
           .eq('lead_id', editLead.id)
           .eq('venue_id', venueId)
           .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
+        setLeadProposals(allProposals || [])
+
+        // Fetch ALL budgets linked to this lead
+        const { data: allBudgets } = await supabase
+          .from('budgets')
+          .select('id, slug, couple_name, status, created_at, total_amount, payment_plan')
+          .eq('lead_id', editLead.id)
+          .eq('venue_id', venueId)
+          .order('created_at', { ascending: false })
+        setLeadBudgetsComercial(allBudgets || [])
+
+        const proposal = allProposals?.[0] ?? null
         if (!proposal) { setProposalResponse(null); return }
         // Fetch latest menu selection
         const { data: menuSel } = await supabase
@@ -6370,6 +6510,34 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
     }
     loadResponse()
   }, [isEdit, editLead?.id, venueId])
+
+  // Load detail data when comercial modal opens
+  useEffect(() => {
+    if (!comercialDetailModal) { setComercialDetailData(null); return }
+    const load = async () => {
+      setLoadingComercialDetail(true)
+      const supabase = createClient()
+      if (comercialDetailModal.type === 'dosier') {
+        const pid = comercialDetailModal.item.id
+        const [{ data: menuSel }, { data: inqs }] = await Promise.all([
+          supabase.from('proposal_menu_selections').select('*').eq('proposal_id', pid).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+          supabase.from('proposal_inquiries').select('*').eq('proposal_id', pid).order('created_at', { ascending: false }),
+        ])
+        setComercialDetailData({ menuSelection: menuSel, inquiries: inqs || [] })
+      } else {
+        const bid = comercialDetailModal.item.id
+        const { data: payments } = await supabase
+          .from('budget_payments')
+          .select('*')
+          .eq('budget_id', bid)
+          .eq('status', 'paid')
+          .order('paid_at', { ascending: false })
+        setComercialDetailData({ payments: payments || [] })
+      }
+      setLoadingComercialDetail(false)
+    }
+    load()
+  }, [comercialDetailModal])
 
   const dateSectionTitle = isNewPhase ? 'Fecha que quiere la pareja' : 'Fechas propuestas a la pareja'
   const dateSectionHint  = isNewPhase
@@ -7245,53 +7413,88 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
             {/* Divider */}
             <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
 
-            {/* Presupuesto digital (bloqueado para básico) */}
-            <div style={{ marginBottom: 22 }}>
-              <SectionTitle icon={<FileText size={14} />} title="Presupuesto digital" hint="Versión interactiva del presupuesto generada automáticamente" />
-              {canPropuesta ? (
-                <a href="/budgets" style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '8px 16px', borderRadius: 10,
-                  background: 'var(--espresso)', color: '#fff',
-                  fontSize: 12, fontWeight: 700, textDecoration: 'none',
-                }}>
-                  <ExternalLink size={12} /> Crear presupuesto digital
-                </a>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px solid var(--ivory)' }}>
-                  <LockKeyhole size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Presupuesto digital</div>
-                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Disponible en plan Premium</div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Divider */}
-            <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
-
-            {/* Dosier digital */}
+            {/* Dosieres y Presupuestos */}
             <div style={{ marginBottom: 4 }}>
-              <SectionTitle icon={<Sparkles size={14} />} title="Dosier digital" hint="Propuesta visual e interactiva para la pareja" />
-              {canPropuesta ? (
-                <a href="/proposals" style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '8px 16px', borderRadius: 10,
-                  background: 'var(--espresso)', color: '#fff',
-                  fontSize: 12, fontWeight: 700, textDecoration: 'none',
-                }}>
-                  <ExternalLink size={12} /> Crear dosier digital
-                </a>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px solid var(--ivory)' }}>
-                  <LockKeyhole size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Dosier digital</div>
-                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Disponible en plan Premium</div>
-                  </div>
+              <SectionTitle icon={<FileText size={14} />} title="Dosieres y presupuestos" hint="Dosieres y presupuestos digitales vinculados" />
+
+              {/* Dosieres list */}
+              {leadProposals.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Dosieres</div>
+                  {leadProposals.map(p => (
+                    <div key={p.id} onClick={() => setComercialDetailModal({ type: 'dosier', item: p })}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: '#fff', border: '1px solid var(--ivory)', marginBottom: 6, cursor: 'pointer', transition: 'all 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--gold)')}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--ivory)')}>
+                      <Sparkles size={14} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.couple_name}</div>
+                        <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+                          {({ draft: 'Borrador', sent: 'Enviado', viewed: 'Visto', expired: 'Expirado' } as Record<string, string>)[p.status] || p.status}
+                          {' · '}{new Date(p.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                        </div>
+                      </div>
+                      <ExternalLink size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                    </div>
+                  ))}
                 </div>
               )}
+
+              {/* Budgets list */}
+              {leadBudgetsComercial.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Presupuestos</div>
+                  {leadBudgetsComercial.map(b => {
+                    const plan = (b.payment_plan || []) as any[]
+                    const paidCount = plan.filter((p: any) => p.status === 'paid').length
+                    return (
+                      <div key={b.id} onClick={() => window.location.href = `/budgets/${b.id}`}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: '#fff', border: '1px solid var(--ivory)', marginBottom: 6, cursor: 'pointer', transition: 'all 0.15s' }}
+                        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--gold)')}
+                        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--ivory)')}>
+                        <Receipt size={14} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.couple_name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+                            {({ draft: 'Borrador', sent: 'Enviado', viewed: 'Visto', accepted: 'Aceptado', expired: 'Expirado' } as Record<string, string>)[b.status] || b.status}
+                            {plan.length > 0 && <> · {paidCount}/{plan.length} cuotas</>}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--espresso)', whiteSpace: 'nowrap' }}>
+                          {Number(b.total_amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                        </div>
+                        <ExternalLink size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {leadProposals.length === 0 && leadBudgetsComercial.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--stone)', fontSize: 12, fontStyle: 'italic' }}>
+                  Sin dosieres ni presupuestos vinculados
+                </div>
+              )}
+
+              {/* Create buttons */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                {canPropuesta && (
+                  <a href={`/proposals/new?lead_id=${editLead?.id}`} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8,
+                    background: 'var(--espresso)', color: '#fff', fontSize: 11, fontWeight: 700, textDecoration: 'none',
+                  }}>
+                    <Plus size={10} /> Dosier
+                  </a>
+                )}
+                {canPropuesta && (
+                  <a href={`/budgets/new?lead_id=${editLead?.id}`} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8,
+                    background: 'var(--gold)', color: '#fff', fontSize: 11, fontWeight: 700, textDecoration: 'none',
+                  }}>
+                    <Plus size={10} /> Presupuesto
+                  </a>
+                )}
+              </div>
             </div>
 
           </>)}
@@ -7372,34 +7575,92 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               </div>
             </div>
 
-            {/* Presupuesto digital (bloqueado para básico) */}
+            {/* Divider */}
+            <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
+
+            {/* Dosieres y Presupuestos */}
             <div style={{ marginBottom: 22 }}>
-              <SectionTitle icon={<FileText size={14} />} title="Presupuesto digital" hint="Versión interactiva del presupuesto generada automáticamente" />
-              {canPropuesta ? (
-                <a href="/budgets" style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '8px 16px', borderRadius: 10,
-                  background: 'var(--espresso)', color: '#fff',
-                  fontSize: 12, fontWeight: 700, textDecoration: 'none',
-                }}>
-                  <ExternalLink size={12} /> Crear presupuesto digital
-                </a>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px solid var(--ivory)' }}>
-                  <LockKeyhole size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Presupuesto digital</div>
-                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Disponible en plan Premium</div>
-                  </div>
+              <SectionTitle icon={<FileText size={14} />} title="Dosieres y presupuestos" hint="Dosieres y presupuestos digitales vinculados" />
+
+              {/* Dosieres list */}
+              {leadProposals.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Dosieres</div>
+                  {leadProposals.map(p => (
+                    <div key={p.id} onClick={() => setComercialDetailModal({ type: 'dosier', item: p })}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: '#fff', border: '1px solid var(--ivory)', marginBottom: 6, cursor: 'pointer', transition: 'all 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--gold)')}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--ivory)')}>
+                      <Sparkles size={14} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.couple_name}</div>
+                        <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+                          {({ draft: 'Borrador', sent: 'Enviado', viewed: 'Visto', expired: 'Expirado' } as Record<string, string>)[p.status] || p.status}
+                          {' · '}{new Date(p.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                        </div>
+                      </div>
+                      <ExternalLink size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                    </div>
+                  ))}
                 </div>
               )}
+
+              {/* Budgets list */}
+              {leadBudgetsComercial.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Presupuestos</div>
+                  {leadBudgetsComercial.map(b => {
+                    const plan = (b.payment_plan || []) as any[]
+                    const paidCount = plan.filter((pp: any) => pp.status === 'paid').length
+                    return (
+                      <div key={b.id} onClick={() => window.location.href = `/budgets/${b.id}`}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: '#fff', border: '1px solid var(--ivory)', marginBottom: 6, cursor: 'pointer', transition: 'all 0.15s' }}
+                        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--gold)')}
+                        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--ivory)')}>
+                        <Receipt size={14} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.couple_name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+                            {({ draft: 'Borrador', sent: 'Enviado', viewed: 'Visto', accepted: 'Aceptado', expired: 'Expirado' } as Record<string, string>)[b.status] || b.status}
+                            {plan.length > 0 && <> · {paidCount}/{plan.length} cuotas</>}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--espresso)', whiteSpace: 'nowrap' }}>
+                          {Number(b.total_amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                        </div>
+                        <ExternalLink size={11} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Create buttons */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                {canPropuesta && (
+                  <a href={`/proposals/new?lead_id=${editLead?.id}`} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8,
+                    background: 'var(--espresso)', color: '#fff', fontSize: 11, fontWeight: 700, textDecoration: 'none',
+                  }}>
+                    <Plus size={10} /> Dosier
+                  </a>
+                )}
+                {canPropuesta && (
+                  <a href={`/budgets/new?lead_id=${editLead?.id}`} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8,
+                    background: 'var(--gold)', color: '#fff', fontSize: 11, fontWeight: 700, textDecoration: 'none',
+                  }}>
+                    <Plus size={10} /> Presupuesto
+                  </a>
+                )}
+              </div>
             </div>
 
             {/* Divider */}
             <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
 
             {/* Fechas ofertadas (las que se propusieron/negociaron antes del presupuesto — read-only) */}
-            <div style={{ marginBottom: 22 }}>
+            <div style={{ marginBottom: 4 }}>
               <SectionTitle icon={<Flower2 size={14} />} title="Fechas ofertadas" hint="Fechas propuestas a la pareja durante la negociación" />
               {(() => {
                 const dates = expandLeadDates(editLead)
@@ -7424,32 +7685,6 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   </div>
                 )
               })()}
-            </div>
-
-            {/* Divider */}
-            <div style={{ borderTop: '1px solid var(--ivory)', marginBottom: 22 }} />
-
-            {/* Dosier digital (bloqueada para básico) */}
-            <div style={{ marginBottom: 4 }}>
-              <SectionTitle icon={<Sparkles size={14} />} title="Dosier digital" hint="Propuesta visual e interactiva para la pareja" />
-              {canPropuesta ? (
-                <a href="/proposals" style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '8px 16px', borderRadius: 10,
-                  background: 'var(--espresso)', color: '#fff',
-                  fontSize: 12, fontWeight: 700, textDecoration: 'none',
-                }}>
-                  <ExternalLink size={12} /> Crear dosier digital
-                </a>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 10, background: '#f9fafb', border: '1px solid var(--ivory)' }}>
-                  <LockKeyhole size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Dosier digital</div>
-                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Disponible en plan Premium</div>
-                  </div>
-                </div>
-              )}
             </div>
 
           </>)}
@@ -7739,6 +7974,217 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
           </button>
         </div>
       </div>
+
+      {/* Comercial detail modal — dosier or budget */}
+      {comercialDetailModal && (() => {
+        const { type, item } = comercialDetailModal
+        const KIND_LABEL: Record<string, string> = { visit: 'Visita solicitada', call: 'Llamada', video: 'Videollamada', menu: 'Pregunta sobre menú', menu_selection: 'Selección de menú', date_pick: 'Fecha confirmada', provider_selection: 'Proveedores propios', other: 'Consulta' }
+        const KIND_EMOJI: Record<string, string> = { visit: '📍', call: '📞', video: '🎥', menu: '🍽️', menu_selection: '✅', date_pick: '📅', provider_selection: '🤝', other: '💬' }
+
+        if (type === 'dosier') {
+          const statusLabel: Record<string, string> = { draft: 'Borrador', sent: 'Enviado', viewed: 'Visto', expired: 'Expirado' }
+          return (
+            <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={() => setComercialDetailModal(null)}>
+              <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
+                  <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Sparkles size={16} style={{ color: 'var(--gold)' }} />
+                    {item.couple_name}
+                  </div>
+                  <div className="modal-sub" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className={`badge ${({ draft: 'badge-inactive', sent: 'badge-contacted', viewed: 'badge-active', expired: 'badge-pending' } as Record<string, string>)[item.status] || ''}`}>
+                      {statusLabel[item.status] || item.status}
+                    </span>
+                    {item.wedding_date && <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{new Date(item.wedding_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
+                  </div>
+                  <button onClick={() => setComercialDetailModal(null)} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6 }}>
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="modal-body" style={{ maxHeight: 420, overflowY: 'auto' }}>
+                  {loadingComercialDetail ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px 0', color: 'var(--warm-gray)', fontSize: 12 }}>
+                      <Loader2 size={16} className="animate-spin" />
+                    </div>
+                  ) : comercialDetailData ? (
+                    <>
+                      {/* Stats */}
+                      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+                        <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)', textAlign: 'center' }}>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--espresso)' }}>{item.open_count ?? item.views ?? 0}</div>
+                          <div style={{ fontSize: 9, color: 'var(--warm-gray)', textTransform: 'uppercase' }}>Vistas</div>
+                        </div>
+                        <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)', textAlign: 'center' }}>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--espresso)' }}>{comercialDetailData.inquiries?.length || 0}</div>
+                          <div style={{ fontSize: 9, color: 'var(--warm-gray)', textTransform: 'uppercase' }}>Respuestas</div>
+                        </div>
+                      </div>
+
+                      {/* Menu selection */}
+                      {comercialDetailData.menuSelection && (() => {
+                        const ms = comercialDetailData.menuSelection
+                        return (
+                          <div style={{ background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Selección de menú</div>
+                            {ms.selected_menu_name && <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', marginBottom: 4 }}>{ms.selected_menu_name}</div>}
+                            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, marginBottom: 4 }}>
+                              {ms.guest_count && <span><Users size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {ms.guest_count} inv.</span>}
+                              {ms.estimated_total != null && <span style={{ fontWeight: 600 }}>{ms.estimated_total.toLocaleString('es-ES')} €</span>}
+                            </div>
+                            {ms.selected_extras?.length > 0 && (
+                              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                                {ms.selected_extras.map((ext: string, i: number) => (
+                                  <span key={i} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: 'rgba(99,102,241,0.08)', color: '#4f46e5', fontWeight: 500 }}>{ext}</span>
+                                ))}
+                              </div>
+                            )}
+                            {ms.comments && <div style={{ marginTop: 6, fontSize: 11, color: 'var(--charcoal)', fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>{ms.comments}</div>}
+                          </div>
+                        )
+                      })()}
+
+                      {/* Inquiries */}
+                      {comercialDetailData.inquiries?.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Respuestas</div>
+                          {comercialDetailData.inquiries.map((inq: any) => (
+                            <div key={inq.id} style={{ padding: '8px 10px', background: inq.status === 'new' ? '#FFFBEB' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#FDE68A' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 5 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
+                                <span>{KIND_EMOJI[inq.kind] ?? '💬'}</span>
+                                <span style={{ fontWeight: 600, color: 'var(--charcoal)' }}>{KIND_LABEL[inq.kind] || inq.kind}</span>
+                                {inq.status === 'new' && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 99, background: 'var(--gold)', color: '#fff', fontWeight: 700 }}>Nuevo</span>}
+                                <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--warm-gray)' }}>{new Date(inq.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
+                              </div>
+                              {inq.message && <div style={{ fontSize: 11, color: 'var(--charcoal)', marginTop: 2, whiteSpace: 'pre-wrap' }}>{inq.message}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* No response */}
+                      {!comercialDetailData.menuSelection && (comercialDetailData.inquiries?.length || 0) === 0 && (
+                        <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--warm-gray)' }}>
+                          <Inbox size={20} style={{ opacity: 0.3, marginBottom: 6 }} />
+                          <div style={{ fontSize: 12 }}>La pareja aún no ha respondido al dosier</div>
+                        </div>
+                      )}
+                    </>
+                  ) : null}
+                </div>
+                <div className="modal-footer" style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setComercialDetailModal(null)}>Cerrar</button>
+                  <div style={{ flex: 1 }} />
+                  <a href={`/proposals/${item.id}/edit`} className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <ExternalLink size={11} /> Ver dosier completo
+                  </a>
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        // Budget detail
+        const plan = (item.payment_plan || []) as any[]
+        const paidCount = plan.filter((p: any) => p.status === 'paid').length
+        const totalPaid = (comercialDetailData?.payments || []).reduce((s: number, p: any) => s + Number(p.amount), 0)
+        const statusLabel: Record<string, string> = { draft: 'Borrador', sent: 'Enviado', viewed: 'Visto', accepted: 'Aceptado', expired: 'Expirado' }
+        return (
+          <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={() => setComercialDetailModal(null)}>
+            <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
+                <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Receipt size={16} style={{ color: 'var(--gold)' }} />
+                  {item.couple_name}
+                </div>
+                <div className="modal-sub" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className={`badge ${({ draft: 'badge-inactive', sent: 'badge-contacted', viewed: 'badge-active', accepted: 'badge-confirmed', expired: 'badge-pending' } as Record<string, string>)[item.status] || ''}`}>
+                    {statusLabel[item.status] || item.status}
+                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)' }}>
+                    {Number(item.total_amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                  </span>
+                </div>
+                <button onClick={() => setComercialDetailModal(null)} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6 }}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="modal-body" style={{ maxHeight: 420, overflowY: 'auto' }}>
+                {loadingComercialDetail ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px 0', color: 'var(--warm-gray)', fontSize: 12 }}>
+                    <Loader2 size={16} className="animate-spin" />
+                  </div>
+                ) : (
+                  <>
+                    {/* Payment progress */}
+                    {plan.length > 0 && (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)' }}>Progreso de pagos</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: paidCount === plan.length ? '#16a34a' : 'var(--espresso)' }}>
+                            {paidCount}/{plan.length} cuotas
+                          </div>
+                        </div>
+                        <div style={{ height: 6, background: 'var(--ivory)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
+                          <div style={{ height: '100%', width: `${plan.length > 0 ? (paidCount / plan.length) * 100 : 0}%`, background: paidCount === plan.length ? '#16a34a' : 'var(--gold)', borderRadius: 3, transition: 'width 0.3s' }} />
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                          {totalPaid.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} pagado de {Number(item.total_amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Installments */}
+                    {plan.length > 0 && (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Cuotas</div>
+                        {plan.map((inst: any, idx: number) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: inst.status === 'paid' ? '#f0fdf4' : 'var(--cream)', border: `1px solid ${inst.status === 'paid' ? '#86efac' : 'var(--ivory)'}`, marginBottom: 4 }}>
+                            {inst.status === 'paid' ? <CheckCircle size={12} style={{ color: '#16a34a', flexShrink: 0 }} /> : <Clock size={12} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
+                            <div style={{ flex: 1, fontSize: 12, color: 'var(--charcoal)' }}>{inst.label}</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: inst.status === 'paid' ? '#16a34a' : 'var(--espresso)' }}>
+                              {Number(inst.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                            </div>
+                            {inst.due_date && <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{new Date(inst.due_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Payment history */}
+                    {(comercialDetailData?.payments?.length || 0) > 0 && (
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Historial de pagos</div>
+                        {comercialDetailData.payments.map((pay: any) => (
+                          <div key={pay.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 11, borderBottom: '1px solid var(--ivory)' }}>
+                            <CheckCircle size={10} style={{ color: '#16a34a', flexShrink: 0 }} />
+                            <div style={{ flex: 1, color: 'var(--charcoal)' }}>{pay.payer_name || pay.payer_email || 'Pago'}</div>
+                            <div style={{ fontWeight: 600, color: '#16a34a' }}>{Number(pay.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
+                            {pay.paid_at && <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{new Date(pay.paid_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {plan.length === 0 && (
+                      <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--warm-gray)' }}>
+                        <Receipt size={20} style={{ opacity: 0.3, marginBottom: 6 }} />
+                        <div style={{ fontSize: 12 }}>Sin plan de pagos definido</div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setComercialDetailModal(null)}>Cerrar</button>
+                <div style={{ flex: 1 }} />
+                <a href={`/budgets/${item.id}/edit`} className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <ExternalLink size={11} /> Ver presupuesto completo
+                </a>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

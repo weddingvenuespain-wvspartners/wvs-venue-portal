@@ -23,6 +23,10 @@ export type PaymentInstallment = {
   amount: number
   due_date: string
   status: 'pending' | 'paid'
+  /** Whether this installment is refundable */
+  refundable?: boolean
+  /** Refund deadline (ISO date). After this date, the installment is non-refundable */
+  refund_deadline?: string
 }
 
 export type PaymentTemplateRule = {

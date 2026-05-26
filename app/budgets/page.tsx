@@ -12,7 +12,8 @@ import FeatureGate from '@/components/FeatureGate'
 import {
   Plus, Trash2, Send, X, Check, Eye, Pencil, Copy,
   Search, Receipt, Star, MessageCircle, Mail, Link2,
-  Loader2, AlertCircle, User, Calculator, LayoutTemplate,
+  Loader2, AlertCircle, User, Calculator, LayoutTemplate, CreditCard,
+  CheckCircle, Clock, ExternalLink,
 } from 'lucide-react'
 import type { Budget, BudgetStatus, PaymentTemplate, LineItemGroup } from '@/lib/budget-types'
 
@@ -60,6 +61,9 @@ export default function BudgetsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | BudgetStatus>('all')
   const [sendModal, setSendModal] = useState<Budget | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  const [detailModal, setDetailModal] = useState<Budget | null>(null)
+  const [detailPayments, setDetailPayments] = useState<any[]>([])
+  const [loadingDetail, setLoadingDetail] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -130,6 +134,24 @@ export default function BudgetsPage() {
     setCopied(slug)
     setTimeout(() => setCopied(null), 2000)
   }
+
+  // Load payment data when detail modal opens
+  useEffect(() => {
+    if (!detailModal) { setDetailPayments([]); return }
+    const loadPayments = async () => {
+      setLoadingDetail(true)
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('budget_payments')
+        .select('*')
+        .eq('budget_id', detailModal.id)
+        .eq('status', 'paid')
+        .order('paid_at', { ascending: false })
+      setDetailPayments(data || [])
+      setLoadingDetail(false)
+    }
+    loadPayments()
+  }, [detailModal?.id])
 
   const filtered = budgets.filter(b => {
     if (statusFilter !== 'all' && b.status !== statusFilter) return false
@@ -215,7 +237,11 @@ export default function BudgetsPage() {
                   {filtered.map(b => {
                     const lead = b.lead_id ? leads.find(l => l.id === b.lead_id) : null
                     return (
-                      <div key={b.id} className="card" style={{ padding: '14px 20px' }}>
+                      <div key={b.id} className="card" style={{ padding: '14px 20px', cursor: 'pointer', transition: 'box-shadow .15s' }}
+                        onClick={() => router.push(`/budgets/${b.id}`)}
+                        onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)')}
+                        onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+                      >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                           {/* Name + lead */}
                           <div style={{ minWidth: 180, flex: 1 }}>
@@ -242,13 +268,32 @@ export default function BudgetsPage() {
                             {S_LABEL[b.status]}
                           </span>
 
+                          {/* Payment progress */}
+                          {(() => {
+                            const plan = (b.payment_plan || []) as any[]
+                            if (plan.length === 0) return <div style={{ minWidth: 80 }} />
+                            const paidCount = plan.filter((p: any) => p.status === 'paid').length
+                            const paidPct = Math.round((paidCount / plan.length) * 100)
+                            return (
+                              <div style={{ minWidth: 80, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                                <CreditCard size={11} style={{ color: paidPct === 100 ? '#16a34a' : 'var(--warm-gray)', flexShrink: 0 }} />
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ height: 4, background: 'var(--ivory)', borderRadius: 2, overflow: 'hidden' }}>
+                                    <div style={{ height: '100%', width: `${paidPct}%`, background: paidPct === 100 ? '#16a34a' : 'var(--gold)', borderRadius: 2 }} />
+                                  </div>
+                                  <div style={{ color: paidPct === 100 ? '#16a34a' : 'var(--warm-gray)', marginTop: 1 }}>{paidCount}/{plan.length}</div>
+                                </div>
+                              </div>
+                            )
+                          })()}
+
                           {/* Views */}
                           <div style={{ minWidth: 50, fontSize: 12, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
                             <Eye size={12} /> {b.open_count || '—'}
                           </div>
 
                           {/* Actions */}
-                          <div style={{ display: 'flex', gap: 6 }}>
+                          <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
                             <button onClick={() => router.push(`/budgets/${b.id}/edit`)} className="btn btn-ghost btn-sm" title="Editar"><Pencil size={13} /></button>
                             <button onClick={() => setSendModal(b)} className="btn btn-ghost btn-sm" title="Enviar"><Send size={13} /></button>
                             <button onClick={() => copyLink(b.slug)} className="btn btn-ghost btn-sm" title="Copiar enlace">
@@ -269,6 +314,127 @@ export default function BudgetsPage() {
       </div>
 
       {sendModal && <SendBudgetModal budget={sendModal} leads={leads} onClose={() => setSendModal(null)} />}
+
+      {/* Budget detail modal */}
+      {detailModal && (() => {
+        const b = detailModal
+        const lead = b.lead_id ? leads.find(l => l.id === b.lead_id) : null
+        const plan = (b.payment_plan || []) as any[]
+        const paidCount = plan.filter((p: any) => p.status === 'paid').length
+        const totalPaid = detailPayments.reduce((s, p) => s + Number(p.amount), 0)
+        const lineItems = b.line_items as any
+        const groups = lineItems?.groups || []
+        return (
+          <div className="modal-overlay" onClick={() => setDetailModal(null)}>
+            <div className="modal" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
+                <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Receipt size={16} style={{ color: 'var(--gold)' }} />
+                  {b.couple_name}
+                </div>
+                <div className="modal-sub" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span className={`badge ${S_BADGE[b.status]}`}>{S_LABEL[b.status]}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--espresso)' }}>
+                    {b.total_amount.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                  </span>
+                  {b.wedding_date && <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{new Date(b.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
+                </div>
+                <button onClick={() => setDetailModal(null)} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6 }}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="modal-body" style={{ maxHeight: 480, overflowY: 'auto' }}>
+                {/* Info row */}
+                <div style={{ display: 'flex', gap: 12, marginBottom: 14, fontSize: 11, color: 'var(--warm-gray)', flexWrap: 'wrap' }}>
+                  {lead && <span><User size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {lead.name}</span>}
+                  {b.guest_count && <span>{b.guest_count} invitados</span>}
+                  <span>Creado: {new Date(b.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                  {b.open_count ? <span><Eye size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {b.open_count} vistas</span> : null}
+                </div>
+
+                {/* Line item groups summary */}
+                {groups.length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Conceptos</div>
+                    {groups.map((g: any, gi: number) => (
+                      <div key={gi} style={{ marginBottom: 8 }}>
+                        {g.name && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--espresso)', marginBottom: 3 }}>{g.name}</div>}
+                        {(g.items || []).map((item: any, ii: number) => (
+                          <div key={ii} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 11, borderBottom: '1px solid var(--ivory)' }}>
+                            <span style={{ color: 'var(--charcoal)' }}>{item.name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}</span>
+                            <span style={{ fontWeight: 600, color: 'var(--espresso)' }}>{(Number(item.unit_price) * (item.quantity || 1)).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Payment progress */}
+                {plan.length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Plan de pagos</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: paidCount === plan.length ? '#16a34a' : 'var(--espresso)' }}>
+                        {paidCount}/{plan.length} cuotas
+                      </div>
+                    </div>
+                    <div style={{ height: 6, background: 'var(--ivory)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
+                      <div style={{ height: '100%', width: `${plan.length > 0 ? (paidCount / plan.length) * 100 : 0}%`, background: paidCount === plan.length ? '#16a34a' : 'var(--gold)', borderRadius: 3 }} />
+                    </div>
+                    {plan.map((inst: any, idx: number) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, background: inst.status === 'paid' ? '#f0fdf4' : 'var(--cream)', border: `1px solid ${inst.status === 'paid' ? '#86efac' : 'var(--ivory)'}`, marginBottom: 4 }}>
+                        {inst.status === 'paid' ? <CheckCircle size={12} style={{ color: '#16a34a', flexShrink: 0 }} /> : <Clock size={12} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
+                        <div style={{ flex: 1, fontSize: 12, color: 'var(--charcoal)' }}>{inst.label}</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: inst.status === 'paid' ? '#16a34a' : 'var(--espresso)' }}>
+                          {Number(inst.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                        </div>
+                        {inst.due_date && <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{new Date(inst.due_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div>}
+                      </div>
+                    ))}
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4 }}>
+                      {totalPaid.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} pagado de {b.total_amount.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Payment history */}
+                {detailPayments.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Historial de pagos</div>
+                    {detailPayments.map(pay => (
+                      <div key={pay.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 11, borderBottom: '1px solid var(--ivory)' }}>
+                        <CheckCircle size={10} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <div style={{ flex: 1, color: 'var(--charcoal)' }}>{pay.payer_name || pay.payer_email || 'Pago'}</div>
+                        <div style={{ fontWeight: 600, color: '#16a34a' }}>{Number(pay.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
+                        {pay.paid_at && <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{new Date(pay.paid_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {loadingDetail && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 0', color: 'var(--warm-gray)' }}>
+                    <Loader2 size={16} className="animate-spin" />
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', gap: 8 }}>
+                {lead && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setDetailModal(null); router.push(`/leads?open=${lead.id}`) }}>
+                    <ExternalLink size={11} /> Ver lead
+                  </button>
+                )}
+                <div style={{ flex: 1 }} />
+                <button className="btn btn-ghost btn-sm" onClick={() => setDetailModal(null)}>Cerrar</button>
+                <button className="btn btn-primary btn-sm" onClick={() => { setDetailModal(null); router.push(`/budgets/${b.id}/edit`) }}>
+                  <Pencil size={11} /> Editar presupuesto
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

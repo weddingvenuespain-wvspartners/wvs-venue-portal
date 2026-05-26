@@ -54,14 +54,12 @@ function NewBudgetContent() {
     load()
   }, [user, authLoading, activeVenue?.id])
 
-  // Auto-create if template selected (via URL param)
+  // Auto-create draft immediately (skip template picker)
   useEffect(() => {
     if (authLoading || !user || isBlocked || !ready || !features.presupuestos || !activeVenue) return
     if (creating) return
-    if (!customTplParam) return
-
-    createDraft(customTplParam)
-  }, [user, authLoading, isBlocked, ready, features.presupuestos, activeVenue?.id, customTplParam])
+    if (!loadingTemplates) createDraft(customTplParam)
+  }, [user, authLoading, isBlocked, ready, features.presupuestos, activeVenue?.id, customTplParam, loadingTemplates])
 
   const createDraft = async (customTemplateId: string | null) => {
     setCreating(true)
@@ -207,135 +205,10 @@ function NewBudgetContent() {
     )
   }
 
-  // If creating (template selected via URL), show spinner
-  if (creating || customTplParam) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--cream)', color: 'var(--warm-gray)', gap: 8 }}>
-        <Loader2 size={16} className="animate-spin" /> Creando presupuesto...
-      </div>
-    )
-  }
-
-  // ── Template Picker UI ─────────────────────────────────────────────────────
-  const pickTemplate = (customId?: string) => {
-    const params = new URLSearchParams()
-    if (leadId) params.set('lead_id', leadId)
-    if (customId) params.set('custom_template', customId)
-    router.replace(`/budgets/new?${params.toString()}`)
-  }
-
-  const calcTotal = (groups: any[]) =>
-    groups.reduce((s: number, g: any) => s + g.items.reduce((is: number, i: any) => is + (i.subtotal || 0), 0), 0)
-
+  // Always show creating spinner — auto-create fires from useEffect
   return (
-    <div style={{ display: 'flex' }}>
-      <Sidebar />
-      <div className="main-layout">
-        <div className="topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button onClick={() => router.push('/budgets')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', padding: 0 }}>
-              <ChevronLeft size={18} />
-            </button>
-            <div className="topbar-title">Nuevo presupuesto</div>
-          </div>
-        </div>
-
-        <div className="page-content" style={{ maxWidth: 800 }}>
-          <div style={{ marginBottom: 24 }}>
-            <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, color: 'var(--espresso)', marginBottom: 6 }}>
-              Elige una plantilla
-            </h2>
-            <p style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.55 }}>
-              Empieza desde cero o usa una estructura predefinida. Podras editar todo despues.
-            </p>
-          </div>
-
-          {/* Templates */}
-          {loadingTemplates ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--warm-gray)', fontSize: 12, padding: '16px 0' }}>
-              <Loader2 size={14} className="animate-spin" /> Cargando plantillas...
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 12 }}>
-              {/* En blanco */}
-              <button
-                onClick={() => pickTemplate()}
-                style={{
-                  textAlign: 'left', padding: '18px 20px',
-                  background: '#fff', border: '2px dashed var(--border)', borderRadius: 12,
-                  cursor: 'pointer', display: 'flex', gap: 14,
-                  transition: 'border-color .15s, box-shadow .15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,.08)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
-              >
-                <div style={{
-                  width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-                  background: 'var(--cream)', border: '1.5px solid var(--border)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <FileText size={20} style={{ color: 'var(--warm-gray)' }} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 2 }}>En blanco</div>
-                  <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.45 }}>
-                    {customTemplates.some(t => t.is_default)
-                      ? `Usa "${customTemplates.find(t => t.is_default)!.name}" como base`
-                      : 'Presupuesto vacío desde cero'}
-                  </div>
-                </div>
-              </button>
-                {customTemplates.map(ct => {
-                  const total = calcTotal(ct.line_items?.groups ?? [])
-                  const groupCount = ct.line_items?.groups?.length ?? 0
-                  const itemCount = (ct.line_items?.groups ?? []).reduce((s: number, g: any) => s + (g.items?.length ?? 0), 0)
-                  return (
-                    <button
-                      key={ct.id}
-                      onClick={() => pickTemplate(ct.id)}
-                      style={{
-                        textAlign: 'left', padding: '18px 20px',
-                        background: '#fff', border: `2px solid ${ct.is_default ? 'var(--gold)' : 'var(--border)'}`, borderRadius: 12,
-                        cursor: 'pointer', display: 'flex', gap: 14,
-                        transition: 'border-color .15s, box-shadow .15s, transform .15s',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,.08)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = ct.is_default ? 'var(--gold)' : 'var(--border)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'translateY(0)' }}
-                    >
-                      <div style={{
-                        width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-                        background: 'var(--cream)', border: '1.5px solid var(--border)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        <FileText size={20} style={{ color: 'var(--charcoal)' }} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)' }}>{ct.name}</div>
-                          {ct.is_default && <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', padding: '1px 8px', borderRadius: 10, fontWeight: 600 }}>Predeterminada</span>}
-                        </div>
-                        {ct.description && <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.45, marginTop: 3, marginBottom: 8 }}>{ct.description}</div>}
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: ct.description ? 0 : 6 }}>
-                          <span style={{ fontSize: 10, fontWeight: 600, background: 'var(--cream)', color: 'var(--charcoal)', padding: '2px 8px', borderRadius: 10 }}>
-                            {groupCount} grupos
-                          </span>
-                          <span style={{ fontSize: 10, fontWeight: 600, background: 'var(--cream)', color: 'var(--charcoal)', padding: '2px 8px', borderRadius: 10 }}>
-                            {itemCount} conceptos
-                          </span>
-                          {total > 0 && (
-                            <span style={{ fontSize: 10, fontWeight: 600, background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: 10 }}>
-                              ~{total.toLocaleString('es-ES')} EUR
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
-            </div>
-          )}
-        </div>
-      </div>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--cream)', color: 'var(--warm-gray)', gap: 8 }}>
+      <Loader2 size={16} className="animate-spin" /> Creando presupuesto...
     </div>
   )
 }

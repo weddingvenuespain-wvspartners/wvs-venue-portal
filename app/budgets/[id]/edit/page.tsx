@@ -8,7 +8,7 @@ import { usePlanFeatures } from '@/lib/use-plan-features'
 import {
   Plus, Trash2, X, Check, Save, ChevronDown,
   GripVertical, AlertCircle, Loader2, Package,
-  Lock, FileText, Download, Calendar, Users, ArrowLeft, Link2, ExternalLink,
+  Lock, FileText, Download, Calendar, Users, ArrowLeft, Link2, ExternalLink, ScrollText,
 } from 'lucide-react'
 import type {
   Budget, LineItemGroup, LineItem, PaymentInstallment,
@@ -18,6 +18,7 @@ import { calcBudgetTotal, applyPaymentTemplate } from '@/lib/budget-types'
 import BudgetView from '@/app/presupuesto/[slug]/BudgetView'
 import ProposalDateModal from '@/components/ProposalDateModal'
 import { fmtDate } from '@/components/DatePicker'
+import { applyCommissionToBudget } from '@/lib/budget-commission'
 
 function nanoid(len = 6): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
@@ -57,6 +58,15 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
   const [leadId, setLeadId] = useState<string | null>(null)
   const [leadSearch, setLeadSearch] = useState('')
   const [showLeadPicker, setShowLeadPicker] = useState(false)
+  // Contracts state
+  const [budgetContracts, setBudgetContracts] = useState<Array<{ id: string; contract_number: string; title: string; status: string }>>([])
+  const [allContracts, setAllContracts] = useState<Array<{ id: string; contract_number: string; client_name: string; status: string }>>([])
+  const [showContractPicker, setShowContractPicker] = useState(false)
+  // Commission state
+  const [commissionPlannerId, setCommissionPlannerId] = useState<string | null>(null)
+  const [commissionPercent, setCommissionPercent] = useState<number | null>(null)
+  const [commissionMode, setCommissionMode] = useState<'comisionable' | 'neto' | null>(null)
+  const [showCommissionAsClient, setShowCommissionAsClient] = useState(false)
   const [showDateModal, setShowDateModal] = useState(false)
   const leadPickerRef = useRef<HTMLDivElement>(null)
 
@@ -102,7 +112,7 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
       supabase.from('venue_modalities').select('*, packages:venue_modality_packages(*, prices:venue_modality_prices(*))').eq('user_id', user!.id).order('sort_order'),
       supabase.from('venue_onboarding').select('name, logo_url, contact_email, contact_phone').eq('user_id', user!.id).maybeSingle(),
       supabase.from('proposal_branding').select('primary_color, logo_url, font_family').eq('user_id', user!.id).maybeSingle(),
-      supabase.from('leads').select('id, name, email, wedding_date, guests').eq('venue_id', activeVenue.id).neq('status', 'lost').order('created_at', { ascending: false }),
+      supabase.from('leads').select('id, name, email, phone, contact_type, client_id, wedding_date, guests').eq('venue_id', activeVenue.id).neq('status', 'lost').order('created_at', { ascending: false }),
     ])
     if (!b) { setError('Presupuesto no encontrado'); setLoading(false); return }
     const bud = b as Budget
@@ -123,11 +133,20 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
     setPassword(bud.password ?? '')
     setIncludesText(bud.includes_text ?? '')
     setLeadId(bud.lead_id)
+    setCommissionPlannerId((bud as any).commission_planner_id ?? null)
+    setCommissionPercent((bud as any).commission_percent ?? null)
+    setCommissionMode(((bud as any).commission_mode as 'comisionable' | 'neto' | null) ?? null)
     if (t) setTemplates(t as PaymentTemplate[])
     if (m) setModalities(m)
     if (v) setVenue(v as any)
     if (br) setBranding(br as any)
     if (ld) setLeads(ld)
+
+    // Load contracts: those for this budget + all unlinked ones (for picker)
+    const { data: linkedCtr } = await supabase.from('venue_contracts').select('id, contract_number, title, status').eq('budget_id', id).order('created_at', { ascending: false })
+    setBudgetContracts(linkedCtr || [])
+    const { data: allCtr } = await supabase.from('venue_contracts').select('id, contract_number, client_name, status').eq('user_id', user!.id).is('budget_id', null).order('created_at', { ascending: false }).limit(100)
+    setAllContracts(allCtr || [])
 
     // Load dossier responses if linked to a lead
     if (bud.lead_id) {
@@ -184,6 +203,12 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
     if (!budget) return
     setSaving(true)
     const supabase = createClient()
+    // Compute commission snapshot
+    const commAmount = (commissionPercent && commissionMode && total)
+      ? (commissionMode === 'neto'
+          ? Math.round(total * (commissionPercent / 100) * 100) / 100
+          : Math.round((total - total * (100 / (100 + commissionPercent))) * 100) / 100)
+      : null
     await supabase.from('budgets').update({
       couple_name: coupleName,
       couple_email: coupleEmail || null,
@@ -202,18 +227,22 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
       password: password || null,
       includes_text: includesText || null,
       lead_id: leadId,
+      commission_planner_id: commissionPlannerId,
+      commission_percent: commissionPercent,
+      commission_mode: commissionMode,
+      commission_amount: commAmount,
       updated_at: new Date().toISOString(),
     }).eq('id', budget.id)
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 2000)
-  }, [budget, coupleName, coupleEmail, weddingDate, guestCount, notes, validUntil, groups, paymentPlan, total, taxRate, taxIncluded, discountType, discountAmount, discountLabel, password, includesText, leadId])
+  }, [budget, coupleName, coupleEmail, weddingDate, guestCount, notes, validUntil, groups, paymentPlan, total, taxRate, taxIncluded, discountType, discountAmount, discountLabel, password, includesText, leadId, commissionPlannerId, commissionPercent, commissionMode])
 
   // Auto-save on changes (debounced)
   useEffect(() => {
     if (!budget || loading) return
     const t = setTimeout(() => { saveBudget() }, 1500)
     return () => clearTimeout(t)
-  }, [coupleName, coupleEmail, weddingDate, guestCount, notes, validUntil, groups, paymentPlan, taxRate, taxIncluded, discountType, discountAmount, discountLabel, password, includesText, leadId])
+  }, [coupleName, coupleEmail, weddingDate, guestCount, notes, validUntil, groups, paymentPlan, taxRate, taxIncluded, discountType, discountAmount, discountLabel, password, includesText, leadId, commissionPlannerId, commissionPercent, commissionMode])
 
   // Group operations
   const addGroup = () => {
@@ -311,6 +340,24 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
     if (lead.email) setCoupleEmail(lead.email)
     if (lead.wedding_date) setWeddingDate(lead.wedding_date)
     if (lead.guests) setGuestCount(lead.guests.toString())
+    // Auto-fill commission if linked client is wedding planner/organizer
+    if (lead.client_id) {
+      const supabase2 = createClient()
+      const { data: c } = await supabase2
+        .from('clients')
+        .select('id, client_type, wp_commission_percent, wp_commission_mode')
+        .eq('id', lead.client_id)
+        .maybeSingle()
+      if (c && (c.client_type === 'wedding_planner' || c.client_type === 'organizador') && c.wp_commission_percent != null) {
+        setCommissionPlannerId(c.id)
+        setCommissionPercent(c.wp_commission_percent)
+        setCommissionMode((c.wp_commission_mode as 'comisionable' | 'neto' | null) || 'comisionable')
+      } else {
+        setCommissionPlannerId(null); setCommissionPercent(null); setCommissionMode(null)
+      }
+    } else {
+      setCommissionPlannerId(null); setCommissionPercent(null); setCommissionMode(null)
+    }
     // Load dossier responses for this lead
     if (!activeVenue) return
     const supabase = createClient()
@@ -521,6 +568,57 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
             )}
           </div>
 
+          {/* ── Comisión wedding planner / organizador ────────── */}
+          {(commissionPlannerId || (leadId && (() => {
+            const l = leads.find(x => x.id === leadId)
+            return l?.contact_type === 'wedding_planner' || l?.contact_type === 'event_organizer'
+          })())) && (
+            <div style={{ marginBottom: 16, padding: 12, border: '1px solid var(--ivory)', borderRadius: 8, background: 'var(--cream)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Comisión planner / organizador</div>
+                <button type="button" onClick={() => setShowCommissionAsClient(v => !v)} style={{ fontSize: 10, padding: '3px 8px', border: '1px solid var(--border, #e5e7eb)', borderRadius: 5, background: '#fff', cursor: 'pointer', color: 'var(--warm-gray)' }}>
+                  {showCommissionAsClient ? 'Ver neto' : 'Ver con comisión'}
+                </button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>% Comisión</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={commissionPercent ?? ''}
+                    onChange={e => setCommissionPercent(e.target.value === '' ? null : Number(e.target.value))}
+                    placeholder="10"
+                    style={{ fontSize: 12 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Modo</label>
+                  <select
+                    className="form-input"
+                    value={commissionMode ?? ''}
+                    onChange={e => setCommissionMode((e.target.value || null) as 'comisionable' | 'neto' | null)}
+                    style={{ fontSize: 12 }}
+                  >
+                    <option value="">—</option>
+                    <option value="comisionable">Comisionable</option>
+                    <option value="neto">Neto (suma encima)</option>
+                  </select>
+                </div>
+              </div>
+              {commissionPercent && commissionMode && (
+                <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 8, lineHeight: 1.5 }}>
+                  {commissionMode === 'neto'
+                    ? `Precios al cliente = neto × ${(1 + commissionPercent / 100).toFixed(4)}. Comisión añadida automáticamente.`
+                    : `Precios al cliente ya incluyen el ${commissionPercent}% de comisión.`}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Datos de la pareja ─────────────────────────────── */}
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Datos del cliente</div>
@@ -682,15 +780,41 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
             ) : (
               <>
                 {paymentPlan.map((p, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 110px 70px 24px', gap: 0, padding: '6px 0', alignItems: 'center', borderBottom: '1px solid var(--ivory)' }}>
-                    <input value={p.label} onChange={e => updatePayment(i, 'label', e.target.value)} className="form-input" style={{ border: 'none', padding: '3px 0', fontSize: 12 }} placeholder="Cuota" />
-                    <input type="number" min={0} step={0.01} value={p.amount} onChange={e => updatePayment(i, 'amount', Number(e.target.value))} className="form-input" style={{ border: 'none', padding: '3px', fontSize: 12, textAlign: 'right' }} />
-                    <input type="date" value={p.due_date} onChange={e => updatePayment(i, 'due_date', e.target.value)} className="form-input" style={{ border: 'none', padding: '3px', fontSize: 11, textAlign: 'center' }} />
-                    <select value={p.status} onChange={e => updatePayment(i, 'status', e.target.value)} className="form-input" style={{ border: 'none', padding: '3px', fontSize: 10 }}>
-                      <option value="pending">Pend.</option>
-                      <option value="paid">Pagado</option>
-                    </select>
-                    <button onClick={() => removePayment(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rose)', padding: 1 }}><X size={11} /></button>
+                  <div key={i} style={{ borderBottom: '1px solid var(--ivory)', padding: '6px 0' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 110px 70px 24px', gap: 0, alignItems: 'center' }}>
+                      <input value={p.label} onChange={e => updatePayment(i, 'label', e.target.value)} className="form-input" style={{ border: 'none', padding: '3px 0', fontSize: 12 }} placeholder="Cuota" />
+                      <input type="number" min={0} step={0.01} value={p.amount} onChange={e => updatePayment(i, 'amount', Number(e.target.value))} className="form-input" style={{ border: 'none', padding: '3px', fontSize: 12, textAlign: 'right' }} />
+                      <input type="date" value={p.due_date} onChange={e => updatePayment(i, 'due_date', e.target.value)} className="form-input" style={{ border: 'none', padding: '3px', fontSize: 11, textAlign: 'center' }} />
+                      <select value={p.status} onChange={e => updatePayment(i, 'status', e.target.value)} className="form-input" style={{ border: 'none', padding: '3px', fontSize: 10 }}>
+                        <option value="pending">Pend.</option>
+                        <option value="paid">Pagado</option>
+                      </select>
+                      <button onClick={() => removePayment(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rose)', padding: 1 }}><X size={11} /></button>
+                    </div>
+                    {/* Refundable toggle + deadline */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 2, marginTop: 3 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--warm-gray)', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={p.refundable ?? false}
+                          onChange={e => updatePayment(i, 'refundable', e.target.checked)}
+                          style={{ width: 12, height: 12 }}
+                        />
+                        Reembolsable
+                      </label>
+                      {p.refundable && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--warm-gray)' }}>
+                          hasta
+                          <input
+                            type="date"
+                            value={p.refund_deadline || ''}
+                            onChange={e => updatePayment(i, 'refund_deadline', e.target.value)}
+                            className="form-input"
+                            style={{ border: 'none', padding: '1px 3px', fontSize: 10 }}
+                          />
+                        </label>
+                      )}
+                    </div>
                   </div>
                 ))}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 6, fontSize: 11, fontWeight: 600, color: Math.abs(paymentTotal - total) < 0.01 ? '#16a34a' : 'var(--rose)' }}>
@@ -890,6 +1014,88 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
 
+          {/* ── Contrato ─────────────────── */}
+          <div style={{ marginBottom: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Contrato</div>
+
+            {/* Linked contracts */}
+            {budgetContracts.length > 0 && (
+              <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {budgetContracts.map(c => (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--surface)', borderRadius: 6, border: '1px solid var(--border)' }}>
+                    <ScrollText size={13} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || c.contract_number}</div>
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{c.contract_number} · {c.status}</div>
+                    </div>
+                    <button onClick={() => router.push(`/contratos/${c.id}`)} className="btn btn-ghost btn-sm" style={{ padding: '4px 8px', fontSize: 10 }}>Ver</button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm('¿Desvincular este contrato del presupuesto?')) return
+                        const supabase = createClient()
+                        await supabase.from('venue_contracts').update({ budget_id: null }).eq('id', c.id)
+                        setBudgetContracts(prev => prev.filter(x => x.id !== c.id))
+                      }}
+                      className="btn btn-ghost btn-sm"
+                      style={{ padding: '4px 6px', fontSize: 10, color: 'var(--burgundy)' }}
+                      title="Desvincular"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button
+                onClick={async () => {
+                  await saveBudget()
+                  router.push(`/contratos/nuevo?budget_id=${id}&lead_id=${leadId || ''}`)
+                }}
+                className="btn btn-ghost btn-sm"
+                style={{ width: '100%', justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', border: '1px dashed var(--border)', borderRadius: 8 }}
+              >
+                <Plus size={13} /> Crear contrato
+              </button>
+
+              {allContracts.length > 0 && (
+                <>
+                  <button
+                    onClick={() => setShowContractPicker(s => !s)}
+                    className="btn btn-ghost btn-sm"
+                    style={{ width: '100%', justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 11 }}
+                  >
+                    <Link2 size={12} /> Asociar contrato existente
+                  </button>
+                  {showContractPicker && (
+                    <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6, background: 'white' }}>
+                      {allContracts.map(c => (
+                        <button
+                          key={c.id}
+                          onClick={async () => {
+                            const supabase = createClient()
+                            await supabase.from('venue_contracts').update({ budget_id: id, lead_id: leadId || null }).eq('id', c.id)
+                            setBudgetContracts(prev => [{ id: c.id, contract_number: c.contract_number, title: c.client_name, status: c.status }, ...prev])
+                            setAllContracts(prev => prev.filter(x => x.id !== c.id))
+                            setShowContractPicker(false)
+                          }}
+                          style={{ width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none', background: 'none', cursor: 'pointer', borderBottom: '1px solid var(--ivory)', fontSize: 11 }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <div style={{ fontWeight: 600, color: 'var(--espresso)' }}>{c.client_name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{c.contract_number} · {c.status}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
         </div>
 
         {/* Footer — save button */}
@@ -908,7 +1114,9 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
       {/* ── RIGHT PANEL: live preview ──────────────────────────────── */}
       <div style={{ flex: 1, minWidth: 0, height: '100vh', overflowY: 'auto' }}>
         <BudgetView
-          budget={previewBudget as any}
+          budget={(showCommissionAsClient && commissionPercent && commissionMode === 'neto'
+            ? applyCommissionToBudget({ ...previewBudget, commission_percent: commissionPercent, commission_mode: commissionMode } as any)
+            : previewBudget) as any}
           venue={venue}
           branding={branding}
           isPreview={true}

@@ -10,7 +10,7 @@ import {
   ChevronLeft, ChevronDown, Phone, Mail, MessageCircle, Users, Calendar,
   Banknote, Tag, MapPin, Clock, FileText, ExternalLink, Edit2, Save, X,
   Landmark, UtensilsCrossed, Globe, Palette, Sparkles, CheckCircle2,
-  Heart, Paperclip, CalendarCheck, Trash2,
+  Heart, Paperclip, CalendarCheck, Trash2, Receipt, CheckCircle, Inbox, Loader2,
 } from 'lucide-react'
 import type { Client, ClientType } from '@/lib/clients'
 import { CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS } from '@/lib/clients'
@@ -216,8 +216,15 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
   const [client,       setClient]       = useState<Client | null>(null)
   const [clientLeads,  setClientLeads]  = useState<Lead[]>([])
   const [proposals,    setProposals]    = useState<any[]>([])
+  const [budgets,      setBudgets]      = useState<any[]>([])
   const [loading,      setLoading]      = useState(true)
   const [tab,          setTab]          = useState<Tab>('info')
+  // Detail modals
+  const [peticionModal,   setPeticionModal]   = useState<Lead | null>(null)
+  const [dosierModal,     setDosierModal]     = useState<any | null>(null)
+  const [budgetModal,     setBudgetModal]     = useState<any | null>(null)
+  const [modalDetail,     setModalDetail]     = useState<any>(null)
+  const [loadingModal,    setLoadingModal]    = useState(false)
   const [editing,      setEditing]      = useState(false)
   const [saving,       setSaving]       = useState(false)
   const [editForm,     setEditForm]     = useState({ name: '', email: '', phone: '', whatsapp: '', client_type: 'pareja' as ClientType, language: '', country: '' })
@@ -246,10 +253,11 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
     if (!activeVenue) return
     setLoading(true)
 
-    const [clientRes, leadsRes, proposalsRes] = await Promise.all([
+    const [clientRes, leadsRes, proposalsRes, budgetsRes] = await Promise.all([
       supabase.from('clients').select('*').eq('id', id).eq('venue_id', activeVenue.id).single(),
       supabase.from('leads').select('*').eq('client_id', id).order('created_at', { ascending: false }),
-      supabase.from('proposals').select('id, slug, couple_name, status, created_at, lead_id').eq('venue_id', activeVenue.id),
+      supabase.from('proposals').select('id, slug, couple_name, status, created_at, lead_id, wedding_date, guest_count, views, open_count').eq('venue_id', activeVenue.id),
+      supabase.from('budgets').select('id, slug, couple_name, status, created_at, total_amount, payment_plan, lead_id, wedding_date, guest_count, open_count, line_items').eq('venue_id', activeVenue.id),
     ])
 
     if (!clientRes.data) {
@@ -306,6 +314,7 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
 
     const leadIds = new Set(leads.map(l => l.id))
     setProposals((proposalsRes.data ?? []).filter((p: any) => p.lead_id && leadIds.has(p.lead_id)))
+    setBudgets((budgetsRes.data ?? []).filter((b: any) => b.lead_id && leadIds.has(b.lead_id)))
 
     // WP: load couples
     if (c.client_type === 'wedding_planner') {
@@ -326,6 +335,27 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
 
     setLoading(false)
   }
+
+  // ── Load modal detail data ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!dosierModal && !budgetModal) { setModalDetail(null); return }
+    const load = async () => {
+      setLoadingModal(true)
+      if (dosierModal) {
+        const [{ data: menuSel }, { data: inqs }] = await Promise.all([
+          supabase.from('proposal_menu_selections').select('*').eq('proposal_id', dosierModal.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+          supabase.from('proposal_inquiries').select('*').eq('proposal_id', dosierModal.id).order('created_at', { ascending: false }),
+        ])
+        setModalDetail({ menuSelection: menuSel, inquiries: inqs || [] })
+      } else if (budgetModal) {
+        const { data: payments } = await supabase
+          .from('budget_payments').select('*').eq('budget_id', budgetModal.id).eq('status', 'paid').order('paid_at', { ascending: false })
+        setModalDetail({ payments: payments || [] })
+      }
+      setLoadingModal(false)
+    }
+    load()
+  }, [dosierModal?.id, budgetModal?.id]) // eslint-disable-line
 
   // ── Notes auto-save ──────────────────────────────────────────────────────────
   const updateNotes = (val: string) => {
@@ -572,7 +602,7 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--ivory)', gap: 0 }}>
                   {([...(['info', 'peticiones', 'oferta', 'notas', 'historial'] as Tab[]), ...(isWP ? ['colaboracion' as Tab] : [])]).map(t => (
                     <button key={t} onClick={() => setTab(t)} style={tabStyle(tab === t)}>
-                      {{ info: 'Info', peticiones: `Peticiones (${clientLeads.length})`, oferta: `Oferta (${proposals.length + docFiles.length})`, notas: 'Notas', historial: 'Historial', colaboracion: 'Colaboración' }[t]}
+                      {{ info: 'Info', peticiones: `Peticiones (${clientLeads.length})`, oferta: `Oferta (${proposals.length + budgets.length + docFiles.length})`, notas: 'Notas', historial: 'Historial', colaboracion: 'Colaboración' }[t]}
                     </button>
                   ))}
                 </div>
@@ -724,7 +754,7 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <SectionLabel>Peticiones ({clientLeads.length})</SectionLabel>
                         {clientLeads.length > 0 && (
-                          <span style={{ fontSize: 10, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Click en una petición para editarla</span>
+                          <span style={{ fontSize: 10, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Click en una petición para ver detalles</span>
                         )}
                       </div>
                       {clientLeads.length === 0 && (
@@ -735,7 +765,7 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                           const ls = STATUS_CFG[l.status] || { label: l.status, bg: '#f3f4f6', color: '#6b7280' }
                           const dateLabel = l.budget_date ? fmtDate(l.budget_date) : l.wedding_date ? fmtDate(l.wedding_date) : l.wedding_year ? String(l.wedding_year) : '—'
                           return (
-                            <button key={l.id} onClick={() => router.push(`/leads?open=${l.id}`)}
+                            <button key={l.id} onClick={() => setPeticionModal(l)}
                               style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, background: '#fafaf8', border: '1px solid var(--ivory)', cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left', width: '100%' }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 3 }}>{l.name || 'Sin nombre'}</div>
@@ -756,36 +786,79 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                   {/* ── Tab: Oferta ─────────────────────────────────── */}
                   {tab === 'oferta' && (
                     <>
-                      {/* Proposals */}
+                      {/* Dosieres */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <SectionLabel>Dosieres y propuestas ({proposals.length})</SectionLabel>
-                        {proposals.length > 0 && (
-                          <span style={{ fontSize: 10, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Click en un dosier para editarlo</span>
+                        <SectionLabel>Dosieres y presupuestos ({proposals.length + budgets.length})</SectionLabel>
+                        {(proposals.length > 0 || budgets.length > 0) && (
+                          <span style={{ fontSize: 10, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Click para ver detalles</span>
                         )}
                       </div>
-                      {proposals.length === 0 && docFiles.length === 0 && (
-                        <p style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin dosieres ni documentos</p>
+
+                      {proposals.length === 0 && budgets.length === 0 && docFiles.length === 0 && (
+                        <p style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin dosieres, presupuestos ni documentos</p>
                       )}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {proposals.map(p => {
-                          const ps = PROPOSAL_STATUS[p.status] || { label: p.status, color: '#6b7280', bg: '#f3f4f6' }
-                          return (
-                            <button key={p.id} onClick={() => router.push(`/proposals/${p.id}`)}
-                              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, background: '#fafaf8', border: '1px solid var(--ivory)', cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left', width: '100%' }}>
-                              <FileText size={16} style={{ color: 'var(--gold)', flexShrink: 0 }} />
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>{p.couple_name || 'Sin nombre'}</div>
-                                <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{fmtDate(p.created_at)}</div>
-                              </div>
-                              <span style={{ fontSize: 10, fontWeight: 600, background: ps.bg, color: ps.color, borderRadius: 5, padding: '3px 8px', flexShrink: 0 }}>{ps.label}</span>
-                            </button>
-                          )
-                        })}
-                      </div>
+
+                      {/* Dosieres list */}
+                      {proposals.length > 0 && (
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Dosieres</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {proposals.map(p => {
+                              const ps = PROPOSAL_STATUS[p.status] || { label: p.status, color: '#6b7280', bg: '#f3f4f6' }
+                              return (
+                                <button key={p.id} onClick={() => setDosierModal(p)}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, background: '#fafaf8', border: '1px solid var(--ivory)', cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left', width: '100%', transition: 'border-color 0.15s' }}
+                                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--gold)')}
+                                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--ivory)')}>
+                                  <Sparkles size={16} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>{p.couple_name || 'Sin nombre'}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{fmtDate(p.created_at)}</div>
+                                  </div>
+                                  <span style={{ fontSize: 10, fontWeight: 600, background: ps.bg, color: ps.color, borderRadius: 5, padding: '3px 8px', flexShrink: 0 }}>{ps.label}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Presupuestos list */}
+                      {budgets.length > 0 && (
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Presupuestos</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {budgets.map(b => {
+                              const bs = PROPOSAL_STATUS[b.status] || { label: b.status, color: '#6b7280', bg: '#f3f4f6' }
+                              const plan = (b.payment_plan || []) as any[]
+                              const paidCount = plan.filter((p: any) => p.status === 'paid').length
+                              return (
+                                <button key={b.id} onClick={() => router.push(`/budgets/${b.id}`)}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, background: '#fafaf8', border: '1px solid var(--ivory)', cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left', width: '100%', transition: 'border-color 0.15s' }}
+                                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--gold)')}
+                                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--ivory)')}>
+                                  <Receipt size={16} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>{b.couple_name || 'Sin nombre'}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                                      {fmtDate(b.created_at)}
+                                      {plan.length > 0 && <> · {paidCount}/{plan.length} cuotas</>}
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)', whiteSpace: 'nowrap', marginRight: 8 }}>
+                                    {Number(b.total_amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                                  </div>
+                                  <span style={{ fontSize: 10, fontWeight: 600, background: bs.bg, color: bs.color, borderRadius: 5, padding: '3px 8px', flexShrink: 0 }}>{bs.label}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Budget files */}
                       {docFiles.length > 0 && (
-                        <div style={{ marginTop: 20 }}>
+                        <div style={{ marginTop: 4 }}>
                           <SectionLabel>Documentos adjuntos ({docFiles.length})</SectionLabel>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {docFiles.map((f, i) => (
@@ -1069,6 +1142,302 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
           </div>
         </div>
       </div>
+
+      {/* ── Petición detail modal ─────────────────────────────────── */}
+      {peticionModal && (() => {
+        const l = peticionModal
+        const ls = STATUS_CFG[l.status] || { label: l.status, bg: '#f3f4f6', color: '#6b7280' }
+        return (
+          <div className="modal-overlay" onClick={() => setPeticionModal(null)}>
+            <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
+                <div className="modal-title">{l.name || 'Sin nombre'}</div>
+                <div className="modal-sub" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, background: ls.bg, color: ls.color, borderRadius: 5, padding: '3px 8px' }}>{ls.label}</span>
+                  {l.source && <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{SOURCE_LABEL[l.source] || l.source}</span>}
+                </div>
+                <button onClick={() => setPeticionModal(null)} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6 }}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="modal-body" style={{ maxHeight: 420, overflowY: 'auto' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px' }}>
+                  {l.wedding_date && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 2 }}>Fecha boda</div>
+                      <div style={{ fontSize: 13, color: 'var(--charcoal)' }}>{weddingLabel(l)}</div>
+                    </div>
+                  )}
+                  {l.guests && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 2 }}>Invitados</div>
+                      <div style={{ fontSize: 13, color: 'var(--charcoal)' }}>{l.guests}{l.guests_adults ? ` (${l.guests_adults} adultos${l.guests_children ? `, ${l.guests_children} niños` : ''})` : ''}</div>
+                    </div>
+                  )}
+                  {l.budget && l.budget !== 'sin_definir' && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 2 }}>Presupuesto</div>
+                      <div style={{ fontSize: 13, color: 'var(--charcoal)' }}>{BUDGET_LABEL[l.budget] || l.budget}</div>
+                    </div>
+                  )}
+                  {l.ceremony_type && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 2 }}>Ceremonia</div>
+                      <div style={{ fontSize: 13, color: 'var(--charcoal)' }}>{l.ceremony_type}</div>
+                    </div>
+                  )}
+                  {l.language && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 2 }}>Idioma</div>
+                      <div style={{ fontSize: 13, color: 'var(--charcoal)' }}>{l.language}</div>
+                    </div>
+                  )}
+                  {l.country && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 2 }}>País</div>
+                      <div style={{ fontSize: 13, color: 'var(--charcoal)' }}>{l.country}</div>
+                    </div>
+                  )}
+                </div>
+                {l.email && (
+                  <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--charcoal)' }}>
+                    <Mail size={12} style={{ color: 'var(--warm-gray)' }} /> {l.email}
+                  </div>
+                )}
+                {l.phone && (
+                  <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--charcoal)' }}>
+                    <Phone size={12} style={{ color: 'var(--warm-gray)' }} /> {l.phone}
+                  </div>
+                )}
+                {l.initial_message && (
+                  <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--ivory)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 4 }}>Mensaje inicial</div>
+                    <div style={{ fontSize: 12, color: 'var(--charcoal)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{l.initial_message}</div>
+                  </div>
+                )}
+                {l.notes && (
+                  <div style={{ marginTop: 10, padding: '10px 12px', background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', marginBottom: 4 }}>Notas</div>
+                    <div style={{ fontSize: 12, color: 'var(--charcoal)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{l.notes}</div>
+                  </div>
+                )}
+                {l.visit_date && (
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#059669' }}>
+                    <CalendarCheck size={12} /> Visita: {fmtDate(l.visit_date)}{l.visit_time ? ` a las ${l.visit_time}` : ''}
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setPeticionModal(null)}>Cerrar</button>
+                <div style={{ flex: 1 }} />
+                <button className="btn btn-primary btn-sm" onClick={() => { setPeticionModal(null); router.push(`/leads?open=${l.id}`) }}>
+                  <ExternalLink size={11} /> Ver en Leads
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Dosier detail modal ───────────────────────────────────── */}
+      {dosierModal && (() => {
+        const p = dosierModal
+        const ps = PROPOSAL_STATUS[p.status] || { label: p.status, color: '#6b7280', bg: '#f3f4f6' }
+        const KIND_LABEL: Record<string, string> = { visit: 'Visita solicitada', call: 'Llamada', video: 'Videollamada', menu: 'Pregunta sobre menú', menu_selection: 'Selección de menú', date_pick: 'Fecha confirmada', provider_selection: 'Proveedores propios', other: 'Consulta' }
+        const KIND_EMOJI: Record<string, string> = { visit: '📍', call: '📞', video: '🎥', menu: '🍽️', menu_selection: '✅', date_pick: '📅', provider_selection: '🤝', other: '💬' }
+        return (
+          <div className="modal-overlay" onClick={() => setDosierModal(null)}>
+            <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
+                <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Sparkles size={16} style={{ color: 'var(--gold)' }} />
+                  {p.couple_name || 'Sin nombre'}
+                </div>
+                <div className="modal-sub" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, background: ps.bg, color: ps.color, borderRadius: 5, padding: '3px 8px' }}>{ps.label}</span>
+                  {p.wedding_date && <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{fmtDate(p.wedding_date)}</span>}
+                </div>
+                <button onClick={() => setDosierModal(null)} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6 }}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="modal-body" style={{ maxHeight: 420, overflowY: 'auto' }}>
+                {loadingModal ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px 0', color: 'var(--warm-gray)' }}>
+                    <Loader2 size={16} className="animate-spin" />
+                  </div>
+                ) : modalDetail ? (
+                  <>
+                    {/* Stats */}
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+                      <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)', textAlign: 'center' }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--espresso)' }}>{p.open_count ?? p.views ?? 0}</div>
+                        <div style={{ fontSize: 9, color: 'var(--warm-gray)', textTransform: 'uppercase' }}>Vistas</div>
+                      </div>
+                      <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)', textAlign: 'center' }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--espresso)' }}>{modalDetail.inquiries?.length || 0}</div>
+                        <div style={{ fontSize: 9, color: 'var(--warm-gray)', textTransform: 'uppercase' }}>Respuestas</div>
+                      </div>
+                    </div>
+
+                    {/* Menu selection */}
+                    {modalDetail.menuSelection && (() => {
+                      const ms = modalDetail.menuSelection
+                      return (
+                        <div style={{ background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Selección de menú</div>
+                          {ms.selected_menu_name && <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', marginBottom: 4 }}>{ms.selected_menu_name}</div>}
+                          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, marginBottom: 4 }}>
+                            {ms.guest_count && <span><Users size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {ms.guest_count} inv.</span>}
+                            {ms.estimated_total != null && <span style={{ fontWeight: 600 }}>{ms.estimated_total.toLocaleString('es-ES')} €</span>}
+                          </div>
+                          {ms.selected_extras?.length > 0 && (
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                              {ms.selected_extras.map((ext: string, i: number) => (
+                                <span key={i} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: 'rgba(99,102,241,0.08)', color: '#4f46e5', fontWeight: 500 }}>{ext}</span>
+                              ))}
+                            </div>
+                          )}
+                          {ms.comments && <div style={{ marginTop: 6, fontSize: 11, color: 'var(--charcoal)', fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>{ms.comments}</div>}
+                        </div>
+                      )
+                    })()}
+
+                    {/* Inquiries */}
+                    {modalDetail.inquiries?.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Respuestas</div>
+                        {modalDetail.inquiries.map((inq: any) => (
+                          <div key={inq.id} style={{ padding: '8px 10px', background: inq.status === 'new' ? '#FFFBEB' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#FDE68A' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 5 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
+                              <span>{KIND_EMOJI[inq.kind] ?? '💬'}</span>
+                              <span style={{ fontWeight: 600, color: 'var(--charcoal)' }}>{KIND_LABEL[inq.kind] || inq.kind}</span>
+                              {inq.status === 'new' && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 99, background: 'var(--gold)', color: '#fff', fontWeight: 700 }}>Nuevo</span>}
+                              <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--warm-gray)' }}>{fmtDate(inq.created_at)}</span>
+                            </div>
+                            {inq.message && <div style={{ fontSize: 11, color: 'var(--charcoal)', marginTop: 2, whiteSpace: 'pre-wrap' }}>{inq.message}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* No response */}
+                    {!modalDetail.menuSelection && (modalDetail.inquiries?.length || 0) === 0 && (
+                      <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--warm-gray)' }}>
+                        <Inbox size={20} style={{ opacity: 0.3, marginBottom: 6 }} />
+                        <div style={{ fontSize: 12 }}>La pareja aún no ha respondido al dosier</div>
+                      </div>
+                    )}
+                  </>
+                ) : null}
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setDosierModal(null)}>Cerrar</button>
+                <div style={{ flex: 1 }} />
+                <a href={`/proposals/${p.id}/edit`} className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <ExternalLink size={11} /> Ver dosier completo
+                </a>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Budget detail modal ───────────────────────────────────── */}
+      {budgetModal && (() => {
+        const b = budgetModal
+        const bs = PROPOSAL_STATUS[b.status] || { label: b.status, color: '#6b7280', bg: '#f3f4f6' }
+        const plan = (b.payment_plan || []) as any[]
+        const paidCount = plan.filter((p: any) => p.status === 'paid').length
+        const totalPaid = (modalDetail?.payments || []).reduce((s: number, p: any) => s + Number(p.amount), 0)
+        return (
+          <div className="modal-overlay" onClick={() => setBudgetModal(null)}>
+            <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
+                <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Receipt size={16} style={{ color: 'var(--gold)' }} />
+                  {b.couple_name || 'Sin nombre'}
+                </div>
+                <div className="modal-sub" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, background: bs.bg, color: bs.color, borderRadius: 5, padding: '3px 8px' }}>{bs.label}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)' }}>
+                    {Number(b.total_amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                  </span>
+                </div>
+                <button onClick={() => setBudgetModal(null)} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6 }}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="modal-body" style={{ maxHeight: 420, overflowY: 'auto' }}>
+                {loadingModal ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px 0', color: 'var(--warm-gray)' }}>
+                    <Loader2 size={16} className="animate-spin" />
+                  </div>
+                ) : (
+                  <>
+                    {/* Payment progress */}
+                    {plan.length > 0 && (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)' }}>Progreso de pagos</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: paidCount === plan.length ? '#16a34a' : 'var(--espresso)' }}>
+                            {paidCount}/{plan.length} cuotas
+                          </div>
+                        </div>
+                        <div style={{ height: 6, background: 'var(--ivory)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
+                          <div style={{ height: '100%', width: `${plan.length > 0 ? (paidCount / plan.length) * 100 : 0}%`, background: paidCount === plan.length ? '#16a34a' : 'var(--gold)', borderRadius: 3 }} />
+                        </div>
+                        {plan.map((inst: any, idx: number) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, background: inst.status === 'paid' ? '#f0fdf4' : 'var(--cream)', border: `1px solid ${inst.status === 'paid' ? '#86efac' : 'var(--ivory)'}`, marginBottom: 4 }}>
+                            {inst.status === 'paid' ? <CheckCircle size={12} style={{ color: '#16a34a', flexShrink: 0 }} /> : <Clock size={12} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
+                            <div style={{ flex: 1, fontSize: 12, color: 'var(--charcoal)' }}>{inst.label}</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: inst.status === 'paid' ? '#16a34a' : 'var(--espresso)' }}>
+                              {Number(inst.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                            </div>
+                            {inst.due_date && <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{fmtDate(inst.due_date)}</div>}
+                          </div>
+                        ))}
+                        <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4 }}>
+                          {totalPaid.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} pagado de {Number(b.total_amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Payment history */}
+                    {(modalDetail?.payments?.length || 0) > 0 && (
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Historial de pagos</div>
+                        {modalDetail.payments.map((pay: any) => (
+                          <div key={pay.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 11, borderBottom: '1px solid var(--ivory)' }}>
+                            <CheckCircle size={10} style={{ color: '#16a34a', flexShrink: 0 }} />
+                            <div style={{ flex: 1, color: 'var(--charcoal)' }}>{pay.payer_name || pay.payer_email || 'Pago'}</div>
+                            <div style={{ fontWeight: 600, color: '#16a34a' }}>{Number(pay.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
+                            {pay.paid_at && <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{fmtDate(pay.paid_at)}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {plan.length === 0 && (
+                      <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--warm-gray)' }}>
+                        <Receipt size={20} style={{ opacity: 0.3, marginBottom: 6 }} />
+                        <div style={{ fontSize: 12 }}>Sin plan de pagos definido</div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setBudgetModal(null)}>Cerrar</button>
+                <div style={{ flex: 1 }} />
+                <a href={`/budgets/${b.id}/edit`} className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <ExternalLink size={11} /> Ver presupuesto completo
+                </a>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

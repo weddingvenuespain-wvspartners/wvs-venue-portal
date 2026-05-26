@@ -159,6 +159,7 @@ export default function Sidebar() {
     { href: '/estadisticas', label: 'Estadísticas', icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z', feature: 'estadisticas' },
   ]
   const facturasItem = { href: '/facturas', label: 'Facturas', icon: 'M3 1h10v14l-2-1-2 1-2-1-2 1-2-1V1zM5 5h6M5 8h6M5 11h4' }
+  const contratosItem = { href: '/contratos', label: 'Contratos', icon: 'M4 1h8l3 3v11H1V1zM8 1v3h4M4 7h8M4 10h8M4 13h5' }
   const configItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
     { href: '/venue-settings', label: 'Configuración',                                 icon: 'M1 3h14M1 7h9M1 11h5M11 9l2 2 4-4',                  feature: 'estructura'   },
   ]
@@ -446,6 +447,12 @@ export default function Sidebar() {
               style={{ paddingLeft: 20 }}
             >
               <Icon d={facturasItem.icon} /> {facturasItem.label}
+            </Link>
+            <Link href={contratosItem.href}
+              className={`nav-item ${isActive(contratosItem.href) ? 'active' : ''}`}
+              style={{ paddingLeft: 20 }}
+            >
+              <Icon d={contratosItem.icon} /> {contratosItem.label}
             </Link>
 
             <div className="nav-section" style={{ marginTop: 8 }}>Configuración</div>

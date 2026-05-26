@@ -47,6 +47,10 @@ export type ProposalData = {
   _preview?: boolean
   venueContent: VenueContent
   commercialConfig?: { space_type?: string; price_model?: string } | null
+  commission_planner_id?: string | null
+  commission_percent?: number | null
+  commission_mode?: 'comisionable' | 'neto' | null
+  commission_amount?: number | null
   // venue — used only for hero name/city and contact
   venue: {
     name: string | null
@@ -124,7 +128,8 @@ export default async function ProposalPage({ params, searchParams }: { params: P
       id, slug, couple_name, personal_message,
       guest_count, wedding_date, price_estimate,
       show_availability, show_price_estimate, status, ctas,
-      sections_data, user_id, access_password
+      sections_data, user_id, access_password,
+      commission_planner_id, commission_percent, commission_mode, commission_amount
     `)
     .eq('slug', slug)
     .single()

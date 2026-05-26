@@ -3,6 +3,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import StripeConnectBlock from '@/components/StripeConnectBlock'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { usePlanFeatures } from '@/lib/use-plan-features'
@@ -1648,6 +1649,10 @@ function PerfilPageContent() {
                       className="btn btn-ghost btn-sm" style={{ marginTop: 8, textDecoration: 'none' }}>
                       Contactar para actualizar →
                     </a>
+                  </Section>
+
+                  <Section title="Pagos online de presupuestos" description="Permite a las parejas pagar cuotas de presupuestos con tarjeta.">
+                    <StripeConnectBlock />
                   </Section>
                 </>
               )}

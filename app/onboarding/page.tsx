@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { createClient } from '@/lib/supabase'
-import { Check, ArrowRight, Building2, MapPin, Globe, Phone, User, Loader2, CalendarHeart, UtensilsCrossed, ChevronDown } from 'lucide-react'
+import { Check, ArrowRight, Building2, MapPin, Globe, Phone, User, Loader2, CalendarHeart, UtensilsCrossed, ChevronDown, CreditCard } from 'lucide-react'
 
 type AccountType = 'venue_owner' | 'wedding_planner' | 'catering'
 
@@ -177,7 +177,12 @@ export default function OnboardingPage() {
       // and redirect back to onboarding
       await refreshProfile()
 
-      router.replace(dashboardForRole(accountType))
+      // Venue owners get optional Stripe Connect step; others go straight to dashboard
+      if (accountType === 'venue_owner') {
+        setStep(3)
+      } else {
+        router.replace(dashboardForRole(accountType))
+      }
     } catch (e: any) {
       setError(e?.message || 'Error al guardar. Inténtalo de nuevo.')
     } finally {
@@ -402,6 +407,57 @@ export default function OnboardingPage() {
                 {saving ? <><Loader2 size={15} style={{ animation: 'spin 0.8s linear infinite' }} /> Guardando...</> : <>Finalizar <Check size={15} /></>}
               </button>
             </form>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div style={{ background: '#fff', borderRadius: 16, padding: '36px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', textAlign: 'center' }}>
+            <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <CreditCard size={24} style={{ color: '#b45309' }} />
+            </div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 8, fontFamily: 'Inter, sans-serif' }}>
+              ¿Quieres activar pagos online?
+            </h2>
+            <p style={{ fontSize: 14, color: 'var(--warm-gray)', lineHeight: 1.6, marginBottom: 24 }}>
+              Permite a las parejas pagar las cuotas de sus presupuestos con tarjeta.
+              Solo necesitas tu IBAN y verificar tu identidad (~5 min).
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                onClick={async () => {
+                  setSaving(true)
+                  try {
+                    const res = await fetch('/api/stripe/create-account', { method: 'POST' })
+                    const data = await res.json()
+                    if (data.url) window.location.href = data.url
+                    else router.replace(dashboardForRole(accountType))
+                  } catch {
+                    router.replace(dashboardForRole(accountType))
+                  }
+                }}
+                disabled={saving}
+                style={{
+                  padding: '12px 24px', borderRadius: 10, border: 'none',
+                  background: 'var(--gold, #c9963a)', color: '#fff',
+                  fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  fontFamily: 'Inter, sans-serif',
+                }}
+              >
+                {saving ? <><Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> Conectando...</> : 'Activar ahora'}
+              </button>
+              <button
+                onClick={() => router.replace(dashboardForRole(accountType))}
+                style={{
+                  padding: '12px 24px', borderRadius: 10,
+                  border: '1px solid var(--ivory)', background: 'transparent',
+                  color: 'var(--warm-gray)', fontSize: 14, cursor: 'pointer',
+                  fontFamily: 'Inter, sans-serif',
+                }}
+              >
+                Más tarde
+              </button>
+            </div>
           </div>
         )}
 

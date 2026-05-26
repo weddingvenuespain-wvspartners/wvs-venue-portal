@@ -20,6 +20,10 @@ import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
 import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
 import { getLeadDateRanges } from '@/lib/lead-dates'
 import { DEFAULT_TEMPLATES } from '@/lib/proposal-starter-templates'
+import LeadPicker from './LeadPicker'
+import ModalityPicker from './ModalityPicker'
+import { CLIENT_TYPE_COLORS, CLIENT_TYPE_LABELS } from '@/lib/clients'
+import { COMMISSION_MODE_LABELS, type CommissionMode } from '@/lib/commission'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -179,7 +183,12 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     modality_id: initial.modality_id ?? '',
     access_password: initial.access_password ?? '',
     password_protected: !!initial.access_password,
+    commission_planner_id: (initial as any).commission_planner_id ?? null as string | null,
+    commission_percent: (initial as any).commission_percent ?? null as number | null,
+    commission_mode: ((initial as any).commission_mode ?? null) as CommissionMode | null,
   })
+  const [clientsCache, setClientsCache] = useState<Record<string, { name: string; client_type: string | null; wp_commission_percent: number | null; wp_commission_mode: string | null }>>({})
+  const [showCommissionAsClient, setShowCommissionAsClient] = useState(false)
   const [sections, setSections] = useState<SectionsData>({ ...emptySections, ...(initial.sections_data ?? {}) })
   const [activeTab, setActiveTab] = useState<'datos' | 'visual' | 'secciones' | 'menus'>('datos')
   const [openSecs, setOpenSecs] = useState<Set<string>>(new Set(['__space_group']))
@@ -204,7 +213,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     const supabase = createClient()
     ;(async () => {
       const [{ data: leadsData }, { data: tplData }, { data: venueRow }, { data: settingsRow }, modalRes, ctplRes] = await Promise.all([
-        supabase.from('leads').select('id, name, guests, email, wedding_date, wedding_date_to, wedding_date_ranges, date_flexibility, wedding_year, wedding_month, wedding_season').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('leads').select('id, name, guests, email, phone, contact_type, client_id, wedding_date, wedding_date_to, wedding_date_ranges, date_flexibility, wedding_year, wedding_month, wedding_season').eq('user_id', user.id).order('created_at', { ascending: false }),
         supabase.from('proposal_web_templates').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('venue_onboarding').select('name, city, region, contact_email, contact_phone, website, photo_urls').eq('user_id', user.id).maybeSingle(),
         (activeVenue?.id
@@ -429,6 +438,19 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       ? form.access_password.trim()
       : null
 
+    // Compute commission snapshot
+    const commPercent = form.commission_percent != null ? Number(form.commission_percent) : null
+    const commMode = form.commission_mode
+    const commAmount = (commPercent && commMode && form.price_estimate)
+      ? (() => {
+          const base = Number(form.price_estimate)
+          if (!base || !commPercent) return null
+          if (commMode === 'neto') return Math.round(base * (commPercent / 100) * 100) / 100
+          // comisionable: extract embedded commission from total
+          return Math.round((base - base * (100 / (100 + commPercent))) * 100) / 100
+        })()
+      : null
+
     const { couple_email: coupleEmailValue, ...corePayload } = {
       user_id: user.id,
       lead_id: form.lead_id || null,
@@ -444,6 +466,10 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       template_id: form.template_id || null,
       modality_id: form.modality_id || null,
       access_password: accessPassword,
+      commission_planner_id: form.commission_planner_id || null,
+      commission_percent: commPercent,
+      commission_mode: commMode,
+      commission_amount: commAmount,
     }
 
     const { error: updErr } = await supabase.from('proposals').update(corePayload).eq('id', proposal.id)
@@ -676,7 +702,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     if (computed) setSections((s: any) => ({ ...s, single_space: { ...(s.single_space ?? {}), date_prices: computed } }))
   }
 
-  const onLeadChange = (leadId: string) => {
+  const onLeadChange = async (leadId: string) => {
     const lead = leads.find(l => l.id === leadId)
     setForm(f => ({
       ...f,
@@ -688,6 +714,37 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     if (lead) {
       const dp = computeDatePrices(lead, form.modality_id ?? null)
       if (dp) setSections((s: any) => ({ ...s, single_space: { ...(s.single_space ?? {}), date_prices: dp } }))
+    }
+    // Auto-fill commission from linked client (when wedding_planner/organizador)
+    if (lead?.client_id) {
+      try {
+        let info = clientsCache[lead.client_id]
+        if (!info) {
+          const supabase = createClient()
+          const { data: c } = await supabase
+            .from('clients')
+            .select('id, name, client_type, wp_commission_percent, wp_commission_mode')
+            .eq('id', lead.client_id)
+            .maybeSingle()
+          if (c) {
+            info = { name: c.name, client_type: c.client_type, wp_commission_percent: c.wp_commission_percent, wp_commission_mode: c.wp_commission_mode }
+            setClientsCache(cc => ({ ...cc, [lead.client_id]: info }))
+          }
+        }
+        if (info && (info.client_type === 'wedding_planner' || info.client_type === 'organizador') && info.wp_commission_percent != null) {
+          setForm(f => ({
+            ...f,
+            commission_planner_id: lead.client_id,
+            commission_percent: info!.wp_commission_percent,
+            commission_mode: (info!.wp_commission_mode as CommissionMode | null) || 'comisionable',
+          }))
+        } else {
+          // Clear commission if the new lead is not a planner with commission
+          setForm(f => ({ ...f, commission_planner_id: null, commission_percent: null, commission_mode: null }))
+        }
+      } catch { /* ignore */ }
+    } else if (!leadId) {
+      setForm(f => ({ ...f, commission_planner_id: null, commission_percent: null, commission_mode: null }))
     }
   }
 
@@ -815,7 +872,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
         }
       })
     }
-    return {
+    const patch: Record<string, any> = {
       couple_name: form.couple_name,
       personal_message: form.personal_message || null,
       guest_count: form.guest_count ? parseInt(form.guest_count) : null,
@@ -831,7 +888,17 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
         font_family: form.font_family,
       },
     }
-  }, [form, sections, venueSpaceGroups])
+    // When venue toggle = "Ver con comisión", pass commission to preview so
+    // prices render with markup (same as client sees). Otherwise preview = neto.
+    if (showCommissionAsClient && form.commission_percent && form.commission_mode === 'neto') {
+      patch.commission_percent = form.commission_percent
+      patch.commission_mode = form.commission_mode
+    } else {
+      patch.commission_percent = null
+      patch.commission_mode = null
+    }
+    return patch
+  }, [form, sections, venueSpaceGroups, showCommissionAsClient])
 
   // ── Reusable styles
   const secLabel: React.CSSProperties = { fontSize: 11, color: 'var(--warm-gray)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }
@@ -907,13 +974,66 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               {leads.length > 0 && (
                 <div className="form-group">
                   <label className="form-label">Vincular a un lead (opcional)</label>
-                  <Select value={form.lead_id || '__none__'} onValueChange={(v) => onLeadChange(v === '__none__' ? '' : v)}>
-                    <SelectTrigger><SelectValue placeholder="— Sin lead —" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— Sin lead —</SelectItem>
-                      {leads.map(l => <SelectItem key={l.id} value={l.id}>{l.name}{l.guests ? ` · ${l.guests} inv.` : ''}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <LeadPicker
+                    value={form.lead_id || null}
+                    leads={leads.map(l => ({ id: l.id, name: l.name, email: l.email, phone: l.phone, guests: l.guests, contact_type: l.contact_type }))}
+                    onChange={(id) => onLeadChange(id || '')}
+                    placeholder="— Sin lead —"
+                    typeColors={CLIENT_TYPE_COLORS as any}
+                    typeLabels={CLIENT_TYPE_LABELS as any}
+                  />
+                </div>
+              )}
+
+              {/* Wedding planner commission */}
+              {(form.commission_planner_id || (form.lead_id && (() => {
+                const l = leads.find(x => x.id === form.lead_id)
+                return l?.contact_type === 'wedding_planner' || l?.contact_type === 'event_organizer'
+              })())) && (
+                <div className="form-group" style={{ padding: 12, border: '1px solid var(--ivory)', borderRadius: 8, background: 'var(--cream)' }}>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Comisión wedding planner / organizador</span>
+                    <button type="button" onClick={() => setShowCommissionAsClient(v => !v)}
+                      style={{ fontSize: 10, padding: '3px 8px', border: '1px solid var(--border)', borderRadius: 5, background: '#fff', cursor: 'pointer', color: 'var(--warm-gray)' }}>
+                      {showCommissionAsClient ? 'Ver neto' : 'Ver con comisión'}
+                    </button>
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
+                    <div>
+                      <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>% Comisión</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={form.commission_percent ?? ''}
+                        onChange={e => setForm(f => ({ ...f, commission_percent: e.target.value === '' ? null : Number(e.target.value) }))}
+                        placeholder="10"
+                        style={{ fontSize: 12 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Modo</label>
+                      <select
+                        className="form-input"
+                        value={form.commission_mode ?? ''}
+                        onChange={e => setForm(f => ({ ...f, commission_mode: (e.target.value || null) as CommissionMode | null }))}
+                        style={{ fontSize: 12 }}
+                      >
+                        <option value="">—</option>
+                        <option value="comisionable">Comisionable</option>
+                        <option value="neto">Neto (suma encima)</option>
+                      </select>
+                    </div>
+                  </div>
+                  {form.commission_percent && form.commission_mode && (
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 8, lineHeight: 1.5 }}>
+                      {form.commission_mode === 'neto'
+                        ? `Precios mostrados al cliente = neto × ${(1 + form.commission_percent / 100).toFixed(4)}. La comisión se añade automáticamente.`
+                        : `Precios mostrados al cliente ya incluyen el ${form.commission_percent}% de comisión.`}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1079,20 +1199,11 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               {modalities.filter(m => m.is_active).length > 0 && (
                 <div className="form-group">
                   <label className="form-label">Modalidad</label>
-                  <Select
-                    value={form.modality_id || '__none__'}
-                    onValueChange={(v) => onModalityChange(v === '__none__' ? '' : v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="— Sin modalidad —" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— Sin modalidad —</SelectItem>
-                      {modalities.filter(m => m.is_active).map((m: any) => (
-                        <SelectItem key={m.id} value={m.id}>{m.name}{m.duration_label ? ` · ${m.duration_label}` : ''}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <ModalityPicker
+                    value={form.modality_id || null}
+                    modalities={modalities}
+                    onChange={(id) => onModalityChange(id ?? '')}
+                  />
                   {form.modality_id && form.wedding_date && (() => {
                     const price = getPriceForDate(form.modality_id, form.wedding_date)
                     const pkgLabel = getMatchedPackageLabel(form.modality_id, form.wedding_date)

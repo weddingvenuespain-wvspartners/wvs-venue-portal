@@ -81,6 +81,7 @@ function PropuestasPageContent() {
   const [currentTab, setCurrentTab] = useState<'proposals'>('proposals')
   const [inquiries, setInquiries] = useState<any[]>([])
   const [responseModalProposal, setResponseModalProposal] = useState<Proposal | null>(null)
+  const [detailModalProposal, setDetailModalProposal] = useState<Proposal | null>(null)
   const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({})
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'sent' | 'viewed' | 'expired'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'last_7d' | 'last_30d'>('all')
@@ -481,7 +482,7 @@ function PropuestasPageContent() {
                     const atLimit = leadProposalCount !== null && leadProposalCount >= MAX_PROPOSALS_PER_LEAD
                     const linkedLeadName = leads.find(l => l.id === p.lead_id)?.name
                     return (
-                      <tr key={p.id} onClick={() => handleEdit(p)} style={{ cursor: 'pointer' }}>
+                      <tr key={p.id} onClick={() => setDetailModalProposal(p)} style={{ cursor: 'pointer' }}>
                         <td>
                           <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
                             {p.couple_name}
@@ -497,7 +498,11 @@ function PropuestasPageContent() {
                           </div>
                           {p.guest_count && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{p.guest_count} invitados</div>}
                           {linkedLeadName && (
-                            <div style={{ fontSize: 11, color: 'var(--gold)', marginTop: 1 }}>Lead: {linkedLeadName}</div>
+                            <div onClick={e => e.stopPropagation()} style={{ fontSize: 11, color: 'var(--gold)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <a href={`/leads?open=${p.lead_id}`} style={{ color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                Lead: {linkedLeadName} <ExternalLink size={9} />
+                              </a>
+                            </div>
                           )}
                         </td>
                         <td style={{ fontSize: 12, color: 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
@@ -645,6 +650,102 @@ function PropuestasPageContent() {
               </div>
               <div className="modal-footer">
                 <button className="btn btn-ghost btn-sm" onClick={() => setResponseModalProposal(null)}>Cerrar</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Proposal detail modal */}
+      {detailModalProposal && (() => {
+        const dp = detailModalProposal
+        const dpInq = inquiries.filter(i => i.proposal_id === dp.id).sort((a: any, b: any) => b.created_at.localeCompare(a.created_at))
+        const linkedLeadName = leads.find(l => l.id === dp.lead_id)?.name
+        const KIND_LABEL: Record<string, string> = { visit: 'Visita solicitada', call: 'Llamada', video: 'Videollamada', menu: 'Pregunta sobre menú', menu_selection: 'Selección de menú', date_pick: 'Fecha confirmada', provider_selection: 'Proveedores propios', other: 'Consulta' }
+        const KIND_EMOJI: Record<string, string> = { visit: '📍', call: '📞', video: '🎥', menu: '🍽️', menu_selection: '✅', date_pick: '📅', provider_selection: '🤝', other: '💬' }
+        return (
+          <div className="modal-overlay" onClick={() => setDetailModalProposal(null)}>
+            <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
+                <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FileText size={16} style={{ color: 'var(--gold)' }} />
+                  {dp.couple_name}
+                </div>
+                <div className="modal-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span className={`badge ${S_BADGE[dp.status] || ''}`}>{S_LABEL[dp.status] || dp.status}</span>
+                  {dp.wedding_date && <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{new Date(dp.wedding_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
+                  {dp.guest_count && <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{dp.guest_count} invitados</span>}
+                </div>
+                <button onClick={() => setDetailModalProposal(null)} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6, display: 'flex', alignItems: 'center', borderRadius: 6 }}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="modal-body" style={{ maxHeight: 450, overflowY: 'auto' }}>
+                {/* Stats */}
+                <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                  <div style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: 'var(--cream)', border: '1px solid var(--ivory)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--espresso)' }}>{dp.open_count ?? dp.views ?? 0}</div>
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Visualizaciones</div>
+                  </div>
+                  <div style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: 'var(--cream)', border: '1px solid var(--ivory)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--espresso)' }}>{dpInq.length}</div>
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Respuestas</div>
+                  </div>
+                  {sectionCounts[dp.id] > 0 && (
+                    <div style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: 'var(--cream)', border: '1px solid var(--ivory)', textAlign: 'center' }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--espresso)' }}>{sectionCounts[dp.id]}</div>
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Secciones leídas</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Dates info */}
+                <div style={{ display: 'flex', gap: 12, marginBottom: 16, fontSize: 11, color: 'var(--warm-gray)' }}>
+                  <div>Creado: {new Date(dp.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                  {dp.sent_at && <div>Enviado: {new Date(dp.sent_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</div>}
+                  {dp.first_viewed_at && <div>1ª vista: {new Date(dp.first_viewed_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</div>}
+                </div>
+
+                {/* Responses */}
+                {dpInq.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Respuestas de la pareja</div>
+                    {dpInq.map((inq: any) => (
+                      <div key={inq.id} style={{ padding: '10px 12px', background: inq.status === 'new' ? '#FFFBEB' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#FDE68A' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                          <span style={{ fontSize: 13 }}>{KIND_EMOJI[inq.kind] ?? '💬'}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{inq.kind_label || KIND_LABEL[inq.kind] || inq.kind}</span>
+                          {inq.status === 'new' && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 99, background: 'var(--gold)', color: '#fff', fontWeight: 700 }}>Nuevo</span>}
+                          <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--warm-gray)' }}>{new Date(inq.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        {inq.name && <div style={{ fontSize: 11, color: 'var(--charcoal)' }}>{inq.name}{inq.email ? ` · ${inq.email}` : ''}</div>}
+                        {inq.message && <div style={{ fontSize: 11, color: 'var(--charcoal)', marginTop: 3, whiteSpace: 'pre-wrap' }}>{inq.message}</div>}
+                        {inq.payload && Object.keys(inq.payload).length > 0 && (
+                          <div style={{ marginTop: 4 }}>{renderPayload(inq)}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {dpInq.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--warm-gray)' }}>
+                    <Inbox size={20} style={{ opacity: 0.3, marginBottom: 6 }} />
+                    <div style={{ fontSize: 12 }}>La pareja aún no ha respondido</div>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', gap: 8 }}>
+                {linkedLeadName && dp.lead_id && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setDetailModalProposal(null); router.push(`/leads?open=${dp.lead_id}`) }}>
+                    <ExternalLink size={11} /> Ver lead
+                  </button>
+                )}
+                <div style={{ flex: 1 }} />
+                <button className="btn btn-ghost btn-sm" onClick={() => setDetailModalProposal(null)}>Cerrar</button>
+                <button className="btn btn-primary btn-sm" onClick={() => { setDetailModalProposal(null); handleEdit(dp) }}>
+                  <Pencil size={11} /> Editar dosier
+                </button>
               </div>
             </div>
           </div>
