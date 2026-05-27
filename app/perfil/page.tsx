@@ -1381,7 +1381,7 @@ function PerfilPageContent() {
                         {features.trialDaysLeft !== null && (
                           <span style={{
                             marginLeft: 'auto', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 5,
-                            background: features.trialDaysLeft <= 3 ? '#7f1d1d' : features.trialDaysLeft <= 7 ? '#78350f' : '#1e3a5f',
+                            background: features.trialDaysLeft <= 3 ? '#7f1d1d' : features.trialDaysLeft <= 7 ? '#78350f' : '#2A3D2E',
                             color: features.trialDaysLeft <= 3 ? '#fca5a5' : features.trialDaysLeft <= 7 ? '#fcd34d' : '#93c5fd',
                           }}>
                             {features.trialDaysLeft > 0 ? `${features.trialDaysLeft} días restantes` : 'Trial expirado'}
@@ -1393,7 +1393,7 @@ function PerfilPageContent() {
                         Cuando expire, necesitarás activar un plan para continuar.
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <div style={{ flex: 1, minWidth: 160, padding: 12, background: '#1e3a5f', borderRadius: 8, border: '1px solid #1d4ed8' }}>
+                        <div style={{ flex: 1, minWidth: 160, padding: 12, background: '#2A3D2E', borderRadius: 8, border: '1px solid #1d4ed8' }}>
                           <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd', marginBottom: 4 }}>PLAN BÁSICO</div>
                           <div style={{ fontSize: 12, color: '#cbd5e1', lineHeight: 1.5 }}>Ficha, leads y calendario. Ideal para empezar.</div>
                         </div>

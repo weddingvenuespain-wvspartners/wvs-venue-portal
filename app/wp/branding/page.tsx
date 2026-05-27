@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { Palette, Upload, CheckCircle, Eye, RotateCcw } from 'lucide-react'
 
 const PRESET_PALETTES = [
-  { label: 'Dorado clásico',  primary: '#2E6DB4', secondary: '#f5f0ea' },
+  { label: 'Dorado clásico',  primary: '#4A6B52', secondary: '#f5f0ea' },
   { label: 'Rosa peonía',     primary: '#be185d', secondary: '#fdf2f8' },
   { label: 'Verde salvia',    primary: '#4a7c59', secondary: '#f0f5f1' },
   { label: 'Azul pizarra',    primary: '#334e68', secondary: '#f0f4f8' },
@@ -23,7 +23,7 @@ export default function BrandingPage() {
 
   const [form, setForm] = useState({
     proposal_title:  '',
-    brand_color:     '#2E6DB4',
+    brand_color:     '#4A6B52',
     brand_color2:    '#f5f0ea',
     brand_logo_url:  '',
   })
@@ -48,7 +48,7 @@ export default function BrandingPage() {
         if (data) {
           setForm({
             proposal_title: data.proposal_title || '',
-            brand_color:    data.brand_color    || '#2E6DB4',
+            brand_color:    data.brand_color    || '#4A6B52',
             brand_color2:   data.brand_color2   || '#f5f0ea',
             brand_logo_url: data.brand_logo_url || '',
           })

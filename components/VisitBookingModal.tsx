@@ -55,7 +55,7 @@ function stepNum(s: Step) {
 const TOTAL_STEPS = 3
 
 export default function VisitBookingModal({
-  proposalId, coupleName, primaryColor = '#2E6DB4',
+  proposalId, coupleName, primaryColor = '#4A6B52',
   selectedSpaces = [], selectedMenus = [], menuCart, guestCount, weddingDate,
   selectedExtraSvcs = [], spaceGroups,
   dateSlots = [], preSelectedDateSlot = null,

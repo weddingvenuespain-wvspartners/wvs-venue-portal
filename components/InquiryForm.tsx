@@ -31,7 +31,7 @@ export default function InquiryForm({
   proposalId,
   coupleName,
   kinds,
-  primary = '#2E6DB4',
+  primary = '#4A6B52',
   onPrimary = '#fff',
   dark = false,
 }: {

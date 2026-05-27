@@ -220,7 +220,7 @@ function AdminDashboard() {
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                   {[
                     { label: 'Total', value: wpStats.total, color: '#a21caf', bg: '#fdf2f8' },
-                    { label: 'Nuevas', value: wpStats.new,  color: '#2E6DB4', bg: '#fdf8f4' },
+                    { label: 'Nuevas', value: wpStats.new,  color: '#4A6B52', bg: '#fdf8f4' },
                     { label: 'Contactadas', value: wpStats.contacted, color: '#3b82f6', bg: '#eff6ff' },
                     { label: 'Aceptadas', value: wpStats.accepted, color: '#22c55e', bg: '#f0fdf4' },
                   ].map(item => (

@@ -76,16 +76,16 @@ function WvsCard({ snap, loading }: { snap: WvsSnapshot | null; loading: boolean
           border: '1px solid rgba(0,0,0,0.08)',
           borderRadius: 16,
           overflow: 'hidden',
-          boxShadow: '0 2px 10px rgba(10,22,40,0.06)',
+          boxShadow: '0 2px 10px rgba(20,30,22,0.06)',
           cursor: 'pointer',
           transition: 'box-shadow 0.15s, transform 0.15s',
         }}
         onMouseEnter={e => {
-          (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 28px rgba(10,22,40,0.11)'
+          (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 28px rgba(20,30,22,0.11)'
           ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'
         }}
         onMouseLeave={e => {
-          (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 10px rgba(10,22,40,0.06)'
+          (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 10px rgba(20,30,22,0.06)'
           ;(e.currentTarget as HTMLElement).style.transform = 'translateY(0)'
         }}
       >
@@ -126,13 +126,13 @@ function WvsCard({ snap, loading }: { snap: WvsSnapshot | null; loading: boolean
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={e => e.stopPropagation()}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, color: '#2E6DB4', textDecoration: 'none', padding: '2px 8px', borderRadius: 20, border: '1px solid rgba(46,109,180,0.25)', background: 'rgba(46,109,180,0.06)', whiteSpace: 'nowrap' }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, color: '#4A6B52', textDecoration: 'none', padding: '2px 8px', borderRadius: 20, border: '1px solid rgba(74,107,82,0.25)', background: 'rgba(74,107,82,0.06)', whiteSpace: 'nowrap' }}
                     >
                       <Globe size={10} /> Ver ficha pública
                     </a>
                   )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 600, color: '#2E6DB4' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 600, color: '#4A6B52' }}>
                   Gestionar <ArrowRight size={12} />
                 </div>
               </div>
@@ -180,7 +180,7 @@ function WvsCard({ snap, loading }: { snap: WvsSnapshot | null; loading: boolean
         <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', background: '#fafafa' }}>
           {[
             {
-              icon: <TrendingUp size={13} style={{ color: '#2E6DB4' }} />,
+              icon: <TrendingUp size={13} style={{ color: '#4A6B52' }} />,
               label: 'Leads totales',
               value: loading ? '—' : String(snap?.leadsTotal ?? 0),
               sub: null,
@@ -367,8 +367,8 @@ export default function CanalesPage() {
           </div>
 
           {/* Footer tip */}
-          <div style={{ marginTop: 32, padding: '14px 18px', borderRadius: 12, background: 'rgba(46,109,180,0.05)', border: '1px solid rgba(46,109,180,0.12)', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Zap size={14} style={{ color: '#2E6DB4', flexShrink: 0 }} />
+          <div style={{ marginTop: 32, padding: '14px 18px', borderRadius: 12, background: 'rgba(74,107,82,0.05)', border: '1px solid rgba(74,107,82,0.12)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Zap size={14} style={{ color: '#4A6B52', flexShrink: 0 }} />
             <span style={{ fontSize: 12.5, color: 'var(--warm-gray)', lineHeight: 1.5 }}>
               Cada nuevo canal que integremos aparecerá aquí automáticamente en tu portal.
             </span>

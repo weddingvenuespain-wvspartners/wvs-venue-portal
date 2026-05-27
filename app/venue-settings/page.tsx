@@ -22,7 +22,7 @@ import type { VisitAvailability, DaySchedule, BlockedDate, VenueSpaceGroup, Venu
 type DurationType = '1_day' | '1_day_morning' | '2_days' | 'package' | 'custom'
 
 const DURATION_TYPES = [
-  { key: '1_day'         as DurationType, label: '1 día',                  sublabel: 'Solo el día del evento',          detail: 'Ej: 12:00 → 00:00',           color: '#2E6DB4', bg: '#FDF8F0', Icon: Sun              },
+  { key: '1_day'         as DurationType, label: '1 día',                  sublabel: 'Solo el día del evento',          detail: 'Ej: 12:00 → 00:00',           color: '#4A6B52', bg: '#FDF8F0', Icon: Sun              },
   { key: '1_day_morning' as DurationType, label: '1 día + noche + mañana', sublabel: 'Hasta mediodía del día siguiente', detail: 'Ej: Sáb. 12:00 → Dom. 14:00', color: '#7C3AED', bg: '#F5F3FF', Icon: Moon             },
   { key: '2_days'        as DurationType, label: '2 días completos',        sublabel: 'Día 1 + noche + día 2 entero',    detail: 'Ej: Sáb. 12:00 → Dom. 23:59', color: '#2563EB', bg: '#EFF6FF', Icon: CalendarDays     },
   { key: 'package'       as DurationType, label: 'Paquetes de días',        sublabel: 'Varios rangos que cubren la semana', detail: 'Ej: Lun-Mié, Mié-Vie, Vie-Dom', color: '#059669', bg: '#ECFDF5', Icon: Package      },
@@ -994,9 +994,9 @@ export default function EstructuraPage() {
               )}
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FDF8F0', border: '1px dashed #2E6DB466', borderRadius: 10, padding: '14px 16px', marginBottom: 24 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #2E6DB444' }}>
-                <Settings2 size={18} style={{ color: '#2E6DB4' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FDF8F0', border: '1px dashed #4A6B5266', borderRadius: 10, padding: '14px 16px', marginBottom: 24 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #4A6B5244' }}>
+                <Settings2 size={18} style={{ color: '#4A6B52' }} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>Configura tu modelo comercial</div>
@@ -2076,14 +2076,14 @@ export default function EstructuraPage() {
                       <button type="button"
                         onClick={() => { const next = !blockRangeMode; setBlockRangeMode(next); if (!next) { setBlockRangeStart(null); setBlockRangeEnd(null); setBlockPickerDate(null) } }}
                         style={{ fontSize: 11, padding: '3px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600,
-                          background: blockRangeMode ? '#1e3a5f' : '#ede9e4',
+                          background: blockRangeMode ? '#2A3D2E' : '#ede9e4',
                           color: blockRangeMode ? '#fff' : 'var(--charcoal)' }}>
                         {blockRangeMode ? '✕ Cancelar rango' : '↔ Rango'}
                       </button>
                     )}
                   </div>
                   {blockRangeMode && blockView === 'month' && (
-                    <div style={{ fontSize: 11, color: '#1e3a5f', background: '#e8f0fe', borderRadius: 7, padding: '6px 12px', marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, color: '#2A3D2E', background: '#EDF2EC', borderRadius: 7, padding: '6px 12px', marginBottom: 8 }}>
                       {!blockRangeStart ? 'Haz click en el primer día del rango' : !blockPickerDate || blockPickerDate === blockRangeStart ? 'Ahora haz click en el último día del rango' : `Rango seleccionado: ${selectedDates.length} días`}
                     </div>
                   )}
@@ -2112,7 +2112,7 @@ export default function EstructuraPage() {
                         const inRange = isInRange(iso)
                         const isSelected = !blockRangeMode && blockPickerDate === iso
                         const col = (firstDow + idx) % 7
-                        const cellBg = isSelected || isRangeStart ? '#1e3a5f'
+                        const cellBg = isSelected || isRangeStart ? '#2A3D2E'
                           : inRange ? '#dbeafe'
                           : b ? `${blockColor(b.type)}22`
                           : autoBlock === 'wedding' ? '#d1fae5'
@@ -2153,7 +2153,7 @@ export default function EstructuraPage() {
                               transition: 'background .1s', position: 'relative',
                             }}
                           >
-                            <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 500, color: (isSelected || isRangeStart) ? '#fff' : inRange ? '#1e3a5f' : isToday ? 'var(--gold)' : 'var(--charcoal)' }}>{day}</span>
+                            <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 500, color: (isSelected || isRangeStart) ? '#fff' : inRange ? '#2A3D2E' : isToday ? 'var(--gold)' : 'var(--charcoal)' }}>{day}</span>
                             {/* Manual block label */}
                             {b && !inRange && !isSelected && !isRangeStart && (
                               <span style={{ fontSize: 7, fontWeight: 700, color: blockColor(b.type), letterSpacing: '.04em', textTransform: 'uppercase', lineHeight: 1, textAlign: 'center' }}>
@@ -2292,7 +2292,7 @@ export default function EstructuraPage() {
                                     {/* Today indicator */}
                                     {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0, timeToY(`${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`)), height: 2, background: '#059669', pointerEvents: 'none' }} />}
                                     {/* Selected column highlight */}
-                                    {isPickerOpen && <div style={{ position: 'absolute', inset: 0, background: 'rgba(30,58,95,.06)', pointerEvents: 'none' }} />}
+                                    {isPickerOpen && <div style={{ position: 'absolute', inset: 0, background: 'rgba(42,61,46,.06)', pointerEvents: 'none' }} />}
                                   </div>
                                 )
                               })}
@@ -2374,7 +2374,7 @@ export default function EstructuraPage() {
                               })}
                               {renderBlockRects(iso)}
                               {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0, timeToY(`${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`)), height: 2, background: '#059669', pointerEvents: 'none' }} />}
-                              {isPickerOpen && <div style={{ position: 'absolute', inset: 0, background: 'rgba(30,58,95,.06)', pointerEvents: 'none' }} />}
+                              {isPickerOpen && <div style={{ position: 'absolute', inset: 0, background: 'rgba(42,61,46,.06)', pointerEvents: 'none' }} />}
                             </div>
                           </div>
                         </div>
@@ -2400,7 +2400,7 @@ export default function EstructuraPage() {
                             const isSelected = blockPickerDate === iso
                             const hasSomething = b || auto
                             return (
-                              <div key={iso} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '7px 10px', borderBottom: '1px solid var(--ivory)', background: isSelected ? 'rgba(30,58,95,.04)' : 'transparent', opacity: isPast ? 0.45 : 1 }}>
+                              <div key={iso} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '7px 10px', borderBottom: '1px solid var(--ivory)', background: isSelected ? 'rgba(42,61,46,.04)' : 'transparent', opacity: isPast ? 0.45 : 1 }}>
                                 {/* Date stamp */}
                                 <div style={{ minWidth: 52, textAlign: 'center', paddingTop: 1 }}>
                                   <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{weekDayNames[d.getDay()]}</div>
@@ -2429,7 +2429,7 @@ export default function EstructuraPage() {
                                       if (b) { setBlockType(b.type); setBlockRanges(b.ranges ?? (b.from ? [{from:b.from,to:b.to??'13:00'}] : [{from:'09:00',to:'13:00'}])) }
                                       else { setBlockType('full'); setBlockRanges([{from:'09:00',to:'13:00'}]) }
                                     }
-                                  }} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, border: '1px solid var(--ivory)', background: isSelected ? '#1e3a5f' : '#faf8f5', color: isSelected ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', flexShrink: 0 }}>
+                                  }} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, border: '1px solid var(--ivory)', background: isSelected ? '#2A3D2E' : '#faf8f5', color: isSelected ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', flexShrink: 0 }}>
                                     {isSelected ? 'Cerrar' : b ? 'Editar' : '+ Bloquear'}
                                   </button>
                                 )}
@@ -2559,14 +2559,14 @@ export default function EstructuraPage() {
 
         const cardOpts = (q: WizardQuestion) => {
           if (q === 'space_type') return [
-            { key: 'single',               icon: Building2, label: 'Precio único por todo',                   sub: 'El presupuesto incluye todas las zonas del venue. El cliente no elige ni paga zonas por separado.',                          color: '#2E6DB4', bg: '#FDF8F0' },
+            { key: 'single',               icon: Building2, label: 'Precio único por todo',                   sub: 'El presupuesto incluye todas las zonas del venue. El cliente no elige ni paga zonas por separado.',                          color: '#4A6B52', bg: '#FDF8F0' },
             { key: 'single_with_supplements', icon: Layers, label: 'Espacio base + zonas a elegir', sub: 'Hay zonas fijas incluidas y otras donde el cliente elige. Pueden ser gratuitas o tener suplemento.', color: '#7C3AED', bg: '#F5F3FF' },
             { key: 'multiple_independent', icon: LayoutGrid, label: 'Grupos de espacios',              sub: 'Organiza tus zonas en grupos flexibles: el cliente puede elegir una, varias, o tener algunas incluidas y escoger entre otras. Ideal para venues con múltiples configuraciones.',            color: '#2563EB', bg: '#EFF6FF' },
           ] as { key: string; icon: any; label: string; sub: string; color: string; bg: string }[]
           if (q === 'price_model') return [
             { key: 'rental',     icon: CreditCard, label: 'Alquiler del espacio', sub: 'Precio fijo por el alquiler del espacio',                        color: '#059669', bg: '#ECFDF5' },
             { key: 'per_person', icon: Users,      label: 'Precio por persona',   sub: 'El total depende de cuántos asistentes hay',                     color: '#DC2626', bg: '#FEF2F2' },
-            { key: 'package',    icon: Package,    label: 'Paquetes cerrados',    sub: 'Precio todo incluido (espacio + servicios) por persona o evento', color: '#2E6DB4', bg: '#FDF8F0' },
+            { key: 'package',    icon: Package,    label: 'Paquetes cerrados',    sub: 'Precio todo incluido (espacio + servicios) por persona o evento', color: '#4A6B52', bg: '#FDF8F0' },
           ] as { key: string; icon: any; label: string; sub: string; color: string; bg: string }[]
           return null
         }

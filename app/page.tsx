@@ -91,9 +91,9 @@ function Stars({ count = 56 }: { count?: number }) {
             width: st.dim ? '1.5px' : '2px',
             height: st.dim ? '1.5px' : '2px',
             borderRadius: '50%',
-            background: st.blue ? '#5EAEF7' : '#fff',
+            background: st.blue ? '#8FAA94' : '#fff',
             opacity: parseFloat(st.op),
-            boxShadow: st.blue ? '0 0 8px #5EAEF7' : '0 0 6px rgba(255,255,255,0.6)',
+            boxShadow: st.blue ? '0 0 8px #8FAA94' : '0 0 6px rgba(255,255,255,0.6)',
             animation: `fe-twinkle 5.5s ease-in-out ${st.delay}s infinite`,
             pointerEvents: 'none',
           }}
@@ -124,12 +124,12 @@ function Hero() {
       borderRadius: 24,
       overflow: 'hidden',
       background: `
-        radial-gradient(ellipse 70% 55% at 50% 30%, rgba(94,174,247,0.55), transparent 65%),
-        radial-gradient(ellipse 80% 60% at 50% 20%, rgba(46,109,180,0.55), transparent 70%),
-        linear-gradient(180deg, #0D1B2A 0%, #070F1B 100%)
+        radial-gradient(ellipse 70% 55% at 50% 30%, rgba(143,170,148,0.55), transparent 65%),
+        radial-gradient(ellipse 80% 60% at 50% 20%, rgba(74,107,82,0.55), transparent 70%),
+        linear-gradient(180deg, #1A2419 0%, #0C1410 100%)
       `,
       border: '1px solid rgba(255,255,255,0.06)',
-      boxShadow: '0 20px 60px rgba(10,22,40,0.45)',
+      boxShadow: '0 20px 60px rgba(20,30,22,0.45)',
     }}>
       {/* bg stars */}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
@@ -140,7 +140,7 @@ function Hero() {
         {/* Brand */}
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 28, justifyContent: 'center' }}>
           <img src="/foreventos-assets/favicon.png" alt="FE" style={{ height: 28, width: 'auto', borderRadius: 6 }} />
-          <span style={{ fontFamily: "'Satoshi', 'Inter', sans-serif", fontWeight: 700, letterSpacing: 0.5, fontSize: 18, color: '#E8ECF1' }}>
+          <span style={{ fontFamily: "'Satoshi', 'Inter', sans-serif", fontWeight: 700, letterSpacing: 0.5, fontSize: 18, color: '#E8E6DC' }}>
             FOREVENTOS
           </span>
         </div>
@@ -155,7 +155,7 @@ function Hero() {
         }}>
           Vuelve a tu{' '}
           <span style={{
-            background: 'linear-gradient(180deg, #fff 30%, #5EAEF7 120%)',
+            background: 'linear-gradient(180deg, #fff 30%, #8FAA94 120%)',
             WebkitBackgroundClip: 'text',
             backgroundClip: 'text',
             color: 'transparent',
@@ -164,7 +164,7 @@ function Hero() {
           </span>
         </h2>
 
-        <p style={{ color: '#8899AA', fontSize: 14, lineHeight: 1.6, margin: '0 auto 36px', maxWidth: 280 }}>
+        <p style={{ color: '#8A9489', fontSize: 14, lineHeight: 1.6, margin: '0 auto 36px', maxWidth: 280 }}>
           Tu CRM, dossieres y presupuestos te están esperando.
         </p>
 
@@ -178,17 +178,17 @@ function Hero() {
               borderRadius: 14,
               background: i === 0 ? 'rgba(255,255,255,0.97)' : 'rgba(255,255,255,0.04)',
               border: i === 0 ? '1px solid rgba(255,255,255,1)' : '1px solid rgba(255,255,255,0.08)',
-              boxShadow: i === 0 ? '0 12px 30px rgba(10,22,40,0.45), inset 0 1px 0 rgba(255,255,255,0.6)' : undefined,
+              boxShadow: i === 0 ? '0 12px 30px rgba(20,30,22,0.45), inset 0 1px 0 rgba(255,255,255,0.6)' : undefined,
               textAlign: 'left',
             }}>
               <span style={{
                 width: 24, height: 24, borderRadius: '50%',
-                background: i === 0 ? '#0A1628' : 'rgba(255,255,255,0.08)',
+                background: i === 0 ? '#141E16' : 'rgba(255,255,255,0.08)',
                 color: i === 0 ? '#fff' : '#5a6878',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 11, fontWeight: 600, flexShrink: 0,
               }}>{i + 1}</span>
-              <span style={{ fontSize: 13.5, color: i === 0 ? '#0A1628' : '#E8ECF1', fontWeight: 500, letterSpacing: -0.1 }}>{lbl}</span>
+              <span style={{ fontSize: 13.5, color: i === 0 ? '#141E16' : '#E8E6DC', fontWeight: 500, letterSpacing: -0.1 }}>{lbl}</span>
             </div>
           ))}
         </div>
@@ -306,7 +306,7 @@ function LoginPageInner() {
           border-radius: 12px;
           background: rgba(255,255,255,0.04);
           border: 1px solid rgba(255,255,255,0.10);
-          color: #E8ECF1;
+          color: #E8E6DC;
           font-size: 14.5px;
           font-weight: 400;
           font-family: 'Inter', sans-serif;
@@ -316,9 +316,9 @@ function LoginPageInner() {
         .fe-input::placeholder { color: #5a6878; }
         .fe-input:hover { border-color: rgba(255,255,255,0.16); }
         .fe-input:focus {
-          border-color: #2E6DB4;
+          border-color: #4A6B52;
           background: rgba(255,255,255,0.06);
-          box-shadow: 0 0 0 3px rgba(94,174,247,0.20);
+          box-shadow: 0 0 0 3px rgba(143,170,148,0.20);
         }
         .fe-input.has-icon { padding-left: 42px; }
         .fe-input.has-right { padding-right: 42px; }
@@ -330,9 +330,9 @@ function LoginPageInner() {
           justify-content: space-between;
           padding: 8px 8px 8px 22px;
           border-radius: 999px;
-          background: rgba(46,109,180,0.95);
+          background: rgba(74,107,82,0.95);
           border: 1px solid rgba(255,255,255,0.18);
-          box-shadow: inset 0 4px 4px rgba(255,255,255,0.30), 0 12px 30px rgba(46,109,180,0.40);
+          box-shadow: inset 0 4px 4px rgba(255,255,255,0.30), 0 12px 30px rgba(74,107,82,0.40);
           color: #fff;
           font-weight: 600;
           font-size: 15px;
@@ -346,7 +346,7 @@ function LoginPageInner() {
         .fe-cta:disabled { opacity: 0.7; cursor: wait; }
         .fe-cta .fe-arrow {
           width: 34px; height: 34px; border-radius: 50%;
-          background: #fff; color: #2E6DB4;
+          background: #fff; color: #4A6B52;
           display: inline-flex; align-items: center; justify-content: center;
           transition: transform .3s cubic-bezier(0.16,1,0.3,1);
           flex-shrink: 0;
@@ -364,7 +364,7 @@ function LoginPageInner() {
           border-radius: 12px;
           background: rgba(255,255,255,0.04);
           border: 1px solid rgba(255,255,255,0.10);
-          color: #E8ECF1;
+          color: #E8E6DC;
           font-size: 14px;
           font-weight: 500;
           font-family: 'Inter', sans-serif;
@@ -381,9 +381,9 @@ function LoginPageInner() {
           transition: all .2s; cursor: pointer; flex-shrink: 0;
         }
         .fe-check.on {
-          background: #2E6DB4;
-          border-color: #2E6DB4;
-          box-shadow: 0 0 0 3px rgba(46,109,180,0.18);
+          background: #4A6B52;
+          border-color: #4A6B52;
+          box-shadow: 0 0 0 3px rgba(74,107,82,0.18);
         }
         .fe-check.on::after {
           content: '';
@@ -406,7 +406,7 @@ function LoginPageInner() {
           background: transparent; border: none; color: #5a6878; cursor: pointer;
           transition: color .2s, background .2s;
         }
-        .fe-eye-btn:hover { color: #5EAEF7; background: rgba(255,255,255,0.04); }
+        .fe-eye-btn:hover { color: #8FAA94; background: rgba(255,255,255,0.04); }
 
         /* Hero panel sizing — flex: 1 so it matches the form panel */
         .fe-hero { flex: 1; display: flex; min-width: 0; }
@@ -432,9 +432,9 @@ function LoginPageInner() {
       <div style={{
         position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden',
         background: `
-          radial-gradient(ellipse 800px 600px at 15% 20%, rgba(46,109,180,0.18), transparent 60%),
-          radial-gradient(ellipse 700px 500px at 85% 85%, rgba(94,174,247,0.10), transparent 60%),
-          #0A1628
+          radial-gradient(ellipse 800px 600px at 15% 20%, rgba(74,107,82,0.18), transparent 60%),
+          radial-gradient(ellipse 700px 500px at 85% 85%, rgba(143,170,148,0.10), transparent 60%),
+          #141E16
         `,
       }}>
         <Stars count={56} />
@@ -443,7 +443,7 @@ function LoginPageInner() {
       {/* App shell */}
       <div style={{ position: 'relative', zIndex: 1, height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif" }}>
         {/* Util bar */}
-        <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 50, display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, color: '#8899AA' }}>
+        <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 50, display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, color: '#8A9489' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', fontSize: 12, fontWeight: 500 }}>
             ES · €
           </span>
@@ -474,14 +474,14 @@ function LoginPageInner() {
               <div style={{ marginBottom: 16 }}>
                 <div className="fe-form-brand" style={{ alignItems: 'center', gap: 10, marginBottom: 12 }}>
                   <img src="/foreventos-assets/favicon.png" alt="FE" style={{ height: 28, width: 'auto', borderRadius: 6 }} />
-                  <span style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, letterSpacing: 0.5, fontSize: 20, color: '#E8ECF1' }}>
+                  <span style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, letterSpacing: 0.5, fontSize: 20, color: '#E8E6DC' }}>
                     FOREVENTOS
                   </span>
                 </div>
-                <h1 style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, fontSize: 28, lineHeight: 1.06, letterSpacing: -1.0, margin: '0 0 4px', color: '#E8ECF1' }}>
+                <h1 style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, fontSize: 28, lineHeight: 1.06, letterSpacing: -1.0, margin: '0 0 4px', color: '#E8E6DC' }}>
                   {mode === 'login' ? 'Iniciar sesión' : mode === 'reset' ? 'Recuperar contraseña' : 'Nueva contraseña'}
                 </h1>
-                <p style={{ margin: 0, color: '#8899AA', fontSize: 14, lineHeight: 1.5 }}>
+                <p style={{ margin: 0, color: '#8A9489', fontSize: 14, lineHeight: 1.5 }}>
                   {mode === 'login'
                     ? 'Gestiona peticiones, dossieres y presupuestos.'
                     : mode === 'reset'
@@ -507,7 +507,7 @@ function LoginPageInner() {
                 <form onSubmit={handleLogin} noValidate>
                   {/* Email */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10 }}>
-                    <label style={{ fontSize: 12, fontWeight: 500, color: '#8899AA', letterSpacing: '0.02em' }}>
+                    <label style={{ fontSize: 12, fontWeight: 500, color: '#8A9489', letterSpacing: '0.02em' }}>
                       Email corporativo
                     </label>
                     <div style={{ position: 'relative' }}>
@@ -528,7 +528,7 @@ function LoginPageInner() {
 
                   {/* Password */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 0 }}>
-                    <label style={{ fontSize: 12, fontWeight: 500, color: '#8899AA', letterSpacing: '0.02em' }}>
+                    <label style={{ fontSize: 12, fontWeight: 500, color: '#8A9489', letterSpacing: '0.02em' }}>
                       Contraseña
                     </label>
                     <div style={{ position: 'relative' }}>
@@ -552,7 +552,7 @@ function LoginPageInner() {
 
                   {/* Remember + forgot */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '10px 0 14px' }}>
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#8899AA', cursor: 'pointer', userSelect: 'none' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#8A9489', cursor: 'pointer', userSelect: 'none' }}>
                       <span
                         className={'fe-check' + (remember ? ' on' : '')}
                         onClick={() => setRemember(r => !r)}
@@ -564,7 +564,7 @@ function LoginPageInner() {
                     <button
                       type="button"
                       className="fe-btn-ghost"
-                      style={{ fontSize: 13, color: '#5EAEF7', fontWeight: 500 }}
+                      style={{ fontSize: 13, color: '#8FAA94', fontWeight: 500 }}
                       onClick={() => { setMode('reset'); setError(''); setSuccess('') }}
                     >
                       ¿Olvidaste tu contraseña?
@@ -592,12 +592,12 @@ function LoginPageInner() {
                   </div>
 
                   {/* Footer */}
-                  <div style={{ marginTop: 16, textAlign: 'center', paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.07)', fontSize: 13, color: '#8899AA' }}>
+                  <div style={{ marginTop: 16, textAlign: 'center', paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.07)', fontSize: 13, color: '#8A9489' }}>
                     ¿Aún no tienes cuenta?{' '}
                     <button
                       type="button"
                       className="fe-btn-ghost"
-                      style={{ color: '#5EAEF7', fontWeight: 500, fontSize: 13 }}
+                      style={{ color: '#8FAA94', fontWeight: 500, fontSize: 13 }}
                       onClick={() => router.push('/signup')}
                     >
                       Crear cuenta gratis
@@ -617,7 +617,7 @@ function LoginPageInner() {
               {mode === 'reset' && (
                 <form onSubmit={handleReset}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
-                    <label style={{ fontSize: 12, fontWeight: 500, color: '#8899AA', letterSpacing: '0.02em' }}>Email</label>
+                    <label style={{ fontSize: 12, fontWeight: 500, color: '#8A9489', letterSpacing: '0.02em' }}>Email</label>
                     <div style={{ position: 'relative' }}>
                       <input
                         className="fe-input has-icon"
@@ -643,7 +643,7 @@ function LoginPageInner() {
                     <button
                       type="button"
                       className="fe-btn-ghost"
-                      style={{ color: '#8899AA', fontSize: 13 }}
+                      style={{ color: '#8A9489', fontSize: 13 }}
                       onClick={() => { setMode('login'); setError(''); setSuccess('') }}
                     >
                       ← Volver al login
@@ -656,7 +656,7 @@ function LoginPageInner() {
               {mode === 'new_password' && (
                 <form onSubmit={handleNewPassword}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
-                    <label style={{ fontSize: 12, fontWeight: 500, color: '#8899AA', letterSpacing: '0.02em' }}>Nueva contraseña</label>
+                    <label style={{ fontSize: 12, fontWeight: 500, color: '#8A9489', letterSpacing: '0.02em' }}>Nueva contraseña</label>
                     <div style={{ position: 'relative' }}>
                       <input
                         className="fe-input has-icon has-right"

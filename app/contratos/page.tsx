@@ -219,7 +219,7 @@ export default function ContratosPage() {
                             </button>
                             <button
                               className="btn btn-ghost btn-sm"
-                              style={{ width: 30, height: 30, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: '#1e3a5f', color: 'white' }}
+                              style={{ width: 30, height: 30, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: '#2A3D2E', color: 'white' }}
                               title="Enviar por email"
                               onClick={() => { /* TODO: send email */ }}
                             >

@@ -40,7 +40,7 @@ export default function ProposalGate({ slug, coupleName }: { slug: string; coupl
       alignItems: 'center',
       justifyContent: 'center',
       padding: 24,
-      background: 'linear-gradient(160deg, #0A1628 0%, #2c2420 50%, #3d3530 100%)',
+      background: 'linear-gradient(160deg, #141E16 0%, #2c2420 50%, #3d3530 100%)',
       fontFamily: 'Inter, sans-serif',
       color: '#fff',
     }}>
@@ -58,7 +58,7 @@ export default function ProposalGate({ slug, coupleName }: { slug: string; coupl
           width: 56, height: 56, borderRadius: '50%',
           background: 'rgba(196,151,90,0.16)',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          color: '#2E6DB4', marginBottom: 20,
+          color: '#4A6B52', marginBottom: 20,
         }}>
           <Lock size={24} strokeWidth={1.6} />
         </div>
@@ -99,8 +99,8 @@ export default function ProposalGate({ slug, coupleName }: { slug: string; coupl
           style={{
             width: '100%',
             padding: '12px 16px',
-            background: '#2E6DB4',
-            color: '#0A1628',
+            background: '#4A6B52',
+            color: '#141E16',
             border: 'none',
             borderRadius: 8,
             fontSize: 13,
@@ -115,7 +115,7 @@ export default function ProposalGate({ slug, coupleName }: { slug: string; coupl
             gap: 10,
           }}
         >
-          {loading ? <Spinner size={14} thickness={2} color="#0A1628" /> : 'Acceder'}
+          {loading ? <Spinner size={14} thickness={2} color="#141E16" /> : 'Acceder'}
         </button>
         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 18, lineHeight: 1.6 }}>
           Si no tienes la contraseña, contacta con el venue que te envió esta propuesta.

@@ -248,7 +248,7 @@ function DateRangeFilter({ from, to, onChange }: { from: string; to: string; onC
           <button onClick={() => { onChange(draft.from, draft.to); setOpen(false) }}
             disabled={!draft.from}
             style={{ fontSize: 12, fontWeight: 600, padding: '6px 18px', borderRadius: 8, border: 'none',
-              background: draft.from ? '#2E6DB4' : '#e5e7eb', color: draft.from ? '#fff' : '#9ca3af',
+              background: draft.from ? '#4A6B52' : '#e5e7eb', color: draft.from ? '#fff' : '#9ca3af',
               cursor: draft.from ? 'pointer' : 'default', fontFamily: 'Inter, sans-serif' }}>
             Aplicar
           </button>

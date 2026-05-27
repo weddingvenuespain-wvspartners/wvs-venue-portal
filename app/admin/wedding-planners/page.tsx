@@ -53,7 +53,7 @@ const BUDGET_LABEL: Record<string, string> = {
 }
 
 const TABS = [
-  { key: 'new',        label: 'Nuevas',      color: '#2E6DB4' },
+  { key: 'new',        label: 'Nuevas',      color: '#4A6B52' },
   { key: 'contacted',  label: 'Contactadas', color: '#3b82f6' },
   { key: 'accepted',   label: 'Aceptadas',   color: '#22c55e' },
   { key: 'cancelled',  label: 'Canceladas',  color: '#6b7280' },
@@ -62,7 +62,7 @@ const TABS = [
 type TabKey = typeof TABS[number]['key']
 
 const STATUS_OPTIONS = [
-  { value: 'new',        label: 'Nueva',      color: '#2E6DB4' },
+  { value: 'new',        label: 'Nueva',      color: '#4A6B52' },
   { value: 'contacted',  label: 'Contactada', color: '#3b82f6' },
   { value: 'accepted',   label: 'Aceptada',   color: '#22c55e' },
   { value: 'cancelled',  label: 'Cancelada',  color: '#6b7280' },

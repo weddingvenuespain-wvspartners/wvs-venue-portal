@@ -6,7 +6,7 @@ import { Heart, MapPin, MessageSquare, Check, Building2, UtensilsCrossed, Lock, 
 /* ─── Status pill ────────────────────────────────────────────── */
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   pending:     { label: 'Pendiente',     color: '#9c8f88', bg: 'rgba(156,143,136,0.12)' },
-  requested:   { label: 'Solicitado',   color: '#2E6DB4', bg: 'rgba(196,151,90,0.15)'  },
+  requested:   { label: 'Solicitado',   color: '#4A6B52', bg: 'rgba(196,151,90,0.15)'  },
   available:   { label: 'Disponible',   color: '#16a34a', bg: 'rgba(22,163,74,0.12)'   },
   unavailable: { label: 'No disponible',color: '#dc2626', bg: 'rgba(220,38,38,0.12)'   },
 }
@@ -83,7 +83,7 @@ function VenueModal({ venue, onClose }: { venue: any; onClose: () => void }) {
               <div style={{ position: 'absolute', width: 140, height: 140, borderRadius: '50%', border: '1px solid rgba(196,151,90,0.25)', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
               {/* Initials */}
               <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
-                <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(196,151,90,0.15)', border: '2px solid rgba(196,151,90,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 24, fontWeight: 800, color: '#2E6DB4', letterSpacing: '0.05em' }}>
+                <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(196,151,90,0.15)', border: '2px solid rgba(196,151,90,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 24, fontWeight: 800, color: '#4A6B52', letterSpacing: '0.05em' }}>
                   {initials}
                 </div>
                 <div style={{ fontSize: 11, color: 'rgba(196,151,90,0.6)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>Venue</div>
@@ -113,7 +113,7 @@ function VenueModal({ venue, onClose }: { venue: any; onClose: () => void }) {
               </button>
               <div style={{ position: 'absolute', bottom: 72, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 5 }}>
                 {imgs.map((_, i) => (
-                  <button key={i} onClick={() => setIdx(i)} style={{ width: i === idx ? 20 : 6, height: 6, borderRadius: 3, background: i === idx ? '#2E6DB4' : 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.2s' }} />
+                  <button key={i} onClick={() => setIdx(i)} style={{ width: i === idx ? 20 : 6, height: 6, borderRadius: 3, background: i === idx ? '#4A6B52' : 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.2s' }} />
                 ))}
               </div>
             </>
@@ -122,7 +122,7 @@ function VenueModal({ venue, onClose }: { venue: any; onClose: () => void }) {
           {/* Name + location overlaid on gradient */}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 24px 22px' }}>
             {vp.venue_type && (
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: '#2E6DB4', textTransform: 'uppercase', marginBottom: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: '#4A6B52', textTransform: 'uppercase', marginBottom: 6 }}>
                 {vp.venue_type}
               </div>
             )}
@@ -145,7 +145,7 @@ function VenueModal({ venue, onClose }: { venue: any; onClose: () => void }) {
             <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
               {venue.capacity && (
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#5c4a3d', background: '#f5ede0', padding: '7px 14px', borderRadius: 30 }}>
-                  <Users size={13} color="#2E6DB4" /> Hasta {venue.capacity} invitados
+                  <Users size={13} color="#4A6B52" /> Hasta {venue.capacity} invitados
                 </div>
               )}
             </div>
@@ -161,7 +161,7 @@ function VenueModal({ venue, onClose }: { venue: any; onClose: () => void }) {
           {/* CTA */}
           {venue.venue_quote_url && (
             <a href={venue.venue_quote_url} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 12, background: '#2E6DB4', color: '#fff', fontSize: 14, fontWeight: 700, textDecoration: 'none', letterSpacing: '0.02em' }}>
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 12, background: '#4A6B52', color: '#fff', fontSize: 14, fontWeight: 700, textDecoration: 'none', letterSpacing: '0.02em' }}>
               <FileText size={16} /> Ver presupuesto
             </a>
           )}
@@ -229,7 +229,7 @@ export default function CoupleLandingClient({ client, venues, caterings }: { cli
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#faf9f7', fontFamily: 'Inter, sans-serif', padding: 16 }}>
       <div style={{ background: '#fff', borderRadius: 20, padding: '44px 40px', maxWidth: 380, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.1)', textAlign: 'center' }}>
         <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(196,151,90,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-          <Lock size={26} color="#2E6DB4" />
+          <Lock size={26} color="#4A6B52" />
         </div>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: '#3d3530', marginBottom: 8 }}>Propuesta protegida</h1>
         <p style={{ fontSize: 13, color: '#9c8f88', marginBottom: 28, lineHeight: 1.6 }}>Tu wedding planner ha protegido esta propuesta con contraseña.</p>
@@ -274,7 +274,7 @@ export default function CoupleLandingClient({ client, venues, caterings }: { cli
             <StatusPill status={v.availability_status || 'pending'} light />
           </div>
           {vp.venue_type && (
-            <div style={{ position: 'absolute', bottom: 10, left: 12, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#2E6DB4', textTransform: 'uppercase' }}>
+            <div style={{ position: 'absolute', bottom: 10, left: 12, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#4A6B52', textTransform: 'uppercase' }}>
               {vp.venue_type}
             </div>
           )}
@@ -291,7 +291,7 @@ export default function CoupleLandingClient({ client, venues, caterings }: { cli
 
           {v.venue_quote_url && (
             <a href={v.venue_quote_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#2E6DB4', textDecoration: 'none', marginBottom: 10, padding: '5px 10px', background: 'rgba(196,151,90,0.08)', borderRadius: 8, border: '1px solid rgba(196,151,90,0.2)' }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#4A6B52', textDecoration: 'none', marginBottom: 10, padding: '5px 10px', background: 'rgba(196,151,90,0.08)', borderRadius: 8, border: '1px solid rgba(196,151,90,0.2)' }}>
               <FileText size={11} /> Ver presupuesto
             </a>
           )}
@@ -314,7 +314,7 @@ export default function CoupleLandingClient({ client, venues, caterings }: { cli
                   <textarea placeholder="Escribe tu opinión…" value={comment} onChange={e => setComment(e.target.value)}
                     style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e4df', fontSize: 12, resize: 'vertical', minHeight: 64, fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box' }} />
                   <button onClick={() => sendComment(entityId, 'venue')} disabled={sending || !comment.trim()}
-                    style={{ marginTop: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#2E6DB4', color: '#fff', fontSize: 12, fontWeight: 600, cursor: comment.trim() ? 'pointer' : 'default', opacity: comment.trim() ? 1 : 0.45 }}>
+                    style={{ marginTop: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#4A6B52', color: '#fff', fontSize: 12, fontWeight: 600, cursor: comment.trim() ? 'pointer' : 'default', opacity: comment.trim() ? 1 : 0.45 }}>
                     Enviar
                   </button>
                 </div>
@@ -348,7 +348,7 @@ export default function CoupleLandingClient({ client, venues, caterings }: { cli
           {cp.city && <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9c8f88', marginBottom: 12 }}><MapPin size={11} /> {cp.city}</div>}
           {c.venue_quote_url && (
             <a href={c.venue_quote_url} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#2E6DB4', textDecoration: 'none', marginBottom: 10, padding: '5px 10px', background: 'rgba(196,151,90,0.08)', borderRadius: 8, border: '1px solid rgba(196,151,90,0.2)' }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#4A6B52', textDecoration: 'none', marginBottom: 10, padding: '5px 10px', background: 'rgba(196,151,90,0.08)', borderRadius: 8, border: '1px solid rgba(196,151,90,0.2)' }}>
               <FileText size={11} /> Ver presupuesto
             </a>
           )}
@@ -453,7 +453,7 @@ export default function CoupleLandingClient({ client, venues, caterings }: { cli
         {venues.length > 0 && (
           <section style={{ marginBottom: 52 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-              <Building2 size={20} color="#2E6DB4" />
+              <Building2 size={20} color="#4A6B52" />
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#3d3530' }}>Venues propuestos</h2>
               <span style={{ fontSize: 13, color: '#b8ada7' }}>({venues.length})</span>
             </div>

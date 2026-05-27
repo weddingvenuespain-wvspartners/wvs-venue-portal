@@ -553,7 +553,7 @@ export default function Sidebar() {
                 {roleLabel}
                 {isVenueOwner && !features.loading && (
                   <span style={{
-                    background: !features.hasPlan ? '#1e293b' : features.isTrial ? '#78350f' : features.planTier === 'basic' ? '#1e3a5f' : '#451a03',
+                    background: !features.hasPlan ? '#1e293b' : features.isTrial ? '#78350f' : features.planTier === 'basic' ? '#2A3D2E' : '#451a03',
                     color: !features.hasPlan ? '#94a3b8' : features.isTrial ? '#fcd34d' : features.planTier === 'basic' ? '#93c5fd' : '#fde68a',
                     padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: '0.04em'
                   }}>

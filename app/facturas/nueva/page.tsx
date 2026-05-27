@@ -356,7 +356,7 @@ export default function NuevaFacturaPage() {
                         <div style={{ padding: '2px 4px' }}><div style={{ height: 2, width: '60%', background: '#ddd', borderRadius: 1 }} /></div>
                       </>}
                       {t.key === 'modern' && <>
-                        <div style={{ height: 10, background: '#1a1a2e' }} />
+                        <div style={{ height: 10, background: '#1A2419' }} />
                         <div style={{ padding: '2px 4px' }}><div style={{ height: 2, width: '50%', background: '#ddd', borderRadius: 1 }} /></div>
                       </>}
                       {t.key === 'minimal' && <>
@@ -626,7 +626,7 @@ export default function NuevaFacturaPage() {
               {template === 'modern' && (
                 <div>
                   {/* Dark header block */}
-                  <div style={{ background: '#1a1a2e', color: 'white', padding: '24px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ background: '#1A2419', color: 'white', padding: '24px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, opacity: 0.6, marginBottom: 4 }}>Factura</div>
                       <div style={{ fontSize: 18, fontWeight: 700 }}>{invoiceNumber}</div>
@@ -651,12 +651,12 @@ export default function NuevaFacturaPage() {
                       </div>
                       <div style={{ textAlign: 'right', fontSize: 11 }}>
                         {dueDate && <div style={{ color: '#888' }}>Vencimiento: <span style={{ color: '#333', fontWeight: 500 }}>{fmtDateLong(dueDate)}</span></div>}
-                        {weddingDate && <div style={{ color: '#1a1a2e', fontWeight: 500, marginTop: 4 }}>Boda: {fmtDateLong(weddingDate)}</div>}
+                        {weddingDate && <div style={{ color: '#1A2419', fontWeight: 500, marginTop: 4 }}>Boda: {fmtDateLong(weddingDate)}</div>}
                       </div>
                     </div>
 
-                    {renderItemsTable('#1a1a2e')}
-                    {renderTotals('#1a1a2e')}
+                    {renderItemsTable('#1A2419')}
+                    {renderTotals('#1A2419')}
                     {renderFooter()}
                   </div>
                 </div>

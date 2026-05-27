@@ -11,7 +11,7 @@ export function fmtDate(d: string) {
   return `${parseInt(day)} ${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(m)-1]} ${y.slice(2)}`
 }
 
-export default function DatePicker({ value, onChange, label, accent = '#2E6DB4', minDate, allowPast = false, dark = false, placeholder = 'Seleccionar fecha', disabledRanges = [] }: {
+export default function DatePicker({ value, onChange, label, accent = '#4A6B52', minDate, allowPast = false, dark = false, placeholder = 'Seleccionar fecha', disabledRanges = [] }: {
   value: string
   onChange: (v: string) => void
   label?: string

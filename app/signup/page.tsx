@@ -54,9 +54,9 @@ function Stars({ count = 50 }: { count?: number }) {
           left: st.left + '%', top: st.top + '%',
           width: st.dim ? '1.5px' : '2px', height: st.dim ? '1.5px' : '2px',
           borderRadius: '50%',
-          background: st.blue ? '#5EAEF7' : '#fff',
+          background: st.blue ? '#8FAA94' : '#fff',
           opacity: parseFloat(st.op),
-          boxShadow: st.blue ? '0 0 8px #5EAEF7' : '0 0 6px rgba(255,255,255,0.5)',
+          boxShadow: st.blue ? '0 0 8px #8FAA94' : '0 0 6px rgba(255,255,255,0.5)',
           animation: `fe-twinkle 5.5s ease-in-out ${st.delay}s infinite`,
           pointerEvents: 'none',
         }} />
@@ -148,24 +148,24 @@ function SignupPageInner() {
           border-radius: 10px;
           background: rgba(255,255,255,0.04);
           border: 1px solid rgba(255,255,255,0.10);
-          color: #E8ECF1; font-size: 14px; font-family: 'Inter', sans-serif;
+          color: #E8E6DC; font-size: 14px; font-family: 'Inter', sans-serif;
           transition: border-color .2s, box-shadow .2s, background .2s;
           outline: none; box-sizing: border-box;
         }
         .su-input::placeholder { color: #5a6878; }
         .su-input:hover { border-color: rgba(255,255,255,0.16); }
         .su-input:focus {
-          border-color: #2E6DB4;
+          border-color: #4A6B52;
           background: rgba(255,255,255,0.06);
-          box-shadow: 0 0 0 3px rgba(94,174,247,0.18);
+          box-shadow: 0 0 0 3px rgba(143,170,148,0.18);
         }
 
         .su-cta {
           width: 100%; display: flex; align-items: center; justify-content: space-between;
           padding: 8px 8px 8px 20px; border-radius: 999px;
-          background: rgba(46,109,180,0.95);
+          background: rgba(74,107,82,0.95);
           border: 1px solid rgba(255,255,255,0.18);
-          box-shadow: inset 0 4px 4px rgba(255,255,255,0.28), 0 10px 28px rgba(46,109,180,0.38);
+          box-shadow: inset 0 4px 4px rgba(255,255,255,0.28), 0 10px 28px rgba(74,107,82,0.38);
           color: #fff; font-weight: 600; font-size: 14px; font-family: 'Inter', sans-serif;
           cursor: pointer; height: 46px;
           transition: transform .25s, filter .25s;
@@ -174,14 +174,14 @@ function SignupPageInner() {
         .su-cta:disabled { opacity: 0.5; cursor: not-allowed; }
         .su-cta .su-arrow {
           width: 30px; height: 30px; border-radius: 50%;
-          background: #fff; color: #2E6DB4;
+          background: #fff; color: #4A6B52;
           display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
 
         .su-social {
           width: 100%; height: 42px; display: flex; align-items: center; justify-content: center; gap: 10px;
           border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10);
-          color: #E8ECF1; font-size: 14px; font-weight: 500; font-family: 'Inter', sans-serif;
+          color: #E8E6DC; font-size: 14px; font-weight: 500; font-family: 'Inter', sans-serif;
           cursor: pointer; transition: background .2s, border-color .2s;
         }
         .su-social:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.18); }
@@ -192,7 +192,7 @@ function SignupPageInner() {
           display: inline-flex; align-items: center; justify-content: center;
           transition: all .2s; cursor: pointer;
         }
-        .su-check.on { background: #2E6DB4; border-color: #2E6DB4; box-shadow: 0 0 0 3px rgba(46,109,180,0.18); }
+        .su-check.on { background: #4A6B52; border-color: #4A6B52; box-shadow: 0 0 0 3px rgba(74,107,82,0.18); }
         .su-check.on::after {
           content: ''; width: 8px; height: 4px;
           border-left: 1.8px solid #fff; border-bottom: 1.8px solid #fff;
@@ -206,10 +206,10 @@ function SignupPageInner() {
           background: rgba(255,255,255,0.03);
           transition: all .18s; text-align: center;
         }
-        .su-type-btn:hover { border-color: rgba(94,174,247,0.30); background: rgba(94,174,247,0.04); }
+        .su-type-btn:hover { border-color: rgba(143,170,148,0.30); background: rgba(143,170,148,0.04); }
         .su-type-btn.selected {
-          border-color: #2E6DB4;
-          background: rgba(46,109,180,0.12);
+          border-color: #4A6B52;
+          background: rgba(74,107,82,0.12);
         }
       `}</style>
 
@@ -217,9 +217,9 @@ function SignupPageInner() {
       <div style={{
         position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden',
         background: `
-          radial-gradient(ellipse 800px 600px at 20% 15%, rgba(46,109,180,0.16), transparent 60%),
-          radial-gradient(ellipse 600px 500px at 80% 85%, rgba(94,174,247,0.09), transparent 60%),
-          #0A1628
+          radial-gradient(ellipse 800px 600px at 20% 15%, rgba(74,107,82,0.16), transparent 60%),
+          radial-gradient(ellipse 600px 500px at 80% 85%, rgba(143,170,148,0.09), transparent 60%),
+          #141E16
         `,
       }}>
         <Stars count={50} />
@@ -237,11 +237,11 @@ function SignupPageInner() {
         <a href="/" style={{
           position: 'fixed', top: 20, left: 24, zIndex: 50,
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontSize: 13, color: '#8899AA', textDecoration: 'none',
+          fontSize: 13, color: '#8A9489', textDecoration: 'none',
           transition: 'color .2s',
         }}
-          onMouseOver={e => (e.currentTarget.style.color = '#E8ECF1')}
-          onMouseOut={e => (e.currentTarget.style.color = '#8899AA')}
+          onMouseOver={e => (e.currentTarget.style.color = '#E8E6DC')}
+          onMouseOut={e => (e.currentTarget.style.color = '#8A9489')}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           Volver
@@ -249,7 +249,7 @@ function SignupPageInner() {
 
         {/* ES badge */}
         <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 50 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', fontSize: 12, fontWeight: 500, color: '#8899AA' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', fontSize: 12, fontWeight: 500, color: '#8A9489' }}>
             ES · €
           </span>
         </div>
@@ -262,7 +262,7 @@ function SignupPageInner() {
           {/* Brand */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24, justifyContent: 'center' }}>
             <img src="/foreventos-assets/favicon.png" alt="FE" style={{ height: 26, width: 'auto', borderRadius: 6 }} />
-            <span style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, letterSpacing: 0.5, fontSize: 18, color: '#E8ECF1' }}>
+            <span style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, letterSpacing: 0.5, fontSize: 18, color: '#E8E6DC' }}>
               FOREVENTOS
             </span>
           </div>
@@ -271,15 +271,15 @@ function SignupPageInner() {
             <>
               {/* Heading */}
               <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                <h1 style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, fontSize: 26, letterSpacing: -0.8, margin: '0 0 4px', color: '#E8ECF1' }}>
+                <h1 style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, fontSize: 26, letterSpacing: -0.8, margin: '0 0 4px', color: '#E8E6DC' }}>
                   Crea tu cuenta gratis
                 </h1>
-                <p style={{ margin: 0, color: '#8899AA', fontSize: 14 }}>14 días de prueba · Sin tarjeta de crédito</p>
+                <p style={{ margin: 0, color: '#8A9489', fontSize: 14 }}>14 días de prueba · Sin tarjeta de crédito</p>
               </div>
 
               {/* Account type */}
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, color: '#8899AA', marginBottom: 8, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                <div style={{ fontSize: 11, color: '#8A9489', marginBottom: 8, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                   Tipo de cuenta
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
@@ -290,10 +290,10 @@ function SignupPageInner() {
                       onClick={() => setAccountType(type)}
                       className={`su-type-btn${accountType === type ? ' selected' : ''}`}
                     >
-                      <span style={{ color: accountType === type ? '#5EAEF7' : 'rgba(255,255,255,0.35)' }}>
+                      <span style={{ color: accountType === type ? '#8FAA94' : 'rgba(255,255,255,0.35)' }}>
                         {icon}
                       </span>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: accountType === type ? '#5EAEF7' : 'rgba(255,255,255,0.55)', lineHeight: 1.2 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: accountType === type ? '#8FAA94' : 'rgba(255,255,255,0.55)', lineHeight: 1.2 }}>
                         {label}
                       </div>
                     </button>
@@ -308,10 +308,10 @@ function SignupPageInner() {
                 </div>
               )}
               {error === '__duplicate__' && (
-                <div style={{ background: 'rgba(46,109,180,0.10)', border: '1px solid rgba(46,109,180,0.25)', borderRadius: 10, padding: '9px 14px', fontSize: 13, marginBottom: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                <div style={{ background: 'rgba(74,107,82,0.10)', border: '1px solid rgba(74,107,82,0.25)', borderRadius: 10, padding: '9px 14px', fontSize: 13, marginBottom: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
                   Ya existe una cuenta con este email.{' '}
                   <button type="button" onClick={() => router.push(`/?hint=${encodeURIComponent(email)}`)}
-                    style={{ background: 'none', border: 'none', color: '#5EAEF7', fontSize: 13, cursor: 'pointer', fontFamily: 'Inter, sans-serif', padding: 0 }}>
+                    style={{ background: 'none', border: 'none', color: '#8FAA94', fontSize: 13, cursor: 'pointer', fontFamily: 'Inter, sans-serif', padding: 0 }}>
                     Iniciar sesión →
                   </button>
                 </div>
@@ -331,8 +331,8 @@ function SignupPageInner() {
                     <span className={`su-check${acceptTerms ? ' on' : ''}`} onClick={() => setAcceptTerms(v => !v)} role="checkbox" aria-checked={acceptTerms} tabIndex={0} onKeyDown={e => (e.key === ' ' || e.key === 'Enter') && setAcceptTerms(v => !v)} />
                     <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
                       He leído y acepto los{' '}
-                      <a href="/terminos" target="_blank" rel="noopener noreferrer" style={{ color: '#5EAEF7', textDecoration: 'underline' }}>términos de servicio</a>{' '}y la{' '}
-                      <a href="/privacidad" target="_blank" rel="noopener noreferrer" style={{ color: '#5EAEF7', textDecoration: 'underline' }}>política de privacidad</a>
+                      <a href="/terminos" target="_blank" rel="noopener noreferrer" style={{ color: '#8FAA94', textDecoration: 'underline' }}>términos de servicio</a>{' '}y la{' '}
+                      <a href="/privacidad" target="_blank" rel="noopener noreferrer" style={{ color: '#8FAA94', textDecoration: 'underline' }}>política de privacidad</a>
                       {' '}<span style={{ color: 'rgba(239,68,68,0.8)' }}>*</span>
                     </span>
                   </label>
@@ -369,10 +369,10 @@ function SignupPageInner() {
               </div>
 
               {/* Footer */}
-              <div style={{ textAlign: 'center', marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.07)', fontSize: 13, color: '#8899AA' }}>
+              <div style={{ textAlign: 'center', marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.07)', fontSize: 13, color: '#8A9489' }}>
                 ¿Ya tienes cuenta?{' '}
                 <button type="button" onClick={() => router.push('/')}
-                  style={{ background: 'none', border: 'none', color: '#5EAEF7', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
+                  style={{ background: 'none', border: 'none', color: '#8FAA94', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
                   Iniciar sesión →
                 </button>
               </div>
@@ -387,14 +387,14 @@ function SignupPageInner() {
               }}>
                 <Check size={24} color="#4ade80" strokeWidth={2.5} />
               </div>
-              <h2 style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontSize: 22, fontWeight: 700, color: '#E8ECF1', margin: '0 0 8px', letterSpacing: -0.5 }}>
+              <h2 style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontSize: 22, fontWeight: 700, color: '#E8E6DC', margin: '0 0 8px', letterSpacing: -0.5 }}>
                 ¡Cuenta creada!
               </h2>
-              <p style={{ fontSize: 14, color: '#8899AA', lineHeight: 1.6, margin: '0 0 20px' }}>
-                Revisa tu email <strong style={{ color: '#E8ECF1' }}>{email}</strong> y haz clic en el enlace de confirmación para activar tu cuenta.
+              <p style={{ fontSize: 14, color: '#8A9489', lineHeight: 1.6, margin: '0 0 20px' }}>
+                Revisa tu email <strong style={{ color: '#E8E6DC' }}>{email}</strong> y haz clic en el enlace de confirmación para activar tu cuenta.
               </p>
               <button type="button" onClick={() => router.push('/')}
-                style={{ background: 'none', border: 'none', color: '#5EAEF7', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
+                style={{ background: 'none', border: 'none', color: '#8FAA94', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
                 Ir a iniciar sesión →
               </button>
             </div>
