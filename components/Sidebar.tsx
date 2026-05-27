@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { usePlanFeatures, type PlanFeatures } from '@/lib/use-plan-features'
-import { Hourglass, ChevronDown, Check } from 'lucide-react'
+import { Hourglass, ChevronDown, Check, User, LogOut, ArrowRight } from 'lucide-react'
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -218,11 +218,13 @@ export default function Sidebar() {
           <div style={{ marginTop: 10, position: 'relative', borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 10 }}>
             <button
               onMouseDown={e => { e.stopPropagation(); setVenueOpen(o => !o) }}
+              onMouseEnter={e => { if (!venueOpen) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+              onMouseLeave={e => { if (!venueOpen) e.currentTarget.style.background = 'none' }}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 9,
-                cursor: 'pointer', background: 'none',
+                cursor: 'pointer', background: venueOpen ? 'rgba(255,255,255,0.05)' : 'none',
                 border: 'none', borderRadius: 8,
-                padding: '4px 2px',
+                padding: '6px 8px', transition: 'background 0.15s',
               }}
             >
               <span style={{
@@ -250,12 +252,14 @@ export default function Sidebar() {
 
             {venueOpen && (
               <div style={{
-                position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0,
-                background: '#1e1a17', border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 8, overflow: 'hidden', zIndex: 50,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0,
+                background: '#fff', border: '1px solid rgba(0,0,0,0.08)',
+                borderRadius: 12, overflow: 'hidden', zIndex: 50, padding: 6,
+                boxShadow: '0 16px 40px rgba(10,15,11,0.45)',
               }}>
-                {userVenues.map(v => (
+                {userVenues.map(v => {
+                  const isCurrent = v.row_id === activeVenue?.row_id
+                  return (
                   <button
                     key={v.row_id}
                     onMouseDown={(e) => {
@@ -263,20 +267,34 @@ export default function Sidebar() {
                       switchVenue(v.row_id)
                       setVenueOpen(false)
                     }}
+                    onMouseEnter={e => e.currentTarget.style.background = isCurrent ? 'rgba(74,107,82,0.12)' : '#f3f5f2'}
+                    onMouseLeave={e => e.currentTarget.style.background = isCurrent ? 'rgba(74,107,82,0.08)' : 'none'}
                     style={{
-                      width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '9px 12px', background: 'none', border: 'none',
-                      color: v.row_id === activeVenue?.row_id ? 'var(--gold)' : 'rgba(255,255,255,0.8)',
-                      fontSize: 12, fontWeight: v.row_id === activeVenue?.row_id ? 600 : 400,
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '9px 10px', border: 'none', borderRadius: 8,
+                      background: isCurrent ? 'rgba(74,107,82,0.08)' : 'none',
+                      color: isCurrent ? '#4A6B52' : 'var(--fe-text-dark)',
+                      fontSize: 13, fontWeight: isCurrent ? 700 : 500,
                       cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left',
+                      transition: 'background 0.12s',
                     }}
                   >
+                    <span style={{
+                      width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 12, fontWeight: 700, letterSpacing: '-0.01em',
+                      background: isCurrent ? '#4A6B52' : 'rgba(74,107,82,0.12)',
+                      color: isCurrent ? '#fff' : '#4A6B52',
+                    }}>
+                      {(v.name ?? 'V').slice(0, 1).toUpperCase()}
+                    </span>
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {v.name ?? `Venue ${v.wp_venue_id}`}
                     </span>
-                    {v.row_id === activeVenue?.row_id && <Check size={11} />}
+                    {isCurrent && <Check size={15} style={{ flexShrink: 0, color: '#4A6B52' }} />}
                   </button>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -492,43 +510,51 @@ export default function Sidebar() {
       <div className="sidebar-footer">
         {/* Trial / plan banners — solo venue owner */}
         {isVenueOwner && !features.loading && features.isTrialExpired && (
-          <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', textDecoration: 'none' }}>
-            <Hourglass size={11} style={{ color: '#f87171', flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: '#f87171', letterSpacing: '0.04em' }}>TRIAL EXPIRADO</div>
-              <div style={{ fontSize: 10, color: 'var(--stone)' }}>Activa tu plan</div>
+          <Link href="/pricing" style={{ display: 'block', padding: '16px 20px', background: 'rgba(220,38,38,0.10)', borderBottom: '1px solid rgba(255,255,255,0.07)', textDecoration: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+              <Hourglass size={13} style={{ color: '#f87171', flexShrink: 0 }} />
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#f87171', letterSpacing: '0.1em' }}>PRUEBA FINALIZADA</span>
             </div>
-            <span style={{ fontSize: 9, fontWeight: 600, color: '#f87171', whiteSpace: 'nowrap' }}>Activar →</span>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff', marginBottom: 9, lineHeight: 1.3 }}>Tu periodo de prueba ha terminado</div>
+            <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginBottom: 12 }}>
+              <div style={{ height: '100%', width: '100%', background: '#f87171' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 8, background: '#dc2626', color: '#fff', fontSize: 12.5, fontWeight: 700 }}>
+              Activar plan <ArrowRight size={14} />
+            </div>
           </Link>
         )}
 
         {isVenueOwner && !features.loading && features.isTrial && !features.isTrialExpired && (
-          <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)', textDecoration: 'none' }}>
-            <Hourglass size={11} style={{ color: 'var(--gold)', flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.04em' }}>TRIAL</div>
-              {features.trialDaysLeft !== null && (
-                <div style={{ fontSize: 10, color: features.trialDaysLeft <= 3 ? '#fca5a5' : 'var(--stone)' }}>
-                  {features.trialDaysLeft} días restantes
-                </div>
-              )}
+          <Link href="/pricing" style={{ display: 'block', padding: '16px 20px', background: 'linear-gradient(135deg, rgba(196,151,90,0.16), rgba(196,151,90,0.05))', borderBottom: '1px solid rgba(255,255,255,0.07)', textDecoration: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+              <Hourglass size={13} style={{ color: '#D4A867', flexShrink: 0 }} />
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#D4A867', letterSpacing: '0.1em' }}>PRUEBA GRATIS</span>
             </div>
-            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--gold)', whiteSpace: 'nowrap' }}>Activar →</span>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 9, lineHeight: 1.15 }}>
+              {features.trialDaysLeft ?? 0} {features.trialDaysLeft === 1 ? 'día restante' : 'días restantes'}
+            </div>
+            <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginBottom: 12 }}>
+              <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #C4975A, #E0B978)', width: `${Math.max(6, Math.min(100, ((features.trialDaysLeft ?? 0) / 14) * 100))}%` }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 8, background: '#C4975A', color: '#1A1208', fontSize: 12.5, fontWeight: 700 }}>
+              Activar plan <ArrowRight size={14} />
+            </div>
           </Link>
         )}
 
         {isVenueOwner && !features.loading && !features.isTrial && !features.isTrialExpired && features.hasPlan && features.planTier === 'basic' && (
-          <Link href="/pricing" style={{ display: 'block', marginBottom: 10, padding: '14px 14px', borderRadius: 10, background: 'rgba(196,151,90,0.08)', border: '1px solid rgba(196,151,90,0.15)', textDecoration: 'none' }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 4 }}>PASA A PREMIUM</div>
-            <div style={{ fontSize: 11, color: 'var(--stone)', lineHeight: 1.5 }}>Propuestas, exportar leads y más.</div>
+          <Link href="/pricing" style={{ display: 'block', padding: '14px 20px', background: 'rgba(196,151,90,0.08)', borderBottom: '1px solid rgba(255,255,255,0.07)', textDecoration: 'none' }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#D4A867', letterSpacing: '0.08em', marginBottom: 4 }}>PASA A PREMIUM</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>Propuestas, exportar leads y más.</div>
           </Link>
         )}
 
         {isVenueOwner && !features.loading && !features.isTrial && !features.isTrialExpired && !features.hasPlan && (
-          <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: '#1e293b', border: '1px solid #334155', textDecoration: 'none' }}>
+          <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 20px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.07)', textDecoration: 'none' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f87171' }}>Sin suscripción</div>
-              <div style={{ fontSize: 10, color: '#94a3b8' }}>Activa tu plan</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Activa tu plan</div>
             </div>
             <span style={{ fontSize: 9, fontWeight: 600, color: '#f87171', whiteSpace: 'nowrap' }}>Ver planes →</span>
           </Link>
@@ -538,23 +564,28 @@ export default function Sidebar() {
         <div style={{ position: 'relative' }} onMouseDown={e => e.stopPropagation()}>
           <button
             onMouseDown={e => { e.stopPropagation(); setUserMenuOpen(o => !o) }}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+            onMouseEnter={e => { if (!userMenuOpen) e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+            onMouseLeave={e => { if (!userMenuOpen) e.currentTarget.style.background = 'none' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: userMenuOpen ? 'rgba(255,255,255,0.06)' : 'none', border: 'none', cursor: 'pointer', padding: '12px 20px', textAlign: 'left', transition: 'background 0.15s' }}
           >
-            <div className="avatar">{initials}</div>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <div className="avatar" style={{ boxShadow: '0 0 0 2px rgba(143,170,148,0.4)' }}>{initials}</div>
+              <span style={{ position: 'absolute', bottom: -1, right: -1, width: 9, height: 9, borderRadius: '50%', background: '#7BD89B', border: '2px solid var(--fe-deep)' }} />
+            </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{
-                color: pathname === '/perfil' ? 'var(--gold)' : '#fff',
-                fontSize: 12, fontWeight: 400,
+                color: pathname === '/perfil' ? 'var(--fe-accent)' : '#fff',
+                fontSize: 12.5, fontWeight: 500,
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
               }}>
                 {userEmail}
               </div>
-              <div style={{ fontSize: 10, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
                 {roleLabel}
                 {isVenueOwner && !features.loading && (
                   <span style={{
-                    background: !features.hasPlan ? '#1e293b' : features.isTrial ? '#78350f' : features.planTier === 'basic' ? '#2A3D2E' : '#451a03',
-                    color: !features.hasPlan ? '#94a3b8' : features.isTrial ? '#fcd34d' : features.planTier === 'basic' ? '#93c5fd' : '#fde68a',
+                    background: !features.hasPlan ? 'rgba(255,255,255,0.08)' : features.isTrial ? 'rgba(196,151,90,0.18)' : features.planTier === 'basic' ? 'rgba(143,170,148,0.20)' : 'rgba(196,151,90,0.18)',
+                    color: !features.hasPlan ? 'rgba(255,255,255,0.6)' : features.isTrial ? '#E0B978' : features.planTier === 'basic' ? '#B8C9B9' : '#E0B978',
                     padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: '0.04em'
                   }}>
                     {features.isTrial ? 'TRIAL' : !features.hasPlan ? 'SIN PLAN' : features.planName ? features.planName.toUpperCase() : features.planTier === 'basic' ? 'BÁSICO' : 'PREMIUM'}
@@ -562,23 +593,30 @@ export default function Sidebar() {
                 )}
               </div>
             </div>
-            <ChevronDown size={11} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.3)', transform: userMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+            <ChevronDown size={13} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.45)', transform: userMenuOpen ? 'rotate(-90deg)' : 'none', transition: 'transform 150ms' }} />
           </button>
 
           {userMenuOpen && (
             <div style={{
-              position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: 0,
-              background: '#1e1a17', border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 8, overflow: 'hidden', zIndex: 50,
-              boxShadow: '0 -8px 24px rgba(0,0,0,0.4)',
+              position: 'fixed', bottom: 0, left: 'var(--sidebar-w)',
+              width: 210,
+              background: 'var(--fe-dark)', borderTop: '1px solid rgba(255,255,255,0.10)', borderRight: '1px solid rgba(255,255,255,0.10)',
+              overflow: 'hidden', zIndex: 200, padding: 4,
+              boxShadow: '12px 0 36px rgba(0,0,0,0.45)',
             }}>
               <button onMouseDown={() => { setUserMenuOpen(false); router.push('/perfil') }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', fontSize: 12, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left' }}>
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'none', border: 'none', borderRadius: 7, color: 'rgba(255,255,255,0.88)', fontSize: 12.5, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left', transition: 'background 0.12s' }}>
+                <User size={14} style={{ opacity: 0.85, flexShrink: 0 }} />
                 Mi perfil
               </button>
-              <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '0 10px' }} />
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 8px' }} />
               <button onMouseDown={() => { setUserMenuOpen(false); handleLogout() }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'none', border: 'none', color: '#f87171', fontSize: 12, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left' }}>
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(248,113,113,0.10)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'none', border: 'none', borderRadius: 7, color: '#f87171', fontSize: 12.5, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left', transition: 'background 0.12s' }}>
+                <LogOut size={14} style={{ flexShrink: 0 }} />
                 Cerrar sesión
               </button>
             </div>
