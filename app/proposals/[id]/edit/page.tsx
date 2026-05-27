@@ -61,7 +61,7 @@ export default function ProposalEditarPage({ params }: { params: Promise<{ id: s
   if (error) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, background: 'var(--cream)' }}>
-        <div style={{ color: '#991b1b' }}>{error}</div>
+        <div style={{ color: '#7E332D' }}>{error}</div>
         <button className="btn btn-ghost btn-sm" onClick={() => router.push('/proposals')}>← Volver a propuestas</button>
       </div>
     )

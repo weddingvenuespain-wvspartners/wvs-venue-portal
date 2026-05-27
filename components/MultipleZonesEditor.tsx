@@ -32,11 +32,11 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
 
   if (venueSpaceGroups.length === 0) {
     return (
-      <div style={{ padding: '12px 14px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 7, fontSize: 12, color: '#9a3412', lineHeight: 1.55, display: 'flex', gap: 8 }}>
-        <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1, color: '#ea580c' }} />
+      <div style={{ padding: '12px 14px', background: '#fff7ed', border: '1px solid #E6D6BE', borderRadius: 7, fontSize: 12, color: '#9a3412', lineHeight: 1.55, display: 'flex', gap: 8 }}>
+        <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1, color: '#A85B2E' }} />
         <div style={{ flex: 1 }}>
           <strong>No hay grupos de espacios definidos</strong> en tu estructura comercial.
-          <div style={{ marginTop: 4 }}>Ve a <a href="/configuracion" style={{ color: '#c2410c', fontWeight: 600 }}>Estructura comercial → Grupos y espacios</a> para configurarlos.</div>
+          <div style={{ marginTop: 4 }}>Ve a <a href="/configuracion" style={{ color: '#924E2A', fontWeight: 600 }}>Estructura comercial → Grupos y espacios</a> para configurarlos.</div>
         </div>
       </div>
     )
@@ -137,7 +137,7 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
 
     if (!ps) {
       return (
-        <div style={{ border: '1px dashed #BFDBFE', borderRadius: 6, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8, opacity: 0.7 }}>
+        <div style={{ border: '1px dashed #CCD9E6', borderRadius: 6, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8, opacity: 0.7 }}>
           <span style={{ fontSize: 12, color: 'var(--warm-gray)', flex: 1, fontStyle: 'italic' }}>{vs.name} — no importado</span>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
             const newSpace: VenueSpaceItem = { zone_id: vs.id, name: vs.name, description: vs.description ?? '', price: vs.price ?? '', capacity_min: vs.capacity_min, capacity_max: vs.capacity_max }
@@ -149,25 +149,25 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
 
     return (
       <div style={{
-        border: `1px solid ${isIncluded === true ? '#bbf7d0' : isIncluded === false ? '#fde68a' : 'var(--border)'}`,
+        border: `1px solid ${isIncluded === true ? '#D2DFD3' : isIncluded === false ? '#E2D4AE' : 'var(--border)'}`,
         borderRadius: 7, padding: 10,
-        background: outOfRange ? '#FAFAF9' : isIncluded === true ? '#f0fdf4' : isIncluded === false ? '#fffbeb' : 'var(--surface)',
+        background: outOfRange ? '#FAFAF9' : isIncluded === true ? '#EEF2EC' : isIncluded === false ? '#F7F3E8' : 'var(--surface)',
         display: 'flex', flexDirection: 'column', gap: 6, opacity: outOfRange ? 0.65 : 1,
       }}>
         {/* Space header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', flex: 1 }}>
             {ps.name}
-            <span style={{ marginLeft: 6, fontSize: 9, color: '#15803d', background: '#dcfce7', padding: '1px 5px', borderRadius: 8, fontWeight: 600 }}>ESTRUCTURA</span>
+            <span style={{ marginLeft: 6, fontSize: 9, color: '#3C5945', background: '#DDE7DF', padding: '1px 5px', borderRadius: 8, fontWeight: 600 }}>ESTRUCTURA</span>
             {isIncluded === true && (
-              <span style={{ marginLeft: 4, fontSize: 9, color: '#166534', background: '#bbf7d0', padding: '1px 5px', borderRadius: 8, fontWeight: 600 }}>INCLUIDO</span>
+              <span style={{ marginLeft: 4, fontSize: 9, color: '#35513E', background: '#D2DFD3', padding: '1px 5px', borderRadius: 8, fontWeight: 600 }}>INCLUIDO</span>
             )}
             {isIncluded === false && (
-              <span style={{ marginLeft: 4, fontSize: 9, color: '#92400e', background: '#fde68a', padding: '1px 5px', borderRadius: 8, fontWeight: 600 }}>OPCIONAL</span>
+              <span style={{ marginLeft: 4, fontSize: 9, color: '#7A5A2E', background: '#E2D4AE', padding: '1px 5px', borderRadius: 8, fontWeight: 600 }}>OPCIONAL</span>
             )}
           </span>
           {(vs.capacity_min || vs.capacity_max) && (
-            <span style={{ fontSize: 10, color: outOfRange ? '#9a3412' : '#64748B', background: outOfRange ? '#fed7aa' : '#F1F5F9', borderRadius: 5, padding: '1px 6px', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 10, color: outOfRange ? '#9a3412' : '#64748B', background: outOfRange ? '#E6D6BE' : '#F1F5F9', borderRadius: 5, padding: '1px 6px', whiteSpace: 'nowrap' }}>
               <Users size={9} style={{ verticalAlign: 'middle', marginRight: 2 }} />
               {vs.capacity_min ?? '0'}–{vs.capacity_max ?? '∞'} pax
               {outOfRange && guestCount && <span style={{ marginLeft: 4 }}>(vosotros: {guestCount})</span>}
@@ -207,7 +207,7 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
                     const next = allPhotos.filter((_: string, j: number) => j !== pi)
                     updateSpace(vg.id, vs.id, { photos: next, photo_url: next[0] ?? '' } as any)
                   }}
-                    style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                    style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#BC5249', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                 </div>
               ))}
               <ImageUploader label="+" height={48} onUpload={async (f) => {
@@ -232,22 +232,22 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Global sync banner */}
-      <div style={{ padding: '8px 12px', borderRadius: 7, background: allSynced ? '#f0fdf4' : '#eff6ff', border: `1px solid ${allSynced ? '#bbf7d0' : '#bfdbfe'}`, display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
+      <div style={{ padding: '8px 12px', borderRadius: 7, background: allSynced ? '#EEF2EC' : '#EEF2F7', border: `1px solid ${allSynced ? '#D2DFD3' : '#CCD9E6'}`, display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
         {allSynced ? (
           <>
-            <Check size={13} style={{ color: '#166534', flexShrink: 0 }} />
-            <span style={{ color: '#166534', flex: 1 }}>
-              Sincronizado con <a href="/configuracion" style={{ color: '#15803d', fontWeight: 600 }}>estructura comercial</a> ({venueSpaceGroups.length} {venueSpaceGroups.length === 1 ? 'grupo' : 'grupos'})
+            <Check size={13} style={{ color: '#35513E', flexShrink: 0 }} />
+            <span style={{ color: '#35513E', flex: 1 }}>
+              Sincronizado con <a href="/configuracion" style={{ color: '#3C5945', fontWeight: 600 }}>estructura comercial</a> ({venueSpaceGroups.length} {venueSpaceGroups.length === 1 ? 'grupo' : 'grupos'})
             </span>
           </>
         ) : (
           <>
-            <RefreshCw size={13} style={{ color: '#1d4ed8', flexShrink: 0 }} />
-            <span style={{ color: '#1e3a8a', flex: 1 }}>
+            <RefreshCw size={13} style={{ color: '#3F5980', flexShrink: 0 }} />
+            <span style={{ color: '#39527A', flex: 1 }}>
               {totalMissing} {totalMissing === 1 ? 'espacio nuevo' : 'espacios nuevos'} en estructura
             </span>
             <button type="button" onClick={syncAll}
-              style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 5, background: '#1d4ed8', color: '#fff', border: 'none', cursor: 'pointer' }}>
+              style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 5, background: '#3F5980', color: '#fff', border: 'none', cursor: 'pointer' }}>
               Sincronizar
             </button>
           </>
@@ -281,10 +281,10 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
                 {SELECTION_LABELS[vg.selection_mode] ?? vg.selection_mode}
               </span>
               {!pg && (
-                <span style={{ fontSize: 10, color: '#9a3412', background: '#fed7aa', borderRadius: 8, padding: '2px 7px', fontWeight: 600 }}>NO IMPORTADO</span>
+                <span style={{ fontSize: 10, color: '#9a3412', background: '#E6D6BE', borderRadius: 8, padding: '2px 7px', fontWeight: 600 }}>NO IMPORTADO</span>
               )}
               {pg && missingCount > 0 && (
-                <span style={{ fontSize: 10, color: '#1e3a8a', background: '#dbeafe', borderRadius: 8, padding: '2px 7px', fontWeight: 600 }}>{missingCount} nuevo{missingCount > 1 ? 's' : ''}</span>
+                <span style={{ fontSize: 10, color: '#39527A', background: '#DDE5EF', borderRadius: 8, padding: '2px 7px', fontWeight: 600 }}>{missingCount} nuevo{missingCount > 1 ? 's' : ''}</span>
               )}
             </div>
 
@@ -323,13 +323,13 @@ export default function MultipleZonesEditor({ venueSpaceGroups, groups, onChange
                       <React.Fragment key={vs.id}>
                         {/* Section divider between included and optional */}
                         {idx === 0 && isITP && includedSpaces.length > 0 && (
-                          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#166534', padding: '4px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ background: '#dcfce7', padding: '2px 8px', borderRadius: 4 }}>✓ Siempre incluidos</span>
+                          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#35513E', padding: '4px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ background: '#DDE7DF', padding: '2px 8px', borderRadius: 4 }}>✓ Siempre incluidos</span>
                           </div>
                         )}
                         {isFirstOptional && (
-                          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#92400e', padding: '8px 0 2px', borderTop: '1px dashed #fde68a', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ background: '#fef3c7', padding: '2px 8px', borderRadius: 4 }}>Adicionales a elegir</span>
+                          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#7A5A2E', padding: '8px 0 2px', borderTop: '1px dashed #E2D4AE', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ background: '#F3EBD8', padding: '2px 8px', borderRadius: 4 }}>Adicionales a elegir</span>
                           </div>
                         )}
                         {renderSpace(vg, pg, vs, isITP ? isIncluded : undefined)}

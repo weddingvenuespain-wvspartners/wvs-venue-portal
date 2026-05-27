@@ -390,7 +390,7 @@ export default function TemplateEditor({
           placeholder="Queridos {{pareja}}, ha sido un placer recibiros en la finca…"
           value={(sections as any).welcome_default ?? ''}
           onChange={e => { setSections(s => ({ ...s, welcome_default: e.target.value } as any)); markDirty() }} />
-        <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 7, padding: '8px 10px', fontSize: 11, color: '#92400e', lineHeight: 1.55 }}>
+        <div style={{ background: '#F7F3E8', border: '1px solid #C2A968', borderRadius: 7, padding: '8px 10px', fontSize: 11, color: '#7A5A2E', lineHeight: 1.55 }}>
           <strong>Marcadores dinámicos:</strong><br />
           <code style={{ background: 'rgba(0,0,0,.06)', padding: '1px 4px', borderRadius: 3 }}>{'{{pareja}}'}</code> → nombre de la pareja &nbsp;·&nbsp;
           <code style={{ background: 'rgba(0,0,0,.06)', padding: '1px 4px', borderRadius: 3 }}>{'{{invitados}}'}</code> → nº invitados &nbsp;·&nbsp;
@@ -645,7 +645,7 @@ export default function TemplateEditor({
                     const next = allPhotos.filter((_: string, j: number) => j !== pi)
                     setSs({ photos: next, image_url: next[0] ?? '' })
                   }}
-                    style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                    style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#BC5249', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                 </div>
               ))}
               <ImageUploader label="+" height={48} onUpload={async (f) => {
@@ -737,7 +737,7 @@ export default function TemplateEditor({
                           <div key={pi} style={{ position: 'relative', width: 56, height: 56 }}>
                             <img src={url} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover' }} />
                             <button type="button" onClick={() => { const next = [...(z.photos ?? [])]; next.splice(pi, 1); updateItem(overrideKey, i, 'photos', next) }}
-                              style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                              style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#BC5249', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                           </div>
                         ))}
                         <ImageUploader label="+" height={48} onUpload={async (f) => { const url = await uploadImage(f, 'zones'); if (url) updateItem(overrideKey, i, 'photos', [...(z.photos ?? []), url]) }} />
@@ -1698,7 +1698,7 @@ export default function TemplateEditor({
           placeholder="Nombre de la plantilla"
           style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', width: 220 }}
         />
-        <span style={{ fontSize: 12, color: saved ? '#16a34a' : 'var(--warm-gray)', marginLeft: 4, display: 'flex', alignItems: 'center', gap: 4, transition: 'color .3s' }}>
+        <span style={{ fontSize: 12, color: saved ? '#4A6B52' : 'var(--warm-gray)', marginLeft: 4, display: 'flex', alignItems: 'center', gap: 4, transition: 'color .3s' }}>
           · {saved ? 'Guardado' : dirty ? 'Sin guardar' : 'Sin cambios'}
           {saved && <Check size={11} strokeWidth={2.5} />}
         </span>
@@ -1713,7 +1713,7 @@ export default function TemplateEditor({
       </div>
 
       {saveError && (
-        <div style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca', padding: '6px 20px', fontSize: 12, color: '#dc2626' }}>{saveError}</div>
+        <div style={{ background: '#FAF3F2', borderBottom: '1px solid #E9D4D0', padding: '6px 20px', fontSize: 12, color: '#B0473E' }}>{saveError}</div>
       )}
 
       {/* ── Body ─────────────────────────────────────────────────────────────── */}
@@ -1951,7 +1951,7 @@ export default function TemplateEditor({
                               const matches = spaceType && allowedTypes.includes(spaceType)
                               if (matches) {
                                 return (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, fontSize: 11, color: '#166534', lineHeight: 1.4 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 12, background: '#EEF2EC', border: '1px solid #D2DFD3', borderRadius: 6, fontSize: 11, color: '#35513E', lineHeight: 1.4 }}>
                                     <Check size={13} style={{ flexShrink: 0 }} />
                                     <span>Recomendada para tu configuración: <strong>{SPACE_TYPE_LABELS[spaceType]}</strong></span>
                                   </div>

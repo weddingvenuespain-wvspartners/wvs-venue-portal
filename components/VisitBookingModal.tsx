@@ -597,7 +597,7 @@ export default function VisitBookingModal({
               </div>
 
               {error && (
-                <div style={{ fontSize: 12, color: '#fca5a5', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 12px' }}>{error}</div>
+                <div style={{ fontSize: 12, color: '#E0C2BD', background: 'rgba(188,82,73,.1)', border: '1px solid rgba(188,82,73,.2)', borderRadius: 6, padding: '8px 12px' }}>{error}</div>
               )}
 
               <button type="button" onClick={submit} disabled={submitting}

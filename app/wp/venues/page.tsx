@@ -164,7 +164,7 @@ export default function VenueSearchPage() {
               boxShadow: viewTab === t.key ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
               transition: 'all 0.15s',
             }}>
-              {t.key === 'favorites' && <Heart size={13} fill={viewTab === 'favorites' ? '#ef4444' : 'none'} color={viewTab === 'favorites' ? '#ef4444' : 'currentColor'} />}
+              {t.key === 'favorites' && <Heart size={13} fill={viewTab === 'favorites' ? '#BC5249' : 'none'} color={viewTab === 'favorites' ? '#BC5249' : 'currentColor'} />}
               {t.label}
             </button>
           ))}
@@ -222,7 +222,7 @@ export default function VenueSearchPage() {
                 const isToggling = togglingFav.has(v.user_id)
                 const initials = (v.display_name || 'V').slice(0, 2).toUpperCase()
                 return (
-                  <div key={v.user_id} style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: isFav ? '0 2px 12px rgba(239,68,68,0.08)' : '0 1px 6px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', border: isFav ? '1px solid rgba(239,68,68,0.15)' : '1px solid transparent', transition: 'box-shadow 0.2s, border-color 0.2s' }}>
+                  <div key={v.user_id} style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: isFav ? '0 2px 12px rgba(188,82,73,0.08)' : '0 1px 6px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', border: isFav ? '1px solid rgba(188,82,73,0.15)' : '1px solid transparent', transition: 'box-shadow 0.2s, border-color 0.2s' }}>
                     {/* Card header */}
                     <div style={{ height: 80, background: 'linear-gradient(135deg, rgba(196,151,90,0.12), rgba(196,151,90,0.04))', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                       <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(196,151,90,0.15)', border: '2px solid rgba(196,151,90,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--gold)' }}>
@@ -241,8 +241,8 @@ export default function VenueSearchPage() {
                         style={{
                           position: 'absolute', top: 8, right: 8,
                           width: 28, height: 28, borderRadius: '50%',
-                          background: isFav ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.8)',
-                          border: isFav ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(0,0,0,0.08)',
+                          background: isFav ? 'rgba(188,82,73,0.12)' : 'rgba(255,255,255,0.8)',
+                          border: isFav ? '1px solid rgba(188,82,73,0.2)' : '1px solid rgba(0,0,0,0.08)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           cursor: isToggling ? 'default' : 'pointer',
                           opacity: isToggling ? 0.6 : 1,
@@ -252,8 +252,8 @@ export default function VenueSearchPage() {
                       >
                         <Heart
                           size={13}
-                          fill={isFav ? '#ef4444' : 'none'}
-                          color={isFav ? '#ef4444' : '#9ca3af'}
+                          fill={isFav ? '#BC5249' : 'none'}
+                          color={isFav ? '#BC5249' : '#9ca3af'}
                           style={{ transition: 'all 0.18s' }}
                         />
                       </button>
@@ -317,7 +317,7 @@ export default function VenueSearchPage() {
             </div>
 
             {sendError && (
-              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 16 }}>
+              <div style={{ background: 'rgba(188,82,73,0.08)', border: '1px solid rgba(188,82,73,0.2)', borderRadius: 8, padding: '10px 14px', color: '#B0473E', fontSize: 13, marginBottom: 16 }}>
                 {sendError}
               </div>
             )}

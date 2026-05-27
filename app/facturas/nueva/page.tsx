@@ -499,7 +499,7 @@ export default function NuevaFacturaPage() {
                 </div>
                 <div>
                   <DatePicker value={dueDate} onChange={v => { if (v && v < issueDate) return; setDueDate(v) }} label="Vencimiento" accent="var(--gold)" allowPast minDate={issueDate} placeholder="Sin vencimiento" />
-                  {dueDate && dueDate < issueDate && <div style={{ fontSize: 10, color: '#dc2626', marginTop: 2 }}>Debe ser igual o posterior a emisión</div>}
+                  {dueDate && dueDate < issueDate && <div style={{ fontSize: 10, color: '#B0473E', marginTop: 2 }}>Debe ser igual o posterior a emisión</div>}
                 </div>
                 <div>
                   <DatePicker value={weddingDate} onChange={setWeddingDate} label="Fecha boda" accent="var(--gold)" allowPast placeholder="Opcional" />

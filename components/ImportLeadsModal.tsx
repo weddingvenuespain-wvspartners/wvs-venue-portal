@@ -443,7 +443,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
                 background: '#faf8f5', border: '1px solid var(--ivory)', borderRadius: 12,
                 padding: 20, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 16,
               }}>
-                <FileSpreadsheet size={28} style={{ color: '#047857', flexShrink: 0 }} />
+                <FileSpreadsheet size={28} style={{ color: '#3C5945', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 4 }}>
                     1. Descarga la plantilla
@@ -454,7 +454,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
                   </div>
                 </div>
                 <button className="btn btn-sm" onClick={downloadTemplate}
-                  style={{ background: '#047857', color: '#fff', border: 'none', whiteSpace: 'nowrap' }}>
+                  style={{ background: '#3C5945', color: '#fff', border: 'none', whiteSpace: 'nowrap' }}>
                   <Download size={13} /> Descargar plantilla
                 </button>
               </div>
@@ -490,7 +490,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
             <div>
               {/* Summary badges */}
               <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '4px 10px', borderRadius: 6, background: '#d1fae5', color: '#065f46' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '4px 10px', borderRadius: 6, background: '#DCE7DE', color: '#35513E' }}>
                   <CheckCircle2 size={12} /> {okRows.length} listos
                 </span>
                 {warnRows.length > 0 && (
@@ -499,7 +499,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
                   </span>
                 )}
                 {errRows.length > 0 && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '4px 10px', borderRadius: 6, background: '#fee2e2', color: '#991b1b' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '4px 10px', borderRadius: 6, background: '#F2E2E0', color: '#7E332D' }}>
                     <XCircle size={12} /> {errRows.length} con errores
                   </span>
                 )}
@@ -542,7 +542,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
                         display: 'grid', gridTemplateColumns: '40px 1fr 140px 100px',
                         padding: '8px 12px', fontSize: 12, borderBottom: '1px solid #f5f0eb',
                         opacity: willSkip ? 0.5 : 1,
-                        background: row.status === 'error' ? '#fff5f5' : row.duplicate ? '#fffbeb' : '#fff',
+                        background: row.status === 'error' ? '#FAF4F3' : row.duplicate ? '#F7F3E8' : '#fff',
                       }}>
                         <span style={{ color: 'var(--warm-gray)' }}>{row.rowNum}</span>
                         <span style={{ color: 'var(--charcoal)', fontWeight: 500 }}>
@@ -553,9 +553,9 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
                           {row.dbStatus === 'won' ? 'Confirmado' : row.dbStatus === 'new' ? 'Nuevo' : row.dbStatus}
                         </span>
                         <span>
-                          {row.status === 'ok' && <span style={{ color: '#047857', display: 'flex', alignItems: 'center', gap: 3 }}><CheckCircle2 size={11} /> Importar</span>}
+                          {row.status === 'ok' && <span style={{ color: '#3C5945', display: 'flex', alignItems: 'center', gap: 3 }}><CheckCircle2 size={11} /> Importar</span>}
                           {row.status === 'warning' && <span style={{ color: '#8a6d2b', display: 'flex', alignItems: 'center', gap: 3 }}><AlertTriangle size={11} /> {duplicateAction === 'skip' ? 'Saltar' : 'Actualizar'}</span>}
-                          {row.status === 'error' && <span style={{ color: '#991b1b', display: 'flex', alignItems: 'center', gap: 3 }}><XCircle size={11} /> Error</span>}
+                          {row.status === 'error' && <span style={{ color: '#7E332D', display: 'flex', alignItems: 'center', gap: 3 }}><XCircle size={11} /> Error</span>}
                         </span>
                       </div>
                     )
@@ -577,7 +577,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
           {/* ── Step: Done ──────────────────────────────────────────────── */}
           {step === 'done' && (
             <div style={{ textAlign: 'center', padding: '30px 0' }}>
-              <CheckCircle2 size={40} style={{ color: '#047857', marginBottom: 16 }} />
+              <CheckCircle2 size={40} style={{ color: '#3C5945', marginBottom: 16 }} />
               <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 16 }}>
                 Importación completada
               </div>

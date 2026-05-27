@@ -83,7 +83,7 @@ export default function ProposalGate({ slug, coupleName }: { slug: string; coupl
             fontSize: 14,
             color: '#fff',
             background: 'rgba(255,255,255,0.06)',
-            border: `1px solid ${error ? 'rgba(220,38,38,0.6)' : 'rgba(255,255,255,0.14)'}`,
+            border: `1px solid ${error ? 'rgba(176,71,62,0.6)' : 'rgba(255,255,255,0.14)'}`,
             borderRadius: 8,
             outline: 'none',
             marginBottom: 14,
@@ -91,7 +91,7 @@ export default function ProposalGate({ slug, coupleName }: { slug: string; coupl
           }}
         />
         {error && (
-          <div style={{ fontSize: 12, color: '#fca5a5', marginBottom: 14 }}>{error}</div>
+          <div style={{ fontSize: 12, color: '#E0C2BD', marginBottom: 14 }}>{error}</div>
         )}
         <button
           type="submit"

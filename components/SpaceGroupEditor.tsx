@@ -250,7 +250,7 @@ export default function SpaceGroupEditor({ groups, onChange, uploadImage, isTemp
                                 const next = allPhotos.filter((_: string, j: number) => j !== pi)
                                 updateSpace(gi, si, { photos: next, photo_url: next[0] ?? '' } as any)
                               }}
-                                style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                                style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#BC5249', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                             </div>
                           ))}
                           <ImageUploader label="+" height={48} onUpload={async (f) => {

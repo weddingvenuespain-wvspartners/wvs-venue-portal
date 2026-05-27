@@ -143,7 +143,7 @@ export default function InvoiceDetailPage() {
   const items = Array.isArray(invoice.line_items) ? invoice.line_items : []
 
   // Template accent color
-  const accentMap: Record<string, string> = { classic: '#8B6914', modern: '#2563EB', minimal: '#111' }
+  const accentMap: Record<string, string> = { classic: '#8B6914', modern: '#47648A', minimal: '#111' }
   const accent = accentMap[invoice.template] || '#8B6914'
 
   return (

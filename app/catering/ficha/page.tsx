@@ -97,7 +97,7 @@ export default function CateringFichaPage() {
         ) : (
           <form onSubmit={handleSave}>
             {error && (
-              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 16 }}>
+              <div style={{ background: 'rgba(188,82,73,0.08)', border: '1px solid rgba(188,82,73,0.2)', borderRadius: 8, padding: '10px 14px', color: '#B0473E', fontSize: 13, marginBottom: 16 }}>
                 {error}
               </div>
             )}
@@ -155,7 +155,7 @@ export default function CateringFichaPage() {
 
             <div style={{ marginTop: 24 }}>
               <button type="submit" disabled={saving}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 8, border: 'none', background: saved ? '#22c55e' : 'var(--charcoal)', color: '#fff', fontSize: 13, fontWeight: 500, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.7 : 1, fontFamily: 'Inter, sans-serif', transition: 'background 0.3s' }}>
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 8, border: 'none', background: saved ? '#5C7E64' : 'var(--charcoal)', color: '#fff', fontSize: 13, fontWeight: 500, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.7 : 1, fontFamily: 'Inter, sans-serif', transition: 'background 0.3s' }}>
                 {saved ? <><CheckCircle size={14} /> Guardado</> : <><Save size={14} /> Guardar cambios</>}
               </button>
             </div>

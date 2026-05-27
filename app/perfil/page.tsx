@@ -32,12 +32,12 @@ function Section({ title, description, children, danger }: {
   title: string; description?: string; children: React.ReactNode; danger?: boolean
 }) {
   return (
-    <div className="card" style={{ marginBottom: 16, ...(danger ? { borderColor: 'rgba(239,68,68,0.25)' } : {}) }}>
+    <div className="card" style={{ marginBottom: 16, ...(danger ? { borderColor: 'rgba(188,82,73,0.25)' } : {}) }}>
       <div className="card-header" style={{
         flexDirection: 'column', alignItems: 'flex-start', gap: 2,
-        ...(danger ? { background: 'rgba(239,68,68,0.04)' } : {}),
+        ...(danger ? { background: 'rgba(188,82,73,0.04)' } : {}),
       }}>
-        <div className="card-title" style={danger ? { color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6 } : {}}>
+        <div className="card-title" style={danger ? { color: '#B0473E', display: 'flex', alignItems: 'center', gap: 6 } : {}}>
           {danger && <ShieldAlert size={14} />}
           {title}
         </div>
@@ -269,7 +269,7 @@ function PerfilPageContent() {
     return s
   }
   const strengthLabel = ['', 'Muy débil', 'Débil', 'Aceptable', 'Fuerte', 'Muy fuerte']
-  const strengthColor = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#16a34a']
+  const strengthColor = ['', '#BC5249', '#f97316', '#eab308', '#5C7E64', '#4A6B52']
 
   // ─── Profile completeness ──────────────────────────────────────────────────
   const completenessItems = [
@@ -281,7 +281,7 @@ function PerfilPageContent() {
   ]
   const completenessCount   = completenessItems.filter(Boolean).length
   const completenessPercent = Math.round((completenessCount / completenessItems.length) * 100)
-  const completenessColor   = completenessPercent < 40 ? '#ef4444' : completenessPercent < 80 ? '#f59e0b' : '#22c55e'
+  const completenessColor   = completenessPercent < 40 ? '#BC5249' : completenessPercent < 80 ? '#AC8B4C' : '#5C7E64'
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
@@ -639,14 +639,14 @@ function PerfilPageContent() {
                       </div>
                       {profile?.wp_venue_id ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <CheckCircle2 size={13} style={{ color: '#22c55e' }} />
+                          <CheckCircle2 size={13} style={{ color: '#5C7E64' }} />
                           <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--espresso)' }}>
                             WordPress ID #{profile.wp_venue_id}
                           </span>
                         </div>
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <AlertTriangle size={13} style={{ color: '#f59e0b' }} />
+                          <AlertTriangle size={13} style={{ color: '#AC8B4C' }} />
                           <span style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Sin asignar — contacta con tu gestor</span>
                         </div>
                       )}
@@ -768,13 +768,13 @@ function PerfilPageContent() {
                     {passSuccess && (
                       <div style={{
                         display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '12px 16px', background: '#f0fdf4',
-                        border: '1px solid #bbf7d0', borderRadius: 8, marginBottom: 16,
+                        padding: '12px 16px', background: '#EEF2EC',
+                        border: '1px solid #D2DFD3', borderRadius: 8, marginBottom: 16,
                       }}>
-                        <CheckCircle2 size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <CheckCircle2 size={16} style={{ color: '#4A6B52', flexShrink: 0 }} />
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#15803d' }}>Contraseña actualizada correctamente</div>
-                          <div style={{ fontSize: 11, color: '#166534', marginTop: 1 }}>Recuerda usar la nueva contraseña la próxima vez que inicies sesión.</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#3C5945' }}>Contraseña actualizada correctamente</div>
+                          <div style={{ fontSize: 11, color: '#35513E', marginTop: 1 }}>Recuerda usar la nueva contraseña la próxima vez que inicies sesión.</div>
                         </div>
                       </div>
                     )}
@@ -866,7 +866,7 @@ function PerfilPageContent() {
                         </div>
                         {confirmPass && newPass && (
                           <div style={{ fontSize: 11, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4,
-                            color: newPass === confirmPass ? '#22c55e' : '#ef4444' }}>
+                            color: newPass === confirmPass ? '#5C7E64' : '#BC5249' }}>
                             {newPass === confirmPass
                               ? <><CheckCircle2 size={11} /> Las contraseñas coinciden</>
                               : <><XCircle size={11} /> Las contraseñas no coinciden</>}
@@ -893,7 +893,7 @@ function PerfilPageContent() {
                   {/* B) 2FA — Full implementation */}
                   <div className="card" style={{ marginBottom: 16, overflow: 'hidden' }}>
                     <div style={{
-                      background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+                      background: 'linear-gradient(135deg, #282652 0%, #36336A 100%)',
                       padding: '20px 24px',
                       display: 'flex', alignItems: 'center', gap: 16,
                     }}>
@@ -903,7 +903,7 @@ function PerfilPageContent() {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         border: '1px solid rgba(255,255,255,0.15)',
                       }}>
-                        <Shield size={20} style={{ color: '#a5b4fc' }} />
+                        <Shield size={20} style={{ color: '#B0B7D6' }} />
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -914,8 +914,8 @@ function PerfilPageContent() {
                             <span style={{
                               fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
                               padding: '2px 7px', borderRadius: 4,
-                              background: 'rgba(34,197,94,0.2)', color: '#4ade80',
-                              border: '1px solid rgba(34,197,94,0.3)',
+                              background: 'rgba(92,126,100,0.2)', color: '#6E9478',
+                              border: '1px solid rgba(92,126,100,0.3)',
                               textTransform: 'uppercase',
                             }}>
                               ACTIVO
@@ -1011,11 +1011,11 @@ function PerfilPageContent() {
                         <div>
                           <div style={{
                             display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '12px 14px', background: '#f0fdf4',
-                            border: '1px solid #bbf7d0', borderRadius: 8, marginBottom: 12,
+                            padding: '12px 14px', background: '#EEF2EC',
+                            border: '1px solid #D2DFD3', borderRadius: 8, marginBottom: 12,
                           }}>
-                            <CheckCircle2 size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#15803d' }}>
+                            <CheckCircle2 size={16} style={{ color: '#4A6B52', flexShrink: 0 }} />
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#3C5945' }}>
                               Verificación en dos pasos activa
                             </div>
                           </div>
@@ -1057,8 +1057,8 @@ function PerfilPageContent() {
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)' }}>Sesión actual</span>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-                          <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 500 }}>Activo ahora</span>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#5C7E64', display: 'inline-block' }} />
+                          <span style={{ fontSize: 11, color: '#5C7E64', fontWeight: 500 }}>Activo ahora</span>
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>
                           Navegador web
@@ -1082,7 +1082,7 @@ function PerfilPageContent() {
                       </button>
                       <button
                         className="btn btn-ghost btn-sm"
-                        style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: 5 }}
+                        style={{ color: '#B0473E', display: 'flex', alignItems: 'center', gap: 5 }}
                         onClick={async () => {
                           const supabase = createClient()
                           localStorage.removeItem('wvs_session_expiry')
@@ -1225,10 +1225,10 @@ function PerfilPageContent() {
                   {/* A) Tus datos */}
                   <Section title="Tus datos" description="Derechos RGPD — acceso y portabilidad de datos.">
                     <div style={{
-                      padding: '12px 14px', background: '#eff6ff',
-                      border: '1px solid #bfdbfe', borderRadius: 8, marginBottom: 16,
+                      padding: '12px 14px', background: '#EEF2F7',
+                      border: '1px solid #CCD9E6', borderRadius: 8, marginBottom: 16,
                     }}>
-                      <div style={{ fontSize: 12, color: '#1d4ed8', lineHeight: 1.6 }}>
+                      <div style={{ fontSize: 12, color: '#3F5980', lineHeight: 1.6 }}>
                         Tienes derecho a acceder y exportar todos tus datos personales almacenados en nuestra plataforma.
                       </div>
                     </div>
@@ -1253,11 +1253,11 @@ function PerfilPageContent() {
                     {dataExportRequested ? (
                       <div style={{
                         display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '12px 16px', background: '#f0fdf4',
-                        border: '1px solid #bbf7d0', borderRadius: 8,
+                        padding: '12px 16px', background: '#EEF2EC',
+                        border: '1px solid #D2DFD3', borderRadius: 8,
                       }}>
-                        <CheckCircle2 size={15} style={{ color: '#16a34a', flexShrink: 0 }} />
-                        <div style={{ fontSize: 12, color: '#15803d' }}>
+                        <CheckCircle2 size={15} style={{ color: '#4A6B52', flexShrink: 0 }} />
+                        <div style={{ fontSize: 12, color: '#3C5945' }}>
                           Solicitud procesada. Recibirás un email en las próximas 24 horas con tus datos.
                         </div>
                       </div>
@@ -1300,19 +1300,19 @@ function PerfilPageContent() {
                   </Section>
 
                   {/* C) Eliminar cuenta */}
-                  <div className="card" style={{ borderColor: 'rgba(239,68,68,0.25)' }}>
-                    <div className="card-header" style={{ background: 'rgba(239,68,68,0.04)' }}>
-                      <div className="card-title" style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div className="card" style={{ borderColor: 'rgba(188,82,73,0.25)' }}>
+                    <div className="card-header" style={{ background: 'rgba(188,82,73,0.04)' }}>
+                      <div className="card-title" style={{ color: '#B0473E', display: 'flex', alignItems: 'center', gap: 6 }}>
                         <ShieldAlert size={14} /> Zona de peligro
                       </div>
                     </div>
                     <div className="card-body">
                       <div style={{
                         marginBottom: 16, padding: 14,
-                        background: 'rgba(239,68,68,0.04)',
-                        borderRadius: 8, border: '1px solid rgba(239,68,68,0.15)',
+                        background: 'rgba(188,82,73,0.04)',
+                        borderRadius: 8, border: '1px solid rgba(188,82,73,0.15)',
                       }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 6 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#B0473E', marginBottom: 6 }}>
                           Eliminar cuenta permanentemente
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.7 }}>
@@ -1325,12 +1325,12 @@ function PerfilPageContent() {
                           Solicitar eliminación de cuenta
                         </button>
                       ) : (
-                        <div style={{ padding: 16, background: 'rgba(239,68,68,0.06)', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)' }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 10 }}>
+                        <div style={{ padding: 16, background: 'rgba(188,82,73,0.06)', borderRadius: 8, border: '1px solid rgba(188,82,73,0.2)' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#B0473E', marginBottom: 10 }}>
                             ¿Estás seguro? Esta acción no se puede deshacer.
                           </div>
                           <div className="form-group" style={{ marginBottom: 12 }}>
-                            <label className="form-label" style={{ color: '#dc2626' }}>
+                            <label className="form-label" style={{ color: '#B0473E' }}>
                               Escribe <strong>ELIMINAR</strong> para confirmar
                             </label>
                             <input
@@ -1338,7 +1338,7 @@ function PerfilPageContent() {
                               value={deleteText}
                               onChange={e => setDeleteText(e.target.value)}
                               placeholder="ELIMINAR"
-                              style={{ borderColor: deleteText === 'ELIMINAR' ? '#dc2626' : undefined }}
+                              style={{ borderColor: deleteText === 'ELIMINAR' ? '#B0473E' : undefined }}
                             />
                           </div>
                           <div style={{ display: 'flex', gap: 8 }}>
@@ -1374,7 +1374,7 @@ function PerfilPageContent() {
                       border: '1px solid #334155',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                        <Clock size={16} style={{ color: '#fcd34d' }} />
+                        <Clock size={16} style={{ color: '#C2A968' }} />
                         <span style={{ fontSize: 14, fontWeight: 600, color: '#f8fafc', fontFamily: 'Inter, sans-serif' }}>
                           Período de prueba activo
                         </span>
@@ -1382,7 +1382,7 @@ function PerfilPageContent() {
                           <span style={{
                             marginLeft: 'auto', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 5,
                             background: features.trialDaysLeft <= 3 ? '#7f1d1d' : features.trialDaysLeft <= 7 ? '#78350f' : '#2A3D2E',
-                            color: features.trialDaysLeft <= 3 ? '#fca5a5' : features.trialDaysLeft <= 7 ? '#fcd34d' : '#93c5fd',
+                            color: features.trialDaysLeft <= 3 ? '#E0C2BD' : features.trialDaysLeft <= 7 ? '#C2A968' : '#AFC0D2',
                           }}>
                             {features.trialDaysLeft > 0 ? `${features.trialDaysLeft} días restantes` : 'Trial expirado'}
                           </span>
@@ -1393,18 +1393,18 @@ function PerfilPageContent() {
                         Cuando expire, necesitarás activar un plan para continuar.
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <div style={{ flex: 1, minWidth: 160, padding: 12, background: '#2A3D2E', borderRadius: 8, border: '1px solid #1d4ed8' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd', marginBottom: 4 }}>PLAN BÁSICO</div>
+                        <div style={{ flex: 1, minWidth: 160, padding: 12, background: '#2A3D2E', borderRadius: 8, border: '1px solid #3F5980' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#AFC0D2', marginBottom: 4 }}>PLAN BÁSICO</div>
                           <div style={{ fontSize: 12, color: '#cbd5e1', lineHeight: 1.5 }}>Ficha, leads y calendario. Ideal para empezar.</div>
                         </div>
-                        <div style={{ flex: 1, minWidth: 160, padding: 12, background: 'linear-gradient(135deg, #451a03, #78350f)', borderRadius: 8, border: '1px solid #b45309' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#fcd34d', marginBottom: 4 }}>✦ PLAN PREMIUM</div>
-                          <div style={{ fontSize: 12, color: '#fef3c7', lineHeight: 1.5 }}>Propuestas, comunicación, estadísticas y más.</div>
+                        <div style={{ flex: 1, minWidth: 160, padding: 12, background: 'linear-gradient(135deg, #451a03, #78350f)', borderRadius: 8, border: '1px solid #8A6A38' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#C2A968', marginBottom: 4 }}>✦ PLAN PREMIUM</div>
+                          <div style={{ fontSize: 12, color: '#F3EBD8', lineHeight: 1.5 }}>Propuestas, comunicación, estadísticas y más.</div>
                         </div>
                       </div>
                       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
                         Para activar tu plan contacta con tu gestor o escríbenos a{' '}
-                        <a href="mailto:info@foreventos.com" style={{ color: '#93c5fd' }}>info@foreventos.com</a>
+                        <a href="mailto:info@foreventos.com" style={{ color: '#AFC0D2' }}>info@foreventos.com</a>
                       </div>
                     </div>
                   )}
@@ -1417,11 +1417,11 @@ function PerfilPageContent() {
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           padding: 16, borderRadius: 8, marginBottom: 20, flexWrap: 'wrap', gap: 12,
                           background: features.planTier === 'premium' ? '#FCF4E2' : 'var(--cream)',
-                          border: features.planTier === 'premium' ? '1px solid #fde68a' : '1px solid var(--ivory)',
+                          border: features.planTier === 'premium' ? '1px solid #E2D4AE' : '1px solid var(--ivory)',
                         }}>
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                              {features.planTier === 'premium' && <Star size={14} style={{ color: '#b45309' }} />}
+                              {features.planTier === 'premium' && <Star size={14} style={{ color: '#8A6A38' }} />}
                               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Inter, sans-serif' }}>
                                 {features.planName || (features.planTier === 'premium' ? 'Plan Premium' : 'Plan Básico')}
                               </div>
@@ -1455,7 +1455,7 @@ function PerfilPageContent() {
                               opacity: item.ok ? 1 : 0.55,
                             }}>
                               {item.ok
-                                ? <CheckCircle2 size={13} style={{ color: '#22c55e', flexShrink: 0 }} />
+                                ? <CheckCircle2 size={13} style={{ color: '#5C7E64', flexShrink: 0 }} />
                                 : <XCircle     size={13} style={{ color: '#9ca3af', flexShrink: 0 }} />}
                               <span style={{ fontSize: 12, color: item.ok ? 'var(--charcoal)' : 'var(--warm-gray)' }}>{item.label}</span>
                             </div>
@@ -1463,12 +1463,12 @@ function PerfilPageContent() {
                         </div>
 
                         {features.planTier === 'basic' && !features.isTrial && (
-                          <div style={{ padding: 14, background: '#FCF4E2', borderRadius: 8, border: '1px solid #fde68a', marginBottom: 16 }}>
+                          <div style={{ padding: 14, background: '#FCF4E2', borderRadius: 8, border: '1px solid #E2D4AE', marginBottom: 16 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                              <Zap size={14} style={{ color: '#b45309' }} />
-                              <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Pasa a Premium</span>
+                              <Zap size={14} style={{ color: '#8A6A38' }} />
+                              <span style={{ fontSize: 13, fontWeight: 600, color: '#7A5A2E' }}>Pasa a Premium</span>
                             </div>
-                            <div style={{ fontSize: 12, color: '#b45309', lineHeight: 1.6, marginBottom: 10 }}>
+                            <div style={{ fontSize: 12, color: '#8A6A38', lineHeight: 1.6, marginBottom: 10 }}>
                               Desbloquea propuestas digitales, estadísticas avanzadas, exportar leads y comunicación de tarifas.
                             </div>
                             <a href="mailto:info@foreventos.com?subject=Quiero%20pasar%20a%20Premium"
@@ -1543,7 +1543,7 @@ function PerfilPageContent() {
                               {[row.basic, row.premium].map((has, ci) => (
                                 <td key={ci} style={{ textAlign: 'center', padding: '9px 16px' }}>
                                   {has
-                                    ? <CheckCircle2 size={14} style={{ color: '#22c55e' }} />
+                                    ? <CheckCircle2 size={14} style={{ color: '#5C7E64' }} />
                                     : <span style={{ color: 'var(--stone)', fontSize: 16, lineHeight: 1 }}>—</span>}
                                 </td>
                               ))}
@@ -1609,8 +1609,8 @@ function PerfilPageContent() {
                             cancelled: 'Cancelación', reactivated: 'Reactivación', note: 'Nota',
                           }
                           const eventColors: Record<string, string> = {
-                            payment: '#22c55e', trial_started: '#b45309', activated: '#22c55e',
-                            plan_changed: '#3b82f6', cancelled: '#ef4444', reactivated: '#22c55e', note: '#6b7280',
+                            payment: '#5C7E64', trial_started: '#8A6A38', activated: '#5C7E64',
+                            plan_changed: '#4F6D8C', cancelled: '#BC5249', reactivated: '#5C7E64', note: '#6b7280',
                           }
                           const color = eventColors[ev.event_type] || '#6b7280'
                           return (
@@ -1622,7 +1622,7 @@ function PerfilPageContent() {
                                     {eventLabels[ev.event_type] || ev.event_type}
                                   </span>
                                   {ev.amount != null && (
-                                    <span style={{ fontSize: 13, fontWeight: 600, color: ev.amount > 0 ? '#22c55e' : 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
+                                    <span style={{ fontSize: 13, fontWeight: 600, color: ev.amount > 0 ? '#5C7E64' : 'var(--warm-gray)', whiteSpace: 'nowrap' }}>
                                       {ev.amount > 0 ? `${ev.amount}€` : 'Sin cargo'}
                                     </span>
                                   )}
@@ -1729,9 +1729,9 @@ function PerfilPageContent() {
                           width: 42, height: 42, borderRadius: 10, flexShrink: 0,
                           background: '#FBEFCB',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          border: '1px solid #fde68a',
+                          border: '1px solid #E2D4AE',
                         }}>
-                          <Mail size={18} style={{ color: '#b45309' }} />
+                          <Mail size={18} style={{ color: '#8A6A38' }} />
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Inter, sans-serif', marginBottom: 4 }}>
@@ -1761,7 +1761,7 @@ function PerfilPageContent() {
                     <div className="card-body" style={{ padding: '16px 20px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 0 3px rgba(34,197,94,0.2)' }} />
+                          <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#5C7E64', display: 'inline-block', boxShadow: '0 0 0 3px rgba(92,126,100,0.2)' }} />
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)' }}>Todos los sistemas operativos</div>
                             <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>
@@ -1787,7 +1787,7 @@ function PerfilPageContent() {
                             { date: '01 dic 2024', status: 'Mantenimiento programado completado', desc: 'Portal y API' },
                           ].map((item, i) => (
                             <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0', borderBottom: i < 2 ? '1px solid var(--ivory)' : 'none' }}>
-                              <CircleCheckBig size={13} style={{ flexShrink: 0, color: '#22c55e' }} />
+                              <CircleCheckBig size={13} style={{ flexShrink: 0, color: '#5C7E64' }} />
                               <div>
                                 <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--charcoal)' }}>{item.status}</div>
                                 <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>

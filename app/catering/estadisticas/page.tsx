@@ -75,9 +75,9 @@ export default function CateringEstadisticasPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
               {[
                 { label: 'Total solicitudes', value: stats.total,      color: 'var(--gold)',  icon: <Users size={18} /> },
-                { label: 'En proceso',        value: stats.active,     color: '#3b82f6',      icon: <TrendingUp size={18} /> },
-                { label: 'Confirmadas',        value: stats.won,        color: '#22c55e',      icon: <CheckCircle size={18} /> },
-                { label: 'Conversión',         value: `${stats.conversion}%`, color: '#8b5cf6', icon: <BarChart2 size={18} /> },
+                { label: 'En proceso',        value: stats.active,     color: '#4F6D8C',      icon: <TrendingUp size={18} /> },
+                { label: 'Confirmadas',        value: stats.won,        color: '#5C7E64',      icon: <CheckCircle size={18} /> },
+                { label: 'Conversión',         value: `${stats.conversion}%`, color: '#7E72A0', icon: <BarChart2 size={18} /> },
               ].map(k => (
                 <div key={k.label} style={{ background: '#fff', borderRadius: 12, padding: '20px', boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, color: k.color }}>
@@ -102,7 +102,7 @@ export default function CateringEstadisticasPage() {
                         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{count} ({pct}%)</span>
                       </div>
                       <div style={{ height: 6, borderRadius: 3, background: 'var(--ivory)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${pct}%`, background: src === 'wedding_planner' ? '#8b5cf6' : 'var(--gold)', borderRadius: 3, transition: 'width 0.5s' }} />
+                        <div style={{ height: '100%', width: `${pct}%`, background: src === 'wedding_planner' ? '#7E72A0' : 'var(--gold)', borderRadius: 3, transition: 'width 0.5s' }} />
                       </div>
                     </div>
                   )

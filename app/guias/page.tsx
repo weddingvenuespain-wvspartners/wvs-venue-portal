@@ -8,12 +8,12 @@ import {
 } from 'lucide-react'
 
 const QUICK_LINKS = [
-  { iconKey: 'users',    title: 'Primeros pasos',       desc: 'Configura tu perfil y empieza a recibir leads',          color: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe' },
-  { iconKey: 'pipeline', title: 'Gestión de leads',     desc: 'Entiende el pipeline y estados de cada lead',            color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
-  { iconKey: 'calendar', title: 'Calendario',           desc: 'Gestiona disponibilidad, visitas y reservas',            color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc' },
-  { iconKey: 'zap',      title: 'Propuestas digitales', desc: 'Crea y envía propuestas profesionales',                  color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
-  { iconKey: 'billing',  title: 'Facturación',          desc: 'Planes, facturas y gestión de suscripción',              color: '#be185d', bg: '#fdf2f8', border: '#fbcfe8' },
-  { iconKey: 'chat',     title: 'Soporte directo',      desc: 'Habla con el equipo de FOREVENTOS',           color: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
+  { iconKey: 'users',    title: 'Primeros pasos',       desc: 'Configura tu perfil y empieza a recibir leads',          color: '#4F6D8C', bg: '#EEF2F7', border: '#CCD9E6' },
+  { iconKey: 'pipeline', title: 'Gestión de leads',     desc: 'Entiende el pipeline y estados de cada lead',            color: '#6A5B95', bg: '#F2F1F8', border: '#DCD8EC' },
+  { iconKey: 'calendar', title: 'Calendario',           desc: 'Gestiona disponibilidad, visitas y reservas',            color: '#3E6E7E', bg: '#ecfeff', border: '#BCD2D6' },
+  { iconKey: 'zap',      title: 'Propuestas digitales', desc: 'Crea y envía propuestas profesionales',                  color: '#9A7A40', bg: '#F7F3E8', border: '#E2D4AE' },
+  { iconKey: 'billing',  title: 'Facturación',          desc: 'Planes, facturas y gestión de suscripción',              color: '#9A3F5F', bg: '#F6EEF2', border: '#E8D2DC' },
+  { iconKey: 'chat',     title: 'Soporte directo',      desc: 'Habla con el equipo de FOREVENTOS',           color: '#4A6B52', bg: '#EEF2EC', border: '#C3D4C5' },
 ]
 
 function getIcon(key: string) {
@@ -151,16 +151,16 @@ export default function GuiasPage() {
           </div>
 
           {/* Contact */}
-          <div style={{ background: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', border: '1px solid #86efac', borderRadius: 14, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
+          <div style={{ background: 'linear-gradient(135deg,#EEF2EC,#DDE7DF)', border: '1px solid #C3D4C5', borderRadius: 14, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-                <CheckCircle size={15} style={{ color: '#16a34a' }} />
-                <span style={{ fontFamily: 'Inter,sans-serif', fontSize: 14, fontWeight: 700, color: '#15803d' }}>¿Necesitas más ayuda?</span>
+                <CheckCircle size={15} style={{ color: '#4A6B52' }} />
+                <span style={{ fontFamily: 'Inter,sans-serif', fontSize: 14, fontWeight: 700, color: '#3C5945' }}>¿Necesitas más ayuda?</span>
               </div>
-              <div style={{ fontSize: 12.5, color: '#166534', lineHeight: 1.5 }}>El equipo responde en menos de 24 horas en días laborables.</div>
+              <div style={{ fontSize: 12.5, color: '#35513E', lineHeight: 1.5 }}>El equipo responde en menos de 24 horas en días laborables.</div>
             </div>
             <a href="mailto:info@foreventos.com"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 18px', borderRadius: 10, background: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 18px', borderRadius: 10, background: '#4A6B52', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
               <Mail size={14} /> Escribir al soporte
             </a>
           </div>

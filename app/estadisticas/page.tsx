@@ -11,11 +11,11 @@ import Spinner from '@/components/Spinner'
 
 const LEAD_STATUS_MAP = [
   { status: 'new',              label: 'Nuevos',              color: 'var(--gold)'  },
-  { status: 'contacted',        label: 'Contactados',         color: '#3b82f6'      },
-  { status: 'proposal_sent',    label: 'Propuesta enviada',   color: '#8b5cf6'      },
-  { status: 'visit_scheduled',  label: 'Visita agendada',     color: '#06b6d4'      },
-  { status: 'budget_sent',      label: 'Presupuesto enviado', color: '#f59e0b'      },
-  { status: 'won',              label: 'Cerrado ganado',      color: '#22c55e'      },
+  { status: 'contacted',        label: 'Contactados',         color: '#4F6D8C'      },
+  { status: 'proposal_sent',    label: 'Propuesta enviada',   color: '#7E72A0'      },
+  { status: 'visit_scheduled',  label: 'Visita agendada',     color: '#5B8794'      },
+  { status: 'budget_sent',      label: 'Presupuesto enviado', color: '#AC8B4C'      },
+  { status: 'won',              label: 'Cerrado ganado',      color: '#5C7E64'      },
   { status: 'lost',             label: 'Cerrado perdido',     color: '#6b7280'      },
 ]
 

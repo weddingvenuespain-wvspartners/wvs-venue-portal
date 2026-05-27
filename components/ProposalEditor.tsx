@@ -929,7 +929,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
               </div>
               <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
                 {proposal.status === 'draft' ? 'Borrador' : proposal.status === 'sent' ? 'Enviada' : proposal.status === 'viewed' ? 'Vista' : proposal.status}
-                {isDirty && <span style={{ color: '#b45309', marginLeft: 6 }}>· sin guardar</span>}
+                {isDirty && <span style={{ color: '#8A6A38', marginLeft: 6 }}>· sin guardar</span>}
               </div>
             </div>
             <button
@@ -1757,13 +1757,13 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                 return (
                                   <span key={vg.id} style={{
                                     fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 6, lineHeight: '16px',
-                                    background: isAllIncluded ? '#f0fdf4' : isMixed ? '#eff6ff' : '#fef3c7',
-                                    color: isAllIncluded ? '#166534' : isMixed ? '#1e3a8a' : '#92400e',
-                                    border: `1px solid ${isAllIncluded ? '#bbf7d0' : isMixed ? '#bfdbfe' : '#fde68a'}`,
+                                    background: isAllIncluded ? '#EEF2EC' : isMixed ? '#EEF2F7' : '#F3EBD8',
+                                    color: isAllIncluded ? '#35513E' : isMixed ? '#39527A' : '#7A5A2E',
+                                    border: `1px solid ${isAllIncluded ? '#D2DFD3' : isMixed ? '#CCD9E6' : '#E2D4AE'}`,
                                   }}>
                                     {vg.name}: {modeLabel}
-                                    {isRequired && <span style={{ marginLeft: 3, color: '#dc2626' }}>· Obligatorio</span>}
-                                    {isOptionalGroup && <span style={{ marginLeft: 3, color: '#92400e' }}>· Opcional</span>}
+                                    {isRequired && <span style={{ marginLeft: 3, color: '#B0473E' }}>· Obligatorio</span>}
+                                    {isOptionalGroup && <span style={{ marginLeft: 3, color: '#7A5A2E' }}>· Opcional</span>}
                                   </span>
                                 )
                               })}
@@ -1936,7 +1936,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                           const allPhotos = [...(Array.isArray(ss.photos) ? ss.photos : []), ...(ss.image_url && !(ss.photos ?? []).includes(ss.image_url) ? [ss.image_url] : [])]
                                           const next = allPhotos.filter((_: string, j: number) => j !== pi)
                                           setSs({ photos: next, image_url: next[0] ?? '' })
-                                        }} style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                                        }} style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#BC5249', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                                       </div>
                                     ))}
                                     <ImageUploader label="+" height={48} onUpload={async (f) => {
@@ -2021,7 +2021,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                                                   <div key={pi} style={{ position: 'relative', width: 56, height: 56 }}>
                                                     <img src={url} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover' }} />
                                                     <button type="button" onClick={() => { const next = [...(z.photos ?? [])]; next.splice(pi, 1); updateOverrideItem(overrideKey, i, 'photos', next) }}
-                                                      style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                                                      style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#BC5249', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                                                   </div>
                                                 ))}
                                                 <ImageUploader label="+" height={48} onUpload={async (f) => { const url = await uploadImage(f, 'zones'); if (url) updateOverrideItem(overrideKey, i, 'photos', [...(z.photos ?? []), url]) }} />
@@ -2746,9 +2746,9 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       {toast && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
-          background: toast.err ? '#fef2f2' : '#f0fdf4',
-          border: `1px solid ${toast.err ? '#fca5a5' : '#86efac'}`,
-          color: toast.err ? '#991b1b' : '#15803d',
+          background: toast.err ? '#FAF3F2' : '#EEF2EC',
+          border: `1px solid ${toast.err ? '#E0C2BD' : '#C3D4C5'}`,
+          color: toast.err ? '#7E332D' : '#3C5945',
           padding: '12px 16px', borderRadius: 10,
           boxShadow: '0 4px 20px rgba(0,0,0,.13)',
           fontSize: 13, maxWidth: 380, display: 'flex', alignItems: 'center', gap: 10,

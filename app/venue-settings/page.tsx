@@ -23,9 +23,9 @@ type DurationType = '1_day' | '1_day_morning' | '2_days' | 'package' | 'custom'
 
 const DURATION_TYPES = [
   { key: '1_day'         as DurationType, label: '1 día',                  sublabel: 'Solo el día del evento',          detail: 'Ej: 12:00 → 00:00',           color: '#4A6B52', bg: '#FDF8F0', Icon: Sun              },
-  { key: '1_day_morning' as DurationType, label: '1 día + noche + mañana', sublabel: 'Hasta mediodía del día siguiente', detail: 'Ej: Sáb. 12:00 → Dom. 14:00', color: '#7C3AED', bg: '#F5F3FF', Icon: Moon             },
-  { key: '2_days'        as DurationType, label: '2 días completos',        sublabel: 'Día 1 + noche + día 2 entero',    detail: 'Ej: Sáb. 12:00 → Dom. 23:59', color: '#2563EB', bg: '#EFF6FF', Icon: CalendarDays     },
-  { key: 'package'       as DurationType, label: 'Paquetes de días',        sublabel: 'Varios rangos que cubren la semana', detail: 'Ej: Lun-Mié, Mié-Vie, Vie-Dom', color: '#059669', bg: '#ECFDF5', Icon: Package      },
+  { key: '1_day_morning' as DurationType, label: '1 día + noche + mañana', sublabel: 'Hasta mediodía del día siguiente', detail: 'Ej: Sáb. 12:00 → Dom. 14:00', color: '#6A5B95', bg: '#F2F1F8', Icon: Moon             },
+  { key: '2_days'        as DurationType, label: '2 días completos',        sublabel: 'Día 1 + noche + día 2 entero',    detail: 'Ej: Sáb. 12:00 → Dom. 23:59', color: '#47648A', bg: '#EEF2F7', Icon: CalendarDays     },
+  { key: 'package'       as DurationType, label: 'Paquetes de días',        sublabel: 'Varios rangos que cubren la semana', detail: 'Ej: Lun-Mié, Mié-Vie, Vie-Dom', color: '#467A60', bg: '#EDF2ED', Icon: Package      },
   { key: 'custom'        as DurationType, label: 'Personalizado',           sublabel: 'Define tu propia duración',        detail: 'Descripción libre',            color: '#8A7F76', bg: '#F7F3EE', Icon: SlidersHorizontal },
 ]
 
@@ -264,7 +264,7 @@ function initPriceForm(p: ModalityPrice): typeof emptyPriceForm {
 
 type DayRange = { day_from: number; day_to: number }
 
-function WeekDayPicker({ dayFrom, dayTo, onChange, accent = '#059669', hint, blockedRanges = [] }: {
+function WeekDayPicker({ dayFrom, dayTo, onChange, accent = '#467A60', hint, blockedRanges = [] }: {
   dayFrom: number | null; dayTo: number | null
   onChange: (from: number | null, to: number | null) => void
   accent?: string; hint?: string
@@ -1054,7 +1054,7 @@ export default function EstructuraPage() {
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = '#fff'}>
                     <span style={{ fontSize: 12.5, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{z.name}</span>
                     <button onClick={() => removeZone(z.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: '2px 4px', display: 'flex', borderRadius: 4, opacity: 0.4, flexShrink: 0 }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#ef4444' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#BC5249' }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.4'; (e.currentTarget as HTMLElement).style.color = 'var(--warm-gray)' }}>
                       <X size={12} />
                     </button>
@@ -1095,7 +1095,7 @@ export default function EstructuraPage() {
                   <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--warm-gray)' }}>{spaceGroups.length}</span>
                 )}
                 {unassignedZones.length > 0 && (
-                  <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#FEF9EC', border: '1px solid #FDE68A', color: '#92400E', fontWeight: 500, marginLeft: 'auto' }}>
+                  <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#F6F1E4', border: '1px solid #E2D4AE', color: '#7A5A2E', fontWeight: 500, marginLeft: 'auto' }}>
                     {unassignedZones.length} sin grupo
                   </span>
                 )}
@@ -1350,15 +1350,15 @@ export default function EstructuraPage() {
                     )}
 
                     {g.spaces.length === 0 && (
-                      <div style={{ padding: '4px 14px 6px', fontSize: 11, color: '#ef4444', opacity: 0.7 }}>
+                      <div style={{ padding: '4px 14px 6px', fontSize: 11, color: '#BC5249', opacity: 0.7 }}>
                         Selecciona al menos una zona para este grupo.
                       </div>
                     )}
 
                     <div style={{ padding: '6px 14px 10px', display: 'flex', justifyContent: 'flex-end' }}>
                       <button type="button" onClick={() => { const next = spaceGroups.filter((_, j) => j !== gi); setSpaceGroups(next); saveSpaceGroups(next) }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 11, padding: '2px 4px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#fef2f2'}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BC5249', fontSize: 11, padding: '2px 4px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#FAF3F2'}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}>
                         <X size={11} /> Eliminar grupo
                       </button>
@@ -1393,13 +1393,13 @@ export default function EstructuraPage() {
           {false && commercialConfig?.space_type === 'single_with_supplements' && (
             <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, padding: '16px 20px', marginBottom: 16, maxWidth: 'none' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Layers size={14} style={{ color: '#7C3AED' }} /> Extras / Suplementos
+                <Layers size={14} style={{ color: '#6A5B95' }} /> Extras / Suplementos
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: supplements.length > 0 ? 12 : 0 }}>
                 {supplements.map(s => (
-                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 20, padding: '4px 10px 4px 12px' }}>
-                    <span style={{ fontSize: 12, color: '#6D28D9', fontWeight: 500 }}>{s.name}</span>
-                    <button onClick={() => removeSupplement(s.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#C4B5FD', padding: 0, display: 'flex', lineHeight: 1 }}><X size={12} /></button>
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F2F1F8', border: '1px solid #DCD8EC', borderRadius: 20, padding: '4px 10px 4px 12px' }}>
+                    <span style={{ fontSize: 12, color: '#5C4E84', fontWeight: 500 }}>{s.name}</span>
+                    <button onClick={() => removeSupplement(s.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#C3BBDA', padding: 0, display: 'flex', lineHeight: 1 }}><X size={12} /></button>
                   </div>
                 ))}
               </div>
@@ -1820,7 +1820,7 @@ export default function EstructuraPage() {
               return null
             }
             const blockTypeLabel = (t: BlockedDate['type']) => ({ full: 'Día completo', morning: 'Solo mañana', afternoon: 'Solo tarde', hours: 'Horas concretas' })[t]
-            const blockColor = (t: BlockedDate['type']) => ({ full: '#f87171', morning: '#fb923c', afternoon: '#fbbf24', hours: '#a78bfa' })[t]
+            const blockColor = (t: BlockedDate['type']) => ({ full: '#C97D75', morning: '#B98A5A', afternoon: '#fbbf24', hours: '#A99FC4' })[t]
             // Range helpers
             const rangeMin = blockRangeStart && blockPickerDate ? [blockRangeStart, blockPickerDate].sort()[0] : null
             const rangeMax = blockRangeStart && blockPickerDate ? [blockRangeStart, blockPickerDate].sort()[1] : null
@@ -1862,10 +1862,10 @@ export default function EstructuraPage() {
               <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, marginBottom: 16, maxWidth: 'none', overflow: 'hidden' }}>
                 {/* Header */}
                 <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <CalendarDays size={14} style={{ color: '#059669', flexShrink: 0 }} />
+                  <CalendarDays size={14} style={{ color: '#467A60', flexShrink: 0 }} />
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', flex: 1 }}>Disponibilidad para visitas</span>
                   {visitAvailDirty && (
-                    <span style={{ fontSize: 10, color: '#d97706' }}>Cambios pendientes</span>
+                    <span style={{ fontSize: 10, color: '#9A7A40' }}>Cambios pendientes</span>
                   )}
                 </div>
 
@@ -1879,8 +1879,8 @@ export default function EstructuraPage() {
                     {DURATIONS.map(({ value, label }) => (
                       <button key={value} type="button" onClick={() => updateAvail({ slot_duration: value })}
                         style={{ fontSize: 11, padding: '4px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600,
-                          background: visitAvail.slot_duration === value ? '#059669' : '#D1FAE5',
-                          color: visitAvail.slot_duration === value ? '#fff' : '#065F46' }}>
+                          background: visitAvail.slot_duration === value ? '#467A60' : '#DCE7DE',
+                          color: visitAvail.slot_duration === value ? '#fff' : '#35513E' }}>
                         {label}
                       </button>
                     ))}
@@ -1895,7 +1895,7 @@ export default function EstructuraPage() {
                       <div key={ds.day} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <button type="button" onClick={() => updateDay(ds.day, { enabled: !ds.enabled })}
                           style={{ width: 72, fontSize: 11, padding: '4px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, textAlign: 'center',
-                            background: ds.enabled ? '#059669' : '#F3F4F6', color: ds.enabled ? '#fff' : '#9CA3AF' }}>
+                            background: ds.enabled ? '#467A60' : '#F3F4F6', color: ds.enabled ? '#fff' : '#9CA3AF' }}>
                           {DAY_NAMES[ds.day].slice(0, 3)}
                         </button>
                         {ds.enabled && (
@@ -1993,7 +1993,7 @@ export default function EstructuraPage() {
                               await fetch('/api/calendar/disconnect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venue_id: activeVenue?.id }) })
                               setGcalConfig(null)
                             }}
-                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', color: '#ef4444' }}>
+                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', color: '#BC5249' }}>
                             Desconectar
                           </button>
                         </>
@@ -2006,7 +2006,7 @@ export default function EstructuraPage() {
                     </div>
                   </div>
                   {gcalMsg && (
-                    <div style={{ padding: '6px 14px', fontSize: 11, background: gcalMsg.startsWith('Error') ? '#fef2f2' : '#f0fdf4', color: gcalMsg.startsWith('Error') ? '#ef4444' : '#15803d', borderTop: '1px solid var(--ivory)' }}>
+                    <div style={{ padding: '6px 14px', fontSize: 11, background: gcalMsg.startsWith('Error') ? '#FAF3F2' : '#EEF2EC', color: gcalMsg.startsWith('Error') ? '#BC5249' : '#3C5945', borderTop: '1px solid var(--ivory)' }}>
                       {gcalMsg}
                     </div>
                   )}
@@ -2113,9 +2113,9 @@ export default function EstructuraPage() {
                         const isSelected = !blockRangeMode && blockPickerDate === iso
                         const col = (firstDow + idx) % 7
                         const cellBg = isSelected || isRangeStart ? '#2A3D2E'
-                          : inRange ? '#dbeafe'
+                          : inRange ? '#DDE5EF'
                           : b ? `${blockColor(b.type)}22`
-                          : autoBlock === 'wedding' ? '#d1fae5'
+                          : autoBlock === 'wedding' ? '#DCE7DE'
                           : autoBlock === 'unavailable' ? '#f3f4f6'
                           : '#fff'
                         return (
@@ -2162,7 +2162,7 @@ export default function EstructuraPage() {
                             )}
                             {/* Auto-block indicator (no manual block on this day) */}
                             {!b && autoBlock && !inRange && !isSelected && !isRangeStart && (
-                              <span style={{ fontSize: 7, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', lineHeight: 1, color: autoBlock === 'wedding' ? '#047857' : '#6b7280' }}>
+                              <span style={{ fontSize: 7, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', lineHeight: 1, color: autoBlock === 'wedding' ? '#3C5945' : '#6b7280' }}>
                                 {autoBlock === 'wedding' ? 'Boda' : 'Ocup.'}
                               </span>
                             )}
@@ -2199,7 +2199,7 @@ export default function EstructuraPage() {
 
                         if (auto === 'wedding') rects.push(
                           <div key="auto-w" style={{ position:'absolute', inset: 0, background: '#d1fae588', borderRadius: 3, pointerEvents: 'none' }}>
-                            <span style={{ fontSize: 8, fontWeight: 700, color: '#047857', padding: '2px 4px', display: 'block' }}>Boda</span>
+                            <span style={{ fontSize: 8, fontWeight: 700, color: '#3C5945', padding: '2px 4px', display: 'block' }}>Boda</span>
                           </div>
                         )
                         else if (auto === 'unavailable') rects.push(
@@ -2245,7 +2245,7 @@ export default function EstructuraPage() {
                                 return (
                                   <div key={iso} style={{ width: COL_W, flexShrink: 0, textAlign: 'center', padding: '6px 4px', borderLeft: '1px solid var(--ivory)', opacity: isPast ? 0.45 : 1 }}>
                                     <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{weekDayNames[wi]}</div>
-                                    <div style={{ fontSize: 14, fontWeight: isToday ? 700 : 500, color: isToday ? '#059669' : 'var(--charcoal)', width: 24, height: 24, borderRadius: '50%', background: isToday ? '#d1fae5' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0' }}>{d.getDate()}</div>
+                                    <div style={{ fontSize: 14, fontWeight: isToday ? 700 : 500, color: isToday ? '#467A60' : 'var(--charcoal)', width: 24, height: 24, borderRadius: '50%', background: isToday ? '#DCE7DE' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0' }}>{d.getDate()}</div>
                                   </div>
                                 )
                               })}
@@ -2285,12 +2285,12 @@ export default function EstructuraPage() {
                                     {/* Schedule available background */}
                                     {visitAvail.schedule.filter(s => s.enabled && s.day === (new Date(iso+'T12:00:00').getDay() === 0 ? 6 : new Date(iso+'T12:00:00').getDay() - 1)).map(s => {
                                       const top = timeToY(s.from); const bot = timeToY(s.to)
-                                      return <div key="avail" style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0,top), height: Math.max(0, bot - top), background: '#f0fdf4', pointerEvents: 'none' }} />
+                                      return <div key="avail" style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0,top), height: Math.max(0, bot - top), background: '#EEF2EC', pointerEvents: 'none' }} />
                                     })}
                                     {/* Blocks */}
                                     {renderBlockRects(iso)}
                                     {/* Today indicator */}
-                                    {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0, timeToY(`${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`)), height: 2, background: '#059669', pointerEvents: 'none' }} />}
+                                    {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0, timeToY(`${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`)), height: 2, background: '#467A60', pointerEvents: 'none' }} />}
                                     {/* Selected column highlight */}
                                     {isPickerOpen && <div style={{ position: 'absolute', inset: 0, background: 'rgba(42,61,46,.06)', pointerEvents: 'none' }} />}
                                   </div>
@@ -2323,7 +2323,7 @@ export default function EstructuraPage() {
                         const b = blockedMap[isoD]
                         const auto = getAutoBlock(isoD)
                         const rects: React.ReactNode[] = []
-                        if (auto === 'wedding') rects.push(<div key="auto-w" style={{ position:'absolute', inset: 0, background: '#d1fae588', borderRadius: 3, pointerEvents: 'none' }}><span style={{ fontSize: 9, fontWeight: 700, color: '#047857', padding: '3px 6px', display: 'block' }}>Boda</span></div>)
+                        if (auto === 'wedding') rects.push(<div key="auto-w" style={{ position:'absolute', inset: 0, background: '#d1fae588', borderRadius: 3, pointerEvents: 'none' }}><span style={{ fontSize: 9, fontWeight: 700, color: '#3C5945', padding: '3px 6px', display: 'block' }}>Boda</span></div>)
                         else if (auto === 'unavailable') rects.push(<div key="auto-u" style={{ position:'absolute', inset: 0, background: '#f3f4f688', borderRadius: 3, pointerEvents: 'none' }}><span style={{ fontSize: 9, fontWeight: 700, color: '#6b7280', padding: '3px 6px', display: 'block' }}>Ocupado</span></div>)
                         if (!b) return rects
                         const addRect = (from: string, to: string, color: string, label: string) => {
@@ -2345,7 +2345,7 @@ export default function EstructuraPage() {
                             <div style={{ width: TIME_COL_W, flexShrink: 0 }} />
                             <div style={{ flex: 1, textAlign: 'center', padding: '8px 4px', borderLeft: '1px solid var(--ivory)', opacity: isPast ? 0.45 : 1 }}>
                               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{weekDayNames[d.getDay()]}</div>
-                              <div style={{ fontSize: 22, fontWeight: isToday ? 700 : 500, color: isToday ? '#059669' : 'var(--charcoal)', width: 36, height: 36, borderRadius: '50%', background: isToday ? '#d1fae5' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0' }}>{d.getDate()}</div>
+                              <div style={{ fontSize: 22, fontWeight: isToday ? 700 : 500, color: isToday ? '#467A60' : 'var(--charcoal)', width: 36, height: 36, borderRadius: '50%', background: isToday ? '#DCE7DE' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0' }}>{d.getDate()}</div>
                             </div>
                           </div>
                           {/* Time grid */}
@@ -2370,10 +2370,10 @@ export default function EstructuraPage() {
                               {HOURS.map(h => <div key={h} style={{ position: 'absolute', top: (h - TIME_START) * PX_PER_HOUR, left: 0, right: 0, borderTop: '1px solid var(--ivory)', pointerEvents: 'none' }} />)}
                               {visitAvail.schedule.filter(s => s.enabled && s.day === (d.getDay() === 0 ? 6 : d.getDay() - 1)).map(s => {
                                 const top = timeToY(s.from); const bot = timeToY(s.to)
-                                return <div key="avail" style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0,top), height: Math.max(0, bot - top), background: '#f0fdf4', pointerEvents: 'none' }} />
+                                return <div key="avail" style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0,top), height: Math.max(0, bot - top), background: '#EEF2EC', pointerEvents: 'none' }} />
                               })}
                               {renderBlockRects(iso)}
-                              {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0, timeToY(`${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`)), height: 2, background: '#059669', pointerEvents: 'none' }} />}
+                              {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: Math.max(0, timeToY(`${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`)), height: 2, background: '#467A60', pointerEvents: 'none' }} />}
                               {isPickerOpen && <div style={{ position: 'absolute', inset: 0, background: 'rgba(42,61,46,.06)', pointerEvents: 'none' }} />}
                             </div>
                           </div>
@@ -2404,12 +2404,12 @@ export default function EstructuraPage() {
                                 {/* Date stamp */}
                                 <div style={{ minWidth: 52, textAlign: 'center', paddingTop: 1 }}>
                                   <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{weekDayNames[d.getDay()]}</div>
-                                  <div style={{ fontSize: 16, fontWeight: isToday ? 700 : 500, color: isToday ? '#059669' : 'var(--charcoal)', width: 28, height: 28, borderRadius: '50%', background: isToday ? '#d1fae5' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '1px auto 0' }}>{d.getDate()}</div>
+                                  <div style={{ fontSize: 16, fontWeight: isToday ? 700 : 500, color: isToday ? '#467A60' : 'var(--charcoal)', width: 28, height: 28, borderRadius: '50%', background: isToday ? '#DCE7DE' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '1px auto 0' }}>{d.getDate()}</div>
                                   <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{CAL_MONTHS[d.getMonth()].slice(0,3)}</div>
                                 </div>
                                 {/* Events */}
                                 <div style={{ flex: 1, paddingTop: 2 }}>
-                                  {auto === 'wedding' && <div style={{ fontSize: 11, fontWeight: 600, color: '#047857', background: '#d1fae5', borderRadius: 5, padding: '2px 8px', display: 'inline-block', marginBottom: 3 }}>Boda reservada</div>}
+                                  {auto === 'wedding' && <div style={{ fontSize: 11, fontWeight: 600, color: '#3C5945', background: '#DCE7DE', borderRadius: 5, padding: '2px 8px', display: 'inline-block', marginBottom: 3 }}>Boda reservada</div>}
                                   {auto === 'unavailable' && <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', background: '#f3f4f6', borderRadius: 5, padding: '2px 8px', display: 'inline-block', marginBottom: 3 }}>Ocupado</div>}
                                   {b && (
                                     <div style={{ fontSize: 11, fontWeight: 600, color: blockColor(b.type), background: `${blockColor(b.type)}18`, borderRadius: 5, padding: '2px 8px', display: 'inline-block', marginBottom: 3, marginLeft: auto ? 4 : 0 }}>
@@ -2449,7 +2449,7 @@ export default function EstructuraPage() {
                         <span style={{ flex: 1 }}>{pickerLabel}</span>
                         {!blockRangeMode && blockPickerDate && blockedMap[blockPickerDate] && (
                           <button type="button" onClick={() => removeBlockedDate(blockPickerDate)}
-                            style={{ fontSize: 10, fontWeight: 600, color: '#dc2626', background: '#fee2e2', border: 'none', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>
+                            style={{ fontSize: 10, fontWeight: 600, color: '#B0473E', background: '#F2E2E0', border: 'none', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>
                             Quitar bloqueo
                           </button>
                         )}
@@ -2486,14 +2486,14 @@ export default function EstructuraPage() {
                             </div>
                           ))}
                           <button type="button" onClick={() => setBlockRanges(prev => [...prev, { from: '15:00', to: '18:00' }])}
-                            style={{ fontSize: 11, padding: '3px 10px', borderRadius: 7, border: '1px dashed #a78bfa', background: 'transparent', color: '#7c3aed', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            style={{ fontSize: 11, padding: '3px 10px', borderRadius: 7, border: '1px dashed #A99FC4', background: 'transparent', color: '#6A5B95', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                             <Plus size={11} /> Añadir otro rango
                           </button>
                         </div>
                       )}
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                         <button type="button" onClick={confirmBlock}
-                          style={{ fontSize: 12, fontWeight: 700, padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          style={{ fontSize: 12, fontWeight: 700, padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#467A60', color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
                           <Check size={13} /> Confirmar bloqueo{selectedDates.length > 1 ? ` (${selectedDates.length} días)` : ''}
                         </button>
                         <button type="button" onClick={() => { setBlockPickerDate(null); setBlockRangeStart(null); setBlockRangeEnd(null) }}
@@ -2516,7 +2516,7 @@ export default function EstructuraPage() {
                       <>
                         {visitAvail.block_booked_weddings && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span style={{ width: 8, height: 8, borderRadius: 2, background: '#d1fae5', border: '1px solid #059669', flexShrink: 0 }} />
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: '#DCE7DE', border: '1px solid #467A60', flexShrink: 0 }} />
                             <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Boda reservada</span>
                           </div>
                         )}
@@ -2534,12 +2534,12 @@ export default function EstructuraPage() {
                   <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
                     <button type="button" onClick={() => saveVisitAvail(visitAvail)} disabled={savingVisit || !visitAvailDirty}
                       style={{ fontSize: 12, fontWeight: 700, padding: '7px 20px', borderRadius: 8, border: 'none', cursor: visitAvailDirty ? 'pointer' : 'default',
-                        background: visitAvailDirty ? '#059669' : '#e5e7eb', color: visitAvailDirty ? '#fff' : '#9ca3af',
+                        background: visitAvailDirty ? '#467A60' : '#e5e7eb', color: visitAvailDirty ? '#fff' : '#9ca3af',
                         display: 'flex', alignItems: 'center', gap: 6, transition: 'background .15s' }}>
                       <Check size={13} /> {savingVisit ? 'Guardando…' : 'Guardar cambios'}
                     </button>
                     {visitAvailDirty && !savingVisit && (
-                      <span style={{ fontSize: 11, color: '#d97706' }}>Tienes cambios sin guardar</span>
+                      <span style={{ fontSize: 11, color: '#9A7A40' }}>Tienes cambios sin guardar</span>
                     )}
                   </div>
                 </div>
@@ -2560,12 +2560,12 @@ export default function EstructuraPage() {
         const cardOpts = (q: WizardQuestion) => {
           if (q === 'space_type') return [
             { key: 'single',               icon: Building2, label: 'Precio único por todo',                   sub: 'El presupuesto incluye todas las zonas del venue. El cliente no elige ni paga zonas por separado.',                          color: '#4A6B52', bg: '#FDF8F0' },
-            { key: 'single_with_supplements', icon: Layers, label: 'Espacio base + zonas a elegir', sub: 'Hay zonas fijas incluidas y otras donde el cliente elige. Pueden ser gratuitas o tener suplemento.', color: '#7C3AED', bg: '#F5F3FF' },
-            { key: 'multiple_independent', icon: LayoutGrid, label: 'Grupos de espacios',              sub: 'Organiza tus zonas en grupos flexibles: el cliente puede elegir una, varias, o tener algunas incluidas y escoger entre otras. Ideal para venues con múltiples configuraciones.',            color: '#2563EB', bg: '#EFF6FF' },
+            { key: 'single_with_supplements', icon: Layers, label: 'Espacio base + zonas a elegir', sub: 'Hay zonas fijas incluidas y otras donde el cliente elige. Pueden ser gratuitas o tener suplemento.', color: '#6A5B95', bg: '#F2F1F8' },
+            { key: 'multiple_independent', icon: LayoutGrid, label: 'Grupos de espacios',              sub: 'Organiza tus zonas en grupos flexibles: el cliente puede elegir una, varias, o tener algunas incluidas y escoger entre otras. Ideal para venues con múltiples configuraciones.',            color: '#47648A', bg: '#EEF2F7' },
           ] as { key: string; icon: any; label: string; sub: string; color: string; bg: string }[]
           if (q === 'price_model') return [
-            { key: 'rental',     icon: CreditCard, label: 'Alquiler del espacio', sub: 'Precio fijo por el alquiler del espacio',                        color: '#059669', bg: '#ECFDF5' },
-            { key: 'per_person', icon: Users,      label: 'Precio por persona',   sub: 'El total depende de cuántos asistentes hay',                     color: '#DC2626', bg: '#FEF2F2' },
+            { key: 'rental',     icon: CreditCard, label: 'Alquiler del espacio', sub: 'Precio fijo por el alquiler del espacio',                        color: '#467A60', bg: '#EDF2ED' },
+            { key: 'per_person', icon: Users,      label: 'Precio por persona',   sub: 'El total depende de cuántos asistentes hay',                     color: '#B0473E', bg: '#FAF3F2' },
             { key: 'package',    icon: Package,    label: 'Paquetes cerrados',    sub: 'Precio todo incluido (espacio + servicios) por persona o evento', color: '#4A6B52', bg: '#FDF8F0' },
           ] as { key: string; icon: any; label: string; sub: string; color: string; bg: string }[]
           return null
@@ -2690,7 +2690,7 @@ export default function EstructuraPage() {
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>Descripción (opcional)</div>
                 <textarea className="form-input" placeholder="Qué incluye esta modalidad, horas exactas, condiciones especiales…" value={modalForm.description} onChange={e => setModalForm(f => ({ ...f, description: e.target.value }))} rows={3} style={{ resize: 'vertical', fontSize: 12 }} />
               </div>
-              {modalError && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', borderRadius: 8, padding: '8px 12px', fontSize: 12, marginTop: 14 }}>{modalError}</div>}
+              {modalError && <div style={{ background: '#FAF3F2', border: '1px solid #E9D4D0', color: '#B0473E', borderRadius: 8, padding: '8px 12px', fontSize: 12, marginTop: 14 }}>{modalError}</div>}
             </div>
             <div style={{ padding: '14px 24px', borderTop: '1px solid var(--ivory)', display: 'flex', gap: 8, justifyContent: 'flex-end', background: '#FAFAF9', flexShrink: 0 }}>
               <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
@@ -2861,7 +2861,7 @@ function TierRows({ tiers, accent, onChange }: { tiers: PriceTier[]; accent: str
           <input type="number" className="form-input" placeholder="€" value={tier.price} style={{ fontSize: 11 }}
             onChange={e => { const n = [...tiers]; n[ti] = { ...tier, price: e.target.value }; onChange(n) }} />
           <button type="button" onClick={() => onChange(tiers.filter((_, i) => i !== ti))}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 2, display: 'flex', alignItems: 'center' }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BC5249', padding: 2, display: 'flex', alignItems: 'center' }}>
             <X size={12} />
           </button>
         </div>
@@ -2950,7 +2950,7 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
               return (
                 <div key={z.id} style={{ border: '1px solid var(--ivory)', borderRadius: 8, padding: '8px 10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isTierMode ? 8 : 0 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#1D4ED8', flex: 1 }}>{z.name}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#3F5980', flex: 1 }}>{z.name}</span>
                     <div style={{ display: 'flex', borderRadius: 20, border: '1px solid #d1d5db', overflow: 'hidden', flexShrink: 0 }}>
                       {([{ tier: false, label: 'Precio fijo' }, { tier: true, label: 'Por tramos' }] as const).map(({ tier, label }) => {
                         const active = isTierMode === tier
@@ -3010,7 +3010,7 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
             return (
               <div key={grp.id} style={{ border: '1px solid var(--ivory)', borderRadius: 8, padding: '10px 12px', marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#1D4ED8', flex: 1 }}>{grp.name || 'Grupo sin nombre'}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#3F5980', flex: 1 }}>{grp.name || 'Grupo sin nombre'}</span>
                   {isMulti && onPricingModeChange && (
                     <>
                       {(['per_space', 'group_base'] as const).map(mode => {
@@ -3152,7 +3152,7 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
                       </div>
                     )}
                     {supplementSpaces.length > 0 && (
-                      <div style={{ paddingLeft: 12, borderLeft: '2px solid #DBEAFE' }}>
+                      <div style={{ paddingLeft: 12, borderLeft: '2px solid #DDE5EF' }}>
                         <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                           {isSupp ? 'Suplemento por zona opcional' : 'Suplemento por espacio'}
                         </div>

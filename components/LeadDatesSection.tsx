@@ -30,11 +30,11 @@ const FLEX_LABEL: Record<string, string> = {
 }
 
 const STATUS_STYLES: Record<CalendarStatus | "ownLead", { dot: string; bg: string; text: string; border: string; label: string }> = {
-  libre:       { dot: "#16a34a", bg: "#f0fdf4", text: "#166534", border: "#bbf7d0", label: "Libre" },
-  negociacion: { dot: "#f59e0b", bg: "#fffbeb", text: "#92400e", border: "#fde68a", label: "En negociación" },
-  reservado:   { dot: "#ef4444", bg: "#fef2f2", text: "#991b1b", border: "#fecaca", label: "Reservado" },
+  libre:       { dot: "#4A6B52", bg: "#EEF2EC", text: "#35513E", border: "#D2DFD3", label: "Libre" },
+  negociacion: { dot: "#AC8B4C", bg: "#F7F3E8", text: "#7A5A2E", border: "#E2D4AE", label: "En negociación" },
+  reservado:   { dot: "#BC5249", bg: "#FAF3F2", text: "#7E332D", border: "#E9D4D0", label: "Reservado" },
   bloqueado:   { dot: "#6b7280", bg: "#f3f4f6", text: "#374151", border: "#d1d5db", label: "Bloqueado" },
-  ownLead:     { dot: "#a855f7", bg: "#faf5ff", text: "#6b21a8", border: "#e9d5ff", label: "Este lead" },
+  ownLead:     { dot: "#8E72B0", bg: "#faf5ff", text: "#5A4878", border: "#e9d5ff", label: "Este lead" },
 }
 
 const fmtShort = (iso: string) =>

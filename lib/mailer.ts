@@ -539,8 +539,8 @@ export async function sendNewLeadEmail({
     </tr>`
 
   const badgesHtml = [
-    whatsappConsent ? `<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:#dcfce7;border:1px solid #86efac;font-size:11px;font-weight:700;color:#16a34a;margin-right:6px;">✓ WhatsApp</span>` : '',
-    wantsWeddingPlanner ? `<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:#fdf2f8;border:1px solid #f0abfc;font-size:11px;font-weight:700;color:#a21caf;">Wedding Planner</span>` : '',
+    whatsappConsent ? `<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:#DDE7DF;border:1px solid #C3D4C5;font-size:11px;font-weight:700;color:#4A6B52;margin-right:6px;">✓ WhatsApp</span>` : '',
+    wantsWeddingPlanner ? `<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:#F6EEF2;border:1px solid #f0abfc;font-size:11px;font-weight:700;color:#a21caf;">Wedding Planner</span>` : '',
   ].filter(Boolean).join('')
 
   await transporter.sendMail({

@@ -14,7 +14,7 @@ import {
 type Tab = 'venues' | 'catering' | 'propuesta' | 'pareja'
 
 const AVAIL_LABEL: Record<string, string> = { pending: 'Sin solicitar', requested: 'Solicitado', available: 'Disponible', unavailable: 'No disponible' }
-const AVAIL_COLOR: Record<string, string> = { pending: 'var(--warm-gray)', requested: '#3b82f6', available: '#22c55e', unavailable: '#ef4444' }
+const AVAIL_COLOR: Record<string, string> = { pending: 'var(--warm-gray)', requested: '#4F6D8C', available: '#5C7E64', unavailable: '#BC5249' }
 
 const VENUE_TYPES = ['Todos', 'Finca', 'Hotel', 'Castillo / Palacio', 'Jardín / Exterior', 'Masía', 'Otro']
 
@@ -187,7 +187,7 @@ function SearchProviderModal({
                 boxShadow: showOnlyFavs === t.key ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
                 transition: 'all 0.15s',
               }}>
-                {t.key && <Heart size={11} fill={showOnlyFavs ? '#ef4444' : 'none'} color={showOnlyFavs ? '#ef4444' : 'currentColor'} />}
+                {t.key && <Heart size={11} fill={showOnlyFavs ? '#BC5249' : 'none'} color={showOnlyFavs ? '#BC5249' : 'currentColor'} />}
                 {t.label}
               </button>
             ))}
@@ -235,14 +235,14 @@ function SearchProviderModal({
                 const isFav = favorites.has(p.user_id)
                 const initials = (p.display_name || 'V').slice(0, 2).toUpperCase()
                 return (
-                  <div key={p.user_id} style={{ background: alreadyLinked || justSent ? '#f9fafb' : '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: isFav ? '0 1px 8px rgba(239,68,68,0.08)' : '0 1px 5px rgba(0,0,0,0.06)', border: alreadyLinked || justSent ? '1px solid var(--ivory)' : isFav ? '1px solid rgba(239,68,68,0.15)' : '1px solid transparent', opacity: alreadyLinked ? 0.7 : 1 }}>
+                  <div key={p.user_id} style={{ background: alreadyLinked || justSent ? '#f9fafb' : '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: isFav ? '0 1px 8px rgba(188,82,73,0.08)' : '0 1px 5px rgba(0,0,0,0.06)', border: alreadyLinked || justSent ? '1px solid var(--ivory)' : isFav ? '1px solid rgba(188,82,73,0.15)' : '1px solid transparent', opacity: alreadyLinked ? 0.7 : 1 }}>
                     <div style={{ height: 64, background: 'linear-gradient(135deg, rgba(196,151,90,0.1), rgba(196,151,90,0.03))', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                       <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(196,151,90,0.15)', border: '2px solid rgba(196,151,90,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, color: 'var(--gold)', fontFamily: 'Inter' }}>
                         {initials}
                       </div>
                       {isFav && (
                         <span style={{ position: 'absolute', top: 7, left: 7 }}>
-                          <Heart size={11} fill="#ef4444" color="#ef4444" />
+                          <Heart size={11} fill="#BC5249" color="#BC5249" />
                         </span>
                       )}
                       {p.venue_type && (
@@ -255,7 +255,7 @@ function SearchProviderModal({
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>{p.display_name || 'Sin nombre'}</div>
                       {p.city && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 3 }}><MapPin size={10} /> {p.city}</div>}
                       {alreadyLinked || justSent ? (
-                        <div style={{ fontSize: 11, color: '#22c55e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div style={{ fontSize: 11, color: '#5C7E64', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                           <CheckCircle size={11} /> {alreadyLinked ? 'Ya añadido' : 'Añadido'}
                         </div>
                       ) : (
@@ -287,7 +287,7 @@ function SearchProviderModal({
               <button onClick={() => setRequestTarget(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={15} /></button>
             </div>
             {sendError && (
-              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '8px 12px', color: '#dc2626', fontSize: 12, marginBottom: 14 }}>
+              <div style={{ background: 'rgba(188,82,73,0.08)', border: '1px solid rgba(188,82,73,0.2)', borderRadius: 8, padding: '8px 12px', color: '#B0473E', fontSize: 12, marginBottom: 14 }}>
                 {sendError}
               </div>
             )}
@@ -681,8 +681,8 @@ export default function ClientDetailPage() {
                   return (
                     <div key={c.id} style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
                       <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <UtensilsCrossed size={17} color="#16a34a" />
+                        <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(92,126,100,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <UtensilsCrossed size={17} color="#4A6B52" />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>{cp.display_name || 'Catering'}</div>
@@ -774,7 +774,7 @@ export default function ClientDetailPage() {
                   <input readOnly value={publicUrl} style={{ ...inputSt, fontSize: 11, color: 'var(--warm-gray)', flex: 1 }} />
                   <button onClick={copyLink}
                     style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--charcoal)', whiteSpace: 'nowrap' }}>
-                    {copiedLink ? <CheckCircle size={13} color="#22c55e" /> : <Copy size={13} />}
+                    {copiedLink ? <CheckCircle size={13} color="#5C7E64" /> : <Copy size={13} />}
                     {copiedLink ? 'Copiado' : 'Copiar'}
                   </button>
                 </div>
@@ -812,7 +812,7 @@ export default function ClientDetailPage() {
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '0.06em', marginBottom: 10 }}>CATERING ({caterings.length})</div>
                   {caterings.map((c: any) => (
                     <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--ivory)' }}>
-                      <UtensilsCrossed size={13} color="#16a34a" />
+                      <UtensilsCrossed size={13} color="#4A6B52" />
                       <span style={{ fontSize: 12, color: 'var(--charcoal)' }}>{c.cat_prof?.display_name || 'Catering'}</span>
                     </div>
                   ))}
@@ -865,8 +865,8 @@ export default function ClientDetailPage() {
               {entries.map(([entityId, data]) => (
                 <div key={entityId} style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: data.comments.length ? 12 : 0 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: data.entityType === 'venue' ? 'rgba(196,151,90,0.1)' : 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {data.entityType === 'venue' ? <Building2 size={16} color="var(--gold)" /> : <UtensilsCrossed size={16} color="#16a34a" />}
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: data.entityType === 'venue' ? 'rgba(196,151,90,0.1)' : 'rgba(92,126,100,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {data.entityType === 'venue' ? <Building2 size={16} color="var(--gold)" /> : <UtensilsCrossed size={16} color="#4A6B52" />}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>{data.name}</div>

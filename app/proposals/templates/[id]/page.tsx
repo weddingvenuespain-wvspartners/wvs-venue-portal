@@ -35,7 +35,7 @@ export default function TemplateEditorPage() {
 
   if (error || !template) return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'var(--cream)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#991b1b', fontSize: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#7E332D', fontSize: 14 }}>
         <AlertCircle size={16} />{error ?? 'Plantilla no encontrada'}
       </div>
       <button className="btn btn-ghost btn-sm" onClick={() => router.push('/proposals/templates')}>← Volver a plantillas</button>

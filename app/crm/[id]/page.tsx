@@ -78,14 +78,14 @@ const PIPELINE: { key: string; label: string }[] = [
 ]
 
 const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> = {
-  new:             { label: 'Nuevo',              bg: '#eff6ff', color: '#1d4ed8' },
-  contacted:       { label: 'En seguimiento',     bg: '#f5f3ff', color: '#6d28d9' },
+  new:             { label: 'Nuevo',              bg: '#EEF2F7', color: '#3F5980' },
+  contacted:       { label: 'En seguimiento',     bg: '#F2F1F8', color: '#5C4E84' },
   proposal_sent:   { label: 'Propuesta enviada',  bg: '#fefce8', color: '#a16207' },
-  visit_scheduled: { label: 'Visita agendada',    bg: '#f0fdf4', color: '#15803d' },
-  post_visit:      { label: 'Post-visita',        bg: '#ecfdf5', color: '#059669' },
-  budget_sent:     { label: 'Presupuesto enviado',bg: '#fff7ed', color: '#c2410c' },
-  won:             { label: 'Confirmado',         bg: '#d1fae5', color: '#065f46' },
-  lost:            { label: 'Perdido',            bg: '#fef2f2', color: '#b91c1c' },
+  visit_scheduled: { label: 'Visita agendada',    bg: '#EEF2EC', color: '#3C5945' },
+  post_visit:      { label: 'Post-visita',        bg: '#EDF2ED', color: '#467A60' },
+  budget_sent:     { label: 'Presupuesto enviado',bg: '#fff7ed', color: '#924E2A' },
+  won:             { label: 'Confirmado',         bg: '#DCE7DE', color: '#35513E' },
+  lost:            { label: 'Perdido',            bg: '#FAF3F2', color: '#933B34' },
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -106,11 +106,11 @@ const BUDGET_LABEL: Record<string, string> = {
 }
 
 const PROPOSAL_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  draft:    { label: 'Borrador',  color: '#92400e', bg: '#fef3c7' },
-  sent:     { label: 'Enviado',   color: '#1e40af', bg: '#dbeafe' },
-  viewed:   { label: 'Visto',     color: '#047857', bg: '#d1fae5' },
-  accepted: { label: 'Aceptado',  color: '#15803d', bg: '#dcfce7' },
-  rejected: { label: 'Rechazado', color: '#b91c1c', bg: '#fee2e2' },
+  draft:    { label: 'Borrador',  color: '#7A5A2E', bg: '#F3EBD8' },
+  sent:     { label: 'Enviado',   color: '#39527A', bg: '#DDE5EF' },
+  viewed:   { label: 'Visto',     color: '#3C5945', bg: '#DCE7DE' },
+  accepted: { label: 'Aceptado',  color: '#3C5945', bg: '#DDE7DF' },
+  rejected: { label: 'Rechazado', color: '#933B34', bg: '#F2E2E0' },
 }
 
 const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
@@ -177,7 +177,7 @@ function InfoRow({ icon, label, value, href, mono }: {
         <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 2 }}>{label}</div>
         {href ? (
           <a href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"
-            style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', wordBreak: 'break-all', fontFamily: mono ? 'monospace' : undefined }}>
+            style={{ fontSize: 13, color: '#47648A', textDecoration: 'none', wordBreak: 'break-all', fontFamily: mono ? 'monospace' : undefined }}>
             {value}
           </a>
         ) : (
@@ -484,7 +484,7 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                 </button>
               </>
             ) : (
-              <button onClick={handleDelete} className="btn btn-ghost btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#b91c1c' }}>
+              <button onClick={handleDelete} className="btn btn-ghost btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#933B34' }}>
                 <Trash2 size={13} /> Eliminar
               </button>
             )}
@@ -569,29 +569,29 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                 )}
                 {isLost && (
                   <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: '#b91c1c', fontWeight: 500 }}>Todos los leads perdidos</span>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#BC5249', flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: '#933B34', fontWeight: 500 }}>Todos los leads perdidos</span>
                   </div>
                 )}
               </div>
 
               {/* Visit banner */}
               {hasVisit && lead && (
-                <div style={{ padding: '16px 20px', borderRadius: 12, background: 'linear-gradient(135deg,#ecfdf5,#f0fdf4)', border: '1.5px solid #6ee7b7', display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{ padding: '16px 20px', borderRadius: 12, background: 'linear-gradient(135deg,#EDF2ED,#EEF2EC)', border: '1.5px solid #BFD2C5', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#5C8570', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Landmark size={18} style={{ color: '#fff' }} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#065f46', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#35513E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
                       {lead.status === 'post_visit' ? 'Visita realizada' : 'Visita agendada'}
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#047857' }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#3C5945' }}>
                       {fmtDate(lead.visit_date)}
-                      {visitTimeLabel && <span style={{ fontWeight: 400, fontSize: 13, color: '#059669' }}> · {visitTimeLabel}</span>}
+                      {visitTimeLabel && <span style={{ fontWeight: 400, fontSize: 13, color: '#467A60' }}> · {visitTimeLabel}</span>}
                     </div>
                   </div>
                   <button onClick={() => router.push(`/leads?open=${lead.id}`)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.7)', border: '1px solid #a7f3d0', color: '#047857', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.7)', border: '1px solid #C6D8C9', color: '#3C5945', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
                     <ExternalLink size={11} /> Gestionar
                   </button>
                 </div>
@@ -904,25 +904,25 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                         const events: { date: string; type: string; label: string; detail?: string; color: string }[] = []
 
                         // Client created
-                        events.push({ date: client.created_at, type: 'contact', label: 'Contacto creado', color: '#6366f1' })
+                        events.push({ date: client.created_at, type: 'contact', label: 'Contacto creado', color: '#5F6196' })
 
                         // Leads
                         for (const l of clientLeads) {
-                          events.push({ date: l.created_at, type: 'lead', label: `Petición recibida`, detail: l.name || undefined, color: '#f59e0b' })
+                          events.push({ date: l.created_at, type: 'lead', label: `Petición recibida`, detail: l.name || undefined, color: '#AC8B4C' })
                           if (l.status === 'won') {
-                            events.push({ date: l.updated_at || l.created_at, type: 'won', label: 'Confirmado', detail: l.name || undefined, color: '#10b981' })
+                            events.push({ date: l.updated_at || l.created_at, type: 'won', label: 'Confirmado', detail: l.name || undefined, color: '#5C8570' })
                           }
                           if (l.status === 'lost') {
-                            events.push({ date: l.updated_at || l.created_at, type: 'lost', label: 'Perdido', detail: l.name || undefined, color: '#ef4444' })
+                            events.push({ date: l.updated_at || l.created_at, type: 'lost', label: 'Perdido', detail: l.name || undefined, color: '#BC5249' })
                           }
                           if (l.visit_date) {
-                            events.push({ date: l.visit_date, type: 'visit', label: 'Visita agendada', detail: l.name || undefined, color: '#059669' })
+                            events.push({ date: l.visit_date, type: 'visit', label: 'Visita agendada', detail: l.name || undefined, color: '#467A60' })
                           }
                         }
 
                         // Proposals
                         for (const p of proposals) {
-                          events.push({ date: p.created_at, type: 'proposal', label: 'Dosier creado', detail: p.couple_name || undefined, color: '#8b5cf6' })
+                          events.push({ date: p.created_at, type: 'proposal', label: 'Dosier creado', detail: p.couple_name || undefined, color: '#7E72A0' })
                         }
 
                         events.sort((a, b) => b.date.localeCompare(a.date))
@@ -1058,7 +1058,7 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                         return (
                           <button key={cp.id} onClick={() => router.push(`/crm/${cp.id}`)}
                             style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: '#fafaf8', border: '1px solid var(--ivory)', cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left', width: '100%' }}>
-                            <div style={{ width: 34, height: 34, borderRadius: 10, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14, fontWeight: 700, color: '#92400e' }}>
+                            <div style={{ width: 34, height: 34, borderRadius: 10, background: '#F3EBD8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14, fontWeight: 700, color: '#7A5A2E' }}>
                               {(cp.name || '?')[0].toUpperCase()}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -1087,13 +1087,13 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {email && (
                     <a href={`mailto:${email}`}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 8, background: '#f0f9ff', color: '#0369a1', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 8, background: '#EFF3F7', color: '#3D5E78', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
                       <Mail size={13} /> Enviar email
                     </a>
                   )}
                   {whatsapp && (
                     <a href={`https://wa.me/${whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 8, background: '#f0fdf4', color: '#15803d', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 8, background: '#EEF2EC', color: '#3C5945', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
                       <MessageCircle size={13} /> WhatsApp
                     </a>
                   )}
@@ -1216,13 +1216,13 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                   </div>
                 )}
                 {l.notes && (
-                  <div style={{ marginTop: 10, padding: '10px 12px', background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', marginBottom: 4 }}>Notas</div>
+                  <div style={{ marginTop: 10, padding: '10px 12px', background: '#F7F3E8', borderRadius: 8, border: '1px solid #E2D4AE' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#7A5A2E', textTransform: 'uppercase', marginBottom: 4 }}>Notas</div>
                     <div style={{ fontSize: 12, color: 'var(--charcoal)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{l.notes}</div>
                   </div>
                 )}
                 {l.visit_date && (
-                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#059669' }}>
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#467A60' }}>
                     <CalendarCheck size={12} /> Visita: {fmtDate(l.visit_date)}{l.visit_time ? ` a las ${l.visit_time}` : ''}
                   </div>
                 )}
@@ -1294,7 +1294,7 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                           {ms.selected_extras?.length > 0 && (
                             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
                               {ms.selected_extras.map((ext: string, i: number) => (
-                                <span key={i} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: 'rgba(99,102,241,0.08)', color: '#4f46e5', fontWeight: 500 }}>{ext}</span>
+                                <span key={i} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: 'rgba(99,102,241,0.08)', color: '#514C84', fontWeight: 500 }}>{ext}</span>
                               ))}
                             </div>
                           )}
@@ -1308,7 +1308,7 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                       <div>
                         <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Respuestas</div>
                         {modalDetail.inquiries.map((inq: any) => (
-                          <div key={inq.id} style={{ padding: '8px 10px', background: inq.status === 'new' ? '#FFFBEB' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#FDE68A' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 5 }}>
+                          <div key={inq.id} style={{ padding: '8px 10px', background: inq.status === 'new' ? '#F7F3E8' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#E2D4AE' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 5 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
                               <span>{KIND_EMOJI[inq.kind] ?? '💬'}</span>
                               <span style={{ fontWeight: 600, color: 'var(--charcoal)' }}>{KIND_LABEL[inq.kind] || inq.kind}</span>
@@ -1380,18 +1380,18 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                       <div style={{ marginBottom: 14 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)' }}>Progreso de pagos</div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: paidCount === plan.length ? '#16a34a' : 'var(--espresso)' }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: paidCount === plan.length ? '#4A6B52' : 'var(--espresso)' }}>
                             {paidCount}/{plan.length} cuotas
                           </div>
                         </div>
                         <div style={{ height: 6, background: 'var(--ivory)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
-                          <div style={{ height: '100%', width: `${plan.length > 0 ? (paidCount / plan.length) * 100 : 0}%`, background: paidCount === plan.length ? '#16a34a' : 'var(--gold)', borderRadius: 3 }} />
+                          <div style={{ height: '100%', width: `${plan.length > 0 ? (paidCount / plan.length) * 100 : 0}%`, background: paidCount === plan.length ? '#4A6B52' : 'var(--gold)', borderRadius: 3 }} />
                         </div>
                         {plan.map((inst: any, idx: number) => (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, background: inst.status === 'paid' ? '#f0fdf4' : 'var(--cream)', border: `1px solid ${inst.status === 'paid' ? '#86efac' : 'var(--ivory)'}`, marginBottom: 4 }}>
-                            {inst.status === 'paid' ? <CheckCircle size={12} style={{ color: '#16a34a', flexShrink: 0 }} /> : <Clock size={12} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, background: inst.status === 'paid' ? '#EEF2EC' : 'var(--cream)', border: `1px solid ${inst.status === 'paid' ? '#C3D4C5' : 'var(--ivory)'}`, marginBottom: 4 }}>
+                            {inst.status === 'paid' ? <CheckCircle size={12} style={{ color: '#4A6B52', flexShrink: 0 }} /> : <Clock size={12} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
                             <div style={{ flex: 1, fontSize: 12, color: 'var(--charcoal)' }}>{inst.label}</div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: inst.status === 'paid' ? '#16a34a' : 'var(--espresso)' }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: inst.status === 'paid' ? '#4A6B52' : 'var(--espresso)' }}>
                               {Number(inst.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
                             </div>
                             {inst.due_date && <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{fmtDate(inst.due_date)}</div>}
@@ -1409,9 +1409,9 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                         <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Historial de pagos</div>
                         {modalDetail.payments.map((pay: any) => (
                           <div key={pay.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 11, borderBottom: '1px solid var(--ivory)' }}>
-                            <CheckCircle size={10} style={{ color: '#16a34a', flexShrink: 0 }} />
+                            <CheckCircle size={10} style={{ color: '#4A6B52', flexShrink: 0 }} />
                             <div style={{ flex: 1, color: 'var(--charcoal)' }}>{pay.payer_name || pay.payer_email || 'Pago'}</div>
-                            <div style={{ fontWeight: 600, color: '#16a34a' }}>{Number(pay.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
+                            <div style={{ fontWeight: 600, color: '#4A6B52' }}>{Number(pay.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
                             {pay.paid_at && <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{fmtDate(pay.paid_at)}</div>}
                           </div>
                         ))}

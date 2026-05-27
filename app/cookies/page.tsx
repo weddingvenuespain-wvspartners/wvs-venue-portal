@@ -80,29 +80,29 @@
         <div style={bodyStyle}>
           <div style={{ display: 'grid', gap: 12, marginTop: 8 }}>
 
-            <div style={{ padding: '16px 18px', borderRadius: 10, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#15803d', marginBottom: 6 }}>
+            <div style={{ padding: '16px 18px', borderRadius: 10, background: '#EEF2EC', border: '1px solid #D2DFD3' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#3C5945', marginBottom: 6 }}>
                 Cookies técnicas necesarias
               </div>
-              <p style={{ fontSize: 13, color: '#166534', lineHeight: 1.7 }}>
+              <p style={{ fontSize: 13, color: '#35513E', lineHeight: 1.7 }}>
                 Son imprescindibles para el funcionamiento del portal. Sin ellas, no podrías iniciar sesión ni usar las funcionalidades básicas. No requieren consentimiento y no pueden desactivarse.
               </p>
             </div>
 
-            <div style={{ padding: '16px 18px', borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 6 }}>
+            <div style={{ padding: '16px 18px', borderRadius: 10, background: '#EEF2F7', border: '1px solid #CCD9E6' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#3F5980', marginBottom: 6 }}>
                 Cookies analíticas (opcionales)
               </div>
-              <p style={{ fontSize: 13, color: '#1e40af', lineHeight: 1.7 }}>
+              <p style={{ fontSize: 13, color: '#39527A', lineHeight: 1.7 }}>
                 Nos permiten entender cómo se utiliza el portal de forma agregada y anónima, para mejorar la experiencia. Solo se activan si has dado tu consentimiento en Configuración &gt; Privacidad y datos.
               </p>
             </div>
 
-            <div style={{ padding: '16px 18px', borderRadius: 10, background: '#fef3c7', border: '1px solid #fde68a' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 6 }}>
+            <div style={{ padding: '16px 18px', borderRadius: 10, background: '#F3EBD8', border: '1px solid #E2D4AE' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#7A5A2E', marginBottom: 6 }}>
                 Cookies de marketing (opcionales)
               </div>
-              <p style={{ fontSize: 13, color: '#92400e', lineHeight: 1.7 }}>
+              <p style={{ fontSize: 13, color: '#7A5A2E', lineHeight: 1.7 }}>
                 En este momento no utilizamos cookies de marketing de terceros para publicidad. Si esto cambiara en el futuro, actualizaremos esta política y solicitaremos tu consentimiento.
               </p>
             </div>

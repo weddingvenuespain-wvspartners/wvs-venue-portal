@@ -106,8 +106,8 @@ export default function StripeConnectBlock() {
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <AlertCircle size={16} style={{ color: '#b45309' }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#b45309' }}>Verificación pendiente</span>
+          <AlertCircle size={16} style={{ color: '#8A6A38' }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#8A6A38' }}>Verificación pendiente</span>
         </div>
         <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.7, marginBottom: 16 }}>
           Tu cuenta está creada pero Stripe necesita que completes la verificación
@@ -130,8 +130,8 @@ export default function StripeConnectBlock() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <CheckCircle size={16} style={{ color: '#16a34a' }} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#16a34a' }}>Stripe conectado</span>
+        <CheckCircle size={16} style={{ color: '#4A6B52' }} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#4A6B52' }}>Stripe conectado</span>
       </div>
       <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.7, marginBottom: 16 }}>
         Las parejas pueden pagar las cuotas de sus presupuestos con tarjeta.

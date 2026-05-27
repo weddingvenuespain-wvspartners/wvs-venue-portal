@@ -306,7 +306,7 @@ export default function TemplatesPage() {
                             </button>
                           )}
                           <button title="Eliminar" className="btn btn-ghost btn-sm" onClick={() => handleDelete(tpl.id)} disabled={deleting === tpl.id}
-                            style={{ height: 26, width: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
+                            style={{ height: 26, width: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#B0473E' }}>
                             {deleting === tpl.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                           </button>
                         </div>

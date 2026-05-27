@@ -39,7 +39,7 @@
       </div>
 
       {/* Intro */}
-      <div style={{ padding: '16px 20px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, marginBottom: 36, fontSize: 13, color: '#1d4ed8', lineHeight: 1.7 }}>
+      <div style={{ padding: '16px 20px', background: '#EEF2F7', border: '1px solid #CCD9E6', borderRadius: 10, marginBottom: 36, fontSize: 13, color: '#3F5980', lineHeight: 1.7 }}>
         En FOREVENTOS respetamos tu privacidad y nos comprometemos a proteger tus datos personales de conformidad con el Reglamento General de Protección de Datos (RGPD) y la Ley Orgánica de Protección de Datos (LOPDGDD). Esta política describe cómo recogemos, usamos y protegemos tus datos.
       </div>
 

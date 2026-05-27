@@ -8,11 +8,11 @@ import { Palette, Upload, CheckCircle, Eye, RotateCcw } from 'lucide-react'
 
 const PRESET_PALETTES = [
   { label: 'Dorado clásico',  primary: '#4A6B52', secondary: '#f5f0ea' },
-  { label: 'Rosa peonía',     primary: '#be185d', secondary: '#fdf2f8' },
+  { label: 'Rosa peonía',     primary: '#9A3F5F', secondary: '#F6EEF2' },
   { label: 'Verde salvia',    primary: '#4a7c59', secondary: '#f0f5f1' },
   { label: 'Azul pizarra',    primary: '#334e68', secondary: '#f0f4f8' },
   { label: 'Terracota',       primary: '#c1440e', secondary: '#fdf4ee' },
-  { label: 'Lavanda',         primary: '#7c3aed', secondary: '#f5f3ff' },
+  { label: 'Lavanda',         primary: '#6A5B95', secondary: '#F2F1F8' },
   { label: 'Grafito',         primary: '#374151', secondary: '#f9fafb' },
   { label: 'Rosado nude',     primary: '#d4a5a5', secondary: '#fef9f9' },
 ]
@@ -164,7 +164,7 @@ export default function BrandingPage() {
                         Cambiar
                       </button>
                       <button type="button" onClick={() => set('brand_logo_url', '')}
-                        style={{ padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.3)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: '#dc2626' }}>
+                        style={{ padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(188,82,73,0.3)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: '#B0473E' }}>
                         <RotateCcw size={11} style={{ display: 'inline', marginRight: 4 }} />Quitar
                       </button>
                     </div>
@@ -192,7 +192,7 @@ export default function BrandingPage() {
                 )}
 
                 {logoError && (
-                  <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{logoError}</div>
+                  <div style={{ fontSize: 12, color: '#B0473E', marginBottom: 8 }}>{logoError}</div>
                 )}
 
                 <input ref={fileRef} type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />

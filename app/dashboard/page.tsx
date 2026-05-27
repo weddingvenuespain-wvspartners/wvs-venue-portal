@@ -51,9 +51,9 @@ function AdminDashboard() {
 
   const kpis = stats ? [
     { label: 'Venues registrados', value: stats.total,   sub: 'Total en la plataforma',  color: 'var(--gold)',    icon: <Building2 size={18} /> },
-    { label: 'Suscripciones activas', value: stats.active, sub: 'Pagando actualmente',   color: '#22c55e',        icon: <CheckCircle size={18} /> },
-    { label: 'En período de trial',   value: stats.trial,  sub: stats.expiringSoon?.length > 0 ? `${stats.expiringSoon.length} expiran en 7d` : 'Probando la plataforma', color: '#f59e0b', icon: <Clock size={18} /> },
-    { label: 'Sin plan activo',       value: stats.noPlan, sub: 'Pendientes de activar', color: stats.noPlan > 0 ? '#ef4444' : 'var(--warm-gray)', icon: <AlertCircle size={18} /> },
+    { label: 'Suscripciones activas', value: stats.active, sub: 'Pagando actualmente',   color: '#5C7E64',        icon: <CheckCircle size={18} /> },
+    { label: 'En período de trial',   value: stats.trial,  sub: stats.expiringSoon?.length > 0 ? `${stats.expiringSoon.length} expiran en 7d` : 'Probando la plataforma', color: '#AC8B4C', icon: <Clock size={18} /> },
+    { label: 'Sin plan activo',       value: stats.noPlan, sub: 'Pendientes de activar', color: stats.noPlan > 0 ? '#BC5249' : 'var(--warm-gray)', icon: <AlertCircle size={18} /> },
   ] : []
 
   const SUB_BADGE: Record<string, string> = {
@@ -99,7 +99,7 @@ function AdminDashboard() {
                   <div style={{ color: k.color, opacity: 0.7 }}>{k.icon}</div>
                 </div>
                 <div className="stat-value" style={{ color: k.color }}>{k.value}</div>
-                <div className="stat-sub" style={{ color: k.color === '#ef4444' && (k.value as number) > 0 ? '#ef4444' : undefined }}>{k.sub}</div>
+                <div className="stat-sub" style={{ color: k.color === '#BC5249' && (k.value as number) > 0 ? '#BC5249' : undefined }}>{k.sub}</div>
               </div>
             ))}
           </div>
@@ -152,10 +152,10 @@ function AdminDashboard() {
                 <div key={v.user_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--ivory)' }}>
                   <div style={{
                     width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-                    background: v.daysLeft <= 2 ? '#fee2e2' : '#fef9c3',
+                    background: v.daysLeft <= 2 ? '#F2E2E0' : '#fef9c3',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 11, fontWeight: 700,
-                    color: v.daysLeft <= 2 ? '#dc2626' : '#92400e',
+                    color: v.daysLeft <= 2 ? '#B0473E' : '#7A5A2E',
                   }}>
                     {v.daysLeft}d
                   </div>
@@ -219,10 +219,10 @@ function AdminDashboard() {
               <div className="card-body" style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                   {[
-                    { label: 'Total', value: wpStats.total, color: '#a21caf', bg: '#fdf2f8' },
+                    { label: 'Total', value: wpStats.total, color: '#a21caf', bg: '#F6EEF2' },
                     { label: 'Nuevas', value: wpStats.new,  color: '#4A6B52', bg: '#fdf8f4' },
-                    { label: 'Contactadas', value: wpStats.contacted, color: '#3b82f6', bg: '#eff6ff' },
-                    { label: 'Aceptadas', value: wpStats.accepted, color: '#22c55e', bg: '#f0fdf4' },
+                    { label: 'Contactadas', value: wpStats.contacted, color: '#4F6D8C', bg: '#EEF2F7' },
+                    { label: 'Aceptadas', value: wpStats.accepted, color: '#5C7E64', bg: '#EEF2EC' },
                   ].map(item => (
                     <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: item.bg, borderRadius: 8, flex: '1 1 120px' }}>
                       <div style={{ fontSize: 22, fontWeight: 700, color: item.color }}>{item.value}</div>
@@ -243,10 +243,10 @@ function AdminDashboard() {
               <div className="card-body" style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                   {[
-                    { label: 'Activas', value: stats.active,  color: '#22c55e', bg: '#f0fdf4' },
-                    { label: 'Trial',   value: stats.trial,   color: '#f59e0b', bg: '#fffbeb' },
+                    { label: 'Activas', value: stats.active,  color: '#5C7E64', bg: '#EEF2EC' },
+                    { label: 'Trial',   value: stats.trial,   color: '#AC8B4C', bg: '#F7F3E8' },
                     { label: 'Pausadas', value: stats.paused, color: '#6b7280', bg: '#f9fafb' },
-                    { label: 'Sin plan', value: stats.noPlan, color: '#ef4444', bg: '#fef2f2' },
+                    { label: 'Sin plan', value: stats.noPlan, color: '#BC5249', bg: '#FAF3F2' },
                   ].map(item => (
                     <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: item.bg, borderRadius: 8, flex: '1 1 120px' }}>
                       <div style={{ fontSize: 22, fontWeight: 700, color: item.color }}>{item.value}</div>
@@ -414,7 +414,7 @@ function VenueDashboard() {
             ) : onbStatus === 'submitted' ? (
               <div className="card">
                 <div className="card-body" style={{ textAlign: 'center', padding: 40 }}>
-                  <AlertCircle size={22} style={{ color: '#92400e', margin: '0 auto 16px' }} />
+                  <AlertCircle size={22} style={{ color: '#7A5A2E', margin: '0 auto 16px' }} />
                   <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Solicitud en revisión</div>
                   <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.7 }}>
                     Hemos recibido la información de <strong>{onboarding.name}</strong>. Te avisaremos en 24-48 horas.
@@ -474,17 +474,17 @@ function VenueDashboard() {
                 href: '/leads?tab=en_seguimiento',
                 sub: 'Leads activos en pipeline',
                 accent: 'var(--espresso)', bg: '#fff',
-                border: 'var(--ivory)', stripe: '#7c3aed',
+                border: 'var(--ivory)', stripe: '#6A5B95',
               },
               {
                 label: 'Sin responder', icon: <Bell size={16} />,
                 value: kpiNew,
                 href: '/leads?tab=new',
                 sub: (kpiNew ?? 0) > 0 ? 'Requieren atención' : 'Al día ✓',
-                accent: (kpiNew ?? 0) > 0 ? '#dc2626' : 'var(--espresso)',
+                accent: (kpiNew ?? 0) > 0 ? '#B0473E' : 'var(--espresso)',
                 bg: (kpiNew ?? 0) > 0 ? '#fff8f8' : '#fff',
-                border: (kpiNew ?? 0) > 0 ? '#fca5a5' : 'var(--ivory)',
-                stripe: (kpiNew ?? 0) > 0 ? '#dc2626' : '#16a34a',
+                border: (kpiNew ?? 0) > 0 ? '#E0C2BD' : 'var(--ivory)',
+                stripe: (kpiNew ?? 0) > 0 ? '#B0473E' : '#4A6B52',
               },
               {
                 label: 'Bodas confirmadas', icon: <PartyPopper size={16} />,
@@ -492,7 +492,7 @@ function VenueDashboard() {
                 href: '/leads?tab=confirmed',
                 sub: 'Reservas cerradas',
                 accent: 'var(--espresso)', bg: '#fff',
-                border: 'var(--ivory)', stripe: '#be185d',
+                border: 'var(--ivory)', stripe: '#9A3F5F',
               },
             ].map((k: any, i) => (
               <Link key={i} href={k.href}
@@ -562,7 +562,7 @@ function VenueDashboard() {
                 </div>
               ) : leads.map(lead => (
                 <div key={lead.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 20px', borderBottom: '1px solid var(--ivory)' }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: lead.status === 'new' ? 'var(--gold)' : lead.status === 'booked' ? '#22c55e' : 'var(--stone)' }} />
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: lead.status === 'new' ? 'var(--gold)' : lead.status === 'booked' ? '#5C7E64' : 'var(--stone)' }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lead.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{lead.wedding_date ? new Date(lead.wedding_date).toLocaleDateString('es-ES') : 'Sin fecha'}{lead.guests ? ` · ${lead.guests} invitados` : ''}</div>

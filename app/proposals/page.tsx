@@ -283,9 +283,9 @@ function PropuestasPageContent() {
         {(success || error) && (
           <div style={{
             position: 'fixed', bottom: 28, right: 28, zIndex: 9999,
-            background: error ? '#fef2f2' : '#f0fdf4',
-            border: `1px solid ${error ? '#fca5a5' : '#86efac'}`,
-            color: error ? '#991b1b' : '#15803d',
+            background: error ? '#FAF3F2' : '#EEF2EC',
+            border: `1px solid ${error ? '#E0C2BD' : '#C3D4C5'}`,
+            color: error ? '#7E332D' : '#3C5945',
             padding: '12px 16px', borderRadius: 10,
             boxShadow: '0 4px 20px rgba(0,0,0,.13)',
             fontSize: 13, maxWidth: 380, minWidth: 240,
@@ -303,7 +303,7 @@ function PropuestasPageContent() {
           <div className="modal-overlay" onClick={() => setSendErrAlert(false)}>
             <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
               <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
-                <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#92400e' }}>
+                <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#7A5A2E' }}>
                   <AlertTriangle size={17} /> No se pudo enviar el email
                 </div>
                 <button onClick={() => setSendErrAlert(false)} style={{ position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 6, display: 'flex', alignItems: 'center', borderRadius: 6 }}>
@@ -489,8 +489,8 @@ function PropuestasPageContent() {
                             {leadProposalCount !== null && (
                               <span title={`${leadProposalCount}/${MAX_PROPOSALS_PER_LEAD} propuestas para este lead`} style={{
                                 fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600,
-                                background: atLimit ? '#fee2e2' : 'var(--ivory)',
-                                color: atLimit ? '#dc2626' : 'var(--warm-gray)',
+                                background: atLimit ? '#F2E2E0' : 'var(--ivory)',
+                                color: atLimit ? '#B0473E' : 'var(--warm-gray)',
                               }}>
                                 {leadProposalCount}/{MAX_PROPOSALS_PER_LEAD}
                               </span>
@@ -626,7 +626,7 @@ function PropuestasPageContent() {
               <div className="modal-body" style={{ maxHeight: 450, overflowY: 'auto' }}>
                 {pInq.length === 0 && <div style={{ textAlign: 'center', padding: 20, color: 'var(--warm-gray)', fontSize: 13 }}>Sin respuestas aún.</div>}
                 {pInq.map((inq: any) => (
-                  <div key={inq.id} style={{ padding: '12px 14px', background: inq.status === 'new' ? '#FFFBEB' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#FDE68A' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 8 }}>
+                  <div key={inq.id} style={{ padding: '12px 14px', background: inq.status === 'new' ? '#F7F3E8' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#E2D4AE' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                       <span style={{ fontSize: 14 }}>{KIND_EMOJI[inq.kind] ?? '💬'}</span>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{inq.kind_label || KIND_LABEL[inq.kind] || inq.kind}</span>
@@ -711,7 +711,7 @@ function PropuestasPageContent() {
                   <div style={{ marginBottom: 12 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Respuestas de la pareja</div>
                     {dpInq.map((inq: any) => (
-                      <div key={inq.id} style={{ padding: '10px 12px', background: inq.status === 'new' ? '#FFFBEB' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#FDE68A' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 6 }}>
+                      <div key={inq.id} style={{ padding: '10px 12px', background: inq.status === 'new' ? '#F7F3E8' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#E2D4AE' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 6 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                           <span style={{ fontSize: 13 }}>{KIND_EMOJI[inq.kind] ?? '💬'}</span>
                           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{inq.kind_label || KIND_LABEL[inq.kind] || inq.kind}</span>

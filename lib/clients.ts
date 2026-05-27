@@ -45,11 +45,11 @@ export const CLIENT_TYPE_LABELS: Record<ClientType, string> = {
 }
 
 export const CLIENT_TYPE_COLORS: Record<ClientType, { bg: string; color: string; border: string }> = {
-  pareja:          { bg: '#fef3c7', color: '#92400e', border: '#fde68a' },
-  wedding_planner: { bg: '#f3e8ff', color: '#6b21a8', border: '#d8b4fe' },
-  organizador:     { bg: '#dbeafe', color: '#1e3a8a', border: '#93c5fd' },
+  pareja:          { bg: '#F3EBD8', color: '#7A5A2E', border: '#E2D4AE' },
+  wedding_planner: { bg: '#f3e8ff', color: '#5A4878', border: '#d8b4fe' },
+  organizador:     { bg: '#DDE5EF', color: '#39527A', border: '#AFC0D2' },
   empresa:         { bg: '#f1f5f9', color: '#334155', border: '#cbd5e1' },
-  cliente:         { bg: '#ecfdf5', color: '#065f46', border: '#6ee7b7' },
+  cliente:         { bg: '#EDF2ED', color: '#35513E', border: '#BFD2C5' },
   otro:            { bg: '#f5f5f4', color: '#57534e', border: '#d6d3d1' },
 }
 

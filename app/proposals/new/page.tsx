@@ -174,7 +174,7 @@ function NuevaPropuestaContent() {
   if (error) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, background: 'var(--cream)', padding: 40 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#991b1b', fontSize: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#7E332D', fontSize: 14 }}>
           <AlertCircle size={18} />
           <span>{error}</span>
         </div>

@@ -303,9 +303,9 @@ function getLeadFirstDate(lead: any): string | null {
 
 
 const CAL_AVAIL_CFG: Record<string, { bg: string; border: string; dot: string; label: string }> = {
-  libre:       { bg: '#fff',    border: '#e5e7eb', dot: '#d1fae5', label: 'Libre' },
-  negociacion: { bg: '#fef9ec', border: '#fde68a', dot: '#f59e0b', label: 'En negociación' },
-  reservado:   { bg: '#fee2e2', border: '#fca5a5', dot: '#ef4444', label: 'Reservado' },
+  libre:       { bg: '#fff',    border: '#e5e7eb', dot: '#DCE7DE', label: 'Libre' },
+  negociacion: { bg: '#F6F1E4', border: '#E2D4AE', dot: '#AC8B4C', label: 'En negociación' },
+  reservado:   { bg: '#F2E2E0', border: '#E0C2BD', dot: '#BC5249', label: 'Reservado' },
   bloqueado:   { bg: '#e5e7eb', border: '#9ca3af', dot: '#6b7280', label: 'Bloqueado' },
 }
 
@@ -1422,16 +1422,16 @@ function LeadsPageInner() {
           {staleLeads.length > 0 && activeTab === 'new' && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
-              background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, marginBottom: 10, fontSize: 12,
+              background: '#FAF3F2', border: '1px solid #E0C2BD', borderRadius: 8, marginBottom: 10, fontSize: 12,
             }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Clock size={16} style={{ color: '#dc2626' }} />
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F2E2E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Clock size={16} style={{ color: '#B0473E' }} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, color: '#dc2626' }}>
+                <div style={{ fontWeight: 700, color: '#B0473E' }}>
                   {staleLeads.length} lead{staleLeads.length !== 1 ? 's' : ''} sin responder hace más de 48h
                 </div>
-                <div style={{ color: '#b91c1c', fontSize: 11, marginTop: 1 }}>
+                <div style={{ color: '#933B34', fontSize: 11, marginTop: 1 }}>
                   Responder rápido aumenta la conversión. Considera contactar o marcar como perdido.
                 </div>
               </div>
@@ -1442,16 +1442,16 @@ function LeadsPageInner() {
           {wpPriorityLeads.length > 0 && activeTab === 'new' && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
-              background: '#f5f3ff', border: '1px solid #d8b4fe', borderRadius: 8, marginBottom: 10, fontSize: 12,
+              background: '#F2F1F8', border: '1px solid #d8b4fe', borderRadius: 8, marginBottom: 10, fontSize: 12,
             }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#E9E6F3', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <span style={{ fontSize: 16 }}>👑</span>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, color: '#6b21a8' }}>
+                <div style={{ fontWeight: 700, color: '#5A4878' }}>
                   {wpPriorityLeads.length} lead{wpPriorityLeads.length !== 1 ? 's' : ''} de Wedding Planners
                 </div>
-                <div style={{ color: '#7c3aed', fontSize: 11, marginTop: 1 }}>
+                <div style={{ color: '#6A5B95', fontSize: 11, marginTop: 1 }}>
                   Prioridad alta — provienen de planners con los que colaboras
                 </div>
               </div>
@@ -1469,11 +1469,11 @@ function LeadsPageInner() {
               </span>
               <div style={{ flex: 1 }} />
               <button onClick={() => bulkMoveTo('contacted')} disabled={bulkProcessing}
-                style={{ padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#fff', background: '#3b82f6', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: bulkProcessing ? 0.5 : 1 }}>
+                style={{ padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#fff', background: '#4F6D8C', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: bulkProcessing ? 0.5 : 1 }}>
                 Mover a En seguimiento
               </button>
               <button onClick={() => bulkMoveTo('lost')} disabled={bulkProcessing}
-                style={{ padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#fff', background: '#ef4444', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: bulkProcessing ? 0.5 : 1 }}>
+                style={{ padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#fff', background: '#BC5249', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: bulkProcessing ? 0.5 : 1 }}>
                 Marcar perdidos
               </button>
               <button onClick={() => setSelectedIds(new Set())}
@@ -1495,11 +1495,11 @@ function LeadsPageInner() {
                 return (
                   <button key={tab.key} onClick={() => { setActiveTab(tab.key); setFlashedTab(null); setVisitSubFilter('all') }} style={{
                     padding: '8px 14px',
-                    background: isFlashing && isLost ? '#dc2626'
-                      : isActive && isLost ? '#dc2626'
+                    background: isFlashing && isLost ? '#B0473E'
+                      : isActive && isLost ? '#B0473E'
                       : isActive ? '#fff'
                       : isFlashing ? '#fefce8'
-                      : isLost && count > 0 && !isActive ? 'rgba(239,68,68,0.05)'
+                      : isLost && count > 0 && !isActive ? 'rgba(188,82,73,0.05)'
                       : 'none',
                     border: isActive ? '1px solid var(--ivory)' : '1px solid transparent',
                     borderBottom: isActive ? '1px solid #fff' : '1px solid transparent',
@@ -1509,7 +1509,7 @@ function LeadsPageInner() {
                     color: isFlashing && isLost ? '#fff'
                       : isActive && isLost ? '#fff'
                       : isActive ? 'var(--espresso)'
-                      : isLost && count > 0 ? '#ef4444'
+                      : isLost && count > 0 ? '#BC5249'
                       : isFlashing ? 'var(--gold)'
                       : 'var(--warm-gray)',
                     marginBottom: -1, display: 'flex', alignItems: 'center', gap: 6,
@@ -1525,11 +1525,11 @@ function LeadsPageInner() {
                         fontSize: 10, fontWeight: 700, minWidth: 18, height: 18,
                         borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: (isFlashing && isLost) || (isActive && isLost) ? 'rgba(255,255,255,0.25)'
-                          : isLost && count > 0 ? '#fee2e2'
+                          : isLost && count > 0 ? '#F2E2E0'
                           : isActive ? 'var(--gold)'
                           : 'var(--ivory)',
                         color: (isFlashing && isLost) || (isActive && isLost) ? '#fff'
-                          : isLost && count > 0 ? '#ef4444'
+                          : isLost && count > 0 ? '#BC5249'
                           : isActive ? '#fff'
                           : 'var(--warm-gray)',
                         padding: '0 5px',
@@ -1564,16 +1564,16 @@ function LeadsPageInner() {
           {/* Lost banner — aparece cuando un lead se mueve a Perdidos */}
           {lostBanner && (
             <div style={{
-              margin: '10px 0 4px', padding: '10px 14px', background: '#fef2f2',
-              border: '1px solid #fca5a5', borderRadius: 8,
+              margin: '10px 0 4px', padding: '10px 14px', background: '#FAF3F2',
+              border: '1px solid #E0C2BD', borderRadius: 8,
               display: 'flex', alignItems: 'center', gap: 8,
             }}>
-              <XCircle size={16} style={{ color: '#ef4444', flexShrink: 0 }} />
-              <span style={{ fontSize: 13, color: '#dc2626', fontWeight: 500, flex: 1 }}>
+              <XCircle size={16} style={{ color: '#BC5249', flexShrink: 0 }} />
+              <span style={{ fontSize: 13, color: '#B0473E', fontWeight: 500, flex: 1 }}>
                 {lostBanner.name ? <><strong>{lostBanner.name}</strong> movido a Perdidos</> : 'Lead movido a Perdidos'}
               </span>
               <button onClick={() => setLostBanner(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 2, display: 'flex' }}>
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BC5249', padding: 2, display: 'flex' }}>
                 <X size={14} />
               </button>
             </div>
@@ -1950,7 +1950,7 @@ function LeadsPageInner() {
           <div style={{ background: '#fff', borderRadius: 14, maxWidth: 400, width: '100%', padding: '24px 24px 20px', boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef9ec', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#F6F1E4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Calendar size={18} style={{ color: 'var(--gold)' }} />
               </div>
               <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--espresso)' }}>
@@ -2003,7 +2003,7 @@ function LeadsPageInner() {
               <div className="modal-body" style={{ maxHeight: 450, overflowY: 'auto' }}>
                 {lInq.length === 0 && <div style={{ textAlign: 'center', padding: 20, color: 'var(--warm-gray)', fontSize: 13 }}>Sin respuestas aún.</div>}
                 {lInq.map((inq: any) => (
-                  <div key={inq.id} style={{ padding: '12px 14px', background: inq.status === 'new' ? '#FFFBEB' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#FDE68A' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 8 }}>
+                  <div key={inq.id} style={{ padding: '12px 14px', background: inq.status === 'new' ? '#F7F3E8' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#E2D4AE' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                       <span style={{ fontSize: 14 }}>{KIND_EMOJI[inq.kind] ?? '💬'}</span>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{inq.kind_label || KIND_LABEL[inq.kind] || inq.kind}</span>
@@ -2813,11 +2813,11 @@ function DateConfirmModal({
   const nextMonth = () => { if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) } else setViewMonth(m => m + 1) }
 
   // Header config per mode
-  const modeConfig = isPdfDigital   ? { label: 'Selecciona las fechas para el dosier digital', icon: <CalendarDays size={16} />, gradient: '#EFF1FB', accent: '#4f6ef7', avatarBg: '#4f6ef7' }
+  const modeConfig = isPdfDigital   ? { label: 'Selecciona las fechas para el dosier digital', icon: <CalendarDays size={16} />, gradient: '#EFF1FB', accent: '#5566A0', avatarBg: '#5566A0' }
     : isVisitMode    ? { label: 'Agendar visita',          icon: <Landmark    size={16} />, gradient: '#EEF1EC', accent: 'var(--gold)',      avatarBg: 'var(--gold)' }
-    : isWonMode      ? { label: 'Confirmar boda',            icon: <PartyPopper size={16} />, gradient: '#EDF7F0', accent: '#16a34a',        avatarBg: 'var(--sage)' }
+    : isWonMode      ? { label: 'Confirmar boda',            icon: <PartyPopper size={16} />, gradient: '#EDF7F0', accent: '#4A6B52',        avatarBg: 'var(--sage)' }
     : isBudgetMode   ? { label: 'Presupuesto',               icon: <Receipt     size={16} />, gradient: '#EEF1EC', accent: 'var(--gold)',      avatarBg: 'var(--gold)' }
-    : isEditDatesMode ? { label: 'Editar fechas propuestas', icon: <CalendarDays size={16} />, gradient: '#EFF1FB', accent: '#4f6ef7',        avatarBg: '#4f6ef7' }
+    : isEditDatesMode ? { label: 'Editar fechas propuestas', icon: <CalendarDays size={16} />, gradient: '#EFF1FB', accent: '#5566A0',        avatarBg: '#5566A0' }
     :                  { label: 'Selecciona las fechas propuestas', icon: <CalendarDays size={16} />, gradient: '#F4F2EC', accent: 'var(--espresso)', avatarBg: 'var(--espresso)' }
 
   const dcmInitials = getInitials(lead.name || '')
@@ -2863,16 +2863,16 @@ function DateConfirmModal({
 
           {/* Existing visit notice — shown when re-scheduling a visit that wasn't cancelled */}
           {isVisitMode && lead.visit_date && (
-            <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 10, background: '#fffbeb', border: '1.5px solid #fde68a', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <CalendarDays size={18} color="#92400e" style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 10, background: '#F7F3E8', border: '1.5px solid #E2D4AE', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <CalendarDays size={18} color="#7A5A2E" style={{ flexShrink: 0, marginTop: 1 }} />
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 2 }}>Visita ya agendada</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#7A5A2E', marginBottom: 2 }}>Visita ya agendada</div>
                 <div style={{ fontSize: 13, color: '#78350f', fontWeight: 500 }}>
                   {new Date(lead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                   {lead.visit_time && <span style={{ marginLeft: 8, fontWeight: 400 }}>· {lead.visit_time}h</span>}
-                  {lead.visit_duration && <span style={{ marginLeft: 6, color: '#b45309', fontSize: 12 }}>({lead.visit_duration >= 60 ? `${Math.floor(lead.visit_duration / 60)}h${lead.visit_duration % 60 > 0 ? ` ${lead.visit_duration % 60}min` : ''}` : `${lead.visit_duration} min`})</span>}
+                  {lead.visit_duration && <span style={{ marginLeft: 6, color: '#8A6A38', fontSize: 12 }}>({lead.visit_duration >= 60 ? `${Math.floor(lead.visit_duration / 60)}h${lead.visit_duration % 60 > 0 ? ` ${lead.visit_duration % 60}min` : ''}` : `${lead.visit_duration} min`})</span>}
                 </div>
-                <div style={{ fontSize: 11, color: '#b45309', marginTop: 3 }}>Selecciona una fecha nueva en el calendario para cambiarla</div>
+                <div style={{ fontSize: 11, color: '#8A6A38', marginTop: 3 }}>Selecciona una fecha nueva en el calendario para cambiarla</div>
               </div>
             </div>
           )}
@@ -2885,7 +2885,7 @@ function DateConfirmModal({
                 {isWonMode ? 'Fechas propuestas a la pareja' : isBudgetMode && lead.status !== 'new' ? 'Fechas propuestas a la pareja' : 'Fecha que quiere la pareja'}
               </div>
               {unavailableRequested.length === requestedDates.length && (
-                <div style={{ fontSize: 12, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '8px 12px', marginBottom: 6 }}>
+                <div style={{ fontSize: 12, color: '#B0473E', background: '#FAF3F2', border: '1px solid #E0C2BD', borderRadius: 8, padding: '8px 12px', marginBottom: 6 }}>
                   ✕ Todas las fechas solicitadas están bloqueadas o reservadas. Selecciona otras fechas en el calendario.
                 </div>
               )}
@@ -2931,27 +2931,27 @@ function DateConfirmModal({
                         display: 'inline-flex', alignItems: 'center', gap: 5,
                         padding: '6px 12px', borderRadius: 20,
                         cursor: (isChecked || !isUnavailable) ? 'pointer' : 'not-allowed',
-                        background: isUnavailable && !isChecked ? '#fef2f2' : isChecked ? '#fef3c7' : '#f9fafb',
-                        border: `1.5px solid ${isUnavailable && !isChecked ? '#fca5a5' : isChecked ? '#f59e0b' : 'var(--ivory)'}`,
+                        background: isUnavailable && !isChecked ? '#FAF3F2' : isChecked ? '#F3EBD8' : '#f9fafb',
+                        border: `1.5px solid ${isUnavailable && !isChecked ? '#E0C2BD' : isChecked ? '#AC8B4C' : 'var(--ivory)'}`,
                         fontSize: 12, fontWeight: 600,
-                        color: isUnavailable && !isChecked ? '#9ca3af' : isChecked ? '#92400e' : 'var(--charcoal)',
+                        color: isUnavailable && !isChecked ? '#9ca3af' : isChecked ? '#7A5A2E' : 'var(--charcoal)',
                         textDecoration: isUnavailable && !isChecked ? 'line-through' : 'none',
                         transition: 'all 0.15s', outline: 'none',
                       }}>
                       {isChecked && (
-                        <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#f59e0b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#AC8B4C', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>✓</span>
                         </span>
                       )}
                       {isUnavailable && !isChecked && (
-                        <span style={{ color: '#ef4444', fontSize: 12, fontWeight: 700, lineHeight: 1 }}>✕</span>
+                        <span style={{ color: '#BC5249', fontSize: 12, fontWeight: 700, lineHeight: 1 }}>✕</span>
                       )}
                       {!isChecked && !isUnavailable && (
                         <span style={{ width: 16, height: 16, borderRadius: '50%', border: '1.5px solid #d1d5db', flexShrink: 0 }} />
                       )}
                       {formatDateLabel(d)}
                       {entryStatus === 'negociacion' && !isUnavailable && (
-                        <span style={{ fontSize: 9, background: '#fef3c7', color: '#92400e', padding: '1px 5px', borderRadius: 8, fontWeight: 700, border: '1px solid #fde68a' }}>Neg.</span>
+                        <span style={{ fontSize: 9, background: '#F3EBD8', color: '#7A5A2E', padding: '1px 5px', borderRadius: 8, fontWeight: 700, border: '1px solid #E2D4AE' }}>Neg.</span>
                       )}
                     </button>
                   )
@@ -3003,14 +3003,14 @@ function DateConfirmModal({
           )}
 
           {!isVisitMode && !hasRequestedDates && (
-            <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fef9ec', border: '1px solid #fde68a', borderRadius: 8, fontSize: 12, color: '#92400e' }}>
+            <div style={{ marginBottom: 12, padding: '10px 14px', background: '#F6F1E4', border: '1px solid #E2D4AE', borderRadius: 8, fontSize: 12, color: '#7A5A2E' }}>
               Este lead no tiene fechas exactas. Selecciona fechas disponibles en el calendario.
             </div>
           )}
 
           {!isVisitMode && !ignoreRules && dateRules?.type === 'packages' && (() => {
             const DOW_NAMES = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
-            const PKG_COLORS = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#14b8a6']
+            const PKG_COLORS = ['#5F6196','#AC8B4C','#5C8570','#BC5249','#7E72A0','#C56A92','#14b8a6']
             const pkgs: any[] = dateRules.packages || []
             return (
               <div style={{ marginBottom: 14 }}>
@@ -3023,8 +3023,8 @@ function DateConfirmModal({
                   {/* Calendar legend for package mode */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 700, lineHeight: 1 }}>+</span>
-                      <span style={{ fontSize: 10, color: '#16a34a', fontWeight: 600 }}>Disponible</span>
+                      <span style={{ fontSize: 11, color: '#4A6B52', fontWeight: 700, lineHeight: 1 }}>+</span>
+                      <span style={{ fontSize: 10, color: '#4A6B52', fontWeight: 600 }}>Disponible</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <div style={{ width: 14, height: 14, borderRadius: 3, background: 'repeating-linear-gradient(45deg, #f3f4f6 0px, #f3f4f6 4px, #e9eaeb 4px, #e9eaeb 8px)' }} />
@@ -3093,7 +3093,7 @@ function DateConfirmModal({
           {/* Overnight: day 1 or day 2 selector — show in auto mode always, in manual mode only when dates selected */}
           {!isVisitMode && dateRules?.type === 'overnight' && (!ignoreRules || selectedDates.length > 0) && (
             <div style={{ marginBottom: 14, padding: '12px 14px', background: '#fdf4ff', border: '1px solid #e9d5ff', borderRadius: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#6A5B95', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
                 ¿Cuándo es la boda?
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -3103,10 +3103,10 @@ function DateConfirmModal({
                 ].map(opt => (
                   <button key={opt.val} type="button" onClick={() => setOvernightDay(opt.val)} style={{
                     flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                    border: `2px solid ${overnightDay === opt.val ? '#7c3aed' : 'var(--ivory)'}`,
+                    border: `2px solid ${overnightDay === opt.val ? '#6A5B95' : 'var(--ivory)'}`,
                     background: overnightDay === opt.val ? '#faf5ff' : '#fff',
                   }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: overnightDay === opt.val ? '#7c3aed' : 'var(--charcoal)', marginBottom: 2 }}>{opt.label}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: overnightDay === opt.val ? '#6A5B95' : 'var(--charcoal)', marginBottom: 2 }}>{opt.label}</div>
                     <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{opt.sub}</div>
                   </button>
                 ))}
@@ -3128,11 +3128,11 @@ function DateConfirmModal({
                       display: 'inline-flex', alignItems: 'center', gap: 5,
                       padding: '3px 9px', borderRadius: 20, cursor: 'pointer', outline: 'none',
                       fontSize: 11, fontWeight: 600, transition: 'all 0.15s',
-                      border: ignoreRules ? '1.5px solid #d1d5db' : '1.5px solid #a78bfa',
-                      background: ignoreRules ? '#f9fafb' : '#ede9fe',
-                      color: ignoreRules ? '#9ca3af' : '#5b21b6',
+                      border: ignoreRules ? '1.5px solid #d1d5db' : '1.5px solid #A99FC4',
+                      background: ignoreRules ? '#f9fafb' : '#E9E6F3',
+                      color: ignoreRules ? '#9ca3af' : '#4F417A',
                     }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: ignoreRules ? '#d1d5db' : '#7c3aed', flexShrink: 0 }} />
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: ignoreRules ? '#d1d5db' : '#6A5B95', flexShrink: 0 }} />
                     {ignoreRules ? 'Sin reglas' : 'Reglas activas'}
                   </button>
                 )}
@@ -3146,7 +3146,7 @@ function DateConfirmModal({
 
             <div style={{ border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden' }}>
               {/* Month nav */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: halfDayMode ? '#fffbeb' : 'var(--cream)', borderBottom: '1px solid var(--ivory)', transition: 'background 0.2s' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: halfDayMode ? '#F7F3E8' : 'var(--cream)', borderBottom: '1px solid var(--ivory)', transition: 'background 0.2s' }}>
                 <button onClick={prevMonth} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}><ChevronLeft size={14} /></button>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                   <span style={{ fontFamily: 'Satoshi, serif', fontSize: 20, color: 'var(--espresso)', fontWeight: 500 }}>{MONTHS[viewMonth]} {viewYear}</span>
@@ -3172,9 +3172,9 @@ function DateConfirmModal({
                         <button type="button" onClick={() => { setHalfDayMode(m => !m); if (!halfDayMode) setRangeMode(false) }}
                           title={halfDayMode ? 'Salir del modo medio día' : 'Marcar fechas como medio día (mañana o tarde)'}
                           style={{ fontSize: 10, padding: '2px 10px', borderRadius: 20, cursor: 'pointer', outline: 'none', fontWeight: 700, letterSpacing: '0.03em', transition: 'all 0.15s',
-                            border: halfDayMode ? '1px solid #d97706' : '1px solid #fde68a',
-                            background: halfDayMode ? '#d97706' : '#fffbeb',
-                            color: halfDayMode ? '#fff' : '#b45309' }}>
+                            border: halfDayMode ? '1px solid #9A7A40' : '1px solid #E2D4AE',
+                            background: halfDayMode ? '#9A7A40' : '#F7F3E8',
+                            color: halfDayMode ? '#fff' : '#8A6A38' }}>
                           ½ día
                         </button>
                       )}
@@ -3285,23 +3285,23 @@ function DateConfirmModal({
                         borderBottom: '1px solid var(--ivory)',
                         borderRight: cellIdx % 7 !== 6 ? '1px solid var(--ivory)' : 'none',
                         background: isOtherVisit && !isSelected
-                          ? '#eff6ff'
+                          ? '#EEF2F7'
                           : isBufferDay
                           ? '#fdf6ee'
                           : isHalfDayBuffer
                           ? 'linear-gradient(135deg, #fdf6ee 50%, #ffffff 50%)'
                           : isSelected && isHalfDay && halfDayMap[ds] === 'medio_dia_tarde'
-                          ? 'linear-gradient(135deg, #e5e7eb 50%, #fef3c7 50%)'  /* mañana bloq(gris) + tarde sel(oro) */
+                          ? 'linear-gradient(135deg, #e5e7eb 50%, #F3EBD8 50%)'  /* mañana bloq(gris) + tarde sel(oro) */
                           : isSelected && isHalfDay && halfDayMap[ds] === 'medio_dia_manana'
-                          ? 'linear-gradient(135deg, #fef3c7 50%, #e5e7eb 50%)'  /* mañana sel(oro) + tarde bloq(gris) */
+                          ? 'linear-gradient(135deg, #F3EBD8 50%, #e5e7eb 50%)'  /* mañana sel(oro) + tarde bloq(gris) */
                           : isSelected && halfDayMap[ds] === 'medio_dia_manana'
-                          ? 'linear-gradient(135deg, #fef3c7 50%, #ffffff 50%)'
+                          ? 'linear-gradient(135deg, #F3EBD8 50%, #ffffff 50%)'
                           : isSelected && halfDayMap[ds] === 'medio_dia_tarde'
-                          ? 'linear-gradient(135deg, #ffffff 50%, #fef3c7 50%)'
+                          ? 'linear-gradient(135deg, #ffffff 50%, #F3EBD8 50%)'
                           : isSelected
-                          ? '#fef3c7'
+                          ? '#F3EBD8'
                           : isPartOfSpan
-                          ? '#fef3c7'
+                          ? '#F3EBD8'
                           : isHalfDay && entry?.note?.startsWith('medio_dia_tarde')
                           ? `linear-gradient(135deg, #ffffff 50%, ${cfg.bg} 50%)`
                           : isHalfDay
@@ -3322,27 +3322,27 @@ function DateConfirmModal({
                         boxShadow: rangeMode && rangeStart === ds
                           ? 'inset 0 0 0 2.5px var(--gold)'
                           : isUnavailable && entryStatus === 'reservado'
-                          ? 'inset 0 0 0 2px #f87171'
+                          ? 'inset 0 0 0 2px #C97D75'
                           : isUnavailable && entryStatus === 'bloqueado'
                           ? 'inset 0 0 0 2px #9ca3af'
                           : isOtherVisit && !isSelected
-                          ? 'inset 0 0 0 1.5px #93c5fd'
+                          ? 'inset 0 0 0 1.5px #AFC0D2'
                           : isBufferDay
-                          ? 'inset 0 0 0 1.5px #f59e0b'
+                          ? 'inset 0 0 0 1.5px #AC8B4C'
                           : isHalfDayBuffer
-                          ? 'inset 0 0 0 1.5px #f59e0b'
+                          ? 'inset 0 0 0 1.5px #AC8B4C'
                           : isSelected
-                          ? 'inset 0 0 0 2px #d97706'
+                          ? 'inset 0 0 0 2px #9A7A40'
                           : isPartOfSpan
-                          ? 'inset 0 0 0 1.5px #f59e0b'
+                          ? 'inset 0 0 0 1.5px #AC8B4C'
                           : isHalfDay && !isSelected
                           ? `inset 0 0 0 1px ${cfg.border}`
                           : isPkgAvailable
                           ? 'none'
                           : isToday ? 'inset 0 0 0 2px var(--gold)'
                           : dateInfo === ds
-                          ? 'inset 0 0 0 2.5px #6366f1'
-                          : isRequested && !isUnavailable ? 'inset 0 0 0 1.5px #fde68a'
+                          ? 'inset 0 0 0 2.5px #5F6196'
+                          : isRequested && !isUnavailable ? 'inset 0 0 0 1.5px #E2D4AE'
                           : 'none',
                         position: 'relative', transition: 'background 0.1s', outline: 'none',
                       }} disabled={isPkgBlocked || isPast}>
@@ -3351,7 +3351,7 @@ function DateConfirmModal({
                         fontSize: 15, fontWeight: isToday ? 700 : 500, lineHeight: 1, fontFamily: 'Inter, sans-serif',
                         color: isPast ? 'var(--stone)'
                           : isPkgBlocked ? '#b0b7c0'
-                          : isBufferDay || isHalfDayBuffer || isSelected || isPartOfSpan ? '#92400e'
+                          : isBufferDay || isHalfDayBuffer || isSelected || isPartOfSpan ? '#7A5A2E'
                           : isPkgAvailable ? 'var(--charcoal)'
                           : isToday ? 'var(--gold)'
                           : isWeekend ? 'var(--gold)'
@@ -3361,7 +3361,7 @@ function DateConfirmModal({
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginTop: 'auto' }}>
                         {/* Requested star — solicitada por la pareja */}
                         {isRequested && !isUnavailable && !isPast && (
-                          <span title="Fecha solicitada por la pareja" style={{ fontSize: 9, color: isSelected ? '#d97706' : '#ca8a04', lineHeight: 1, fontWeight: 700 }}>★</span>
+                          <span title="Fecha solicitada por la pareja" style={{ fontSize: 9, color: isSelected ? '#9A7A40' : '#ca8a04', lineHeight: 1, fontWeight: 700 }}>★</span>
                         )}
                         {/* Other leads count — orange circle badge */}
                         {otherLeadCount > 0 && !isUnavailable && !isPast && (
@@ -3371,7 +3371,7 @@ function DateConfirmModal({
                         )}
                         {/* Other visits count — green circle badge */}
                         {otherVisitCount > 0 && !isUnavailable && !isPast && (
-                          <div title={`${otherVisitCount} visita(s) programada(s)`} style={{ width: 14, height: 14, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 2, flexShrink: 0 }}>
+                          <div title={`${otherVisitCount} visita(s) programada(s)`} style={{ width: 14, height: 14, borderRadius: '50%', background: '#5C8570', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 2, flexShrink: 0 }}>
                             <span style={{ fontSize: 8, color: '#fff', fontWeight: 700, lineHeight: 1 }}>{otherVisitCount}</span>
                           </div>
                         )}
@@ -3385,29 +3385,29 @@ function DateConfirmModal({
                         )}
                         {/* Span day indicator (part of a selected package) */}
                         {isPartOfSpan && (
-                          <span style={{ fontSize: 8, color: '#d97706', fontWeight: 700, lineHeight: 1, marginLeft: 'auto' }}>→</span>
+                          <span style={{ fontSize: 8, color: '#9A7A40', fontWeight: 700, lineHeight: 1, marginLeft: 'auto' }}>→</span>
                         )}
                         {/* Package available dot — small green pip bottom-right */}
                         {isPkgAvailable && !isRequested && (
-                          <span style={{ fontSize: 8, color: '#16a34a', fontWeight: 700, lineHeight: 1, marginLeft: 'auto' }}>+</span>
+                          <span style={{ fontSize: 8, color: '#4A6B52', fontWeight: 700, lineHeight: 1, marginLeft: 'auto' }}>+</span>
                         )}
                       </div>
                       {/* Other lead visit badge — blue circle with 'V' */}
                       {isOtherVisit && !isSelected && (
-                        <div style={{ position: 'absolute', top: 3, right: 3, width: 15, height: 15, borderRadius: '50%', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        <div style={{ position: 'absolute', top: 3, right: 3, width: 15, height: 15, borderRadius: '50%', background: '#4F6D8C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           title="Visita de otro lead este día">
                           <span style={{ fontSize: 8, color: '#fff', fontWeight: 700, lineHeight: 1 }}>V</span>
                         </div>
                       )}
                       {/* Buffer day indicator (pure buffer, not also a wedding day) */}
                       {isBufferDay && (
-                        <div style={{ position: 'absolute', top: 3, right: 3, width: 15, height: 15, borderRadius: '50%', background: '#f59e0b', opacity: 0.55, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ position: 'absolute', top: 3, right: 3, width: 15, height: 15, borderRadius: '50%', background: '#AC8B4C', opacity: 0.55, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>+</span>
                         </div>
                       )}
                       {/* Half-day buffer indicator */}
                       {isHalfDayBuffer && (
-                        <div style={{ position: 'absolute', top: 3, right: 3, width: 15, height: 15, borderRadius: '50%', background: '#f59e0b', opacity: 0.4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ position: 'absolute', top: 3, right: 3, width: 15, height: 15, borderRadius: '50%', background: '#AC8B4C', opacity: 0.4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, lineHeight: 1 }}>½</span>
                         </div>
                       )}
@@ -3415,11 +3415,11 @@ function DateConfirmModal({
                       {isSelected && !isBufferDay && !isHalfDayBuffer && (
                         <div style={{ position: 'absolute', top: 3, right: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
                           {isAlsoBuffer && (
-                            <div style={{ width: 13, height: 13, borderRadius: '50%', background: '#f59e0b', opacity: 0.65, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ width: 13, height: 13, borderRadius: '50%', background: '#AC8B4C', opacity: 0.65, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, lineHeight: 1 }}>+</span>
                             </div>
                           )}
-                          <div style={{ width: 15, height: 15, borderRadius: '50%', background: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={{ width: 15, height: 15, borderRadius: '50%', background: '#9A7A40', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <span style={{ color: '#fff', fontSize: halfDayMap[ds] ? 7 : 9, fontWeight: 700, lineHeight: 1 }}>
                               {halfDayMap[ds] === 'medio_dia_manana' ? '½M' : halfDayMap[ds] === 'medio_dia_tarde' ? '½T' : '✓'}
                             </span>
@@ -3449,20 +3449,20 @@ function DateConfirmModal({
               ? (rawNote === 'medio_dia_manana' ? 'Medio día — mañana' : 'Medio día — tarde')
               : rawNote
             const statusColor: Record<string, string> = {
-              reservado: '#ef4444', bloqueado: '#6b7280', negociacion: '#f59e0b', libre: '#10b981',
+              reservado: '#BC5249', bloqueado: '#6b7280', negociacion: '#AC8B4C', libre: '#5C8570',
             }
             const statusLabel: Record<string, string> = {
               reservado: 'Reservado', bloqueado: 'Bloqueado', negociacion: 'En negociación', libre: 'Libre',
             }
             const borderColor: Record<string, string> = {
-              reservado: '#fca5a5', bloqueado: '#d1d5db', negociacion: '#fde68a', libre: '#bbf7d0',
+              reservado: '#E0C2BD', bloqueado: '#d1d5db', negociacion: '#E2D4AE', libre: '#D2DFD3',
             }
             const bgColor: Record<string, string> = {
-              reservado: '#fff5f5', bloqueado: '#f9fafb', negociacion: '#fffbeb', libre: '#f0fdf4',
+              reservado: '#FAF4F3', bloqueado: '#f9fafb', negociacion: '#F7F3E8', libre: '#EEF2EC',
             }
-            const panelBg    = isInfoVisit ? '#eff6ff' : (bgColor[infoStatus] || '#f9fafb')
-            const panelBorder = isInfoVisit ? '#93c5fd' : (borderColor[infoStatus] || '#e5e7eb')
-            const labelColor  = isInfoVisit ? '#1d4ed8' : (statusColor[infoStatus] || '#374151')
+            const panelBg    = isInfoVisit ? '#EEF2F7' : (bgColor[infoStatus] || '#f9fafb')
+            const panelBorder = isInfoVisit ? '#AFC0D2' : (borderColor[infoStatus] || '#e5e7eb')
+            const labelColor  = isInfoVisit ? '#3F5980' : (statusColor[infoStatus] || '#374151')
             const statusText  = isInfoVisit ? 'Visita de otro lead' : (statusLabel[infoStatus] || infoStatus)
             const parsedDate = new Date(dateInfo + 'T12:00:00')
             const dateStr = parsedDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -3534,8 +3534,8 @@ function DateConfirmModal({
               { value: 180, label: '3 horas'  },
             ]
             return (
-              <div style={{ margin: '8px 0 10px', padding: '12px 14px', borderRadius: 10, background: '#f0fdf4', border: '1.5px solid #bbf7d0' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+              <div style={{ margin: '8px 0 10px', padding: '12px 14px', borderRadius: 10, background: '#EEF2EC', border: '1.5px solid #D2DFD3' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#35513E', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
                   Detalles de la visita
                 </div>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -3545,7 +3545,7 @@ function DateConfirmModal({
                     <select
                       value={visitTime}
                       onChange={e => setVisitTime(e.target.value)}
-                      style={{ fontSize: 13, padding: '6px 10px', borderRadius: 8, border: '1.5px solid #86efac', background: '#fff', color: visitTime ? '#111827' : '#9ca3af', outline: 'none', cursor: 'pointer', minWidth: 110 }}>
+                      style={{ fontSize: 13, padding: '6px 10px', borderRadius: 8, border: '1.5px solid #C3D4C5', background: '#fff', color: visitTime ? '#111827' : '#9ca3af', outline: 'none', cursor: 'pointer', minWidth: 110 }}>
                       <option value=''>Sin especificar</option>
                       {timeSlots.map(t => <option key={t} value={t}>{t}h</option>)}
                     </select>
@@ -3557,7 +3557,7 @@ function DateConfirmModal({
                       {durationOpts.map(opt => (
                         <button key={opt.value} type='button'
                           onClick={() => setVisitDuration(opt.value)}
-                          style={{ fontSize: 11, padding: '5px 10px', borderRadius: 20, border: visitDuration === opt.value ? '1.5px solid #16a34a' : '1.5px solid #d1fae5', background: visitDuration === opt.value ? '#16a34a' : '#fff', color: visitDuration === opt.value ? '#fff' : '#374151', cursor: 'pointer', fontWeight: visitDuration === opt.value ? 700 : 400, transition: 'all 0.1s', outline: 'none' }}>
+                          style={{ fontSize: 11, padding: '5px 10px', borderRadius: 20, border: visitDuration === opt.value ? '1.5px solid #4A6B52' : '1.5px solid #DCE7DE', background: visitDuration === opt.value ? '#4A6B52' : '#fff', color: visitDuration === opt.value ? '#fff' : '#374151', cursor: 'pointer', fontWeight: visitDuration === opt.value ? 700 : 400, transition: 'all 0.1s', outline: 'none' }}>
                           {opt.label}
                         </button>
                       ))}
@@ -3565,7 +3565,7 @@ function DateConfirmModal({
                   </div>
                 </div>
                 {visitTime && (
-                  <div style={{ fontSize: 11, color: '#15803d', marginTop: 8, fontWeight: 500 }}>
+                  <div style={{ fontSize: 11, color: '#3C5945', marginTop: 8, fontWeight: 500 }}>
                     Visita programada: {visitTime}h · {durationOpts.find(o => o.value === visitDuration)?.label || `${visitDuration} min`}
                     {' · '}hasta {(() => {
                       const [hh, mm] = visitTime.split(':').map(Number)
@@ -3588,7 +3588,7 @@ function DateConfirmModal({
             {/* Reservado — full day */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <div style={{ width: 10, height: 10, borderRadius: 2, background: CAL_AVAIL_CFG.reservado.bg, border: `1.5px solid ${CAL_AVAIL_CFG.reservado.border}` }} />
-              <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 900 }}>×</span>
+              <span style={{ fontSize: 10, color: '#BC5249', fontWeight: 900 }}>×</span>
               <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Reservado</span>
             </div>
             {/* Bloqueado — full day */}
@@ -3611,8 +3611,8 @@ function DateConfirmModal({
             )}
             {!isVisitMode && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: '#fef3c7', border: '1.5px solid #d97706' }} />
-                <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: '#F3EBD8', border: '1.5px solid #9A7A40' }} />
+                <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#9A7A40', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>✓</span>
                 </div>
                 <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Seleccionada</span>
@@ -3628,7 +3628,7 @@ function DateConfirmModal({
             )}
             {!isVisitMode && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                <div style={{ width: 14, height: 14, borderRadius: 7, background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 14, height: 14, borderRadius: 7, background: '#5C8570', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>1</span>
                 </div>
                 <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Visitas ese día</span>
@@ -3636,7 +3636,7 @@ function DateConfirmModal({
             )}
             {isVisitMode && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                <div style={{ width: 14, height: 14, borderRadius: 7, background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 14, height: 14, borderRadius: 7, background: '#4F6D8C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>V</span>
                 </div>
                 <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Visita otro lead</span>
@@ -3691,7 +3691,7 @@ function DateConfirmModal({
                             </SelectContent>
                           </Select>
                         </div>
-                        <button type="button" onClick={() => setEditingDuration(false)} style={{ fontSize: 11, color: '#16a34a', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}>OK</button>
+                        <button type="button" onClick={() => setEditingDuration(false)} style={{ fontSize: 11, color: '#4A6B52', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}>OK</button>
                       </span>
                     ) : (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
@@ -3704,7 +3704,7 @@ function DateConfirmModal({
                 )}
 
                 {/* Calendar status */}
-                <span style={{ fontSize: 12, fontWeight: 700, color: isWonMode ? '#16a34a' : '#d97706' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: isWonMode ? '#4A6B52' : '#9A7A40' }}>
                   {isWonMode ? 'Reservado' : 'En negociación'}
                 </span>
               </>
@@ -3721,18 +3721,18 @@ function DateConfirmModal({
 
               {/* Already uploaded or lead already has a file */}
               {budgetFileUrl ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#f0fdf4', border: '1.5px solid #86efac' }}>
-                  <CheckCircle2 size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#EEF2EC', border: '1.5px solid #C3D4C5' }}>
+                  <CheckCircle2 size={16} style={{ color: '#4A6B52', flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#15803d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{budgetFileName}</div>
-                    <div style={{ fontSize: 11, color: '#16a34a' }}>Adjunto listo para guardar</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#3C5945', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{budgetFileName}</div>
+                    <div style={{ fontSize: 11, color: '#4A6B52' }}>Adjunto listo para guardar</div>
                   </div>
                   <a href={budgetFileUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: 11, color: '#16a34a', textDecoration: 'underline', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    style={{ fontSize: 11, color: '#4A6B52', textDecoration: 'underline', whiteSpace: 'nowrap', flexShrink: 0 }}>
                     Ver
                   </a>
                   <button type="button" onClick={() => { setBudgetFileUrl(''); setBudgetFileName(''); setBudgetFile(null) }}
-                    style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(22,163,74,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#16a34a' }}>
+                    style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(74,107,82,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#4A6B52' }}>
                     <X size={12} />
                   </button>
                 </div>
@@ -3746,7 +3746,7 @@ function DateConfirmModal({
                     border: `2px dashed ${budgetDragOver ? 'var(--gold)' : 'var(--ivory)'}`,
                     borderRadius: 10, padding: '20px 16px',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-                    cursor: 'pointer', background: budgetDragOver ? '#fffbeb' : '#fafaf8',
+                    cursor: 'pointer', background: budgetDragOver ? '#F7F3E8' : '#fafaf8',
                     transition: 'all 0.15s',
                   }}>
                   <input ref={budgetInputRef} type="file" style={{ display: 'none' }}
@@ -3770,7 +3770,7 @@ function DateConfirmModal({
               )}
 
               {budgetError && (
-                <div style={{ marginTop: 6, fontSize: 11, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ marginTop: 6, fontSize: 11, color: '#B0473E', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <AlertTriangle size={11} /> {budgetError}
                 </div>
               )}
@@ -3827,7 +3827,7 @@ function DateConfirmModal({
           <button className="btn btn-primary" onClick={handleConfirm}
             disabled={!canConfirm}
             style={{
-              background: isWonMode ? 'var(--sage)' : isBudgetMode ? 'var(--gold)' : isEditDatesMode ? '#4f6ef7' : undefined,
+              background: isWonMode ? 'var(--sage)' : isBudgetMode ? 'var(--gold)' : isEditDatesMode ? '#5566A0' : undefined,
               opacity: !canConfirm ? 0.5 : 1,
             }}>
             {saving ? 'Guardando...'
@@ -3896,18 +3896,18 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
   const isStale = tab === 'new' && lead.created_at && (Date.now() - new Date(lead.created_at).getTime()) > 48 * 3600_000
 
   const SOURCE_COLORS: Record<string, { bg: string; color: string }> = {
-    wedding_venues_spain: { bg: 'rgba(201,150,58,0.12)', color: '#92400e' },
-    web:                 { bg: 'rgba(59,130,246,0.1)',  color: '#2563eb' },
-    whatsapp:            { bg: 'rgba(22,163,74,0.1)',   color: '#16a34a' },
-    instagram:           { bg: 'rgba(219,39,119,0.1)', color: '#db2777' },
-    bodas_net:           { bg: 'rgba(236,72,153,0.1)', color: '#db2777' },
-    referral:            { bg: 'rgba(14,165,233,0.1)', color: '#0284c7' },
-    email:               { bg: 'rgba(99,102,241,0.1)', color: '#4f46e5' },
-    wedding_planner:     { bg: 'rgba(139,92,246,0.12)', color: '#7c3aed' },
+    wedding_venues_spain: { bg: 'rgba(201,150,58,0.12)', color: '#7A5A2E' },
+    web:                 { bg: 'rgba(79,109,140,0.1)',  color: '#47648A' },
+    whatsapp:            { bg: 'rgba(74,107,82,0.1)',   color: '#4A6B52' },
+    instagram:           { bg: 'rgba(219,39,119,0.1)', color: '#B05477' },
+    bodas_net:           { bg: 'rgba(236,72,153,0.1)', color: '#B05477' },
+    referral:            { bg: 'rgba(14,165,233,0.1)', color: '#41698A' },
+    email:               { bg: 'rgba(99,102,241,0.1)', color: '#514C84' },
+    wedding_planner:     { bg: 'rgba(126,114,160,0.12)', color: '#6A5B95' },
   }
 
   return (
-    <div className="card" style={{ padding: 0, overflow: 'visible', ...(isStale ? { boxShadow: '0 0 0 1.5px rgba(239,68,68,0.25), 0 2px 8px rgba(239,68,68,0.06)' } : isRecent ? { boxShadow: '0 0 0 2px #16a34a44, 0 2px 12px rgba(22,163,106,0.10)' } : isPlanner ? { boxShadow: '0 0 0 1.5px rgba(139,92,246,0.25), 0 2px 8px rgba(139,92,246,0.08)' } : {}) }}>
+    <div className="card" style={{ padding: 0, overflow: 'visible', ...(isStale ? { boxShadow: '0 0 0 1.5px rgba(188,82,73,0.25), 0 2px 8px rgba(188,82,73,0.06)' } : isRecent ? { boxShadow: '0 0 0 2px #4A6B5244, 0 2px 12px rgba(74,107,82,0.10)' } : isPlanner ? { boxShadow: '0 0 0 1.5px rgba(126,114,160,0.25), 0 2px 8px rgba(126,114,160,0.08)' } : {}) }}>
       {/* Main clickable area */}
       <div style={{ display: 'flex', gap: 12, padding: '14px 16px 12px', cursor: 'pointer', alignItems: 'flex-start' }}
         onClick={() => onEdit(lead)}>
@@ -3925,7 +3925,7 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
         {(() => {
           const days = lead.date_flexibility === 'exact' || !lead.date_flexibility ? (lead.wedding_date ? Math.ceil((new Date(lead.wedding_date + 'T12:00:00').getTime() - Date.now()) / 86400000) : null) : null
           const color = days !== null && days > 0 ? urgencyColor(days) : 'var(--ivory)'
-          const stripeColor = isStale ? '#ef4444' : isRecent ? '#16a34a' : isPlanner ? '#7c3aed' : color
+          const stripeColor = isStale ? '#BC5249' : isRecent ? '#4A6B52' : isPlanner ? '#6A5B95' : color
           return <div style={{ width: 4, borderRadius: 3, background: stripeColor, flexShrink: 0, alignSelf: 'stretch' }} />
         })()}
 
@@ -3942,8 +3942,8 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
                 <span style={{
                   fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap',
                   padding: '2px 8px', borderRadius: 10,
-                  background: ta.urgent ? 'rgba(225,29,72,0.1)' : ta.warning ? 'rgba(217,119,6,0.1)' : isRecent ? 'rgba(22,163,74,0.1)' : 'var(--ivory)',
-                  color: ta.urgent ? 'var(--rose)' : ta.warning ? '#b45309' : isRecent ? '#16a34a' : 'var(--warm-gray)',
+                  background: ta.urgent ? 'rgba(225,29,72,0.1)' : ta.warning ? 'rgba(217,119,6,0.1)' : isRecent ? 'rgba(74,107,82,0.1)' : 'var(--ivory)',
+                  color: ta.urgent ? 'var(--rose)' : ta.warning ? '#8A6A38' : isRecent ? '#4A6B52' : 'var(--warm-gray)',
                   flexShrink: 0,
                 }}>
                   {ta.text}
@@ -3952,7 +3952,7 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
             })()}
             {/* Stale indicator */}
             {isStale && (
-              <span style={{ fontSize: 10, background: 'rgba(239,68,68,0.1)', color: '#dc2626', padding: '2px 8px', borderRadius: 10, fontWeight: 700, flexShrink: 0 }}>
+              <span style={{ fontSize: 10, background: 'rgba(188,82,73,0.1)', color: '#B0473E', padding: '2px 8px', borderRadius: 10, fontWeight: 700, flexShrink: 0 }}>
                 ⚠ Sin responder
               </span>
             )}
@@ -3978,15 +3978,15 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
             {tab === 'visit' && (
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
-                background: lead.status === 'post_visit' ? 'rgba(99,102,241,0.1)' : 'rgba(22,163,74,0.1)',
-                color: lead.status === 'post_visit' ? '#4f46e5' : '#16a34a',
+                background: lead.status === 'post_visit' ? 'rgba(99,102,241,0.1)' : 'rgba(74,107,82,0.1)',
+                color: lead.status === 'post_visit' ? '#514C84' : '#4A6B52',
               }}>
                 {lead.status === 'post_visit' ? 'Post-visita' : 'Visita agendada'}
               </span>
             )}
             {/* Tags */}
             {lead.tags?.length > 0 && lead.tags.slice(0, 3).map((t: string) => (
-              <span key={t} style={{ fontSize: 10, background: 'rgba(99,102,241,0.08)', color: '#4f46e5', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+              <span key={t} style={{ fontSize: 10, background: 'rgba(99,102,241,0.08)', color: '#514C84', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
                 {t}
               </span>
             ))}
@@ -3994,7 +3994,7 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
             {inquiries && inquiries.length > 0 && (
               <span
                 onClick={e => { e.stopPropagation(); onInquiries?.(lead) }}
-                style={{ fontSize: 10, background: 'rgba(201,150,58,0.12)', color: '#92400e', padding: '2px 8px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                style={{ fontSize: 10, background: 'rgba(201,150,58,0.12)', color: '#7A5A2E', padding: '2px 8px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                 <Inbox size={10} /> {inquiries.length} consulta{inquiries.length > 1 ? 's' : ''}
                 {(() => {
                   const newCount = inquiries.filter(i => i.status === 'new').length
@@ -4006,7 +4006,7 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
             )}
             {/* PDF attached */}
             {(lead.budget_files?.length > 0 || lead.budget_file_url) && (
-              <span style={{ fontSize: 10, color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+              <span style={{ fontSize: 10, color: '#4A6B52', display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
                 <Paperclip size={10} /> {lead.budget_files?.length > 1 ? `${lead.budget_files.length} docs` : 'PDF'}
               </span>
             )}
@@ -4036,12 +4036,12 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
               const daysUntil = Math.ceil((vDate.getTime() - Date.now()) / 86400000)
               return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Landmark size={12} style={{ color: isPast ? '#4f46e5' : '#16a34a', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: isPast ? '#4f46e5' : '#16a34a' }}>
+                  <Landmark size={12} style={{ color: isPast ? '#514C84' : '#4A6B52', flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: isPast ? '#514C84' : '#4A6B52' }}>
                     {vDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
                   </span>
                   {!isPast && daysUntil >= 0 && (
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: daysUntil <= 2 ? 'var(--rose)' : '#16a34a', padding: '1px 7px', borderRadius: 10, lineHeight: 1.2 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: daysUntil <= 2 ? 'var(--rose)' : '#4A6B52', padding: '1px 7px', borderRadius: 10, lineHeight: 1.2 }}>
                       {daysUntil === 0 ? 'Hoy' : daysUntil === 1 ? 'Mañana' : `${daysUntil}d`}
                     </span>
                   )}
@@ -4189,8 +4189,8 @@ function MoreMenu({ items }: { items: { label: string; icon: React.ReactNode; da
               </div>
             ) : (
               <button key={i} onClick={() => { item.onClick(); setOpen(false) }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 7, padding: '7px 10px', borderRadius: 7, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, fontWeight: 500, color: item.danger ? '#dc2626' : 'var(--charcoal)', textAlign: 'left' }}
-                onMouseEnter={e => (e.currentTarget.style.background = item.danger ? '#fef2f2' : 'var(--cream)')}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 7, padding: '7px 10px', borderRadius: 7, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, fontWeight: 500, color: item.danger ? '#B0473E' : 'var(--charcoal)', textAlign: 'left' }}
+                onMouseEnter={e => (e.currentTarget.style.background = item.danger ? '#FAF3F2' : 'var(--cream)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                 {item.icon}{item.label}
               </button>
@@ -4232,7 +4232,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm, onPd
       {tab === 'new' && (<>
         {lead.source === 'wedding_planner' && (
           <>
-            <button className="qa" style={{ background: 'rgba(34,197,94,0.1)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.2)', fontWeight: 600 }}
+            <button className="qa" style={{ background: 'rgba(92,126,100,0.1)', color: '#4A6B52', border: '1px solid rgba(92,126,100,0.2)', fontWeight: 600 }}
               onClick={async () => {
                 const supabase = (await import('@/lib/supabase')).createClient()
                 await supabase.from('wp_client_venues').update({ availability_status: 'available' }).eq('lead_id', lead.id)
@@ -4240,7 +4240,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm, onPd
               }}>
               ✓ Disponible
             </button>
-            <button className="qa" style={{ background: 'rgba(239,68,68,0.08)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.15)' }}
+            <button className="qa" style={{ background: 'rgba(188,82,73,0.08)', color: '#B0473E', border: '1px solid rgba(188,82,73,0.15)' }}
               onClick={async () => {
                 const supabase = (await import('@/lib/supabase')).createClient()
                 await supabase.from('wp_client_venues').update({ availability_status: 'unavailable' }).eq('lead_id', lead.id)
@@ -4339,9 +4339,9 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm, onPd
 // ── Detail Drawer ──────────────────────────────────────────────────────────────
 const COMM_TYPES: { value: string; label: string; icon: React.ReactNode; color: string }[] = [
   { value: 'nota',      label: 'Nota',      icon: <Edit2 size={11} />,          color: 'var(--warm-gray)' },
-  { value: 'llamada',   label: 'Llamada',   icon: <Phone size={11} />,          color: '#2563eb' },
-  { value: 'email',     label: 'Email',     icon: <Mail size={11} />,           color: '#7c3aed' },
-  { value: 'whatsapp',  label: 'WhatsApp',  icon: <MessageCircle size={11} />,  color: '#16a34a' },
+  { value: 'llamada',   label: 'Llamada',   icon: <Phone size={11} />,          color: '#47648A' },
+  { value: 'email',     label: 'Email',     icon: <Mail size={11} />,           color: '#6A5B95' },
+  { value: 'whatsapp',  label: 'WhatsApp',  icon: <MessageCircle size={11} />,  color: '#4A6B52' },
 ]
 
 function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConfirm, onUpdateLead }: {
@@ -4400,7 +4400,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, fontWeight: 600, color: 'var(--espresso)' }}>{lead.name}</div>
               {lead.source === 'wedding_planner' && (
-                <span style={{ fontSize: 10, background: 'rgba(139,92,246,0.12)', color: '#7c3aed', padding: '3px 8px', borderRadius: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 10, background: 'rgba(126,114,160,0.12)', color: '#6A5B95', padding: '3px 8px', borderRadius: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' }}>
                   👑 Planner
                 </span>
               )}
@@ -4420,28 +4420,28 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
         <div style={{ flex: 1, padding: '20px 24px' }}>
           {/* Confirmed: wedding date banner with change button */}
           {tab === 'confirmed' && (
-            <div style={{ marginBottom: 20, padding: '16px 18px', background: 'linear-gradient(135deg, #fdf2f8, #fce7f3)', border: '1px solid #fbcfe8', borderRadius: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#be185d', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+            <div style={{ marginBottom: 20, padding: '16px 18px', background: 'linear-gradient(135deg, #F6EEF2, #F3E7ED)', border: '1px solid #E8D2DC', borderRadius: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#9A3F5F', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
                 <Flower2 size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />Fecha de boda confirmada
               </div>
               {lead.wedding_date ? (
                 <>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#831843', fontFamily: 'Satoshi, Georgia, serif', marginBottom: 4 }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#6E3049', fontFamily: 'Satoshi, Georgia, serif', marginBottom: 4 }}>
                     {new Date(lead.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                   </div>
                   {(() => {
                     const days = Math.ceil((new Date(lead.wedding_date + 'T12:00:00').getTime() - Date.now()) / 86400000)
                     return days > 0
-                      ? <div style={{ fontSize: 12, color: '#be185d', fontWeight: 500 }}>{days} días restantes</div>
+                      ? <div style={{ fontSize: 12, color: '#9A3F5F', fontWeight: 500 }}>{days} días restantes</div>
                       : <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Fecha pasada</div>
                   })()}
                 </>
               ) : (
-                <div style={{ fontSize: 14, color: '#be185d' }}>Sin fecha asignada</div>
+                <div style={{ fontSize: 14, color: '#9A3F5F' }}>Sin fecha asignada</div>
               )}
               <button
                 onClick={() => onDateConfirm(lead, 'won')}
-                style={{ marginTop: 12, fontSize: 12, padding: '6px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid #f9a8d4', background: '#fff', color: '#be185d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+                style={{ marginTop: 12, fontSize: 12, padding: '6px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid #DDB3C6', background: '#fff', color: '#9A3F5F', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <Calendar size={12} /> Cambiar fecha
               </button>
             </div>
@@ -4517,7 +4517,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
                   const budgetPayments = leadPayments.filter(p => p.budget_id === b.id)
                   const totalPaid = budgetPayments.reduce((s: number, p: any) => s + Number(p.amount), 0)
                   const statusLabel: Record<string, string> = { draft: 'Borrador', sent: 'Enviado', viewed: 'Visto', accepted: 'Aceptado', expired: 'Expirado' }
-                  const statusColor: Record<string, string> = { draft: 'var(--warm-gray)', sent: '#2563eb', viewed: '#7c3aed', accepted: '#16a34a', expired: 'var(--rose)' }
+                  const statusColor: Record<string, string> = { draft: 'var(--warm-gray)', sent: '#47648A', viewed: '#6A5B95', accepted: '#4A6B52', expired: 'var(--rose)' }
 
                   return (
                     <div key={b.id} style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden' }}>
@@ -4546,7 +4546,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
                       {plan.length > 0 && (
                         <div style={{ padding: '0 14px 6px' }}>
                           <div style={{ height: 4, background: 'var(--ivory)', borderRadius: 2, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${paidPct}%`, background: paidPct === 100 ? '#16a34a' : 'var(--gold)', borderRadius: 2 }} />
+                            <div style={{ height: '100%', width: `${paidPct}%`, background: paidPct === 100 ? '#4A6B52' : 'var(--gold)', borderRadius: 2 }} />
                           </div>
                           <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 2 }}>
                             {totalPaid.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} pagado de {Number(b.total_amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
@@ -4562,11 +4562,11 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
                           </div>
                           {budgetPayments.slice(0, 5).map((pay: any) => (
                             <div key={pay.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 11 }}>
-                              <CheckCircle size={10} style={{ color: '#16a34a', flexShrink: 0 }} />
+                              <CheckCircle size={10} style={{ color: '#4A6B52', flexShrink: 0 }} />
                               <div style={{ flex: 1, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {pay.payer_name || pay.payer_email || 'Pago'}
                               </div>
-                              <div style={{ fontWeight: 600, color: '#16a34a', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontWeight: 600, color: '#4A6B52', whiteSpace: 'nowrap' }}>
                                 {Number(pay.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
                               </div>
                               {pay.paid_at && (
@@ -4788,21 +4788,21 @@ function KanbanColumn({ col, leads, isOver, draggingId, onDragOver, onDragLeave,
               onDragEnd={onDragEnd}
               onClick={() => onDetail(lead)}
               style={{
-                background: isDragging ? 'var(--cream)' : isRecent ? '#f0fdf4' : isPlanner ? 'rgba(139,92,246,0.04)' : 'var(--cream)',
-                border: isRecent ? '1px solid #86efac' : isPlanner ? '1px solid rgba(139,92,246,0.2)' : '1px solid var(--ivory)',
+                background: isDragging ? 'var(--cream)' : isRecent ? '#EEF2EC' : isPlanner ? 'rgba(126,114,160,0.04)' : 'var(--cream)',
+                border: isRecent ? '1px solid #C3D4C5' : isPlanner ? '1px solid rgba(126,114,160,0.2)' : '1px solid var(--ivory)',
                 borderRadius: 8,
                 padding: '9px 10px',
                 marginBottom: 5,
                 cursor: isDragging ? 'grabbing' : 'grab',
                 opacity: isDragging ? 0.35 : 1,
                 transition: 'box-shadow 0.15s, opacity 0.15s',
-                boxShadow: isRecent ? '0 0 8px rgba(22,163,106,0.12)' : isPlanner ? '0 1px 4px rgba(139,92,246,0.1)' : '0 1px 2px rgba(0,0,0,0.03)',
+                boxShadow: isRecent ? '0 0 8px rgba(22,163,106,0.12)' : isPlanner ? '0 1px 4px rgba(126,114,160,0.1)' : '0 1px 2px rgba(0,0,0,0.03)',
               }}
-              onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 12px rgba(22,163,106,0.2)' : isPlanner ? '0 3px 10px rgba(139,92,246,0.15)' : '0 3px 10px rgba(0,0,0,0.07)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 8px rgba(22,163,106,0.12)' : isPlanner ? '0 1px 4px rgba(139,92,246,0.1)' : '0 1px 2px rgba(0,0,0,0.03)' }}
+              onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 12px rgba(22,163,106,0.2)' : isPlanner ? '0 3px 10px rgba(126,114,160,0.15)' : '0 3px 10px rgba(0,0,0,0.07)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 8px rgba(22,163,106,0.12)' : isPlanner ? '0 1px 4px rgba(126,114,160,0.1)' : '0 1px 2px rgba(0,0,0,0.03)' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600, color: 'var(--espresso)', fontSize: 12.5, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {isRecent && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', flexShrink: 0, animation: 'pulse-dot 2s ease-in-out infinite' }} />}
+                {isRecent && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4A6B52', flexShrink: 0, animation: 'pulse-dot 2s ease-in-out infinite' }} />}
                 {isPlanner && !isRecent && <span style={{ fontSize: 9 }}>👑</span>}
                 {lead.name}
               </div>
@@ -4820,14 +4820,14 @@ function KanbanColumn({ col, leads, isOver, draggingId, onDragOver, onDragLeave,
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                 {lead.source && (() => {
                   const sc: Record<string, { bg: string; color: string }> = {
-                    wedding_venues_spain: { bg: 'rgba(201,150,58,0.12)', color: '#92400e' },
-                    wedding_planner:     { bg: 'rgba(139,92,246,0.1)',  color: '#7c3aed' },
-                    web:                 { bg: 'rgba(59,130,246,0.1)',  color: '#2563eb' },
-                    whatsapp:            { bg: 'rgba(22,163,74,0.1)',   color: '#16a34a' },
-                    instagram:           { bg: 'rgba(219,39,119,0.1)', color: '#db2777' },
-                    bodas_net:           { bg: 'rgba(236,72,153,0.1)', color: '#db2777' },
-                    referral:            { bg: 'rgba(14,165,233,0.1)', color: '#0284c7' },
-                    email:               { bg: 'rgba(99,102,241,0.1)', color: '#4f46e5' },
+                    wedding_venues_spain: { bg: 'rgba(201,150,58,0.12)', color: '#7A5A2E' },
+                    wedding_planner:     { bg: 'rgba(126,114,160,0.1)',  color: '#6A5B95' },
+                    web:                 { bg: 'rgba(79,109,140,0.1)',  color: '#47648A' },
+                    whatsapp:            { bg: 'rgba(74,107,82,0.1)',   color: '#4A6B52' },
+                    instagram:           { bg: 'rgba(219,39,119,0.1)', color: '#B05477' },
+                    bodas_net:           { bg: 'rgba(236,72,153,0.1)', color: '#B05477' },
+                    referral:            { bg: 'rgba(14,165,233,0.1)', color: '#41698A' },
+                    email:               { bg: 'rgba(99,102,241,0.1)', color: '#514C84' },
                   }
                   const s = sc[lead.source] || { bg: 'var(--ivory)', color: 'var(--charcoal)' }
                   return (
@@ -4837,7 +4837,7 @@ function KanbanColumn({ col, leads, isOver, draggingId, onDragOver, onDragLeave,
                   )
                 })()}
                 {lead.guests && (
-                  <span style={{ fontSize: 9, background: 'rgba(201,150,58,0.1)', color: '#92400e', padding: '1px 6px', borderRadius: 8, fontWeight: 500 }}>
+                  <span style={{ fontSize: 9, background: 'rgba(201,150,58,0.1)', color: '#7A5A2E', padding: '1px 6px', borderRadius: 8, fontWeight: 500 }}>
                     {lead.guests} inv.
                   </span>
                 )}
@@ -5049,7 +5049,7 @@ function FilterDateRangePicker({ from, to, onChange }: {
           padding: '7px 12px',
           border: `1px solid ${hasFilter ? 'var(--gold)' : 'var(--ivory)'}`,
           borderRadius: 8,
-          background: hasFilter ? '#fffbeb' : '#fff',
+          background: hasFilter ? '#F7F3E8' : '#fff',
           cursor: 'pointer', fontSize: 12.5,
           color: hasFilter ? 'var(--espresso)' : 'var(--warm-gray)',
           fontFamily: 'Inter, sans-serif',
@@ -5084,7 +5084,7 @@ function FilterDateRangePicker({ from, to, onChange }: {
                 style={{
                   flex: 1, padding: '7px 10px', borderRadius: 8, cursor: 'pointer',
                   border: `1.5px solid ${picking === side ? 'var(--gold)' : 'var(--ivory)'}`,
-                  background: picking === side ? '#fffbeb' : '#fafaf8',
+                  background: picking === side ? '#F7F3E8' : '#fafaf8',
                   transition: 'all 0.15s',
                 }}>
                 <div style={{ fontSize: 9, color: 'var(--warm-gray)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 3 }}>
@@ -5142,7 +5142,7 @@ function FilterDateRangePicker({ from, to, onChange }: {
                     cursor: 'pointer',
                     fontFamily: 'Inter, sans-serif', fontSize: 12,
                     fontWeight: isActive ? 700 : 400,
-                    background: isActive ? 'var(--gold)' : (inRange || isHov) ? '#fef3c7' : 'transparent',
+                    background: isActive ? 'var(--gold)' : (inRange || isHov) ? '#F3EBD8' : 'transparent',
                     color: isActive ? '#fff' : isToday ? 'var(--gold)' : 'var(--charcoal)',
                     outline: isToday && !isActive ? '1.5px solid var(--gold)' : 'none',
                     outlineOffset: '-1px',
@@ -5319,20 +5319,20 @@ function MiniCalendarPicker({
           const isLastCol = cellIdx % 7 === 6
 
           const bg = sel ? 'var(--gold)'
-                  : inR  ? '#fef3c7'
+                  : inR  ? '#F3EBD8'
                   : past ? '#fafaf7'
                   : isHalf && isTarde  ? `linear-gradient(135deg, #ffffff 50%, #e5e7eb 50%)`
                   : isHalf             ? `linear-gradient(135deg, #e5e7eb 50%, #ffffff 50%)`
-                  : isRes ? '#fef2f2'
+                  : isRes ? '#FAF3F2'
                   : isBlk ? '#f5f5f4'
-                  : isNeg ? '#fffbeb'
+                  : isNeg ? '#F7F3E8'
                   : '#fff'
           const color = sel ? '#fff'
                   : past ? '#cfcbc3'
                   : isHalf ? '#9ca3af'
-                  : isRes ? '#b91c1c'
+                  : isRes ? '#933B34'
                   : isBlk ? '#9ca3af'
-                  : isNeg ? '#b45309'
+                  : isNeg ? '#8A6A38'
                   : 'var(--charcoal)'
 
           const halfTitle = isTarde ? '½ Tarde bloqueada — mañana libre' : '½ Mañana bloqueada — tarde libre'
@@ -5369,8 +5369,8 @@ function MiniCalendarPicker({
                 <span style={{
                   position: 'absolute', bottom: 2, right: 3,
                   minWidth: 13, height: 13, borderRadius: 7, padding: '0 3px',
-                  background: sel ? 'rgba(255,255,255,0.85)' : '#fde68a',
-                  color: sel ? 'var(--gold)' : '#92400e',
+                  background: sel ? 'rgba(255,255,255,0.85)' : '#E2D4AE',
+                  color: sel ? 'var(--gold)' : '#7A5A2E',
                   fontSize: 9, fontWeight: 700, lineHeight: 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>{lCount}</span>
@@ -5381,10 +5381,10 @@ function MiniCalendarPicker({
       </div>
       <div style={{ display: 'flex', gap: 12, padding: '8px 14px', background: 'var(--cream)', borderTop: '1px solid var(--ivory)', fontSize: 10, color: 'var(--warm-gray)', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#fffbeb', border: '1px solid #fde68a' }} /> Negociación
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#F7F3E8', border: '1px solid #E2D4AE' }} /> Negociación
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#fef2f2', border: '1px solid #fecaca' }} /> Reservado
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#FAF3F2', border: '1px solid #E9D4D0' }} /> Reservado
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ width: 10, height: 10, borderRadius: 3, background: '#f5f5f4', border: '1px solid #e7e5e4' }} /> Bloqueado
@@ -5393,7 +5393,7 @@ function MiniCalendarPicker({
           <span style={{ width: 10, height: 10, borderRadius: 3, background: 'linear-gradient(135deg, #e5e7eb 50%, #ffffff 50%)', border: '1px solid #e7e5e4' }} /> ½ Bloqueado
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ minWidth: 14, height: 14, borderRadius: 7, padding: '0 3px', background: '#fde68a', color: '#92400e', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
+          <span style={{ minWidth: 14, height: 14, borderRadius: 7, padding: '0 3px', background: '#E2D4AE', color: '#7A5A2E', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
           <span>Otros leads</span>
         </div>
       </div>
@@ -5500,10 +5500,10 @@ function RangeCalendarPicker({
   return (
     <div style={{ border: '1px solid var(--ivory)', borderRadius: 14, overflow: 'hidden', fontSize: 12, background: '#fff' }}>
       {/* Instrucción contextual */}
-      <div style={{ padding: '8px 14px', background: phase === 'to' ? '#fffbeb' : '#f0fdf4', borderBottom: '1px solid var(--ivory)', fontSize: 11, color: phase === 'to' ? '#92400e' : '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ padding: '8px 14px', background: phase === 'to' ? '#F7F3E8' : '#EEF2EC', borderBottom: '1px solid var(--ivory)', fontSize: 11, color: phase === 'to' ? '#7A5A2E' : '#3C5945', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
         {phase === 'from'
-          ? <><span style={{ background: '#d1fae5', color: '#15803d', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>1</span> Selecciona la fecha de inicio</>
-          : <><span style={{ background: '#fef3c7', color: '#92400e', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>2</span> Selecciona la fecha de fin · inicio: <strong>{from ? new Date(from + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : ''}</strong></>
+          ? <><span style={{ background: '#DCE7DE', color: '#3C5945', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>1</span> Selecciona la fecha de inicio</>
+          : <><span style={{ background: '#F3EBD8', color: '#7A5A2E', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>2</span> Selecciona la fecha de fin · inicio: <strong>{from ? new Date(from + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : ''}</strong></>
         }
       </div>
       {/* Navegación */}
@@ -5548,22 +5548,22 @@ function RangeCalendarPicker({
           const isLastCol = cellIdx % 7 === 6
 
           const bg = isEnd ? 'var(--gold)'
-                  : inR  ? '#fef3c7'
+                  : inR  ? '#F3EBD8'
                   : hov  ? '#fefce8'
                   : past ? '#fafaf7'
                   : isHalf && isTarde  ? 'linear-gradient(135deg, #ffffff 50%, #e5e7eb 50%)'
                   : isHalf             ? 'linear-gradient(135deg, #e5e7eb 50%, #ffffff 50%)'
-                  : isRes ? '#fef2f2'
+                  : isRes ? '#FAF3F2'
                   : isBlk ? '#f5f5f4'
-                  : isNeg ? '#fffbeb'
+                  : isNeg ? '#F7F3E8'
                   : '#fff'
           const color = isEnd ? '#fff'
-                  : inR  ? '#92400e'
+                  : inR  ? '#7A5A2E'
                   : past ? '#cfcbc3'
                   : isHalf ? '#9ca3af'
-                  : isRes ? '#b91c1c'
+                  : isRes ? '#933B34'
                   : isBlk ? '#9ca3af'
-                  : isNeg ? '#b45309'
+                  : isNeg ? '#8A6A38'
                   : 'var(--charcoal)'
 
           const halfTitle = isTarde ? '½ Tarde bloqueada — mañana libre' : '½ Mañana bloqueada — tarde libre'
@@ -5600,8 +5600,8 @@ function RangeCalendarPicker({
                 <span style={{
                   position: 'absolute', bottom: 2, right: 3,
                   minWidth: 13, height: 13, borderRadius: 7, padding: '0 3px',
-                  background: isEnd ? 'rgba(255,255,255,0.85)' : '#fde68a',
-                  color: isEnd ? 'var(--gold)' : '#92400e',
+                  background: isEnd ? 'rgba(255,255,255,0.85)' : '#E2D4AE',
+                  color: isEnd ? 'var(--gold)' : '#7A5A2E',
                   fontSize: 9, fontWeight: 700, lineHeight: 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>{lCnt}</span>
@@ -5613,10 +5613,10 @@ function RangeCalendarPicker({
       {/* Leyenda */}
       <div style={{ display: 'flex', gap: 12, padding: '8px 14px', background: 'var(--cream)', borderTop: '1px solid var(--ivory)', fontSize: 10, color: 'var(--warm-gray)', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#fffbeb', border: '1px solid #fde68a' }} /> Negociación
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#F7F3E8', border: '1px solid #E2D4AE' }} /> Negociación
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#fef2f2', border: '1px solid #fecaca' }} /> Reservado
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#FAF3F2', border: '1px solid #E9D4D0' }} /> Reservado
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ width: 10, height: 10, borderRadius: 3, background: '#f5f5f4', border: '1px solid #e7e5e4' }} /> Bloqueado
@@ -5625,7 +5625,7 @@ function RangeCalendarPicker({
           <span style={{ width: 10, height: 10, borderRadius: 3, background: 'linear-gradient(135deg, #e5e7eb 50%, #ffffff 50%)', border: '1px solid #e7e5e4' }} /> ½ Bloqueado
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ minWidth: 14, height: 14, borderRadius: 7, padding: '0 3px', background: '#fde68a', color: '#92400e', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
+          <span style={{ minWidth: 14, height: 14, borderRadius: 7, padding: '0 3px', background: '#E2D4AE', color: '#7A5A2E', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
           <span>Otros leads</span>
         </div>
       </div>
@@ -5655,7 +5655,7 @@ function MultiRangeCalendarPicker({
 
   // Refined, brand-coherent palette — earthy & muted (not kindergarten primaries)
   const RANGE_COLORS = [
-    { bg: '#fdf6ee', sel: '#c8941f', light: '#fef3c7', border: '#c8941f' }, // gold (brand)
+    { bg: '#fdf6ee', sel: '#c8941f', light: '#F3EBD8', border: '#c8941f' }, // gold (brand)
     { bg: '#f4f1ec', sel: '#8a7a5e', light: '#ece7dd', border: '#8a7a5e' }, // taupe
     { bg: '#f1f5f0', sel: '#6b8e5a', light: '#dde8d8', border: '#6b8e5a' }, // sage
     { bg: '#f6f1ee', sel: '#a8654d', light: '#ecdcd2', border: '#a8654d' }, // terracotta
@@ -5774,18 +5774,18 @@ function MultiRangeCalendarPicker({
         {/* Instrucción / aviso */}
         <div style={{
           padding: '8px 14px',
-          background: overlapWarn ? '#fef2f2' : pendingFrom ? '#fffbeb' : '#f0fdf4',
+          background: overlapWarn ? '#FAF3F2' : pendingFrom ? '#F7F3E8' : '#EEF2EC',
           borderBottom: '1px solid var(--ivory)',
           fontSize: 11,
-          color: overlapWarn ? '#991b1b' : pendingFrom ? '#92400e' : '#15803d',
+          color: overlapWarn ? '#7E332D' : pendingFrom ? '#7A5A2E' : '#3C5945',
           fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8,
           transition: 'background 0.2s, color 0.2s',
         }}>
           {overlapWarn
             ? <><AlertTriangle size={13} style={{ flexShrink: 0 }} /> Esa fecha ya está en otro rango — elige días libres.</>
             : !pendingFrom
-              ? <><span style={{ background: '#d1fae5', color: '#15803d', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>1</span> Inicio del rango {ranges.length + 1}</>
-              : <><span style={{ background: '#fef3c7', color: '#92400e', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>2</span> Selecciona la fecha de fin · inicio: <strong>{new Date(pendingFrom + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</strong></>
+              ? <><span style={{ background: '#DCE7DE', color: '#3C5945', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>1</span> Inicio del rango {ranges.length + 1}</>
+              : <><span style={{ background: '#F3EBD8', color: '#7A5A2E', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>2</span> Selecciona la fecha de fin · inicio: <strong>{new Date(pendingFrom + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</strong></>
           }
         </div>
         {/* Navegación */}
@@ -5852,20 +5852,20 @@ function MultiRangeCalendarPicker({
               if (isRangeEnd) { bg = col.sel; color = '#fff'; fw = 700; inset = `inset 0 0 0 2px ${col.sel}` }
               else            { bg = col.light; color = col.sel; fw = 600 }
             } else if (isPendingFrom) {
-              const c = previewWouldOverlap ? '#dc2626' : nextColor.sel
+              const c = previewWouldOverlap ? '#B0473E' : nextColor.sel
               bg = c; color = '#fff'; fw = 700; inset = `inset 0 0 0 2px ${c}`
             } else if (isPreviewTo) {
-              const c = previewWouldOverlap ? '#dc2626' : nextColor.sel
+              const c = previewWouldOverlap ? '#B0473E' : nextColor.sel
               bg = c; color = '#fff'; fw = 700; inset = `inset 0 0 0 2px ${c}`
             } else if (isPreviewIn) {
-              bg = previewWouldOverlap ? '#fee2e2' : nextColor.light
-              color = previewWouldOverlap ? '#dc2626' : nextColor.sel
+              bg = previewWouldOverlap ? '#F2E2E0' : nextColor.light
+              color = previewWouldOverlap ? '#B0473E' : nextColor.sel
             } else if (isHalf) {
               bg = isTarde ? 'linear-gradient(135deg, #ffffff 50%, #e5e7eb 50%)' : 'linear-gradient(135deg, #e5e7eb 50%, #ffffff 50%)'
               color = '#9ca3af'
-            } else if (isRes) { bg = '#fef2f2'; color = '#b91c1c' }
+            } else if (isRes) { bg = '#FAF3F2'; color = '#933B34' }
             else if (isBlk)   { bg = '#f5f5f4'; color = '#9ca3af' }
-            else if (isNeg)   { bg = '#fffbeb'; color = '#b45309' }
+            else if (isNeg)   { bg = '#F7F3E8'; color = '#8A6A38' }
             else if (past)    { bg = '#fafaf7' }
             if (isToday && inset === 'none') inset = 'inset 0 0 0 1.5px var(--gold)'
 
@@ -5901,7 +5901,7 @@ function MultiRangeCalendarPicker({
                   <span style={{
                     position: 'absolute', bottom: 2, right: 3,
                     minWidth: 13, height: 13, borderRadius: 7, padding: '0 3px',
-                    background: '#fde68a', color: '#92400e',
+                    background: '#E2D4AE', color: '#7A5A2E',
                     fontSize: 9, fontWeight: 700, lineHeight: 1,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>{lCnt}</span>
@@ -5913,16 +5913,16 @@ function MultiRangeCalendarPicker({
         {/* Leyenda */}
         <div style={{ display: 'flex', gap: 12, padding: '8px 14px', background: 'var(--cream)', borderTop: '1px solid var(--ivory)', fontSize: 10, color: 'var(--warm-gray)', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: '#fffbeb', border: '1px solid #fde68a' }} /> Negociación
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: '#F7F3E8', border: '1px solid #E2D4AE' }} /> Negociación
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: '#fef2f2', border: '1px solid #fecaca' }} /> Reservado
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: '#FAF3F2', border: '1px solid #E9D4D0' }} /> Reservado
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: '#f5f5f4', border: '1px solid #e7e5e4' }} /> Bloqueado
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ minWidth: 14, height: 14, borderRadius: 7, padding: '0 3px', background: '#fde68a', color: '#92400e', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
+            <span style={{ minWidth: 14, height: 14, borderRadius: 7, padding: '0 3px', background: '#E2D4AE', color: '#7A5A2E', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
             <span>Otros leads</span>
           </div>
         </div>
@@ -5981,7 +5981,7 @@ function MultiRangeCalendarPicker({
                       flexShrink: 0, padding: 0,
                       transition: 'all 0.15s',
                     }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#fef2f2'; (e.currentTarget as HTMLElement).style.borderColor = '#fca5a5'; (e.currentTarget as HTMLElement).style.color = '#dc2626' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#FAF3F2'; (e.currentTarget as HTMLElement).style.borderColor = '#E0C2BD'; (e.currentTarget as HTMLElement).style.color = '#B0473E' }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--ivory)'; (e.currentTarget as HTMLElement).style.color = 'var(--warm-gray)' }}
                   >
                     <X size={13} />
@@ -5993,7 +5993,7 @@ function MultiRangeCalendarPicker({
         </div>
       )}
       {pendingFrom && (
-        <div style={{ marginTop: 8, fontSize: 11, color: '#92400e', padding: '7px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ marginTop: 8, fontSize: 11, color: '#7A5A2E', padding: '7px 12px', background: '#F7F3E8', border: '1px solid #E2D4AE', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
           <Clock size={11} style={{ flexShrink: 0 }} />
           Inicio del nuevo rango seleccionado: <strong style={{ textTransform: 'capitalize' }}>{new Date(pendingFrom + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}</strong>
         </div>
@@ -6265,7 +6265,7 @@ function ClientLinkSelector({ venueId, clientId, onChange, leadInfo }: {
           </div>
         </div>
         <button type="button" onClick={() => onChange('')}
-          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#b91c1c' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#933B34' }}>
           <Unlink size={11} /> Desvincular
         </button>
       </div>
@@ -6274,10 +6274,10 @@ function ClientLinkSelector({ venueId, clientId, onChange, leadInfo }: {
 
   if (clientId && !selected && loaded) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fca5a5' }}>
-        <span style={{ fontSize: 12, color: '#b91c1c', flex: 1 }}>Contacto vinculado no encontrado</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: '#FAF3F2', border: '1px solid #E0C2BD' }}>
+        <span style={{ fontSize: 12, color: '#933B34', flex: 1 }}>Contacto vinculado no encontrado</span>
         <button type="button" onClick={() => onChange('')}
-          style={{ padding: '3px 8px', borderRadius: 6, background: '#fff', border: '1px solid #fca5a5', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#b91c1c' }}>
+          style={{ padding: '3px 8px', borderRadius: 6, background: '#fff', border: '1px solid #E0C2BD', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#933B34' }}>
           Limpiar
         </button>
       </div>
@@ -6646,14 +6646,14 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               </div>
               {isEdit && leadStatus && (() => {
                 const STATUS_INFO: Record<string, { label: string; bg: string; border: string; color: string; icon: React.ReactNode }> = {
-                  new:             { label: 'Lead nuevo',          bg: 'rgba(219,234,254,0.7)', border: '#bfdbfe', color: '#1d4ed8', icon: <Sparkles size={11} /> },
-                  contacted:       { label: 'En seguimiento',      bg: 'rgba(255,251,235,0.8)', border: '#fde68a', color: '#92400e', icon: <RotateCcw size={11} /> },
-                  proposal_sent:   { label: 'Propuesta enviada',   bg: 'rgba(255,251,235,0.8)', border: '#fde68a', color: '#92400e', icon: <FileText size={11} /> },
-                  visit_scheduled: { label: 'Visita agendada',     bg: 'rgba(209,250,229,0.7)', border: '#a7f3d0', color: '#047857', icon: <Calendar size={11} /> },
-                  post_visit:      { label: 'Post-visita',         bg: 'rgba(207,250,254,0.7)', border: '#a5f3fc', color: '#0e7490', icon: <CheckCircle size={11} /> },
-                  budget_sent:     { label: 'Presupuesto enviado', bg: 'rgba(255,251,235,0.8)', border: '#fde68a', color: '#92400e', icon: <Receipt size={11} /> },
-                  won:             { label: 'Boda confirmada',     bg: 'rgba(220,252,231,0.7)', border: '#86efac', color: '#15803d', icon: <PartyPopper size={11} /> },
-                  lost:            { label: 'Perdido',             bg: 'rgba(254,226,226,0.7)', border: '#fecaca', color: '#b91c1c', icon: <XCircle size={11} /> },
+                  new:             { label: 'Lead nuevo',          bg: 'rgba(219,234,254,0.7)', border: '#CCD9E6', color: '#3F5980', icon: <Sparkles size={11} /> },
+                  contacted:       { label: 'En seguimiento',      bg: 'rgba(255,251,235,0.8)', border: '#E2D4AE', color: '#7A5A2E', icon: <RotateCcw size={11} /> },
+                  proposal_sent:   { label: 'Propuesta enviada',   bg: 'rgba(255,251,235,0.8)', border: '#E2D4AE', color: '#7A5A2E', icon: <FileText size={11} /> },
+                  visit_scheduled: { label: 'Visita agendada',     bg: 'rgba(209,250,229,0.7)', border: '#C6D8C9', color: '#3C5945', icon: <Calendar size={11} /> },
+                  post_visit:      { label: 'Post-visita',         bg: 'rgba(207,250,254,0.7)', border: '#BCD2D6', color: '#3C5E68', icon: <CheckCircle size={11} /> },
+                  budget_sent:     { label: 'Presupuesto enviado', bg: 'rgba(255,251,235,0.8)', border: '#E2D4AE', color: '#7A5A2E', icon: <Receipt size={11} /> },
+                  won:             { label: 'Boda confirmada',     bg: 'rgba(220,252,231,0.7)', border: '#C3D4C5', color: '#3C5945', icon: <PartyPopper size={11} /> },
+                  lost:            { label: 'Perdido',             bg: 'rgba(254,226,226,0.7)', border: '#E9D4D0', color: '#933B34', icon: <XCircle size={11} /> },
                 }
                 const info = STATUS_INFO[leadStatus] || STATUS_INFO.new
                 const hasVisit = form.visit_date
@@ -6669,7 +6669,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                       {info.icon} {info.label}
                     </span>
                     {hasVisit && (
-                      <span style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, background: '#ecfdf5', border: '1px solid #6ee7b7', color: '#047857', fontWeight: 600 }}>
+                      <span style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, background: '#EDF2ED', border: '1px solid #BFD2C5', color: '#3C5945', fontWeight: 600 }}>
                         <Landmark size={10} />
                         Visita: {new Date(form.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
                         {form.visit_time ? ` · ${form.visit_time}` : ''}
@@ -6738,27 +6738,27 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
 
           {/* ── Visita agendada: banner destacado cuando hay visita programada ── */}
           {!isNewPhase && editLead && editLead.visit_date && (
-            <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 12, background: 'linear-gradient(135deg,#ecfdf5,#f0fdf4)', border: '1.5px solid #6ee7b7', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 12, background: 'linear-gradient(135deg,#EDF2ED,#EEF2EC)', border: '1.5px solid #BFD2C5', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#5C8570', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Landmark size={16} style={{ color: '#fff' }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#065f46', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Visita agendada</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#047857' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#35513E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Visita agendada</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#3C5945' }}>
                   {new Date(editLead.visit_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
-                  {editLead.visit_time ? <span style={{ fontWeight: 400, color: '#059669' }}> · {editLead.visit_time}{(() => { if (!editLead.visit_duration || !editLead.visit_time) return ''; const [h, m] = editLead.visit_time.split(':').map(Number); const tot = h*60+m+editLead.visit_duration; return ` – ${pad(Math.floor(tot/60)%24)}:${pad(tot%60)}` })()} </span> : null}
+                  {editLead.visit_time ? <span style={{ fontWeight: 400, color: '#467A60' }}> · {editLead.visit_time}{(() => { if (!editLead.visit_duration || !editLead.visit_time) return ''; const [h, m] = editLead.visit_time.split(':').map(Number); const tot = h*60+m+editLead.visit_duration; return ` – ${pad(Math.floor(tot/60)%24)}:${pad(tot%60)}` })()} </span> : null}
                 </div>
-                {editLead.visit_duration && <div style={{ fontSize: 11, color: '#6ee7b7', marginTop: 1 }}>{editLead.visit_duration} min</div>}
+                {editLead.visit_duration && <div style={{ fontSize: 11, color: '#BFD2C5', marginTop: 1 }}>{editLead.visit_duration} min</div>}
               </div>
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                 {onEditVisit && (
-                  <button type="button" onClick={onEditVisit} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.7)', border: '1px solid #a7f3d0', color: '#047857', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                  <button type="button" onClick={onEditVisit} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.7)', border: '1px solid #C6D8C9', color: '#3C5945', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                     <Edit2 size={10} /> Editar
                   </button>
                 )}
                 {onDeleteVisit && (
                   <button type="button" onClick={onDeleteVisit} aria-label="Eliminar visita"
-                    style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.7)', border: '1px solid #a7f3d0', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.7)', border: '1px solid #C6D8C9', color: '#B0473E', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Trash2 size={12} />
                   </button>
                 )}
@@ -6782,7 +6782,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                           display: 'inline-flex', alignItems: 'center', gap: 5,
                           padding: '6px 12px', borderRadius: 8, flexShrink: 0, marginBottom: 12,
                           background: '#f0f4ff', border: '1.5px solid #c7d7fd',
-                          color: '#4f6ef7', fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none',
+                          color: '#5566A0', fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none',
                         }}>
                           <Edit2 size={10} /> Cambiar fechas
                         </button>
@@ -6802,10 +6802,10 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                               <span key={d} style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 4,
                                 padding: '5px 10px', borderRadius: 16,
-                                background: '#eff6ff', border: '1.5px solid #bfdbfe',
-                                fontSize: 12, fontWeight: 600, color: '#1e40af',
+                                background: '#EEF2F7', border: '1.5px solid #CCD9E6',
+                                fontSize: 12, fontWeight: 600, color: '#39527A',
                               }}>
-                                <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#3b82f6', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#4F6D8C', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                   <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, lineHeight: 1 }}>✓</span>
                                 </span>
                                 {formatDateLabel(d)}
@@ -6825,7 +6825,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                           display: 'inline-flex', alignItems: 'center', gap: 5,
                           padding: '6px 12px', borderRadius: 8, flexShrink: 0, marginBottom: 12,
                           background: '#f0f4ff', border: '1.5px solid #c7d7fd',
-                          color: '#4f6ef7', fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none',
+                          color: '#5566A0', fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none',
                         }}>
                           <Edit2 size={10} /> Cambiar fechas
                         </button>
@@ -6845,10 +6845,10 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                               <span key={d} style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 4,
                                 padding: '5px 10px', borderRadius: 16,
-                                background: '#fef3c7', border: '1.5px solid #fde68a',
-                                fontSize: 12, fontWeight: 600, color: '#92400e',
+                                background: '#F3EBD8', border: '1.5px solid #E2D4AE',
+                                fontSize: 12, fontWeight: 600, color: '#7A5A2E',
                               }}>
-                                <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#f59e0b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#AC8B4C', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                   <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, lineHeight: 1 }}>✓</span>
                                 </span>
                                 {formatDateLabel(d)}
@@ -7022,9 +7022,9 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                         <button type="button" onClick={() => setEditingOriginal((v: boolean) => !v)} style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
                           padding: '3px 8px', borderRadius: 6,
-                          background: editingOriginal ? '#ecfdf5' : '#f9fafb',
-                          border: `1.5px solid ${editingOriginal ? '#86efac' : '#e5e7eb'}`,
-                          color: editingOriginal ? '#15803d' : 'var(--warm-gray)',
+                          background: editingOriginal ? '#EDF2ED' : '#f9fafb',
+                          border: `1.5px solid ${editingOriginal ? '#C3D4C5' : '#e5e7eb'}`,
+                          color: editingOriginal ? '#3C5945' : 'var(--warm-gray)',
                           fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none',
                         }}>
                           {editingOriginal ? <><CheckCircle2 size={10} /> Listo</> : <><Edit2 size={10} /> Editar</>}
@@ -7139,9 +7139,9 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   <button type="button" onClick={() => setEditingOriginal((v: boolean) => !v)} style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
                     padding: '3px 8px', borderRadius: 6,
-                    background: editingOriginal ? '#ecfdf5' : '#f9fafb',
-                    border: `1.5px solid ${editingOriginal ? '#86efac' : '#e5e7eb'}`,
-                    color: editingOriginal ? '#15803d' : 'var(--warm-gray)',
+                    background: editingOriginal ? '#EDF2ED' : '#f9fafb',
+                    border: `1.5px solid ${editingOriginal ? '#C3D4C5' : '#e5e7eb'}`,
+                    color: editingOriginal ? '#3C5945' : 'var(--warm-gray)',
                     fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none',
                   }}>
                     {editingOriginal ? <><CheckCircle2 size={10} /> Listo</> : <><Edit2 size={10} /> Editar</>}
@@ -7360,21 +7360,21 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 <SectionTitle icon={<Receipt size={14} />} title="Documentos" hint="Adjunta propuestas, presupuestos o cualquier documento para la pareja" />
                 {/* Multi-file list */}
                 {(form.budget_files || []).map((bf: { url: string; name: string }, idx: number) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#f0fdf4', border: '1.5px solid #86efac', marginBottom: 8 }}>
-                    <CheckCircle2 size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#EEF2EC', border: '1.5px solid #C3D4C5', marginBottom: 8 }}>
+                    <CheckCircle2 size={16} style={{ color: '#4A6B52', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#15803d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bf.name || 'Documento'}</div>
-                      <div style={{ fontSize: 11, color: '#16a34a' }}>Archivo adjunto</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#3C5945', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bf.name || 'Documento'}</div>
+                      <div style={{ fontSize: 11, color: '#4A6B52' }}>Archivo adjunto</div>
                     </div>
                     <a href={bf.url} target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 11, color: '#16a34a', textDecoration: 'underline', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
+                      style={{ fontSize: 11, color: '#4A6B52', textDecoration: 'underline', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
                       <ExternalLink size={11} /> Ver
                     </a>
                     <button type="button" onClick={() => {
                       const newFiles = (form.budget_files || []).filter((_: any, i: number) => i !== idx)
                       setForm((f: any) => ({ ...f, budget_files: newFiles, budget_file_url: newFiles[0]?.url || '', budget_file_name: newFiles[0]?.name || '' }))
                       setBudgetFileSaved(false)
-                    }} style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(22,163,74,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#16a34a' }}>
+                    }} style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(74,107,82,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#4A6B52' }}>
                       <X size={12} />
                     </button>
                   </div>
@@ -7385,7 +7385,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   onDragLeave={() => setBudgetDragOver(false)}
                   onDrop={e => { e.preventDefault(); setBudgetDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleBudgetFileSelect(f) }}
                   onClick={() => budgetInputRef.current?.click()}
-                  style={{ border: `2px dashed ${budgetDragOver ? 'var(--gold)' : 'var(--ivory)'}`, borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer', background: budgetDragOver ? '#fffbeb' : '#fafaf8', transition: 'all 0.15s', marginBottom: 10 }}>
+                  style={{ border: `2px dashed ${budgetDragOver ? 'var(--gold)' : 'var(--ivory)'}`, borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer', background: budgetDragOver ? '#F7F3E8' : '#fafaf8', transition: 'all 0.15s', marginBottom: 10 }}>
                   <input ref={budgetInputRef} type="file" style={{ display: 'none' }}
                     accept=".pdf,.xlsx,.xls,.docx,.doc,.png,.jpg,.jpeg,.webp"
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleBudgetFileSelect(f); e.target.value = '' }} />
@@ -7401,10 +7401,10 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     </div>
                   </>}
                 </div>
-                {budgetError && <div style={{ marginBottom: 8, fontSize: 11, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}><AlertTriangle size={11} /> {budgetError}</div>}
+                {budgetError && <div style={{ marginBottom: 8, fontSize: 11, color: '#B0473E', display: 'flex', alignItems: 'center', gap: 4 }}><AlertTriangle size={11} /> {budgetError}</div>}
                 {/* Save button */}
                 <button type="button" onClick={handleSaveFileOnly} disabled={budgetFileSaving || !(form.budget_files || []).length}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: 'none', cursor: (budgetFileSaving || !(form.budget_files || []).length) ? 'not-allowed' : 'pointer', background: budgetFileSaved ? '#16a34a' : 'var(--espresso)', color: '#fff', fontSize: 12, fontWeight: 700, opacity: (budgetFileSaving || !(form.budget_files || []).length) ? 0.6 : 1, transition: 'all 0.2s' }}>
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: 'none', cursor: (budgetFileSaving || !(form.budget_files || []).length) ? 'not-allowed' : 'pointer', background: budgetFileSaved ? '#4A6B52' : 'var(--espresso)', color: '#fff', fontSize: 12, fontWeight: 700, opacity: (budgetFileSaving || !(form.budget_files || []).length) ? 0.6 : 1, transition: 'all 0.2s' }}>
                   {budgetFileSaved ? <><CheckCircle2 size={13} /> Guardado</> : budgetFileSaving ? 'Guardando…' : <><Upload size={13} /> Guardar documento</>}
                 </button>
               </>)}
@@ -7525,20 +7525,20 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Documentos adjuntos</label>
                 {(form.budget_files || []).map((bf: { url: string; name: string }, idx: number) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#f0fdf4', border: '1.5px solid #86efac', marginBottom: 8 }}>
-                    <CheckCircle2 size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#EEF2EC', border: '1.5px solid #C3D4C5', marginBottom: 8 }}>
+                    <CheckCircle2 size={16} style={{ color: '#4A6B52', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#15803d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bf.name || 'Documento adjunto'}</div>
-                      <div style={{ fontSize: 11, color: '#16a34a' }}>Archivo guardado</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#3C5945', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bf.name || 'Documento adjunto'}</div>
+                      <div style={{ fontSize: 11, color: '#4A6B52' }}>Archivo guardado</div>
                     </div>
                     <a href={bf.url} target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 11, color: '#16a34a', textDecoration: 'underline', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
+                      style={{ fontSize: 11, color: '#4A6B52', textDecoration: 'underline', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
                       <ExternalLink size={11} /> Ver
                     </a>
                     <button type="button" onClick={() => {
                       const newFiles = (form.budget_files || []).filter((_: any, i: number) => i !== idx)
                       setForm((f: any) => ({ ...f, budget_files: newFiles, budget_file_url: newFiles[0]?.url || '', budget_file_name: newFiles[0]?.name || '' }))
-                    }} style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(22,163,74,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#16a34a' }}>
+                    }} style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(74,107,82,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#4A6B52' }}>
                       <X size={12} />
                     </button>
                   </div>
@@ -7548,7 +7548,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   onDragLeave={() => setBudgetDragOver(false)}
                   onDrop={e => { e.preventDefault(); setBudgetDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleBudgetFileSelect(f) }}
                   onClick={() => budgetInputRef.current?.click()}
-                  style={{ border: `2px dashed ${budgetDragOver ? 'var(--gold)' : 'var(--ivory)'}`, borderRadius: 10, padding: '18px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, cursor: 'pointer', background: budgetDragOver ? '#fffbeb' : '#fafaf8', transition: 'all 0.15s' }}>
+                  style={{ border: `2px dashed ${budgetDragOver ? 'var(--gold)' : 'var(--ivory)'}`, borderRadius: 10, padding: '18px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, cursor: 'pointer', background: budgetDragOver ? '#F7F3E8' : '#fafaf8', transition: 'all 0.15s' }}>
                   <input ref={budgetInputRef} type="file" style={{ display: 'none' }}
                     accept=".pdf,.xlsx,.xls,.docx,.doc,.png,.jpg,.jpeg,.webp"
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleBudgetFileSelect(f); e.target.value = '' }} />
@@ -7568,7 +7568,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                   )}
                 </div>
                 {budgetError && (
-                  <div style={{ marginTop: 6, fontSize: 11, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ marginTop: 6, fontSize: 11, color: '#B0473E', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <AlertTriangle size={11} /> {budgetError}
                   </div>
                 )}
@@ -7724,9 +7724,9 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
             </div>
 
             {isEdit && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '4px 10px', borderRadius: 20, background: editLead?.whatsapp_consent ? '#dcfce7' : '#fef2f2', border: `1px solid ${editLead?.whatsapp_consent ? '#86efac' : '#fca5a5'}` }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill={editLead?.whatsapp_consent ? '#16a34a' : '#dc2626'}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.555 4.118 1.528 5.847L0 24l6.335-1.508A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.65-.502-5.18-1.378l-.37-.22-3.862.919.977-3.773-.243-.387A9.953 9.953 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-                <span style={{ fontSize: 11, fontWeight: 600, color: editLead?.whatsapp_consent ? '#16a34a' : '#dc2626' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '4px 10px', borderRadius: 20, background: editLead?.whatsapp_consent ? '#DDE7DF' : '#FAF3F2', border: `1px solid ${editLead?.whatsapp_consent ? '#C3D4C5' : '#E0C2BD'}` }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill={editLead?.whatsapp_consent ? '#4A6B52' : '#B0473E'}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.555 4.118 1.528 5.847L0 24l6.335-1.508A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.65-.502-5.18-1.378l-.37-.22-3.862.919.977-3.773-.243-.387A9.953 9.953 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+                <span style={{ fontSize: 11, fontWeight: 600, color: editLead?.whatsapp_consent ? '#4A6B52' : '#B0473E' }}>
                   {editLead?.whatsapp_consent ? 'Acepta contacto por WhatsApp' : 'No acepta contacto por WhatsApp'}
                 </span>
               </div>
@@ -7846,7 +7846,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                               <Users size={12} style={{ color: 'var(--gold)' }} />
                               <span style={{ fontSize: 12, color: 'var(--charcoal)' }}>{ms.guest_count} invitados</span>
                               {ms.guest_count_changed && ms.original_guest_count && (
-                                <span style={{ fontSize: 10, color: '#b45309', background: 'rgba(217,119,6,0.1)', padding: '1px 6px', borderRadius: 8 }}>
+                                <span style={{ fontSize: 10, color: '#8A6A38', background: 'rgba(217,119,6,0.1)', padding: '1px 6px', borderRadius: 8 }}>
                                   antes: {ms.original_guest_count}
                                 </span>
                               )}
@@ -7878,7 +7878,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Extras seleccionados</div>
                             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                               {ms.selected_extras.map((ext: string, i: number) => (
-                                <span key={i} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 8, background: 'rgba(99,102,241,0.08)', color: '#4f46e5', fontWeight: 500 }}>
+                                <span key={i} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 8, background: 'rgba(99,102,241,0.08)', color: '#514C84', fontWeight: 500 }}>
                                   {ext}
                                 </span>
                               ))}
@@ -7902,16 +7902,16 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     const visit = proposalResponse.inquiries.find((i: any) => i.kind === 'visit')
                     const p = visit.payload || {}
                     return (
-                      <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ background: '#EDF2ED', border: '1px solid #C6D8C9', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#3C5945', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
                           <Landmark size={11} /> Visita solicitada
                         </div>
                         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12 }}>
-                          {p.date && <div><span style={{ color: '#6ee7b7' }}>Fecha:</span> <span style={{ fontWeight: 600, color: '#047857' }}>{new Date(p.date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>}
-                          {p.time && <div><span style={{ color: '#6ee7b7' }}>Hora:</span> <span style={{ fontWeight: 600, color: '#047857' }}>{p.time}</span></div>}
+                          {p.date && <div><span style={{ color: '#BFD2C5' }}>Fecha:</span> <span style={{ fontWeight: 600, color: '#3C5945' }}>{new Date(p.date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>}
+                          {p.time && <div><span style={{ color: '#BFD2C5' }}>Hora:</span> <span style={{ fontWeight: 600, color: '#3C5945' }}>{p.time}</span></div>}
                         </div>
                         {visit.message && (
-                          <div style={{ marginTop: 8, fontSize: 12, color: '#065f46', fontStyle: 'italic' }}>"{visit.message}"</div>
+                          <div style={{ marginTop: 8, fontSize: 12, color: '#35513E', fontStyle: 'italic' }}>"{visit.message}"</div>
                         )}
                       </div>
                     )
@@ -7923,11 +7923,11 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     const p = dp.payload || {}
                     return (
                       <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#514C84', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
                           <Calendar size={11} /> Fecha seleccionada
                         </div>
                         {p.wedding_date && (
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#312e81' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#36336A' }}>
                             {new Date(p.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                           </div>
                         )}
@@ -8034,7 +8034,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                             {ms.selected_extras?.length > 0 && (
                               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
                                 {ms.selected_extras.map((ext: string, i: number) => (
-                                  <span key={i} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: 'rgba(99,102,241,0.08)', color: '#4f46e5', fontWeight: 500 }}>{ext}</span>
+                                  <span key={i} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: 'rgba(99,102,241,0.08)', color: '#514C84', fontWeight: 500 }}>{ext}</span>
                                 ))}
                               </div>
                             )}
@@ -8048,7 +8048,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                         <div>
                           <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Respuestas</div>
                           {comercialDetailData.inquiries.map((inq: any) => (
-                            <div key={inq.id} style={{ padding: '8px 10px', background: inq.status === 'new' ? '#FFFBEB' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#FDE68A' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 5 }}>
+                            <div key={inq.id} style={{ padding: '8px 10px', background: inq.status === 'new' ? '#F7F3E8' : 'var(--cream)', border: `1px solid ${inq.status === 'new' ? '#E2D4AE' : 'var(--ivory)'}`, borderRadius: 8, marginBottom: 5 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
                                 <span>{KIND_EMOJI[inq.kind] ?? '💬'}</span>
                                 <span style={{ fontWeight: 600, color: 'var(--charcoal)' }}>{KIND_LABEL[inq.kind] || inq.kind}</span>
@@ -8120,12 +8120,12 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                       <div style={{ marginBottom: 14 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)' }}>Progreso de pagos</div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: paidCount === plan.length ? '#16a34a' : 'var(--espresso)' }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: paidCount === plan.length ? '#4A6B52' : 'var(--espresso)' }}>
                             {paidCount}/{plan.length} cuotas
                           </div>
                         </div>
                         <div style={{ height: 6, background: 'var(--ivory)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
-                          <div style={{ height: '100%', width: `${plan.length > 0 ? (paidCount / plan.length) * 100 : 0}%`, background: paidCount === plan.length ? '#16a34a' : 'var(--gold)', borderRadius: 3, transition: 'width 0.3s' }} />
+                          <div style={{ height: '100%', width: `${plan.length > 0 ? (paidCount / plan.length) * 100 : 0}%`, background: paidCount === plan.length ? '#4A6B52' : 'var(--gold)', borderRadius: 3, transition: 'width 0.3s' }} />
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
                           {totalPaid.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} pagado de {Number(item.total_amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
@@ -8138,10 +8138,10 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                       <div style={{ marginBottom: 14 }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Cuotas</div>
                         {plan.map((inst: any, idx: number) => (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: inst.status === 'paid' ? '#f0fdf4' : 'var(--cream)', border: `1px solid ${inst.status === 'paid' ? '#86efac' : 'var(--ivory)'}`, marginBottom: 4 }}>
-                            {inst.status === 'paid' ? <CheckCircle size={12} style={{ color: '#16a34a', flexShrink: 0 }} /> : <Clock size={12} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: inst.status === 'paid' ? '#EEF2EC' : 'var(--cream)', border: `1px solid ${inst.status === 'paid' ? '#C3D4C5' : 'var(--ivory)'}`, marginBottom: 4 }}>
+                            {inst.status === 'paid' ? <CheckCircle size={12} style={{ color: '#4A6B52', flexShrink: 0 }} /> : <Clock size={12} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
                             <div style={{ flex: 1, fontSize: 12, color: 'var(--charcoal)' }}>{inst.label}</div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: inst.status === 'paid' ? '#16a34a' : 'var(--espresso)' }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: inst.status === 'paid' ? '#4A6B52' : 'var(--espresso)' }}>
                               {Number(inst.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
                             </div>
                             {inst.due_date && <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{new Date(inst.due_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div>}
@@ -8156,9 +8156,9 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                         <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Historial de pagos</div>
                         {comercialDetailData.payments.map((pay: any) => (
                           <div key={pay.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 11, borderBottom: '1px solid var(--ivory)' }}>
-                            <CheckCircle size={10} style={{ color: '#16a34a', flexShrink: 0 }} />
+                            <CheckCircle size={10} style={{ color: '#4A6B52', flexShrink: 0 }} />
                             <div style={{ flex: 1, color: 'var(--charcoal)' }}>{pay.payer_name || pay.payer_email || 'Pago'}</div>
-                            <div style={{ fontWeight: 600, color: '#16a34a' }}>{Number(pay.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
+                            <div style={{ fontWeight: 600, color: '#4A6B52' }}>{Number(pay.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
                             {pay.paid_at && <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{new Date(pay.paid_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div>}
                           </div>
                         ))}
@@ -8553,7 +8553,7 @@ function VisitScheduleModal({
                         <span style={{
                           position: 'absolute', top: 2, right: 2,
                           minWidth: 14, height: 14, borderRadius: 7, padding: '0 3px',
-                          background: '#fde68a', color: '#92400e',
+                          background: '#E2D4AE', color: '#7A5A2E',
                           fontSize: 9, fontWeight: 700, lineHeight: 1,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}>{leadCount}</span>
@@ -8564,14 +8564,14 @@ function VisitScheduleModal({
                           style={{
                             position: 'absolute',
                             left: 0, right: 0, bottom: 0,
-                            background: isSelected ? 'rgba(255,255,255,0.85)' : '#ecfdf5',
-                            color: isSelected ? '#047857' : '#047857',
+                            background: isSelected ? 'rgba(255,255,255,0.85)' : '#EDF2ED',
+                            color: isSelected ? '#3C5945' : '#3C5945',
                             fontSize: 9, fontWeight: 700,
                             letterSpacing: '0.04em',
                             fontVariantNumeric: 'tabular-nums',
                             lineHeight: 1,
                             padding: '3px 0 4px',
-                            borderTop: `2px solid ${isSelected ? '#fff' : '#10b981'}`,
+                            borderTop: `2px solid ${isSelected ? '#fff' : '#5C8570'}`,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                           }}
                         >
@@ -8721,10 +8721,10 @@ function VisitScheduleModal({
                     }
                     const anyOverlap = dayVisits.some(overlapsMine)
                     return (
-                      <div style={{ marginTop: 10, borderRadius: 10, overflow: 'hidden', border: `1px solid ${anyOverlap ? '#fca5a5' : '#fed7aa'}` }}>
-                        <div style={{ padding: '7px 10px', background: anyOverlap ? '#fef2f2' : '#fff7ed', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <AlertTriangle size={12} style={{ color: anyOverlap ? '#dc2626' : '#ea580c', flexShrink: 0 }} />
-                          <span style={{ fontSize: 10, fontWeight: 700, color: anyOverlap ? '#991b1b' : '#9a3412', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      <div style={{ marginTop: 10, borderRadius: 10, overflow: 'hidden', border: `1px solid ${anyOverlap ? '#E0C2BD' : '#E6D6BE'}` }}>
+                        <div style={{ padding: '7px 10px', background: anyOverlap ? '#FAF3F2' : '#fff7ed', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <AlertTriangle size={12} style={{ color: anyOverlap ? '#B0473E' : '#A85B2E', flexShrink: 0 }} />
+                          <span style={{ fontSize: 10, fontWeight: 700, color: anyOverlap ? '#7E332D' : '#9a3412', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                             {anyOverlap ? 'Conflicto de horario' : `Ya hay ${dayVisits.length === 1 ? 'otra visita' : `${dayVisits.length} visitas`} este día`}
                           </span>
                         </div>
@@ -8741,12 +8741,12 @@ function VisitScheduleModal({
                                 display: 'flex', alignItems: 'center', gap: 10,
                                 padding: '8px 10px',
                                 borderTop: vi === 0 ? 'none' : '1px solid var(--ivory)',
-                                background: overlap ? '#fef2f2' : '#fff',
+                                background: overlap ? '#FAF3F2' : '#fff',
                               }}>
                                 <div style={{
                                   width: 28, height: 28, borderRadius: '50%',
-                                  background: overlap ? '#fee2e2' : '#ecfdf5',
-                                  color: overlap ? '#b91c1c' : '#047857',
+                                  background: overlap ? '#F2E2E0' : '#EDF2ED',
+                                  color: overlap ? '#933B34' : '#3C5945',
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                                   fontSize: 10, fontWeight: 700, flexShrink: 0,
                                 }}>{ini}</div>
@@ -8755,13 +8755,13 @@ function VisitScheduleModal({
                                     {v.name || 'Lead sin nombre'}
                                   </div>
                                   <div style={{ fontSize: 10, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 5, fontVariantNumeric: 'tabular-nums', marginTop: 1 }}>
-                                    <Clock size={10} style={{ color: overlap ? '#dc2626' : '#10b981' }} />
+                                    <Clock size={10} style={{ color: overlap ? '#B0473E' : '#5C8570' }} />
                                     {v.visit_time ? `${v.visit_time}${vEnd ? ` – ${vEnd}` : ''}` : 'Sin hora'}
                                     {v.visit_duration ? <span style={{ opacity: 0.7 }}>· {v.visit_duration} min</span> : null}
                                   </div>
                                 </div>
                                 {overlap && (
-                                  <span style={{ fontSize: 9, fontWeight: 700, color: '#991b1b', background: '#fee2e2', padding: '3px 7px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: '#7E332D', background: '#F2E2E0', padding: '3px 7px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                     Solapa
                                   </span>
                                 )}

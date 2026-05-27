@@ -20,9 +20,9 @@ const STATUS_LABEL: Record<string, string> = {
   won: 'Confirmado', lost: 'Perdido',
 }
 const STATUS_COLOR: Record<string, string> = {
-  new: '#ef4444', contacted: '#3b82f6', proposal_sent: '#8b5cf6',
-  visit_scheduled: '#f59e0b', post_visit: '#f59e0b', budget_sent: '#f97316',
-  won: '#22c55e', lost: 'var(--warm-gray)',
+  new: '#BC5249', contacted: '#4F6D8C', proposal_sent: '#7E72A0',
+  visit_scheduled: '#AC8B4C', post_visit: '#AC8B4C', budget_sent: '#f97316',
+  won: '#5C7E64', lost: 'var(--warm-gray)',
 }
 
 const SOURCE_LABEL: Record<string, string> = { wedding_planner: 'Planner', direct: 'Directo', web: 'Web' }
@@ -125,8 +125,8 @@ export default function CateringLeadsPage() {
                 onMouseOver={e => (e.currentTarget.style.background = 'rgba(196,151,90,0.03)')}
                 onMouseOut={e => (e.currentTarget.style.background = 'transparent')}
               >
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(34,197,94,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Users size={16} color="#16a34a" />
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(92,126,100,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Users size={16} color="#4A6B52" />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>{l.name}</div>
@@ -138,7 +138,7 @@ export default function CateringLeadsPage() {
                     )}
                     {l.guests && <span>{l.guests} inv.</span>}
                     {l.source === 'wedding_planner' && (
-                      <span style={{ background: 'rgba(139,92,246,0.1)', color: '#7c3aed', padding: '1px 6px', borderRadius: 8, fontWeight: 600, fontSize: 10 }}>
+                      <span style={{ background: 'rgba(126,114,160,0.1)', color: '#6A5B95', padding: '1px 6px', borderRadius: 8, fontWeight: 600, fontSize: 10 }}>
                         Planner
                       </span>
                     )}
@@ -193,19 +193,19 @@ export default function CateringLeadsPage() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {selected.status === 'new' && (
                 <button onClick={() => updateStatus(selected.id, 'contacted')} disabled={!!updatingId}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: 'none', background: '#3b82f6', color: '#fff', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: 'none', background: '#4F6D8C', color: '#fff', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
                   <MessageSquare size={12} /> Marcar contactado
                 </button>
               )}
               {!['won','lost'].includes(selected.status) && (
                 <button onClick={() => updateStatus(selected.id, 'won')} disabled={!!updatingId}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: 'none', background: '#22c55e', color: '#fff', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: 'none', background: '#5C7E64', color: '#fff', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
                   <CheckCircle size={12} /> Confirmar boda
                 </button>
               )}
               {selected.status !== 'lost' && (
                 <button onClick={() => updateStatus(selected.id, 'lost')} disabled={!!updatingId}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: 'none', background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: 'none', background: 'rgba(188,82,73,0.1)', color: '#BC5249', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
                   <XCircle size={12} /> Perdido
                 </button>
               )}

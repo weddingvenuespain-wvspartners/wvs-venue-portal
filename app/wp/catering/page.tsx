@@ -170,12 +170,12 @@ export default function CateringSearchPage() {
                 const initials = (c.display_name || 'C').slice(0, 2).toUpperCase()
                 return (
                   <div key={c.user_id} style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ height: 80, background: 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.02))', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                      <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', border: '2px solid rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 16, color: '#16a34a' }}>
+                    <div style={{ height: 80, background: 'linear-gradient(135deg, rgba(92,126,100,0.08), rgba(92,126,100,0.02))', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                      <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(92,126,100,0.1)', border: '2px solid rgba(92,126,100,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 16, color: '#4A6B52' }}>
                         {initials}
                       </div>
                       {c.venue_type && (
-                        <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 10, padding: '2px 7px', borderRadius: 8, background: 'rgba(34,197,94,0.1)', color: '#16a34a', fontWeight: 600 }}>
+                        <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 10, padding: '2px 7px', borderRadius: 8, background: 'rgba(92,126,100,0.1)', color: '#4A6B52', fontWeight: 600 }}>
                           {c.venue_type}
                         </span>
                       )}
@@ -188,7 +188,7 @@ export default function CateringSearchPage() {
                         </div>
                       )}
                       {c.venue_website && (
-                        <a href={c.venue_website} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#16a34a', textDecoration: 'none' }}>
+                        <a href={c.venue_website} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#4A6B52', textDecoration: 'none' }}>
                           {c.venue_website.replace(/^https?:\/\//, '')}
                         </a>
                       )}
@@ -199,7 +199,7 @@ export default function CateringSearchPage() {
                         disabled={clients.length === 0}
                         style={{
                           width: '100%', padding: '8px 12px', borderRadius: 8, border: 'none',
-                          background: clients.length === 0 ? 'var(--ivory)' : '#16a34a',
+                          background: clients.length === 0 ? 'var(--ivory)' : '#4A6B52',
                           color: clients.length === 0 ? 'var(--warm-gray)' : '#fff',
                           fontSize: 12, fontWeight: 500, cursor: clients.length === 0 ? 'not-allowed' : 'pointer',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -234,7 +234,7 @@ export default function CateringSearchPage() {
             </div>
 
             {sendError && (
-              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 16 }}>
+              <div style={{ background: 'rgba(188,82,73,0.08)', border: '1px solid rgba(188,82,73,0.2)', borderRadius: 8, padding: '10px 14px', color: '#B0473E', fontSize: 13, marginBottom: 16 }}>
                 {sendError}
               </div>
             )}
@@ -263,7 +263,7 @@ export default function CateringSearchPage() {
                 Cancelar
               </button>
               <button onClick={handleSendRequest} disabled={sending}
-                style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 500, cursor: sending ? 'default' : 'pointer', opacity: sending ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: '#4A6B52', color: '#fff', fontSize: 13, fontWeight: 500, cursor: sending ? 'default' : 'pointer', opacity: sending ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Send size={13} /> {sending ? 'Enviando…' : 'Enviar solicitud'}
               </button>
             </div>

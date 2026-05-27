@@ -272,7 +272,7 @@ export default function OnboardingPage() {
             <p style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 28 }}>{step1Sub}</p>
 
             {error && (
-              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 16 }}>
+              <div style={{ background: 'rgba(188,82,73,0.08)', border: '1px solid rgba(188,82,73,0.2)', borderRadius: 8, padding: '10px 14px', color: '#B0473E', fontSize: 13, marginBottom: 16 }}>
                 {error}
               </div>
             )}
@@ -343,7 +343,7 @@ export default function OnboardingPage() {
             </p>
 
             {error && (
-              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 16 }}>
+              <div style={{ background: 'rgba(188,82,73,0.08)', border: '1px solid rgba(188,82,73,0.2)', borderRadius: 8, padding: '10px 14px', color: '#B0473E', fontSize: 13, marginBottom: 16 }}>
                 {error}
               </div>
             )}
@@ -412,8 +412,8 @@ export default function OnboardingPage() {
 
         {step === 3 && (
           <div style={{ background: '#fff', borderRadius: 16, padding: '36px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)', textAlign: 'center' }}>
-            <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-              <CreditCard size={24} style={{ color: '#b45309' }} />
+            <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#F3EBD8', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <CreditCard size={24} style={{ color: '#8A6A38' }} />
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 8, fontFamily: 'Inter, sans-serif' }}>
               ¿Quieres activar pagos online?

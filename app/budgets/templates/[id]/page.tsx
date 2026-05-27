@@ -170,8 +170,8 @@ export default function TemplateEditorPage({ params }: { params: Promise<{ id: s
           </div>
           <div style={{ fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span>Plantilla de estructura</span>
-            {saving && <span style={{ color: '#b45309' }}>· guardando...</span>}
-            {saved && !saving && <span style={{ color: '#16a34a' }}>· guardado</span>}
+            {saving && <span style={{ color: '#8A6A38' }}>· guardando...</span>}
+            {saved && !saving && <span style={{ color: '#4A6B52' }}>· guardado</span>}
           </div>
         </div>
         <button

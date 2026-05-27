@@ -77,10 +77,10 @@ function VenueModal({
     return (
       <div style={{
         marginBottom: 14,
-        ...(changed ? { background: '#fef3c7', borderLeft: '3px solid #f59e0b', padding: '6px 8px', borderRadius: 4, marginLeft: -8 } : {})
+        ...(changed ? { background: '#F3EBD8', borderLeft: '3px solid #AC8B4C', padding: '6px 8px', borderRadius: 4, marginLeft: -8 } : {})
       }}>
-        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', color: changed ? '#92400e' : 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 3 }}>
-          {label}{changed && <span style={{ marginLeft: 6, fontSize: 9, background: '#f59e0b', color: '#fff', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>CAMBIO</span>}
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', color: changed ? '#7A5A2E' : 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 3 }}>
+          {label}{changed && <span style={{ marginLeft: 6, fontSize: 9, background: '#AC8B4C', color: '#fff', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>CAMBIO</span>}
         </div>
         <div style={{ fontSize: 13, color: changed ? '#78350f' : 'var(--charcoal)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{String(value)}</div>
         {changed && published[fieldKey!] !== undefined && published[fieldKey!] !== null && published[fieldKey!] !== '' && (
@@ -144,7 +144,7 @@ function VenueModal({
         {isChanges && (
           <div className="alert alert-info" style={{ fontSize: 12, marginBottom: 20 }}>
             <strong>Solicitud de cambios</strong> — Venue publicado (WP #{onb.wp_post_id}).
-            Los campos <span style={{ background: '#fef3c7', color: '#92400e', padding: '1px 5px', borderRadius: 3, fontWeight: 600 }}>resaltados en amarillo</span> han cambiado respecto a la versión publicada.
+            Los campos <span style={{ background: '#F3EBD8', color: '#7A5A2E', padding: '1px 5px', borderRadius: 3, fontWeight: 600 }}>resaltados en amarillo</span> han cambiado respecto a la versión publicada.
           </div>
         )}
 
@@ -168,12 +168,12 @@ function VenueModal({
                   return (
                     <div style={{
                       marginBottom: 14,
-                      ...(chg ? { background: '#fef3c7', borderLeft: '3px solid #f59e0b', padding: '6px 8px', borderRadius: 4, marginLeft: -8 } : {})
+                      ...(chg ? { background: '#F3EBD8', borderLeft: '3px solid #AC8B4C', padding: '6px 8px', borderRadius: 4, marginLeft: -8 } : {})
                     }}>
-                      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', color: chg ? '#92400e' : 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 3 }}>
-                        Descripción completa{chg && <span style={{ marginLeft: 6, fontSize: 9, background: '#f59e0b', color: '#fff', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>CAMBIO</span>}
+                      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', color: chg ? '#7A5A2E' : 'var(--warm-gray)', textTransform: 'uppercase', marginBottom: 3 }}>
+                        Descripción completa{chg && <span style={{ marginLeft: 6, fontSize: 9, background: '#AC8B4C', color: '#fff', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>CAMBIO</span>}
                       </div>
-                      <div style={{ fontSize: 11, color: chg ? '#78350f' : 'var(--charcoal)', fontFamily: 'monospace', background: chg ? '#fde68a' : 'var(--cream)', padding: '8px 10px', borderRadius: 6, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                      <div style={{ fontSize: 11, color: chg ? '#78350f' : 'var(--charcoal)', fontFamily: 'monospace', background: chg ? '#E2D4AE' : 'var(--cream)', padding: '8px 10px', borderRadius: 6, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
                         {data.postContent}
                       </div>
                     </div>
@@ -568,7 +568,7 @@ export default function AdminOnboardingPage() {
                 borderBottom: solTab === tab.key ? '2px solid var(--gold)' : '2px solid transparent',
                 background: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif', marginBottom: -1,
               }}>
-              {tab.label}{tab.count > 0 && <span style={{ marginLeft: 5, background: '#fef9ec', color: '#92400e', fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 8 }}>{tab.count}</span>}
+              {tab.label}{tab.count > 0 && <span style={{ marginLeft: 5, background: '#F6F1E4', color: '#7A5A2E', fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 8 }}>{tab.count}</span>}
             </button>
           ))}
         </div>
@@ -692,7 +692,7 @@ export default function AdminOnboardingPage() {
                           <tr key={p.user_id}>
                             <td>
                               <div style={{ fontWeight: 600, fontSize: 13 }}>{[p.first_name, p.last_name].filter(Boolean).join(' ') || '—'}</div>
-                              {p.email && <div style={{ fontSize: 11, color: '#0369a1' }}>{p.email}</div>}
+                              {p.email && <div style={{ fontSize: 11, color: '#3D5E78' }}>{p.email}</div>}
                               {p.phone && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{p.phone}</div>}
                             </td>
                             <td style={{ fontSize: 12 }}>{p.company || '—'}</td>

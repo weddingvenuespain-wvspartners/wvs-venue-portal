@@ -340,23 +340,23 @@ export default function ProposalMenuEditor({
           Mantener el handler/refs para reactivarlo cuando mejore el parsing. */}
 
       {undoSnapshot && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, padding: '10px 12px', borderRadius: 8, marginBottom: 12, background: '#f0fdf4', border: '1px solid #86efac', color: '#15803d' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, padding: '10px 12px', borderRadius: 8, marginBottom: 12, background: '#EEF2EC', border: '1px solid #C3D4C5', color: '#3C5945' }}>
           <span style={{ flex: 1 }}>
             ✓ Importados <strong>{undoSnapshot.count} menú{undoSnapshot.count > 1 ? 's' : ''}</strong>. Revisa y edita antes de guardar.
           </span>
           <button type="button" onClick={handleUndoImport}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #86efac', color: '#15803d', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #C3D4C5', color: '#3C5945', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
             <Undo2 size={12} /> Deshacer
           </button>
           <button type="button" onClick={() => setUndoSnapshot(null)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#15803d', padding: 2, display: 'flex' }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3C5945', padding: 2, display: 'flex' }}>
             <X size={13} />
           </button>
         </div>
       )}
 
       {parseMessage && (
-        <div style={{ fontSize: 12, padding: '8px 12px', borderRadius: 6, marginBottom: 12, background: parseMessage.startsWith('✓') ? '#f0fdf4' : '#fffbeb', border: `1px solid ${parseMessage.startsWith('✓') ? '#86efac' : '#fcd34d'}`, color: parseMessage.startsWith('✓') ? '#15803d' : '#92400e' }}>
+        <div style={{ fontSize: 12, padding: '8px 12px', borderRadius: 6, marginBottom: 12, background: parseMessage.startsWith('✓') ? '#EEF2EC' : '#F7F3E8', border: `1px solid ${parseMessage.startsWith('✓') ? '#C3D4C5' : '#C2A968'}`, color: parseMessage.startsWith('✓') ? '#3C5945' : '#7A5A2E' }}>
           {parseMessage}
         </div>
       )}
@@ -412,7 +412,7 @@ export default function ProposalMenuEditor({
                   <div style={subBlockHeader}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={subBlockTitle}>Estaciones opcionales</div>
-                      <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' }}>Opcional</span>
+                      <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#F7F3E8', color: '#7A5A2E', border: '1px solid #E2D4AE' }}>Opcional</span>
                     </div>
                     <div style={subBlockHint}>Añadidos que los invitados pueden contratar: ostras, foie, quesos, buffet de jamón…</div>
                   </div>
@@ -535,12 +535,12 @@ export default function ProposalMenuEditor({
                         }
                         const invalid = sp.date_from && sp.date_to && sp.date_from > sp.date_to
                         return (
-                          <div key={si} style={{ background: 'var(--cream)', border: `1px solid ${invalid ? '#fca5a5' : 'var(--border)'}`, borderRadius: 8, padding: '10px 10px 8px', marginBottom: 8 }}>
+                          <div key={si} style={{ background: 'var(--cream)', border: `1px solid ${invalid ? '#E0C2BD' : 'var(--border)'}`, borderRadius: 8, padding: '10px 10px 8px', marginBottom: 8 }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
                               <DatePicker label="Desde" value={sp.date_from} onChange={v => updateSp({ date_from: v })} allowPast />
                               <DatePicker label="Hasta" value={sp.date_to} onChange={v => updateSp({ date_to: v })} allowPast minDate={sp.date_from || undefined} />
                             </div>
-                            {invalid && <div style={{ fontSize: 10, color: '#dc2626', marginBottom: 6 }}>La fecha de inicio debe ser anterior a la de fin</div>}
+                            {invalid && <div style={{ fontSize: 10, color: '#B0473E', marginBottom: 6 }}>La fecha de inicio debe ser anterior a la de fin</div>}
                             <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 24px', gap: 8, alignItems: 'center' }}>
                               <input className="form-input" placeholder="Precio (ej. 95€)" value={sp.price_per_person}
                                 onChange={e => updateSp({ price_per_person: e.target.value })} style={{ fontSize: 12 }} />
@@ -620,7 +620,7 @@ export default function ProposalMenuEditor({
                             </span>
                           )}
                           {c.mode === 'fixed' && (
-                            <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#EEF2EC', color: '#35513E', border: '1px solid #D2DFD3', whiteSpace: 'nowrap' }}>
                               Fijo
                             </span>
                           )}
@@ -678,7 +678,7 @@ export default function ProposalMenuEditor({
             <div style={sectionHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggle('night_extras')}>
                 <span style={sectionTitle}>Noche y madrugada ({nightExtras.length})</span>
-                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' }}>Opcional</span>
+                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#F7F3E8', color: '#7A5A2E', border: '1px solid #E2D4AE' }}>Opcional</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <VisToggle skey="night" />
@@ -711,7 +711,7 @@ export default function ProposalMenuEditor({
             <div style={sectionHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggle('event_extras')}>
                 <span style={sectionTitle}>Extras del evento ({eventExtras.length})</span>
-                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' }}>Opcional</span>
+                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#F7F3E8', color: '#7A5A2E', border: '1px solid #E2D4AE' }}>Opcional</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <VisToggle skey="event_extras" />

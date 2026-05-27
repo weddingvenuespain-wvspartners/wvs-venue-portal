@@ -22,9 +22,9 @@ const STATUS_LABEL: Record<string, string> = {
   budget_sent: 'Presupuesto enviado', won: 'Confirmado', lost: 'Perdido',
 }
 const STATUS_COLOR: Record<string, string> = {
-  new: '#eab308', contacted: '#3b82f6', proposal_sent: '#8b5cf6',
-  visit_scheduled: '#06b6d4', post_visit: '#f97316',
-  budget_sent: '#10b981', won: '#22c55e', lost: '#ef4444',
+  new: '#eab308', contacted: '#4F6D8C', proposal_sent: '#7E72A0',
+  visit_scheduled: '#5B8794', post_visit: '#f97316',
+  budget_sent: '#5C8570', won: '#5C7E64', lost: '#BC5249',
 }
 
 const BUDGET_LABELS: Record<string, string> = {
@@ -386,10 +386,10 @@ export default function CrmListPage() {
         {/* ── KPI cards ──────────────────────────────────────────────── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
           {[
-            { label: 'Total contactos', value: kpis.total, icon: <Users size={16} />, color: '#6366f1', bg: '#eef2ff' },
-            { label: 'Con leads activos', value: kpis.withActive, icon: <Heart size={16} />, color: '#f59e0b', bg: '#fffbeb' },
-            { label: 'Confirmados', value: kpis.confirmed, icon: <CheckCircle2 size={16} />, color: '#10b981', bg: '#ecfdf5' },
-            { label: 'Wedding Planners', value: kpis.wps, icon: <Crown size={16} />, color: '#8b5cf6', bg: '#f5f3ff' },
+            { label: 'Total contactos', value: kpis.total, icon: <Users size={16} />, color: '#5F6196', bg: '#eef2ff' },
+            { label: 'Con leads activos', value: kpis.withActive, icon: <Heart size={16} />, color: '#AC8B4C', bg: '#F7F3E8' },
+            { label: 'Confirmados', value: kpis.confirmed, icon: <CheckCircle2 size={16} />, color: '#5C8570', bg: '#EDF2ED' },
+            { label: 'Wedding Planners', value: kpis.wps, icon: <Crown size={16} />, color: '#7E72A0', bg: '#F2F1F8' },
           ].map(kpi => (
             <div key={kpi.label} style={{ background: '#fff', borderRadius: 10, border: '1px solid var(--border)', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ width: 38, height: 38, borderRadius: 10, background: kpi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: kpi.color, flexShrink: 0 }}>
@@ -409,19 +409,19 @@ export default function CrmListPage() {
             onClick={() => setShowDuplicates(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', marginBottom: 16,
-              borderRadius: 10, background: '#fffbeb', border: '1px solid #fde68a', cursor: 'pointer',
+              borderRadius: 10, background: '#F7F3E8', border: '1px solid #E2D4AE', cursor: 'pointer',
               transition: 'background .12s',
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#fef3c7')}
-            onMouseLeave={e => (e.currentTarget.style.background = '#fffbeb')}>
-            <AlertTriangle size={18} style={{ color: '#f59e0b', flexShrink: 0 }} />
+            onMouseEnter={e => (e.currentTarget.style.background = '#F3EBD8')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#F7F3E8')}>
+            <AlertTriangle size={18} style={{ color: '#AC8B4C', flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#7A5A2E' }}>
                 {duplicateGroups.length} posible{duplicateGroups.length !== 1 ? 's' : ''} duplicado{duplicateGroups.length !== 1 ? 's' : ''} detectado{duplicateGroups.length !== 1 ? 's' : ''}
               </div>
-              <div style={{ fontSize: 11, color: '#b45309' }}>Click para revisar y fusionar</div>
+              <div style={{ fontSize: 11, color: '#8A6A38' }}>Click para revisar y fusionar</div>
             </div>
-            <Merge size={16} style={{ color: '#f59e0b' }} />
+            <Merge size={16} style={{ color: '#AC8B4C' }} />
           </div>
         )}
 
@@ -550,12 +550,12 @@ export default function CrmListPage() {
                         {CLIENT_TYPE_LABELS[c.client_type]}
                       </span>
                       {parentName && (
-                        <span style={{ fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 999, background: '#f3e8ff', color: '#6b21a8', border: '1px solid #d8b4fe', flexShrink: 0 }}>
+                        <span style={{ fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 999, background: '#f3e8ff', color: '#5A4878', border: '1px solid #d8b4fe', flexShrink: 0 }}>
                           WP: {parentName}
                         </span>
                       )}
                       {isWP && c.couple_count !== undefined && (
-                        <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 999, background: '#f3e8ff', color: '#6b21a8', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 999, background: '#f3e8ff', color: '#5A4878', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
                           <Heart size={9} /> {c.couple_count}
                         </span>
                       )}
@@ -578,18 +578,18 @@ export default function CrmListPage() {
                   <div style={{ flexShrink: 0 }}>
                     {isWP ? (
                       c.couple_count ? (
-                        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: '#f3e8ff', color: '#6b21a8' }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: '#f3e8ff', color: '#5A4878' }}>
                           {c.couple_count} pareja{c.couple_count !== 1 ? 's' : ''}
                         </span>
                       ) : (
                         <span style={{ fontSize: 10, color: '#ccc' }}>Sin parejas</span>
                       )
                     ) : c.active_leads > 0 ? (
-                      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: '#fef3c7', color: '#92400e' }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: '#F3EBD8', color: '#7A5A2E' }}>
                         {c.active_leads} activa{c.active_leads !== 1 ? 's' : ''}
                       </span>
                     ) : ll ? (
-                      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: ll.status === 'won' ? '#dcfce7' : ll.status === 'lost' ? '#fee2e2' : '#f5f5f4', color: STATUS_COLOR[ll.status] ?? '#999' }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: ll.status === 'won' ? '#DDE7DF' : ll.status === 'lost' ? '#F2E2E0' : '#f5f5f4', color: STATUS_COLOR[ll.status] ?? '#999' }}>
                         {STATUS_LABEL[ll.status] ?? ll.status}
                       </span>
                     ) : (
@@ -603,12 +603,12 @@ export default function CrmListPage() {
                     title={hasNotes ? 'Ver/editar notas' : 'Añadir nota'}
                     style={{
                       width: 28, height: 28, borderRadius: 6,
-                      background: hasNotes ? '#fef3c7' : 'var(--cream)',
-                      border: hasNotes ? '1px solid #fde68a' : '1px solid var(--border)',
+                      background: hasNotes ? '#F3EBD8' : 'var(--cream)',
+                      border: hasNotes ? '1px solid #E2D4AE' : '1px solid var(--border)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       cursor: 'pointer', flexShrink: 0,
                     }}>
-                    <StickyNote size={12} style={{ color: hasNotes ? '#92400e' : '#999' }} />
+                    <StickyNote size={12} style={{ color: hasNotes ? '#7A5A2E' : '#999' }} />
                   </button>
 
                   {/* Quick contact actions */}
@@ -616,15 +616,15 @@ export default function CrmListPage() {
                     {c.whatsapp && (
                       <a href={`https://wa.me/${c.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer"
                         onClick={e => e.stopPropagation()} title="WhatsApp"
-                        style={{ width: 28, height: 28, borderRadius: 6, background: '#dcfce7', border: '1px solid #86efac', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
-                        <MessageCircle size={12} style={{ color: '#16a34a' }} />
+                        style={{ width: 28, height: 28, borderRadius: 6, background: '#DDE7DF', border: '1px solid #C3D4C5', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                        <MessageCircle size={12} style={{ color: '#4A6B52' }} />
                       </a>
                     )}
                     {c.email && (
                       <a href={`mailto:${c.email}`}
                         onClick={e => e.stopPropagation()} title="Email"
-                        style={{ width: 28, height: 28, borderRadius: 6, background: '#dbeafe', border: '1px solid #93c5fd', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
-                        <Mail size={12} style={{ color: '#2563eb' }} />
+                        style={{ width: 28, height: 28, borderRadius: 6, background: '#DDE5EF', border: '1px solid #AFC0D2', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                        <Mail size={12} style={{ color: '#47648A' }} />
                       </a>
                     )}
                     {c.phone && (
@@ -682,7 +682,7 @@ export default function CrmListPage() {
             </p>
             {duplicateGroups.map((group, gi) => (
               <div key={gi} style={{ marginBottom: 20, padding: 16, borderRadius: 10, background: '#fafaf8', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#f59e0b', letterSpacing: '0.06em', marginBottom: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#AC8B4C', letterSpacing: '0.06em', marginBottom: 10 }}>
                   {group.reason}
                 </div>
                 {[group.primary, ...group.duplicates].map(c => {

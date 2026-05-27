@@ -18,10 +18,10 @@ export default function CheckoutErrorPage() {
       }}>
         <div style={{
           width: 56, height: 56, borderRadius: '50%', margin: '0 auto 20px',
-          background: 'rgba(239,68,68,0.1)', display: 'flex',
+          background: 'rgba(188,82,73,0.1)', display: 'flex',
           alignItems: 'center', justifyContent: 'center',
         }}>
-          <XCircle size={28} color="#ef4444" />
+          <XCircle size={28} color="#BC5249" />
         </div>
 
         <h1 style={{

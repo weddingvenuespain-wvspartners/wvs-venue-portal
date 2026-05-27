@@ -474,15 +474,15 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
               </div>
               <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
                 <span className={`badge ${S_BADGE[budget.status]}`} style={{ fontSize: 10, padding: '1px 6px' }}>{S_LABEL[budget.status]}</span>
-                {saving && <span style={{ color: '#b45309', marginLeft: 6 }}>· guardando…</span>}
-                {saved && !saving && <span style={{ color: '#16a34a', marginLeft: 6 }}>· guardado</span>}
+                {saving && <span style={{ color: '#8A6A38', marginLeft: 6 }}>· guardando…</span>}
+                {saved && !saving && <span style={{ color: '#4A6B52', marginLeft: 6 }}>· guardado</span>}
               </div>
             </div>
             <button
               type="button"
               onClick={copyUrl}
               title="Copiar URL pública"
-              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: linkCopied ? '#16a34a' : 'var(--warm-gray)', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: linkCopied ? '#4A6B52' : 'var(--warm-gray)', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11 }}
             >
               {linkCopied ? <><Check size={12} /> Copiado</> : <><Link2 size={12} /> URL</>}
             </button>
@@ -737,7 +737,7 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
                 <span>{subtotal.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>
               </div>
               {discountType && discountAmount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#16a34a', marginBottom: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#4A6B52', marginBottom: 4 }}>
                   <span>Descuento</span>
                   <span>-{discountType === 'percent' ? `${discountAmount}%` : discountAmount.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>
                 </div>
@@ -817,7 +817,7 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
                     </div>
                   </div>
                 ))}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 6, fontSize: 11, fontWeight: 600, color: Math.abs(paymentTotal - total) < 0.01 ? '#16a34a' : 'var(--rose)' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 6, fontSize: 11, fontWeight: 600, color: Math.abs(paymentTotal - total) < 0.01 ? '#4A6B52' : 'var(--rose)' }}>
                   Suma: {paymentTotal.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} {Math.abs(paymentTotal - total) >= 0.01 && `(dif: ${(paymentTotal - total).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })})`}
                 </div>
               </>

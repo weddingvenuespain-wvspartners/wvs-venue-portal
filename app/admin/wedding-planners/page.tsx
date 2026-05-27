@@ -54,8 +54,8 @@ const BUDGET_LABEL: Record<string, string> = {
 
 const TABS = [
   { key: 'new',        label: 'Nuevas',      color: '#4A6B52' },
-  { key: 'contacted',  label: 'Contactadas', color: '#3b82f6' },
-  { key: 'accepted',   label: 'Aceptadas',   color: '#22c55e' },
+  { key: 'contacted',  label: 'Contactadas', color: '#4F6D8C' },
+  { key: 'accepted',   label: 'Aceptadas',   color: '#5C7E64' },
   { key: 'cancelled',  label: 'Canceladas',  color: '#6b7280' },
 ] as const
 
@@ -63,8 +63,8 @@ type TabKey = typeof TABS[number]['key']
 
 const STATUS_OPTIONS = [
   { value: 'new',        label: 'Nueva',      color: '#4A6B52' },
-  { value: 'contacted',  label: 'Contactada', color: '#3b82f6' },
-  { value: 'accepted',   label: 'Aceptada',   color: '#22c55e' },
+  { value: 'contacted',  label: 'Contactada', color: '#4F6D8C' },
+  { value: 'accepted',   label: 'Aceptada',   color: '#5C7E64' },
   { value: 'cancelled',  label: 'Cancelada',  color: '#6b7280' },
 ]
 
@@ -236,7 +236,7 @@ export default function WeddingPlannersPage() {
                         <div style={{ fontWeight: 600, color: 'var(--espresso)' }}>{lead.name || '—'}</div>
                         <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
                           {lead.whatsapp_consent && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 10, background: '#dcfce7', fontSize: 9, fontWeight: 600, color: '#16a34a' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 10, background: '#DDE7DF', fontSize: 9, fontWeight: 600, color: '#4A6B52' }}>
                               ✓ WhatsApp
                             </span>
                           )}

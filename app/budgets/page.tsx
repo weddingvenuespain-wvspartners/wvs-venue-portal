@@ -276,12 +276,12 @@ export default function BudgetsPage() {
                             const paidPct = Math.round((paidCount / plan.length) * 100)
                             return (
                               <div style={{ minWidth: 80, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                                <CreditCard size={11} style={{ color: paidPct === 100 ? '#16a34a' : 'var(--warm-gray)', flexShrink: 0 }} />
+                                <CreditCard size={11} style={{ color: paidPct === 100 ? '#4A6B52' : 'var(--warm-gray)', flexShrink: 0 }} />
                                 <div style={{ flex: 1 }}>
                                   <div style={{ height: 4, background: 'var(--ivory)', borderRadius: 2, overflow: 'hidden' }}>
-                                    <div style={{ height: '100%', width: `${paidPct}%`, background: paidPct === 100 ? '#16a34a' : 'var(--gold)', borderRadius: 2 }} />
+                                    <div style={{ height: '100%', width: `${paidPct}%`, background: paidPct === 100 ? '#4A6B52' : 'var(--gold)', borderRadius: 2 }} />
                                   </div>
-                                  <div style={{ color: paidPct === 100 ? '#16a34a' : 'var(--warm-gray)', marginTop: 1 }}>{paidCount}/{plan.length}</div>
+                                  <div style={{ color: paidPct === 100 ? '#4A6B52' : 'var(--warm-gray)', marginTop: 1 }}>{paidCount}/{plan.length}</div>
                                 </div>
                               </div>
                             )
@@ -297,7 +297,7 @@ export default function BudgetsPage() {
                             <button onClick={() => router.push(`/budgets/${b.id}/edit`)} className="btn btn-ghost btn-sm" title="Editar"><Pencil size={13} /></button>
                             <button onClick={() => setSendModal(b)} className="btn btn-ghost btn-sm" title="Enviar"><Send size={13} /></button>
                             <button onClick={() => copyLink(b.slug)} className="btn btn-ghost btn-sm" title="Copiar enlace">
-                              {copied === b.slug ? <Check size={13} style={{ color: '#16a34a' }} /> : <Copy size={13} />}
+                              {copied === b.slug ? <Check size={13} style={{ color: '#4A6B52' }} /> : <Copy size={13} />}
                             </button>
                             <button onClick={() => handleDuplicate(b)} className="btn btn-ghost btn-sm" title="Duplicar"><Copy size={13} style={{ opacity: 0.5 }} /></button>
                             <button onClick={() => handleDelete(b.id)} className="btn btn-ghost btn-sm" title="Eliminar"><Trash2 size={13} style={{ color: 'var(--rose)' }} /></button>
@@ -375,18 +375,18 @@ export default function BudgetsPage() {
                   <div style={{ marginBottom: 14 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Plan de pagos</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: paidCount === plan.length ? '#16a34a' : 'var(--espresso)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: paidCount === plan.length ? '#4A6B52' : 'var(--espresso)' }}>
                         {paidCount}/{plan.length} cuotas
                       </div>
                     </div>
                     <div style={{ height: 6, background: 'var(--ivory)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
-                      <div style={{ height: '100%', width: `${plan.length > 0 ? (paidCount / plan.length) * 100 : 0}%`, background: paidCount === plan.length ? '#16a34a' : 'var(--gold)', borderRadius: 3 }} />
+                      <div style={{ height: '100%', width: `${plan.length > 0 ? (paidCount / plan.length) * 100 : 0}%`, background: paidCount === plan.length ? '#4A6B52' : 'var(--gold)', borderRadius: 3 }} />
                     </div>
                     {plan.map((inst: any, idx: number) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, background: inst.status === 'paid' ? '#f0fdf4' : 'var(--cream)', border: `1px solid ${inst.status === 'paid' ? '#86efac' : 'var(--ivory)'}`, marginBottom: 4 }}>
-                        {inst.status === 'paid' ? <CheckCircle size={12} style={{ color: '#16a34a', flexShrink: 0 }} /> : <Clock size={12} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, background: inst.status === 'paid' ? '#EEF2EC' : 'var(--cream)', border: `1px solid ${inst.status === 'paid' ? '#C3D4C5' : 'var(--ivory)'}`, marginBottom: 4 }}>
+                        {inst.status === 'paid' ? <CheckCircle size={12} style={{ color: '#4A6B52', flexShrink: 0 }} /> : <Clock size={12} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
                         <div style={{ flex: 1, fontSize: 12, color: 'var(--charcoal)' }}>{inst.label}</div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: inst.status === 'paid' ? '#16a34a' : 'var(--espresso)' }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: inst.status === 'paid' ? '#4A6B52' : 'var(--espresso)' }}>
                           {Number(inst.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
                         </div>
                         {inst.due_date && <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{new Date(inst.due_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div>}
@@ -404,9 +404,9 @@ export default function BudgetsPage() {
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Historial de pagos</div>
                     {detailPayments.map(pay => (
                       <div key={pay.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 11, borderBottom: '1px solid var(--ivory)' }}>
-                        <CheckCircle size={10} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <CheckCircle size={10} style={{ color: '#4A6B52', flexShrink: 0 }} />
                         <div style={{ flex: 1, color: 'var(--charcoal)' }}>{pay.payer_name || pay.payer_email || 'Pago'}</div>
-                        <div style={{ fontWeight: 600, color: '#16a34a' }}>{Number(pay.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
+                        <div style={{ fontWeight: 600, color: '#4A6B52' }}>{Number(pay.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
                         {pay.paid_at && <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{new Date(pay.paid_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div>}
                       </div>
                     ))}
@@ -551,7 +551,7 @@ function PaymentTemplatesTab({ templates, userId, venueId, onRefresh }: {
           ))}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
             <button onClick={() => setInstallments(prev => [...prev, { label: '', percent: 0, due_rule: 'months_before', months: 1 }])} className="btn btn-ghost btn-sm"><Plus size={11} /> Añadir cuota</button>
-            <span style={{ fontSize: 11, color: totalPercent === 100 ? '#16a34a' : 'var(--rose)', fontWeight: 600 }}>Total: {totalPercent}%</span>
+            <span style={{ fontSize: 11, color: totalPercent === 100 ? '#4A6B52' : 'var(--rose)', fontWeight: 600 }}>Total: {totalPercent}%</span>
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
             <button className="btn btn-ghost" onClick={cancel}>Cancelar</button>
@@ -578,7 +578,7 @@ function PaymentTemplatesTab({ templates, userId, venueId, onRefresh }: {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>{t.name}</div>
-                    {t.is_default && <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', padding: '1px 8px', borderRadius: 10, fontWeight: 600 }}>Predeterminada</span>}
+                    {t.is_default && <span style={{ fontSize: 10, background: '#F3EBD8', color: '#7A5A2E', padding: '1px 8px', borderRadius: 10, fontWeight: 600 }}>Predeterminada</span>}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2 }}>
                     {t.installments.length} cuota{t.installments.length !== 1 ? 's' : ''}: {(t.installments as any[]).map((i: any) => `${i.percent}%`).join(' / ')}
@@ -681,7 +681,7 @@ function StructureTemplatesTab({ templates, userId, venueId, onRefresh }: {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>{tpl.name}</div>
-                      {tpl.is_default && <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', padding: '1px 8px', borderRadius: 10, fontWeight: 600 }}>Predeterminada</span>}
+                      {tpl.is_default && <span style={{ fontSize: 10, background: '#F3EBD8', color: '#7A5A2E', padding: '1px 8px', borderRadius: 10, fontWeight: 600 }}>Predeterminada</span>}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2, display: 'flex', gap: 10 }}>
                       <span>{groupCount} grupo{groupCount !== 1 ? 's' : ''}</span>
@@ -756,13 +756,13 @@ function SendBudgetModal({ budget, leads, onClose }: {
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Seleccionar lead (opcional)</div>
             {lead ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8 }}>
-                <User size={14} style={{ color: '#16a34a' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#EEF2EC', border: '1px solid #C3D4C5', borderRadius: 8 }}>
+                <User size={14} style={{ color: '#4A6B52' }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#15803d' }}>{lead.name}</div>
-                  <div style={{ fontSize: 11, color: '#16a34a' }}>{lead.phone || lead.email || 'Sin contacto'}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#3C5945' }}>{lead.name}</div>
+                  <div style={{ fontSize: 11, color: '#4A6B52' }}>{lead.phone || lead.email || 'Sin contacto'}</div>
                 </div>
-                <button onClick={() => setLead(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a' }}><X size={12} /></button>
+                <button onClick={() => setLead(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4A6B52' }}><X size={12} /></button>
               </div>
             ) : (
               <div>
@@ -793,16 +793,16 @@ function SendBudgetModal({ budget, leads, onClose }: {
           {/* Send buttons */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <a href={waLink} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#16a34a', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#4A6B52', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
               <MessageCircle size={16} /> Enviar por WhatsApp
             </a>
             <a href={emailLink} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#2563eb', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#47648A', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
               <Mail size={16} /> Enviar por email
             </a>
             <button onClick={copyLink}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'var(--cream)', color: 'var(--charcoal)', border: '1px solid var(--ivory)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-              {copied ? <><Check size={16} style={{ color: '#16a34a' }} /> ¡Enlace copiado!</> : <><Link2 size={16} /> Copiar enlace del presupuesto</>}
+              {copied ? <><Check size={16} style={{ color: '#4A6B52' }} /> ¡Enlace copiado!</> : <><Link2 size={16} /> Copiar enlace del presupuesto</>}
             </button>
           </div>
         </div>

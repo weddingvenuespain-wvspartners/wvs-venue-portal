@@ -54,13 +54,13 @@ export default function CateringDashboard() {
 
   const kpis = [
     { label: 'Solicitudes recibidas', value: stats.total,   color: 'var(--gold)',  icon: <Users size={18} /> },
-    { label: 'Nuevas solicitudes',    value: stats.new,     color: '#ef4444',      icon: <Clock size={18} /> },
-    { label: 'En proceso',            value: stats.pending, color: '#3b82f6',      icon: <TrendingUp size={18} /> },
-    { label: 'Confirmadas',           value: stats.won,     color: '#22c55e',      icon: <CheckCircle size={18} /> },
+    { label: 'Nuevas solicitudes',    value: stats.new,     color: '#BC5249',      icon: <Clock size={18} /> },
+    { label: 'En proceso',            value: stats.pending, color: '#4F6D8C',      icon: <TrendingUp size={18} /> },
+    { label: 'Confirmadas',           value: stats.won,     color: '#5C7E64',      icon: <CheckCircle size={18} /> },
   ]
 
   const STATUS_LABEL: Record<string, string> = { new: 'Nuevo', contacted: 'Contactado', won: 'Confirmado', lost: 'Perdido' }
-  const STATUS_COLOR: Record<string, string>  = { new: '#ef4444', contacted: '#3b82f6', won: '#22c55e', lost: 'var(--warm-gray)' }
+  const STATUS_COLOR: Record<string, string>  = { new: '#BC5249', contacted: '#4F6D8C', won: '#5C7E64', lost: 'var(--warm-gray)' }
 
   return (
     <div style={{ display: 'flex' }}>
@@ -116,8 +116,8 @@ export default function CateringDashboard() {
             </div>
           ) : recentLeads.map((l: any) => (
             <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 24px', borderBottom: '1px solid var(--ivory)' }}>
-              <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(34,197,94,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Users size={15} color="#16a34a" />
+              <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(92,126,100,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Users size={15} color="#4A6B52" />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)' }}>{l.name}</div>

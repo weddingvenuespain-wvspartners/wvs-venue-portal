@@ -48,9 +48,9 @@ function expandAnchorsWithRules(anchors: string[], rules: any): string[] {
 }
 
 const CAL_AVAIL_CFG: Record<string, { bg: string; border: string; dot: string; label: string }> = {
-  libre:       { bg: '#fff',    border: '#e5e7eb', dot: '#d1fae5', label: 'Libre' },
-  negociacion: { bg: '#fef9ec', border: '#fde68a', dot: '#f59e0b', label: 'En negociación' },
-  reservado:   { bg: '#fee2e2', border: '#fca5a5', dot: '#ef4444', label: 'Reservado' },
+  libre:       { bg: '#fff',    border: '#e5e7eb', dot: '#DCE7DE', label: 'Libre' },
+  negociacion: { bg: '#F6F1E4', border: '#E2D4AE', dot: '#AC8B4C', label: 'En negociación' },
+  reservado:   { bg: '#F2E2E0', border: '#E0C2BD', dot: '#BC5249', label: 'Reservado' },
   bloqueado:   { bg: '#e5e7eb', border: '#9ca3af', dot: '#6b7280', label: 'Bloqueado' },
 }
 
@@ -175,7 +175,7 @@ export default function ProposalDateModal({
         <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#f0f4ff,#e8eeff)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CalendarDays size={17} style={{ color: '#4f6ef7' }} />
+              <CalendarDays size={17} style={{ color: '#5566A0' }} />
             </div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)' }}>Seleccionar fecha de boda</div>
@@ -240,7 +240,7 @@ export default function ProposalDateModal({
                 const canClick      = !isPast && !isUnavailable
 
                 const bg = isBufferDay ? '#fdf6ee'
-                  : isSelected ? '#fef3c7'
+                  : isSelected ? '#F3EBD8'
                   : isHalfDay ? `linear-gradient(135deg, ${cfg.bg} 50%, #ffffff 50%)`
                   : isPast ? '#faf8f5'
                   : isUnavailable ? cfg.bg
@@ -248,10 +248,10 @@ export default function ProposalDateModal({
                   : isWeekend ? '#faf7f4'
                   : '#fff'
 
-                const shadow = isUnavailable && entryStatus === 'reservado' ? 'inset 0 0 0 2px #f87171'
+                const shadow = isUnavailable && entryStatus === 'reservado' ? 'inset 0 0 0 2px #C97D75'
                   : isUnavailable && entryStatus === 'bloqueado' ? 'inset 0 0 0 2px #9ca3af'
-                  : isBufferDay ? 'inset 0 0 0 1.5px #f59e0b'
-                  : isAnchor ? 'inset 0 0 0 2px #d97706'
+                  : isBufferDay ? 'inset 0 0 0 1.5px #AC8B4C'
+                  : isAnchor ? 'inset 0 0 0 2px #9A7A40'
                   : rangeMode && rangeStart === ds ? 'inset 0 0 0 2.5px var(--gold)'
                   : isToday ? 'inset 0 0 0 2px var(--gold)'
                   : 'none'
@@ -280,7 +280,7 @@ export default function ProposalDateModal({
                     <span style={{
                       fontSize: 14, fontWeight: isToday ? 700 : 500, lineHeight: 1,
                       color: isPast ? 'var(--stone)'
-                        : isBufferDay || isAnchor ? '#92400e'
+                        : isBufferDay || isAnchor ? '#7A5A2E'
                         : isToday ? 'var(--gold)'
                         : isWeekend ? 'var(--gold)'
                         : 'var(--charcoal)',
@@ -293,12 +293,12 @@ export default function ProposalDateModal({
                       )}
                     </div>
                     {isBufferDay && (
-                      <div style={{ position: 'absolute', top: 2, right: 2, width: 13, height: 13, borderRadius: '50%', background: '#f59e0b', opacity: 0.55, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ position: 'absolute', top: 2, right: 2, width: 13, height: 13, borderRadius: '50%', background: '#AC8B4C', opacity: 0.55, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, lineHeight: 1 }}>+</span>
                       </div>
                     )}
                     {isAnchor && (
-                      <div style={{ position: 'absolute', top: 2, right: 2, width: 14, height: 14, borderRadius: '50%', background: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ position: 'absolute', top: 2, right: 2, width: 14, height: 14, borderRadius: '50%', background: '#9A7A40', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>✓</span>
                       </div>
                     )}
@@ -311,10 +311,10 @@ export default function ProposalDateModal({
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginTop: 12, fontSize: 10, color: 'var(--warm-gray)' }}>
               {[
                 { color: '#fff', border: '1px solid #e5e7eb', label: 'Libre' },
-                { color: '#fee2e2', border: '1px solid #fca5a5', label: 'Reservado' },
+                { color: '#F2E2E0', border: '1px solid #E0C2BD', label: 'Reservado' },
                 { color: '#e5e7eb', border: '1px solid #9ca3af', label: 'Bloqueado' },
-                { color: '#fef9ec', border: '1px solid #fde68a', label: 'Negociación' },
-                { color: '#fef3c7', border: '1px solid #d97706', label: 'Seleccionada' },
+                { color: '#F6F1E4', border: '1px solid #E2D4AE', label: 'Negociación' },
+                { color: '#F3EBD8', border: '1px solid #9A7A40', label: 'Seleccionada' },
               ].map(item => (
                 <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <div style={{ width: 12, height: 12, borderRadius: 3, background: item.color, border: item.border }} />
@@ -334,7 +334,7 @@ export default function ProposalDateModal({
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
             <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
             <button className="btn btn-primary" onClick={() => onConfirm(selectedAnchors)}
-              style={{ background: '#4f6ef7' }}>
+              style={{ background: '#5566A0' }}>
               <CalendarDays size={13} /> Guardar fecha{selectedAnchors.length !== 1 ? 's' : ''}
             </button>
           </div>

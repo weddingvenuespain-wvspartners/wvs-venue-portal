@@ -8,7 +8,7 @@ import { FileText, Plus, Send, Eye, Clock, Copy, CheckCircle } from 'lucide-reac
 import { DatePicker } from '@/components/ui/date-picker'
 
 const STATUS_LABEL: Record<string, string> = { draft: 'Borrador', sent: 'Enviada', viewed: 'Vista', expired: 'Expirada' }
-const STATUS_COLOR: Record<string, string>  = { draft: 'var(--warm-gray)', sent: '#f59e0b', viewed: '#22c55e', expired: '#ef4444' }
+const STATUS_COLOR: Record<string, string>  = { draft: 'var(--warm-gray)', sent: '#AC8B4C', viewed: '#5C7E64', expired: '#BC5249' }
 
 export default function CateringPropuestasPage() {
   const router = useRouter()
@@ -139,7 +139,7 @@ export default function CateringPropuestasPage() {
                   </span>
                   <button onClick={() => copyLink(p.slug, p.id)}
                     style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--charcoal)' }}>
-                    {copiedId === p.id ? <CheckCircle size={12} color="#22c55e" /> : <Copy size={12} />}
+                    {copiedId === p.id ? <CheckCircle size={12} color="#5C7E64" /> : <Copy size={12} />}
                     {copiedId === p.id ? 'Copiado' : 'Enlace'}
                   </button>
                 </div>
@@ -157,7 +157,7 @@ export default function CateringPropuestasPage() {
           <div style={{ background: '#fff', borderRadius: 16, padding: '28px 32px', width: '100%', maxWidth: 460 }}>
             <h2 style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 20 }}>Nueva propuesta</h2>
 
-            {formError && <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 16 }}>{formError}</div>}
+            {formError && <div style={{ background: 'rgba(188,82,73,0.08)', border: '1px solid rgba(188,82,73,0.2)', borderRadius: 8, padding: '10px 14px', color: '#B0473E', fontSize: 13, marginBottom: 16 }}>{formError}</div>}
 
             <form onSubmit={handleCreate}>
               <div style={{ marginBottom: 14 }}>

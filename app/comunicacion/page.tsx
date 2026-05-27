@@ -133,7 +133,7 @@ const SECTION_RELEVANCE: Record<string, Partial<Record<PricingModel, SectionRele
 }
 
 const RELEVANCE_BADGE: Record<SectionRelevance, { label: string; color: string; bg: string }> = {
-  key:      { label: '🔑 Clave',    color: '#92400e', bg: '#fef3c7' },
+  key:      { label: '🔑 Clave',    color: '#7A5A2E', bg: '#F3EBD8' },
   optional: { label: '⚪ Opcional', color: '#6b7280', bg: '#f3f4f6' },
   na:       { label: '🚫 No aplica', color: '#9ca3af', bg: '#f9fafb' },
 }
@@ -738,9 +738,9 @@ function MessagesTab({ templates, leads, userId, venueId, onRefresh }: {
   const visible = filterCh === 'all' ? templates : templates.filter(t => t.channel === filterCh || t.channel === 'both')
 
   const CH_CFG = {
-    whatsapp: { label: 'WhatsApp', color: '#16a34a', bg: '#dcfce7', icon: <MessageCircle size={12} /> },
-    email:    { label: 'Email',    color: '#2563eb', bg: '#dbeafe', icon: <Mail size={12} /> },
-    both:     { label: 'Ambos',    color: '#7c3aed', bg: '#ede9fe', icon: <Sparkles size={12} /> },
+    whatsapp: { label: 'WhatsApp', color: '#4A6B52', bg: '#DDE7DF', icon: <MessageCircle size={12} /> },
+    email:    { label: 'Email',    color: '#47648A', bg: '#DDE5EF', icon: <Mail size={12} /> },
+    both:     { label: 'Ambos',    color: '#6A5B95', bg: '#E9E6F3', icon: <Sparkles size={12} /> },
   }
 
   return (
@@ -778,7 +778,7 @@ function MessagesTab({ templates, leads, userId, venueId, onRefresh }: {
             return (
               <div key={t.id} onClick={() => openEdit(t)} style={{
                 padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--ivory)',
-                background: isActive ? '#fef9ec' : '#fff',
+                background: isActive ? '#F6F1E4' : '#fff',
                 borderLeft: isActive ? '2px solid var(--gold)' : '2px solid transparent',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -815,7 +815,7 @@ function MessagesTab({ templates, leads, userId, venueId, onRefresh }: {
                   <button onClick={() => setSendModal(selected)} className="btn btn-ghost btn-sm">
                     <Send size={12} /> Enviar
                   </button>
-                  <button onClick={() => handleDelete(selected.id)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}>
+                  <button onClick={() => handleDelete(selected.id)} style={{ fontSize: 12, color: '#B0473E', background: 'none', border: '1px solid #E0C2BD', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}>
                     <Trash2 size={12} />
                   </button>
                 </>
@@ -864,7 +864,7 @@ function MessagesTab({ templates, leads, userId, venueId, onRefresh }: {
             <div className="form-group" style={{ marginBottom: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <label className="form-label" style={{ marginBottom: 0 }}>Mensaje</label>
-                <span style={{ fontSize: 10, color: form.body.length > 900 ? '#dc2626' : 'var(--stone)' }}>{form.body.length} caracteres</span>
+                <span style={{ fontSize: 10, color: form.body.length > 900 ? '#B0473E' : 'var(--stone)' }}>{form.body.length} caracteres</span>
               </div>
               <textarea ref={bodyRef} className="form-textarea" style={{ minHeight: 180, fontFamily: 'monospace', fontSize: 12 }}
                 value={form.body} onChange={e => setF('body', e.target.value)}
@@ -986,13 +986,13 @@ function SendMsgModal({ template, leads, onClose }: {
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>1. Seleccionar lead</div>
             {lead ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, marginBottom: 10 }}>
-                <User size={14} style={{ color: '#16a34a' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#EEF2EC', border: '1px solid #C3D4C5', borderRadius: 8, marginBottom: 10 }}>
+                <User size={14} style={{ color: '#4A6B52' }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#15803d' }}>{lead.name}</div>
-                  <div style={{ fontSize: 11, color: '#16a34a' }}>{lead.phone || lead.email || 'Sin contacto'}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#3C5945' }}>{lead.name}</div>
+                  <div style={{ fontSize: 11, color: '#4A6B52' }}>{lead.phone || lead.email || 'Sin contacto'}</div>
                 </div>
-                <button onClick={() => setLead(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a' }}><X size={12} /></button>
+                <button onClick={() => setLead(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4A6B52' }}><X size={12} /></button>
               </div>
             ) : (
               <div style={{ position: 'relative', marginBottom: 8 }}>
@@ -1035,14 +1035,14 @@ function SendMsgModal({ template, leads, onClose }: {
           {/* Preview */}
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Vista previa</div>
-            <div style={{ background: '#f0fdf4', borderRadius: 12, padding: '14px', fontSize: 12, lineHeight: 1.8, whiteSpace: 'pre-wrap', minHeight: 180, color: '#1a1a1a', border: '1px solid #bbf7d0', marginBottom: 12 }}>
+            <div style={{ background: '#EEF2EC', borderRadius: 12, padding: '14px', fontSize: 12, lineHeight: 1.8, whiteSpace: 'pre-wrap', minHeight: 180, color: '#1a1a1a', border: '1px solid #D2DFD3', marginBottom: 12 }}>
               {preview}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {(template.channel === 'whatsapp' || template.channel === 'both') && (
                 <a href={waLink} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#16a34a', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#4A6B52', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
                   <MessageCircle size={15} />
                   Abrir en WhatsApp
                   {lead?.phone && <span style={{ fontSize: 11, opacity: 0.8, marginLeft: 4 }}>{lead.phone}</span>}
@@ -1050,7 +1050,7 @@ function SendMsgModal({ template, leads, onClose }: {
               )}
               {(template.channel === 'email' || template.channel === 'both') && (
                 <a href={emailLink} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#2563eb', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#47648A', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
                   <Mail size={15} />
                   Abrir en email
                   {lead?.email && <span style={{ fontSize: 11, opacity: 0.8, marginLeft: 4 }}>{lead.email}</span>}
@@ -1058,7 +1058,7 @@ function SendMsgModal({ template, leads, onClose }: {
               )}
               <button onClick={copyText}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: 'var(--cream)', color: 'var(--charcoal)', border: '1px solid var(--ivory)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
-                {copied ? <><Check size={14} style={{ color: '#16a34a' }} /> ¡Copiado!</> : <><Copy size={14} /> Copiar texto</>}
+                {copied ? <><Check size={14} style={{ color: '#4A6B52' }} /> ¡Copiado!</> : <><Copy size={14} /> Copiar texto</>}
               </button>
             </div>
           </div>
@@ -1149,16 +1149,16 @@ function DossierTab({ dossiers, leads, userId, venueId, onRefresh }: {
             onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f?.type === 'application/pdf') handleUpload(f) }}
             style={{
               border: '2px dashed var(--gold)', borderRadius: 10, padding: '28px', textAlign: 'center',
-              cursor: 'pointer', background: '#fef9ec', marginBottom: 16,
+              cursor: 'pointer', background: '#F6F1E4', marginBottom: 16,
             }}>
             <input ref={fileRef} type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f) }} />
             {uploading ? (
               <div style={{ color: 'var(--warm-gray)', fontSize: 13 }}>Subiendo...</div>
             ) : newForm.file_url ? (
               <div>
-                <Check size={24} style={{ color: '#16a34a', margin: '0 auto 8px' }} />
-                <div style={{ fontSize: 13, color: '#15803d', fontWeight: 500 }}>PDF subido correctamente</div>
-                <div style={{ fontSize: 11, color: '#16a34a', marginTop: 4 }}>Click para cambiar archivo</div>
+                <Check size={24} style={{ color: '#4A6B52', margin: '0 auto 8px' }} />
+                <div style={{ fontSize: 13, color: '#3C5945', fontWeight: 500 }}>PDF subido correctamente</div>
+                <div style={{ fontSize: 11, color: '#4A6B52', marginTop: 4 }}>Click para cambiar archivo</div>
               </div>
             ) : (
               <div>
@@ -1210,14 +1210,14 @@ function DossierTab({ dossiers, leads, userId, venueId, onRefresh }: {
             <div key={d.id} className="card">
               <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
                 {/* Icon */}
-                <div style={{ width: 44, height: 44, borderRadius: 10, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <FileText size={20} style={{ color: '#92400e' }} />
+                <div style={{ width: 44, height: 44, borderRadius: 10, background: '#F3EBD8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FileText size={20} style={{ color: '#7A5A2E' }} />
                 </div>
                 {/* Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>{d.name}</div>
-                    {d.is_default && <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', padding: '1px 8px', borderRadius: 10, fontWeight: 600 }}>Predeterminado</span>}
+                    {d.is_default && <span style={{ fontSize: 10, background: '#F3EBD8', color: '#7A5A2E', padding: '1px 8px', borderRadius: 10, fontWeight: 600 }}>Predeterminado</span>}
                   </div>
                   {d.description && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 4 }}>{d.description}</div>}
                   <div style={{ fontSize: 11, color: 'var(--stone)' }}>
@@ -1241,7 +1241,7 @@ function DossierTab({ dossiers, leads, userId, venueId, onRefresh }: {
                     </button>
                   )}
                   <button onClick={() => handleDelete(d.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '7px 12px', borderRadius: 7, border: '1px solid #fca5a5', color: '#dc2626', background: '#fff', cursor: 'pointer' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '7px 12px', borderRadius: 7, border: '1px solid #E0C2BD', color: '#B0473E', background: '#fff', cursor: 'pointer' }}>
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -1302,13 +1302,13 @@ function SendDossierModal({ dossier, leads, onClose }: {
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Seleccionar lead (opcional)</div>
             {lead ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8 }}>
-                <User size={14} style={{ color: '#16a34a' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#EEF2EC', border: '1px solid #C3D4C5', borderRadius: 8 }}>
+                <User size={14} style={{ color: '#4A6B52' }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#15803d' }}>{lead.name}</div>
-                  <div style={{ fontSize: 11, color: '#16a34a' }}>{lead.phone || lead.email || 'Sin contacto'}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#3C5945' }}>{lead.name}</div>
+                  <div style={{ fontSize: 11, color: '#4A6B52' }}>{lead.phone || lead.email || 'Sin contacto'}</div>
                 </div>
-                <button onClick={() => setLead(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a' }}><X size={12} /></button>
+                <button onClick={() => setLead(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4A6B52' }}><X size={12} /></button>
               </div>
             ) : (
               <div>
@@ -1340,7 +1340,7 @@ function SendDossierModal({ dossier, leads, onClose }: {
           {/* Send buttons */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <a href={waLink} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#16a34a', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#4A6B52', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
               <MessageCircle size={16} />
               <div>
                 <div>Enviar por WhatsApp</div>
@@ -1348,7 +1348,7 @@ function SendDossierModal({ dossier, leads, onClose }: {
               </div>
             </a>
             <a href={emailLink} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#2563eb', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#47648A', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
               <Mail size={16} />
               <div>
                 <div>Enviar por email</div>
@@ -1357,7 +1357,7 @@ function SendDossierModal({ dossier, leads, onClose }: {
             </a>
             <button onClick={copyLink}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'var(--cream)', color: 'var(--charcoal)', border: '1px solid var(--ivory)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-              {copied ? <><Check size={16} style={{ color: '#16a34a' }} /> ¡Enlace copiado!</> : <><Link2 size={16} /> Copiar enlace del PDF</>}
+              {copied ? <><Check size={16} style={{ color: '#4A6B52' }} /> ¡Enlace copiado!</> : <><Link2 size={16} /> Copiar enlace del PDF</>}
             </button>
           </div>
         </div>

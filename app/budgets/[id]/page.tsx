@@ -245,7 +245,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
               <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--espresso)', lineHeight: 1 }}>{fmtEur(budget.total_amount)}</div>
               <div style={{ display: 'flex', gap: 6, marginTop: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button onClick={copyLink} className="btn btn-ghost btn-sm" title="Copiar enlace">
-                  {copied ? <Check size={13} style={{ color: '#16a34a' }} /> : <Copy size={13} />}
+                  {copied ? <Check size={13} style={{ color: '#4A6B52' }} /> : <Copy size={13} />}
                   {copied ? 'Copiado' : 'Enlace'}
                 </button>
                 <a href={`/presupuesto/${budget.slug}`} target="_blank" rel="noopener" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
@@ -268,12 +268,12 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
             <div style={{ marginTop: 18 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)' }}>Progreso de pagos</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: paidCount === plan.length ? '#16a34a' : 'var(--espresso)' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: paidCount === plan.length ? '#4A6B52' : 'var(--espresso)' }}>
                   {fmtEur(totalPaid)} / {fmtEur(budget.total_amount)}
                 </span>
               </div>
               <div style={{ height: 8, background: 'var(--ivory)', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${budget.total_amount > 0 ? Math.min(100, (totalPaid / budget.total_amount) * 100) : 0}%`, background: paidCount === plan.length ? '#16a34a' : 'var(--gold)', borderRadius: 4, transition: 'width 0.3s' }} />
+                <div style={{ height: '100%', width: `${budget.total_amount > 0 ? Math.min(100, (totalPaid / budget.total_amount) * 100) : 0}%`, background: paidCount === plan.length ? '#4A6B52' : 'var(--gold)', borderRadius: 4, transition: 'width 0.3s' }} />
               </div>
             </div>
           )}
@@ -330,7 +330,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
                   <span>Subtotal</span><span>{fmtEur(subtotal)}</span>
                 </div>
                 {budget.discount_type && budget.discount_amount && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#dc2626', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#B0473E', marginBottom: 4 }}>
                     <span>{budget.discount_label || 'Descuento'}</span>
                     <span>-{budget.discount_type === 'percent' ? `${budget.discount_amount}%` : fmtEur(budget.discount_amount)}</span>
                   </div>
@@ -365,9 +365,9 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Plan de pagos</div>
                   {plan.map((inst, idx) => (
                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: idx < plan.length - 1 ? '1px solid #f5f5f0' : 'none' }}>
-                      {inst.status === 'paid' ? <CheckCircle size={13} style={{ color: '#16a34a', flexShrink: 0 }} /> : <Clock size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
+                      {inst.status === 'paid' ? <CheckCircle size={13} style={{ color: '#4A6B52', flexShrink: 0 }} /> : <Clock size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
                       <div style={{ flex: 1, fontSize: 12, color: 'var(--charcoal)' }}>{inst.label}</div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: inst.status === 'paid' ? '#16a34a' : 'var(--espresso)' }}>{fmtEur(inst.amount)}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: inst.status === 'paid' ? '#4A6B52' : 'var(--espresso)' }}>{fmtEur(inst.amount)}</div>
                     </div>
                   ))}
                 </div>
@@ -379,7 +379,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Timeline</div>
                   {timelineEvents.map((ev, idx) => (
                     <div key={idx} style={{ display: 'flex', gap: 10, padding: '6px 0', borderBottom: idx < timelineEvents.length - 1 ? '1px solid #f5f5f0' : 'none' }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 4, flexShrink: 0, background: ev.type === 'payment' ? '#16a34a' : ev.type === 'invoice' ? 'var(--gold)' : ev.type === 'contract' ? '#2563EB' : 'var(--warm-gray)' }} />
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 4, flexShrink: 0, background: ev.type === 'payment' ? '#4A6B52' : ev.type === 'invoice' ? 'var(--gold)' : ev.type === 'contract' ? '#47648A' : 'var(--warm-gray)' }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 12, color: 'var(--charcoal)' }}>{ev.label}</div>
                         <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{fmtDateShort(ev.date)}</div>
@@ -452,18 +452,18 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
                       return (
                         <div key={idx} className="card" style={{ padding: '18px 24px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: instPayments.length > 0 ? 10 : 0 }}>
-                            {inst.status === 'paid' ? <CheckCircle size={18} style={{ color: '#16a34a', flexShrink: 0 }} /> : <Clock size={18} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
+                            {inst.status === 'paid' ? <CheckCircle size={18} style={{ color: '#4A6B52', flexShrink: 0 }} /> : <Clock size={18} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />}
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)' }}>{inst.label}</div>
                               <div style={{ fontSize: 11, color: 'var(--warm-gray)', display: 'flex', gap: 10, marginTop: 2 }}>
                                 {inst.due_date && <span>Vence: {fmtDate(inst.due_date + 'T12:00:00')}</span>}
-                                {inst.refundable && inst.refund_deadline && <span style={{ color: '#16a34a' }}>Reembolsable hasta {fmtDateShort(inst.refund_deadline + 'T12:00:00')}</span>}
-                                {inst.refundable === false && <span style={{ color: '#dc2626' }}>No reembolsable</span>}
+                                {inst.refundable && inst.refund_deadline && <span style={{ color: '#4A6B52' }}>Reembolsable hasta {fmtDateShort(inst.refund_deadline + 'T12:00:00')}</span>}
+                                {inst.refundable === false && <span style={{ color: '#B0473E' }}>No reembolsable</span>}
                               </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontSize: 18, fontWeight: 800, color: inst.status === 'paid' ? '#16a34a' : 'var(--espresso)' }}>{fmtEur(inst.amount)}</div>
-                              {inst.status === 'paid' && <div style={{ fontSize: 10, color: '#16a34a', fontWeight: 600 }}>Pagado</div>}
+                              <div style={{ fontSize: 18, fontWeight: 800, color: inst.status === 'paid' ? '#4A6B52' : 'var(--espresso)' }}>{fmtEur(inst.amount)}</div>
+                              {inst.status === 'paid' && <div style={{ fontSize: 10, color: '#4A6B52', fontWeight: 600 }}>Pagado</div>}
                               {inst.status !== 'paid' && instPaid > 0 && <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{fmtEur(instPaid)} pagado</div>}
                             </div>
                           </div>
@@ -472,9 +472,9 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
                               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Pagos realizados</div>
                               {instPayments.map(pay => (
                                 <div key={pay.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', fontSize: 12, borderBottom: '1px solid #f5f5f0' }}>
-                                  <CheckCircle size={11} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                  <CheckCircle size={11} style={{ color: '#4A6B52', flexShrink: 0 }} />
                                   <div style={{ flex: 1, color: 'var(--charcoal)' }}>{pay.payer_name || pay.payer_email || 'Pago'}</div>
-                                  <div style={{ fontWeight: 600, color: '#16a34a' }}>{fmtEur(pay.amount)}</div>
+                                  <div style={{ fontWeight: 600, color: '#4A6B52' }}>{fmtEur(pay.amount)}</div>
                                   {pay.paid_at && <div style={{ fontSize: 10, color: 'var(--warm-gray)', minWidth: 80, textAlign: 'right' }}>{fmtDateShort(pay.paid_at)}</div>}
                                 </div>
                               ))}
@@ -522,7 +522,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
                         return (
                           <div key={pay.id} className="card" style={{ padding: '16px 24px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              <CreditCard size={16} style={{ color: '#dc2626', flexShrink: 0 }} />
+                              <CreditCard size={16} style={{ color: '#B0473E', flexShrink: 0 }} />
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)' }}>
                                   Comisión sobre {pay.payer_name || 'pago'}
@@ -531,14 +531,14 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
                                   {commPercent}% de {fmtEur(pay.amount)} · {pay.paid_at ? fmtDateShort(pay.paid_at) : ''}
                                 </div>
                               </div>
-                              <div style={{ fontSize: 18, fontWeight: 700, color: '#dc2626' }}>{fmtEur(payComm)}</div>
+                              <div style={{ fontSize: 18, fontWeight: 700, color: '#B0473E' }}>{fmtEur(payComm)}</div>
                             </div>
                           </div>
                         )
                       })}
                       <div style={{ padding: '12px 24px', background: 'var(--surface)', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--warm-gray)' }}>Total a pagar</span>
-                        <span style={{ fontSize: 18, fontWeight: 800, color: '#dc2626' }}>{fmtEur(commissionTotal)}</span>
+                        <span style={{ fontSize: 18, fontWeight: 800, color: '#B0473E' }}>{fmtEur(commissionTotal)}</span>
                       </div>
                     </div>
                   ) : commPercent > 0 ? (
@@ -602,7 +602,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
                                     const { data } = await supabase.from('venue_invoices').select('*').eq('budget_id', id).order('created_at', { ascending: false })
                                     setVenueInvoices(data || [])
                                   }}>
-                                    <CheckCircle size={12} style={{ color: '#16a34a' }} />
+                                    <CheckCircle size={12} style={{ color: '#4A6B52' }} />
                                   </button>
                                 )}
                               </div>
@@ -635,13 +635,13 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
                       inv.line_items?.some?.((li: any) => Math.abs(Number(li.subtotal) - Number(pay.amount)) < 0.01)
                     )
                     return (
-                      <div key={pay.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #86efac' }}>
-                        <CheckCircle size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                      <div key={pay.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 8, background: '#EEF2EC', border: '1px solid #C3D4C5' }}>
+                        <CheckCircle size={14} style={{ color: '#4A6B52', flexShrink: 0 }} />
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)' }}>{pay.payer_name || pay.payer_email || 'Pago'}</div>
                           {pay.paid_at && <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{fmtDate(pay.paid_at)}</div>}
                         </div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: '#16a34a', marginRight: 12 }}>{fmtEur(pay.amount)}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#4A6B52', marginRight: 12 }}>{fmtEur(pay.amount)}</div>
                         {hasInvoice ? (
                           <span style={{ fontSize: 10, color: 'var(--warm-gray)', fontWeight: 600 }}>Factura creada</span>
                         ) : (

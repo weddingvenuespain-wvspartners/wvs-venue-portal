@@ -113,19 +113,19 @@ const DOW_NAMES_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']  // Mon
 const STATUS_CFG: Record<Status, { label: string; bg: string; border: string; color: string; dot: string; badge: string }> = {
   libre:       { label: 'Libre',          bg: '#fff',     border: '#e8ddd3', color: 'var(--charcoal)', dot: '#c5b9aa', badge: '#f5f0eb' },
   negociacion: { label: 'En negociación', bg: '#fef7ec',  border: '#f5deb3', color: '#8a6d2b',         dot: '#d4a24c', badge: '#fef7ec' },
-  reservado:   { label: 'Reservado',      bg: '#d1fae5',  border: '#059669', color: '#064e3b',         dot: '#047857', badge: '#d1fae5' },
+  reservado:   { label: 'Reservado',      bg: '#DCE7DE',  border: '#467A60', color: '#064e3b',         dot: '#3C5945', badge: '#DCE7DE' },
   bloqueado:   { label: 'Bloqueado',      bg: '#f0eeec',  border: '#d6d2ce', color: '#8b8580',         dot: '#a8a3a0', badge: '#f0eeec' },
 }
 
 const LEAD_STATUS: Record<string, { label: string; color: string }> = {
-  new:            { label: 'Nuevo',            color: '#3b82f6' },
-  contacted:      { label: 'Contactado',       color: '#8b5cf6' },
-  proposal_sent:  { label: 'Propuesta enviada', color: '#f59e0b' },
-  visit_scheduled:{ label: 'Visita agendada',  color: '#10b981' },
-  post_visit:     { label: 'Post-visita',      color: '#06b6d4' },
-  budget_sent:    { label: 'Presupuesto',      color: '#6366f1' },
-  won:            { label: 'Reservado',         color: '#16a34a' },
-  lost:           { label: 'Perdido',          color: '#dc2626' },
+  new:            { label: 'Nuevo',            color: '#4F6D8C' },
+  contacted:      { label: 'Contactado',       color: '#7E72A0' },
+  proposal_sent:  { label: 'Propuesta enviada', color: '#AC8B4C' },
+  visit_scheduled:{ label: 'Visita agendada',  color: '#5C8570' },
+  post_visit:     { label: 'Post-visita',      color: '#5B8794' },
+  budget_sent:    { label: 'Presupuesto',      color: '#5F6196' },
+  won:            { label: 'Reservado',         color: '#4A6B52' },
+  lost:           { label: 'Perdido',          color: '#B0473E' },
 }
 
 const BUDGET_LABEL: Record<string, string> = {
@@ -1039,7 +1039,7 @@ export default function CalendarioPage() {
                   {saving ? 'Guardando...' : 'Bloquear'}
                 </button>
                 <button className="btn btn-sm" onClick={() => { setBulkStatus('libre'); applyBulk() }} disabled={saving || bulkDates.size === 0}
-                  style={{ background: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7' }}>
+                  style={{ background: '#DCE7DE', color: '#35513E', border: '1px solid #BFD2C5' }}>
                   {saving ? 'Guardando...' : 'Desbloquear'}
                 </button>
                 <button className="btn btn-ghost btn-sm" onClick={() => { setBulkMode(false); setBulkDates(new Set()); setBulkStart(null); wasDragBulkRef.current = false }}>
@@ -1151,7 +1151,7 @@ export default function CalendarioPage() {
                                 color: 'var(--warm-gray)', fontFamily: 'Inter, sans-serif', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                               {v === 'agenda' ? 'Agenda' : 'Tareas'}
                               {pendingOverdue > 0 && (
-                                <span style={{ background: '#ef4444', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
+                                <span style={{ background: '#BC5249', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
                                   {pendingOverdue}
                                 </span>
                               )}
@@ -1184,7 +1184,7 @@ export default function CalendarioPage() {
                                 fontFamily: 'Inter, sans-serif', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                               {v === 'agenda' ? 'Agenda' : 'Tareas'}
                               {pendingOverdue > 0 && (
-                                <span style={{ background: '#ef4444', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
+                                <span style={{ background: '#BC5249', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
                                   {pendingOverdue}
                                 </span>
                               )}
@@ -1208,9 +1208,9 @@ export default function CalendarioPage() {
               <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 {([
                   { key: 'all',    label: 'Todos',             color: 'var(--gold)' },
-                  { key: 'visitas', label: 'Visitas',           color: '#10b981' },
-                  { key: 'bodas',  label: 'Bodas confirmadas', color: '#059669' },
-                  { key: 'leads',  label: 'Leads',             color: '#3b82f6' },
+                  { key: 'visitas', label: 'Visitas',           color: '#5C8570' },
+                  { key: 'bodas',  label: 'Bodas confirmadas', color: '#467A60' },
+                  { key: 'leads',  label: 'Leads',             color: '#4F6D8C' },
                 ] as const).map(({ key, label, color }) => {
                   const isActive = key === 'all' ? filterAll : calendarFilters.has(key)
                   return (
@@ -1320,7 +1320,7 @@ export default function CalendarioPage() {
                         : isTarde
                           ? `linear-gradient(135deg, #ffffff 50%, ${statusColor} 50%)`
                           : `linear-gradient(135deg, ${statusColor} 50%, #ffffff 50%)`
-                      const cellBg = isBulkSel ? '#fef3c7' : isPast ? '#faf8f5' : hasVisits && !effectiveStatus ? 'rgba(16,185,129,0.06)' : isHalfDayBlock ? halfDayBg : effectiveStatus ? effectiveCfg.bg : '#fff'
+                      const cellBg = isBulkSel ? '#F3EBD8' : isPast ? '#faf8f5' : hasVisits && !effectiveStatus ? 'rgba(92,133,112,0.06)' : isHalfDayBlock ? halfDayBg : effectiveStatus ? effectiveCfg.bg : '#fff'
                       const colIndex = (startDow + day - 1 + startDow === 0 ? 0 : i) % 7
 
                       return (
@@ -1399,7 +1399,7 @@ export default function CalendarioPage() {
                           {displayName && !isPast && !showCross && (
                             <span style={{
                               fontSize: 9, lineHeight: 1.3,
-                              color: visitOnly && matchesFilter ? '#059669' : effectiveCfg.color,
+                              color: visitOnly && matchesFilter ? '#467A60' : effectiveCfg.color,
                               fontWeight: 600, maxWidth: '100%', overflow: 'hidden',
                               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                               textAlign: 'left', wordBreak: 'break-word', marginTop: 2,
@@ -1457,12 +1457,12 @@ export default function CalendarioPage() {
                               const tipParts = sorted.map((v: any) => `${v.name}${v.visit_time ? ' · ' + v.visit_time : ''}`).join(' · ')
                               return (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={`Visita: ${tipParts}`}>
-                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
-                                  <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#059669', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#5C8570', flexShrink: 0 }} />
+                                  <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#467A60', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                                     {firstTime ? firstTime : 'Visita'}
                                   </span>
                                   {visitLeads.length > 1 && (
-                                    <span style={{ fontSize: 8, color: '#10b981', fontWeight: 700 }}>+{visitLeads.length - 1}</span>
+                                    <span style={{ fontSize: 8, color: '#5C8570', fontWeight: 700 }}>+{visitLeads.length - 1}</span>
                                   )}
                                 </div>
                               )
@@ -1483,7 +1483,7 @@ export default function CalendarioPage() {
                               // If a name is shown already (displayName), count = extras beyond that one
                               const extraCount = displayName ? nonVisitLeadCount - 1 : nonVisitLeadCount
                               return extraCount > 0 ? (
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 7, fontWeight: 700, background: '#fef3c7', color: '#92400e', borderRadius: 5, padding: '1px 5px', letterSpacing: '0.03em' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 7, fontWeight: 700, background: '#F3EBD8', color: '#7A5A2E', borderRadius: 5, padding: '1px 5px', letterSpacing: '0.03em' }}>
                                   +{extraCount} {extraCount === 1 ? 'lead' : 'leads'}
                                 </span>
                               ) : null
@@ -1492,8 +1492,8 @@ export default function CalendarioPage() {
                             {dayTasks.length > 0 && (
                               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}
                                 title={dayTasks.map(t => t.title).join(' · ')}>
-                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: dayTasks.some(t => t.due_date < todayIso) ? '#ef4444' : '#8b5cf6', flexShrink: 0 }} />
-                                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: dayTasks.some(t => t.due_date < todayIso) ? '#ef4444' : '#7c3aed', whiteSpace: 'nowrap' }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: dayTasks.some(t => t.due_date < todayIso) ? '#BC5249' : '#7E72A0', flexShrink: 0 }} />
+                                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: dayTasks.some(t => t.due_date < todayIso) ? '#BC5249' : '#6A5B95', whiteSpace: 'nowrap' }}>
                                   {dayTasks.length === 1 ? 'Tarea' : `${dayTasks.length} tareas`}
                                 </span>
                               </div>
@@ -1523,7 +1523,7 @@ export default function CalendarioPage() {
                         return (
                           <div key={iso} style={{ textAlign: 'center', padding: '10px 4px', borderLeft: wi > 0 ? '1px solid var(--ivory)' : 'none', opacity: isPast ? 0.5 : 1 }}>
                             <div style={{ fontSize: 10, fontWeight: 600, color: wi >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '.07em', textTransform: 'uppercase' }}>{DOW_SHORT[wi]}</div>
-                            <div style={{ fontSize: 18, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--gold)' : 'var(--charcoal)', width: 30, height: 30, borderRadius: '50%', background: isToday ? '#fef3c7' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0', fontFamily: 'Inter, sans-serif' }}>{d.getDate()}</div>
+                            <div style={{ fontSize: 18, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--gold)' : 'var(--charcoal)', width: 30, height: 30, borderRadius: '50%', background: isToday ? '#F3EBD8' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0', fontFamily: 'Inter, sans-serif' }}>{d.getDate()}</div>
                           </div>
                         )
                       })}
@@ -1550,8 +1550,8 @@ export default function CalendarioPage() {
                             )}
                             {visitLeads.slice(0,2).map(vl => (
                               <div key={vl.id} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
-                                <span style={{ fontSize: 9, fontWeight: 600, color: '#059669', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{vl.name}{(vl as any).visit_time ? ` · ${(vl as any).visit_time}` : ''}</span>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#5C8570', flexShrink: 0 }} />
+                                <span style={{ fontSize: 9, fontWeight: 600, color: '#467A60', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{vl.name}{(vl as any).visit_time ? ` · ${(vl as any).visit_time}` : ''}</span>
                               </div>
                             ))}
                             {dayInqs.length > 0 && (
@@ -1561,7 +1561,7 @@ export default function CalendarioPage() {
                               </div>
                             )}
                             {dayLeads.filter(l => !visitLeads.some(v => v.id === l.id) && l.id !== entry?.lead_id).slice(0,2).map(l => (
-                              <span key={l.id} style={{ fontSize: 9, color: '#3b82f6', fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{l.name}</span>
+                              <span key={l.id} style={{ fontSize: 9, color: '#4F6D8C', fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{l.name}</span>
                             ))}
                           </div>
                         )
@@ -1605,19 +1605,19 @@ export default function CalendarioPage() {
                           {!isPast && <button onClick={() => setModalDate(iso)} style={{ marginLeft: 'auto', fontSize: 11, padding: '4px 12px', borderRadius: 7, border: '1px solid var(--ivory)', background: '#fff', color: 'var(--charcoal)', cursor: 'pointer', fontWeight: 600 }}>Editar</button>}
                         </div>
                         {/* Visits */}
-                        {vLeads.length > 0 && <div style={{ borderRadius: 10, border: '1px solid #d1fae5', background: '#f0fdf4', padding: '10px 14px' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#047857', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 6 }}>Visitas agendadas</div>
+                        {vLeads.length > 0 && <div style={{ borderRadius: 10, border: '1px solid #DCE7DE', background: '#EEF2EC', padding: '10px 14px' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#3C5945', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 6 }}>Visitas agendadas</div>
                           {vLeads.map(vl => <div key={vl.id} style={{ fontSize: 12, color: '#064e3b' }}>{vl.name}{(vl as any).visit_time ? ` · ${(vl as any).visit_time}` : ''}</div>)}
                         </div>}
                         {/* Inquiries */}
-                        {dInqs.length > 0 && <div style={{ borderRadius: 10, border: '1px solid #fde68a', background: '#fffbeb', padding: '10px 14px' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 6 }}>Solicitudes pendientes</div>
+                        {dInqs.length > 0 && <div style={{ borderRadius: 10, border: '1px solid #E2D4AE', background: '#F7F3E8', padding: '10px 14px' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#7A5A2E', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 6 }}>Solicitudes pendientes</div>
                           {dInqs.map(inq => <div key={inq.id} style={{ fontSize: 12, color: '#78350f' }}>{inq.name} · {inq.kind === 'visit' ? 'Visita' : inq.kind === 'video' ? 'Videollamada' : 'Llamada'}{typeof inq.payload?.time === 'string' ? ` · ${inq.payload.time}` : ''}</div>)}
                         </div>}
                         {/* Leads */}
-                        {dLeads.filter(l => !vLeads.some(v => v.id === l.id)).length > 0 && <div style={{ borderRadius: 10, border: '1px solid #bfdbfe', background: '#eff6ff', padding: '10px 14px' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 6 }}>Leads</div>
-                          {dLeads.filter(l => !vLeads.some(v => v.id === l.id)).map(l => <div key={l.id} style={{ fontSize: 12, color: '#1e40af' }}>{l.name}</div>)}
+                        {dLeads.filter(l => !vLeads.some(v => v.id === l.id)).length > 0 && <div style={{ borderRadius: 10, border: '1px solid #CCD9E6', background: '#EEF2F7', padding: '10px 14px' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#3F5980', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 6 }}>Leads</div>
+                          {dLeads.filter(l => !vLeads.some(v => v.id === l.id)).map(l => <div key={l.id} style={{ fontSize: 12, color: '#39527A' }}>{l.name}</div>)}
                         </div>}
                         {!entry && vLeads.length === 0 && dInqs.length === 0 && dLeads.length === 0 && (
                           <div style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin eventos</div>
@@ -1673,15 +1673,15 @@ export default function CalendarioPage() {
                             {showDots && (
                               <div style={{ display: 'flex', gap: 2 }}>
                                 {calView === 'tasks' ? (
-                                  <span style={{ fontSize: 9, fontWeight: 700, color: '#8b5cf6' }}>{taskCount}</span>
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: '#7E72A0' }}>{taskCount}</span>
                                 ) : (
                                   <>
                                     {hasReservado && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#5c4033' }} />}
                                     {hasNegociacion && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--gold)' }} />}
                                     {hasBloqueado && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#6b7280' }} />}
-                                    {hasVisit && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981' }} />}
-                                    {hasLead && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6' }} />}
-                                    {hasTasks && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#8b5cf6' }} />}
+                                    {hasVisit && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#5C8570' }} />}
+                                    {hasLead && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4F6D8C' }} />}
+                                    {hasTasks && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#7E72A0' }} />}
                                   </>
                                 )}
                               </div>
@@ -1694,12 +1694,12 @@ export default function CalendarioPage() {
                     <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
                       {calView === 'tasks' ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#8b5cf6' }} />
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7E72A0' }} />
                           <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Tareas pendientes</span>
                         </div>
                       ) : (
                         <>
-                          {[{ c: '#5c4033', l: 'Reservado' }, { c: 'var(--gold)', l: 'Negociación' }, { c: '#10b981', l: 'Visita' }, { c: '#3b82f6', l: 'Lead' }, { c: '#8b5cf6', l: 'Tarea' }].map(x => (
+                          {[{ c: '#5c4033', l: 'Reservado' }, { c: 'var(--gold)', l: 'Negociación' }, { c: '#5C8570', l: 'Visita' }, { c: '#4F6D8C', l: 'Lead' }, { c: '#7E72A0', l: 'Tarea' }].map(x => (
                             <div key={x.l} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                               <span style={{ width: 7, height: 7, borderRadius: '50%', background: x.c }} />
                               <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{x.l}</span>
@@ -1756,8 +1756,8 @@ export default function CalendarioPage() {
                             )}
                             {vLeads.map(vl => (
                               <div key={vl.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
-                                <span style={{ fontSize: 11, fontWeight: 600, color: '#059669' }}>Visita · {vl.name}{(vl as any).visit_time ? ` · ${(vl as any).visit_time}` : ''}</span>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#5C8570', flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#467A60' }}>Visita · {vl.name}{(vl as any).visit_time ? ` · ${(vl as any).visit_time}` : ''}</span>
                               </div>
                             ))}
                             {dInqs.map(inq => (
@@ -1768,15 +1768,15 @@ export default function CalendarioPage() {
                             ))}
                             {dLeads.filter(l => !vLeads.some(v => v.id === l.id)).map(l => (
                               <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
-                                <span style={{ fontSize: 11, color: '#1d4ed8' }}>{l.name}</span>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4F6D8C', flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, color: '#3F5980' }}>{l.name}</span>
                               </div>
                             ))}
                             {dTasks.map(t => (
                               <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#8b5cf6', flexShrink: 0 }} />
-                                <span style={{ fontSize: 11, color: '#5b21b6', fontWeight: 500 }}>{t.title}</span>
-                                <button onClick={() => toggleTask(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#8b5cf6', display: 'flex', alignItems: 'center' }} title="Marcar completada">
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7E72A0', flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, color: '#4F417A', fontWeight: 500 }}>{t.title}</span>
+                                <button onClick={() => toggleTask(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#7E72A0', display: 'flex', alignItems: 'center' }} title="Marcar completada">
                                   <CheckCircle2 size={12} />
                                 </button>
                               </div>
@@ -1812,7 +1812,7 @@ export default function CalendarioPage() {
                   const dt = new Date(task.due_date + 'T12:00:00')
                   return (
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--ivory)', background: task.completed ? '#faf8f5' : 'transparent' }}>
-                      <button onClick={() => toggleTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 1, flexShrink: 0, color: task.completed ? '#10b981' : isPast ? '#ef4444' : '#8b5cf6' }}>
+                      <button onClick={() => toggleTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 1, flexShrink: 0, color: task.completed ? '#5C8570' : isPast ? '#BC5249' : '#7E72A0' }}>
                         {task.completed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
                       </button>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1823,12 +1823,12 @@ export default function CalendarioPage() {
                           <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{task.description}</div>
                         )}
                         <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: isPast && !task.completed ? '#ef4444' : 'var(--warm-gray)' }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: isPast && !task.completed ? '#BC5249' : 'var(--warm-gray)' }}>
                             {dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: dt.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })}
                             {isPast && !task.completed && ' · Vencida'}
                           </span>
                           {task.type === 'lead' && linkedLead && (
-                            <span style={{ fontSize: 11, background: '#ede9fe', color: '#5b21b6', borderRadius: 5, padding: '1px 7px', fontWeight: 500 }}>
+                            <span style={{ fontSize: 11, background: '#E9E6F3', color: '#4F417A', borderRadius: 5, padding: '1px 7px', fontWeight: 500 }}>
                               {linkedLead.name}
                             </span>
                           )}
@@ -1840,7 +1840,7 @@ export default function CalendarioPage() {
                         </div>
                       </div>
                       <button onClick={() => deleteTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#d1cac3', flexShrink: 0 }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#BC5249')}
                         onMouseLeave={e => (e.currentTarget.style.color = '#d1cac3')}>
                         <Trash2 size={14} />
                       </button>
@@ -1860,7 +1860,7 @@ export default function CalendarioPage() {
                     {/* Nueva tarea button */}
                     <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'flex-end' }}>
                       <button onClick={() => { setTaskForm({ title: '', description: '', due_date: todayIso, type: 'internal', lead_id: '' }); setTaskModal(true) }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#8b5cf6', color: '#fff', cursor: 'pointer' }}>
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#7E72A0', color: '#fff', cursor: 'pointer' }}>
                         <Plus size={14} /> Nueva tarea
                       </button>
                     </div>
@@ -1875,7 +1875,7 @@ export default function CalendarioPage() {
 
                     {overdue.length > 0 && (
                       <>
-                        <SectionHeader label="Vencidas" count={overdue.length} color="#ef4444" />
+                        <SectionHeader label="Vencidas" count={overdue.length} color="#BC5249" />
                         {overdue.map(t => <TaskRow key={t.id} task={t} />)}
                       </>
                     )}
@@ -1889,7 +1889,7 @@ export default function CalendarioPage() {
 
                     {upcoming.length > 0 && (
                       <>
-                        <SectionHeader label="Próximamente" count={upcoming.length} color="#8b5cf6" />
+                        <SectionHeader label="Próximamente" count={upcoming.length} color="#7E72A0" />
                         {upcoming.map(t => <TaskRow key={t.id} task={t} />)}
                       </>
                     )}
@@ -1914,11 +1914,11 @@ export default function CalendarioPage() {
                   </div>
                 ))}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#10b981' }} />
+                  <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#5C8570' }} />
                   <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>Visita agendada</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#8b5cf6' }} />
+                  <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#7E72A0' }} />
                   <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>Tareas</span>
                 </div>
               </div>
@@ -1936,10 +1936,10 @@ export default function CalendarioPage() {
                   <div className="card" style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <ClipboardList size={14} style={{ color: '#8b5cf6' }} /> Tareas
+                        <ClipboardList size={14} style={{ color: '#7E72A0' }} /> Tareas
                       </div>
                       <button onClick={() => { setTaskForm({ title: '', description: '', due_date: todayIso, type: 'internal', lead_id: '' }); setTaskModal(true) }}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 7, border: 'none', background: '#8b5cf6', color: '#fff', cursor: 'pointer' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 7, border: 'none', background: '#7E72A0', color: '#fff', cursor: 'pointer' }}>
                         <Plus size={11} /> Nueva
                       </button>
                     </div>
@@ -1948,21 +1948,21 @@ export default function CalendarioPage() {
                     ) : (
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {overdueTasks.length > 0 && (
-                          <div onClick={() => setCalView('tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 7, padding: '5px 10px' }}>
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
-                            <span style={{ fontSize: 11, fontWeight: 700, color: '#ef4444' }}>{overdueTasks.length} vencida{overdueTasks.length !== 1 ? 's' : ''}</span>
+                          <div onClick={() => setCalView('tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: '#FAF3F2', border: '1px solid #E0C2BD', borderRadius: 7, padding: '5px 10px' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#BC5249', flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#BC5249' }}>{overdueTasks.length} vencida{overdueTasks.length !== 1 ? 's' : ''}</span>
                           </div>
                         )}
                         {todayTasks.length > 0 && (
-                          <div onClick={() => setCalView('tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 7, padding: '5px 10px' }}>
+                          <div onClick={() => setCalView('tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: '#F7F3E8', border: '1px solid #C2A968', borderRadius: 7, padding: '5px 10px' }}>
                             <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
                             <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)' }}>{todayTasks.length} para hoy</span>
                           </div>
                         )}
                         {overdueTasks.length === 0 && todayTasks.length === 0 && (
-                          <div onClick={() => setCalView('tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 7, padding: '5px 10px' }}>
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#8b5cf6', flexShrink: 0 }} />
-                            <span style={{ fontSize: 11, fontWeight: 600, color: '#5b21b6' }}>{pendingCount} pendiente{pendingCount !== 1 ? 's' : ''}</span>
+                          <div onClick={() => setCalView('tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: '#F2F1F8', border: '1px solid #C3BBDA', borderRadius: 7, padding: '5px 10px' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7E72A0', flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#4F417A' }}>{pendingCount} pendiente{pendingCount !== 1 ? 's' : ''}</span>
                           </div>
                         )}
                       </div>
@@ -2068,12 +2068,12 @@ export default function CalendarioPage() {
           <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ClipboardList size={18} style={{ color: '#8b5cf6' }} /> Nueva tarea
+                <ClipboardList size={18} style={{ color: '#7E72A0' }} /> Nueva tarea
               </div>
               <button onClick={() => setTaskModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={18} /></button>
             </div>
 
-            {taskError && <div style={{ fontSize: 12, color: '#ef4444', marginBottom: 12, padding: '8px 12px', background: '#fef2f2', borderRadius: 8 }}>{taskError}</div>}
+            {taskError && <div style={{ fontSize: 12, color: '#BC5249', marginBottom: 12, padding: '8px 12px', background: '#FAF3F2', borderRadius: 8 }}>{taskError}</div>}
 
             <div className="form-group" style={{ marginBottom: 14 }}>
               <label className="form-label" style={{ fontSize: 11 }}>Título *</label>
@@ -2096,9 +2096,9 @@ export default function CalendarioPage() {
                   {(['internal', 'lead'] as const).map(t => (
                     <button key={t} type="button" onClick={() => setTaskForm(f => ({ ...f, type: t, lead_id: '' }))}
                       style={{ flex: 1, fontSize: 11, fontWeight: 600, padding: '6px 4px', borderRadius: 7, border: '1.5px solid',
-                        borderColor: taskForm.type === t ? '#8b5cf6' : 'var(--ivory)',
-                        background: taskForm.type === t ? '#ede9fe' : 'transparent',
-                        color: taskForm.type === t ? '#5b21b6' : 'var(--warm-gray)', cursor: 'pointer' }}>
+                        borderColor: taskForm.type === t ? '#7E72A0' : 'var(--ivory)',
+                        background: taskForm.type === t ? '#E9E6F3' : 'transparent',
+                        color: taskForm.type === t ? '#4F417A' : 'var(--warm-gray)', cursor: 'pointer' }}>
                       {t === 'internal' ? 'Interna' : 'Lead'}
                     </button>
                   ))}
@@ -2135,7 +2135,7 @@ export default function CalendarioPage() {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
               <button className="btn btn-ghost btn-sm" onClick={() => setTaskModal(false)}>Cancelar</button>
               <button onClick={createTask} disabled={taskSaving}
-                style={{ fontSize: 12, fontWeight: 600, padding: '8px 20px', borderRadius: 8, border: 'none', background: '#8b5cf6', color: '#fff', cursor: taskSaving ? 'not-allowed' : 'pointer', opacity: taskSaving ? 0.7 : 1 }}>
+                style={{ fontSize: 12, fontWeight: 600, padding: '8px 20px', borderRadius: 8, border: 'none', background: '#7E72A0', color: '#fff', cursor: taskSaving ? 'not-allowed' : 'pointer', opacity: taskSaving ? 0.7 : 1 }}>
                 {taskSaving ? 'Guardando...' : 'Crear tarea'}
               </button>
             </div>
@@ -2550,8 +2550,8 @@ function DayModal({
               {/* ══ ② VISITAS PROGRAMADAS ══ */}
               {visitsOnDate.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} /> Visitas programadas
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#467A60', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#5C8570', display: 'inline-block' }} /> Visitas programadas
                   </div>
                   {[...visitsOnDate].sort((a, b) => (a.visit_time || 'zz').localeCompare(b.visit_time || 'zz')).map(l => {
                     const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
@@ -2565,8 +2565,8 @@ function DayModal({
                       }
                     }
                     return (
-                      <div key={l.id} style={{ display: 'flex', alignItems: 'stretch', gap: 0, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
-                        <div style={{ width: 64, flexShrink: 0, background: l.visit_time ? '#10b981' : 'rgba(16,185,129,0.18)', color: l.visit_time ? '#fff' : '#047857', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 4px', fontVariantNumeric: 'tabular-nums' }}>
+                      <div key={l.id} style={{ display: 'flex', alignItems: 'stretch', gap: 0, background: 'rgba(92,133,112,0.06)', border: '1px solid rgba(92,133,112,0.25)', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
+                        <div style={{ width: 64, flexShrink: 0, background: l.visit_time ? '#5C8570' : 'rgba(92,133,112,0.18)', color: l.visit_time ? '#fff' : '#3C5945', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 4px', fontVariantNumeric: 'tabular-nums' }}>
                           {l.visit_time ? (
                             <>
                               <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1, fontFamily: 'Inter, sans-serif' }}>{l.visit_time}</div>
@@ -2582,8 +2582,8 @@ function DayModal({
                         </div>
                         <div style={{ flex: 1, minWidth: 0, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#065f46' }}>{l.name}</div>
-                            <div style={{ fontSize: 11, color: '#059669' }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#35513E' }}>{l.name}</div>
+                            <div style={{ fontSize: 11, color: '#467A60' }}>
                               {l.guests ? `${l.guests} inv.` : ''}
                               {l.guests && (l.budget && l.budget !== 'sin_definir') ? ' · ' : ''}
                               {l.budget && l.budget !== 'sin_definir' ? BUDGET_LABEL[l.budget] || l.budget : ''}
@@ -2603,7 +2603,7 @@ function DayModal({
                                 onUpdateLead(l.id, updates)
                                 setDeleteVisitConfirmId(null)
                                 setDeletingVisit(false)
-                              }} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                              }} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: '#BC5249', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                                 {deletingVisit ? '...' : '¿Eliminar?'}
                               </button>
                               <button onClick={() => setDeleteVisitConfirmId(null)} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 11, cursor: 'pointer' }}>
@@ -2612,10 +2612,10 @@ function DayModal({
                             </div>
                           ) : (
                             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                              <a href={`/leads?openVisit=${l.id}`} title="Editar visita" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6, background: '#10b981', color: '#fff', textDecoration: 'none', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              <a href={`/leads?openVisit=${l.id}`} title="Editar visita" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6, background: '#5C8570', color: '#fff', textDecoration: 'none', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
                                 <Edit2 size={11} /> Editar
                               </a>
-                              <button onClick={() => setDeleteVisitConfirmId(l.id)} title="Eliminar visita" style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                              <button onClick={() => setDeleteVisitConfirmId(l.id)} title="Eliminar visita" style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid rgba(188,82,73,0.3)', background: 'rgba(188,82,73,0.06)', color: '#BC5249', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                                 <Trash2 size={11} />
                               </button>
                             </div>
@@ -2715,7 +2715,7 @@ function DayModal({
 
                 if (newLeads.length === 0 && negAll.length === 0 && propLeads.length === 0) return null
 
-                const SC = { new: '#3b82f6', neg: '#d97706', prop: '#059669' }
+                const SC = { new: '#4F6D8C', neg: '#9A7A40', prop: '#467A60' }
 
                 const SectionLabel = ({ label, count, color }: { label: string; count: number; color: string }) => (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -2747,9 +2747,9 @@ function DayModal({
                       </div>
                       {removeLeadConfirmId === l.id ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-                          <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 500 }}>¿Quitar?</span>
+                          <span style={{ fontSize: 11, color: '#B0473E', fontWeight: 500 }}>¿Quitar?</span>
                           <button onClick={() => handleRemoveLeadFromDate(l)} disabled={removingSaving}
-                            style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, cursor: 'pointer', border: 'none', background: '#dc2626', color: '#fff', fontWeight: 600 }}>
+                            style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, cursor: 'pointer', border: 'none', background: '#B0473E', color: '#fff', fontWeight: 600 }}>
                             {removingSaving ? '...' : 'Sí'}
                           </button>
                           <button onClick={() => setRemoveLeadConfirmId(null)}
@@ -2765,7 +2765,7 @@ function DayModal({
                           </a>
                           {!isPast && l.status !== 'won' && (
                             <button onClick={() => setRemoveLeadConfirmId(l.id)}
-                              style={{ fontSize: 10, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', border: '1px solid #fca5a5', background: 'transparent', color: '#dc2626', display: 'flex', alignItems: 'center' }}>
+                              style={{ fontSize: 10, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', border: '1px solid #E0C2BD', background: 'transparent', color: '#B0473E', display: 'flex', alignItems: 'center' }}>
                               <Trash2 size={10} />
                             </button>
                           )}
@@ -2855,8 +2855,8 @@ function DayModal({
 
               {/* RESERVADO: boda card */}
               {!isPast && status === 'reservado' && (
-                <div style={{ marginBottom: 20, padding: '14px 16px', background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#9d174d', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                <div style={{ marginBottom: 20, padding: '14px 16px', background: '#F6EEF2', border: '1px solid #E8D2DC', borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#8A3A5A', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
                     <Flower2 size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Boda reservada
                   </div>
                   {selectedLead ? (
@@ -2871,27 +2871,27 @@ function DayModal({
                           { label: 'Email', value: selectedLead.email || '—' },
                         ].map(({ label, value }) => (
                           <div key={label}>
-                            <div style={{ fontSize: 10, color: '#be185d', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-                            <div style={{ fontSize: 12, color: '#831843', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+                            <div style={{ fontSize: 10, color: '#9A3F5F', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+                            <div style={{ fontSize: 12, color: '#6E3049', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
                           </div>
                         ))}
                       </div>
                       {!showCancelWedding ? (
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <a href={`/leads?open=${selectedLead.id}&returnDate=${date}`} style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                          <a href={`/leads?open=${selectedLead.id}&returnDate=${date}`} style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #E8D2DC', color: '#9A3F5F', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                             <User size={12} /> Ver lead
                           </a>
-                          <a href="/proposals" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                          <a href="/proposals" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #E8D2DC', color: '#9A3F5F', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                             <FileText size={12} /> Propuesta
                           </a>
                           <button onClick={() => setShowCancelWedding(true)}
-                            style={{ flex: 1, fontSize: 12, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 6, padding: '6px', cursor: 'pointer' }}>
+                            style={{ flex: 1, fontSize: 12, color: '#B0473E', background: 'none', border: '1px solid #E0C2BD', borderRadius: 6, padding: '6px', cursor: 'pointer' }}>
                             Cancelar boda
                           </button>
                         </div>
                       ) : (
                         <div>
-                          <div style={{ fontSize: 11, color: '#9d174d', marginBottom: 8, lineHeight: 1.5 }}>Esta acción liberará la fecha y moverá el lead a Perdidos.</div>
+                          <div style={{ fontSize: 11, color: '#8A3A5A', marginBottom: 8, lineHeight: 1.5 }}>Esta acción liberará la fecha y moverá el lead a Perdidos.</div>
                           <textarea value={cancelWeddingReason} onChange={e => setCancelWeddingReason(e.target.value)}
                             placeholder="Motivo de la cancelación (opcional)..." className="form-input" rows={2}
                             style={{ fontSize: 12, marginBottom: 8, resize: 'none', width: '100%', boxSizing: 'border-box' }} />
@@ -2902,7 +2902,7 @@ function DayModal({
                             </button>
                             <button disabled={cancelWeddingSaving}
                               onClick={async () => { setCancelWeddingSaving(true); await onCancelWedding(selectedLead, cancelWeddingReason); setCancelWeddingSaving(false); onClose() }}
-                              style={{ flex: 2, fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 600 }}>
+                              style={{ flex: 2, fontSize: 12, color: '#fff', background: '#B0473E', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 600 }}>
                               {cancelWeddingSaving ? 'Cancelando...' : 'Confirmar cancelación'}
                             </button>
                           </div>
@@ -2912,9 +2912,9 @@ function DayModal({
                   ) : (
                     /* No lead linked: show lead search */
                     <div>
-                      <div style={{ fontSize: 12, color: '#be185d', marginBottom: 10 }}>Vincula la pareja que reservó esta boda.</div>
+                      <div style={{ fontSize: 12, color: '#9A3F5F', marginBottom: 10 }}>Vincula la pareja que reservó esta boda.</div>
                       {!showQuickLink ? (
-                        <button onClick={() => setShowQuickLink(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid #fbcfe8', color: '#be185d', background: 'transparent', cursor: 'pointer', fontWeight: 500 }}><Link2 size={13} /> Vincular lead</button>
+                        <button onClick={() => setShowQuickLink(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid #E8D2DC', color: '#9A3F5F', background: 'transparent', cursor: 'pointer', fontWeight: 500 }}><Link2 size={13} /> Vincular lead</button>
                       ) : (
                         <div>
                           <div style={{ position: 'relative', marginBottom: 8 }}>
@@ -2993,8 +2993,8 @@ function DayModal({
 
                       {/* Modality picker — only shown when modalities with matching packages exist */}
                       {modalityOptions.length > 0 && (
-                        <div style={{ padding: '10px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, marginBottom: 10 }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: '#15803d', marginBottom: 8 }}>Modalidad</div>
+                        <div style={{ padding: '10px 12px', background: '#EEF2EC', border: '1px solid #D2DFD3', borderRadius: 8, marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: '#3C5945', marginBottom: 8 }}>Modalidad</div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                             {[{ modality: { id: '', name: 'Sin modalidad (1 día)' }, pkgLabel: '', span: 1, endDate: date } as any,
                               ...modalityOptions].map(opt => (
@@ -3002,10 +3002,10 @@ function DayModal({
                                 onClick={() => setSelectedModalityId(opt.modality.id)}
                                 style={{
                                   padding: '7px 10px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
-                                  border: `2px solid ${selectedModalityId === opt.modality.id ? '#16a34a' : 'var(--ivory)'}`,
-                                  background: selectedModalityId === opt.modality.id ? '#f0fdf4' : '#fff',
+                                  border: `2px solid ${selectedModalityId === opt.modality.id ? '#4A6B52' : 'var(--ivory)'}`,
+                                  background: selectedModalityId === opt.modality.id ? '#EEF2EC' : '#fff',
                                   fontSize: 12, fontWeight: 500,
-                                  color: selectedModalityId === opt.modality.id ? '#15803d' : 'var(--charcoal)',
+                                  color: selectedModalityId === opt.modality.id ? '#3C5945' : 'var(--charcoal)',
                                 }}>
                                 {opt.modality.name}
                                 {opt.span > 1 && (
@@ -3119,10 +3119,10 @@ function DayModal({
               onClick={e => e.stopPropagation()}>
 
               {/* Header */}
-              <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid #fde68a', background: '#fffbeb' }}>
+              <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid #E2D4AE', background: '#F7F3E8' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <AlertCircle size={15} style={{ color: '#d97706', flexShrink: 0 }} />
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#92400e' }}>
+                  <AlertCircle size={15} style={{ color: '#9A7A40', flexShrink: 0 }} />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#7A5A2E' }}>
                     {affectedLeads.length === 1 ? '1 lead pendiente de gestionar' : `${affectedLeads.length} leads pendientes de gestionar`}
                   </span>
                 </div>
@@ -3145,11 +3145,11 @@ function DayModal({
                         <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: st.color + '1a', color: st.color, fontWeight: 600, flexShrink: 0 }}>{st.label}</span>
                       </div>
                       {otherDates ? (
-                        <div style={{ fontSize: 11, color: '#059669', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div style={{ fontSize: 11, color: '#467A60', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
                           ✓ Tiene otras fechas propuestas: <strong>{otherDates}</strong>
                         </div>
                       ) : (
-                        <div style={{ fontSize: 11, color: '#d97706', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div style={{ fontSize: 11, color: '#9A7A40', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
                           ⚠ Esta es su única fecha propuesta
                         </div>
                       )}
@@ -3159,7 +3159,7 @@ function DayModal({
                           + Añadir otra fecha
                         </a>
                         <button onClick={() => handleRemoveFromDate(l)} disabled={isSav}
-                          style={{ flex: 1, fontSize: 11, padding: '6px 8px', borderRadius: 7, border: '1px solid #fca5a5', color: '#dc2626', background: 'transparent', cursor: 'pointer', fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
+                          style={{ flex: 1, fontSize: 11, padding: '6px 8px', borderRadius: 7, border: '1px solid #E0C2BD', color: '#B0473E', background: 'transparent', cursor: 'pointer', fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
                           {isSav ? '...' : '✗ Quitar de esta fecha'}
                         </button>
                       </div>
@@ -3185,8 +3185,8 @@ function DayModal({
             <div style={{ background: '#fff', borderRadius: 14, maxWidth: 380, width: '100%', padding: '24px', boxShadow: '0 24px 60px rgba(0,0,0,0.25)' }}
               onClick={e => e.stopPropagation()}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <User size={18} style={{ color: '#ef4444' }} />
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#FAF3F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <User size={18} style={{ color: '#BC5249' }} />
                 </div>
                 <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--espresso)' }}>Lead sin fechas asignadas</div>
               </div>
@@ -3201,7 +3201,7 @@ function DayModal({
                     await onUpdateLead(removedLeadForCrm.id, { status: 'lost' })
                     setRemovedLeadForCrm(null)
                   }}
-                  style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: '#BC5249', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                   Mover a Perdidos
                 </button>
                 <button onClick={() => setRemovedLeadForCrm(null)}
@@ -3220,7 +3220,7 @@ function DayModal({
             <div>
               {entry && (
                 <button onClick={handleDelete} disabled={isSaving}
-                  style={{ fontSize: 12, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 6, padding: '6px 12px', cursor: 'pointer' }}>
+                  style={{ fontSize: 12, color: '#B0473E', background: 'none', border: '1px solid #E0C2BD', borderRadius: 6, padding: '6px 12px', cursor: 'pointer' }}>
                   Eliminar entrada
                 </button>
               )}
@@ -3282,12 +3282,12 @@ function QuickCreateLead({
   }
 
   return (
-    <div style={{ marginBottom: 20, padding: '16px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#15803d', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ marginBottom: 20, padding: '16px', background: '#EEF2EC', border: '1px solid #C3D4C5', borderRadius: 10 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#3C5945', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         Nuevo lead
-        <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a' }}><X size={14} /></button>
+        <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4A6B52' }}><X size={14} /></button>
       </div>
-      {error && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{error}</div>}
+      {error && <div style={{ fontSize: 12, color: '#B0473E', marginBottom: 8 }}>{error}</div>}
       <div className="form-group" style={{ marginBottom: 10 }}>
         <label className="form-label" style={{ fontSize: 11 }}>Nombre de la pareja *</label>
         <input className="form-input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Ej: Laura & Carlos" />

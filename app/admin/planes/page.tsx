@@ -124,7 +124,7 @@ function CycleRow({
         <input className="form-input" style={{ fontSize: 12 }} type="number" min={0} value={cycle.cancel_notice_days}
           onChange={e => set('cancel_notice_days', parseInt(e.target.value) || 15)} />
       </div>
-      <button onClick={onDelete} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', color: '#c0392b', marginTop: 16 }}>
+      <button onClick={onDelete} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', color: '#A8443B', marginTop: 16 }}>
         <X size={14} />
       </button>
     </div>
@@ -140,19 +140,19 @@ function FeatureRow({ def, checked, onChange }: { def: import('@/lib/use-plan-fe
     <label style={{
       display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', borderRadius: 6,
       cursor: 'pointer', marginBottom: 5,
-      background: checked ? (isRestriction ? '#fff5f5' : isPremium ? '#fef9ec' : '#f0fdf4') : '#f8f8f8',
-      border: `1px solid ${checked ? (isRestriction ? '#fca5a5' : isPremium ? '#fde68a' : '#bbf7d0') : 'var(--ivory)'}`,
+      background: checked ? (isRestriction ? '#FAF4F3' : isPremium ? '#F6F1E4' : '#EEF2EC') : '#f8f8f8',
+      border: `1px solid ${checked ? (isRestriction ? '#E0C2BD' : isPremium ? '#E2D4AE' : '#D2DFD3') : 'var(--ivory)'}`,
     }}>
       <Checkbox checked={checked} onCheckedChange={(v) => onChange(v === true)} className="mt-0.5 shrink-0" />
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--espresso)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {def.label}
-          {isRestriction && <span style={{ fontSize: 9, background: '#fee2e2', color: '#dc2626', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>RESTRICCIÓN ⚠️</span>}
-          {isPremium && <span style={{ fontSize: 9, background: '#fef9ec', color: '#92400e', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>PREMIUM</span>}
+          {isRestriction && <span style={{ fontSize: 9, background: '#F2E2E0', color: '#B0473E', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>RESTRICCIÓN ⚠️</span>}
+          {isPremium && <span style={{ fontSize: 9, background: '#F6F1E4', color: '#7A5A2E', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>PREMIUM</span>}
         </div>
         <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{def.description}</div>
         {isRestriction && checked && (
-          <div style={{ fontSize: 10, color: '#dc2626', marginTop: 4, fontStyle: 'italic' }}>
+          <div style={{ fontSize: 10, color: '#B0473E', marginTop: 4, fontStyle: 'italic' }}>
             ⚠️ Esta restricción LIMITA al usuario. Actívala con cuidado.
           </div>
         )}
@@ -449,9 +449,9 @@ export default function PlanesPage() {
                 </div>
 
                 {/* Master toggle — big and clear */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none', padding: '8px 14px', borderRadius: 8, background: trialConfig.is_active ? '#f0fdf4' : '#f9fafb', border: `1px solid ${trialConfig.is_active ? '#bbf7d0' : 'var(--ivory)'}` }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none', padding: '8px 14px', borderRadius: 8, background: trialConfig.is_active ? '#EEF2EC' : '#f9fafb', border: `1px solid ${trialConfig.is_active ? '#D2DFD3' : 'var(--ivory)'}` }}>
                   <Checkbox checked={trialConfig.is_active} onCheckedChange={(v) => setTrialConfig(c => ({ ...c, is_active: v === true }))} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: trialConfig.is_active ? '#15803d' : 'var(--warm-gray)' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: trialConfig.is_active ? '#3C5945' : 'var(--warm-gray)' }}>
                     {trialConfig.is_active ? 'Activo' : 'Inactivo'}
                   </span>
                 </label>
@@ -515,7 +515,7 @@ export default function PlanesPage() {
               {/* Footer */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--ivory)' }}>
                 {trialSuccess && (
-                  <span style={{ fontSize: 12, color: '#15803d', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 12, color: '#3C5945', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Check size={13} /> {trialSuccess}
                   </span>
                 )}
@@ -557,15 +557,15 @@ export default function PlanesPage() {
                         </span>
                         <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
                           {(plan.subscriber_count ?? 0) > 0 && (
-                            <span style={{ fontSize: 10, background: '#f0f9ff', color: '#0369a1', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
+                            <span style={{ fontSize: 10, background: '#EFF3F7', color: '#3D5E78', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
                               <Users size={9} style={{ display: 'inline', marginRight: 3 }} />
                               {plan.subscriber_count} suscriptor{plan.subscriber_count !== 1 ? 'es' : ''}
                             </span>
                           )}
                           <span style={{
                             fontSize: 10, padding: '1px 7px', borderRadius: 10, fontWeight: 600,
-                            background: plan.visible_on_web ? '#f0fdf4' : '#f9fafb',
-                            color: plan.visible_on_web ? '#16a34a' : '#9ca3af',
+                            background: plan.visible_on_web ? '#EEF2EC' : '#f9fafb',
+                            color: plan.visible_on_web ? '#4A6B52' : '#9ca3af',
                           }}>
                             {plan.visible_on_web ? <><Eye size={9} style={{ display: 'inline', marginRight: 3 }} />En web</> : <><EyeOff size={9} style={{ display: 'inline', marginRight: 3 }} />Oculto web</>}
                           </span>
@@ -612,9 +612,9 @@ export default function PlanesPage() {
                           {enabled.map(f => (
                             <span key={f.key} style={{
                               fontSize: 11, padding: '2px 8px', borderRadius: 20,
-                              background: f.tier === 'premium' ? '#fef9ec' : '#f0fdf4',
-                              color:      f.tier === 'premium' ? '#92400e'  : '#16a34a',
-                              border: `1px solid ${f.tier === 'premium' ? '#fde68a' : '#bbf7d0'}`,
+                              background: f.tier === 'premium' ? '#F6F1E4' : '#EEF2EC',
+                              color:      f.tier === 'premium' ? '#7A5A2E'  : '#4A6B52',
+                              border: `1px solid ${f.tier === 'premium' ? '#E2D4AE' : '#D2DFD3'}`,
                               fontWeight: 500,
                             }}>✓ {f.label}</span>
                           ))}
@@ -624,7 +624,7 @@ export default function PlanesPage() {
                     {restricted.length > 0 && (
                       <div style={{ marginBottom: 10, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                         {restricted.map(f => (
-                          <span key={f.key} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#fff5f5', color: '#dc2626', border: '1px solid #fca5a5', fontWeight: 500 }}>✕ {f.label}</span>
+                          <span key={f.key} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#FAF4F3', color: '#B0473E', border: '1px solid #E0C2BD', fontWeight: 500 }}>✕ {f.label}</span>
                         ))}
                       </div>
                     )}
@@ -636,7 +636,7 @@ export default function PlanesPage() {
                       {/* Visible en web toggle */}
                       <button className="btn btn-ghost btn-sm" title={plan.visible_on_web ? 'Ocultar de la web' : 'Mostrar en la web'}
                         onClick={() => handleToggleWeb(plan)}>
-                        {plan.visible_on_web ? <Eye size={14} style={{ color: '#16a34a' }} /> : <EyeOff size={14} style={{ color: '#9ca3af' }} />}
+                        {plan.visible_on_web ? <Eye size={14} style={{ color: '#4A6B52' }} /> : <EyeOff size={14} style={{ color: '#9ca3af' }} />}
                       </button>
                       {/* Activar/desactivar */}
                       <button className="btn btn-ghost btn-sm" title={plan.is_active ? 'Desactivar plan' : 'Activar plan'}
@@ -648,7 +648,7 @@ export default function PlanesPage() {
                         title={(plan.subscriber_count ?? 0) > 0 ? 'No se puede eliminar: tiene suscriptores activos' : 'Eliminar plan'}
                         onClick={() => (plan.subscriber_count ?? 0) === 0 && setConfirmDelete(plan)}
                         style={{ opacity: (plan.subscriber_count ?? 0) > 0 ? 0.35 : 1, cursor: (plan.subscriber_count ?? 0) > 0 ? 'not-allowed' : 'pointer' }}>
-                        <Trash2 size={13} style={{ color: '#c0392b' }} />
+                        <Trash2 size={13} style={{ color: '#A8443B' }} />
                       </button>
                     </div>
                   </div>
@@ -709,19 +709,19 @@ export default function PlanesPage() {
 
               {/* Estado y visibilidad */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, background: form.is_active ? '#f0fdf4' : '#f9fafb', border: `1px solid ${form.is_active ? '#bbf7d0' : 'var(--ivory)'}`, cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, background: form.is_active ? '#EEF2EC' : '#f9fafb', border: `1px solid ${form.is_active ? '#D2DFD3' : 'var(--ivory)'}`, cursor: 'pointer' }}>
                   <Checkbox checked={form.is_active} onCheckedChange={(v) => setForm(f => ({ ...f, is_active: v === true }))} />
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: form.is_active ? '#16a34a' : 'var(--warm-gray)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: form.is_active ? '#4A6B52' : 'var(--warm-gray)' }}>
                       Plan activo
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Acepta nuevas suscripciones</div>
                   </div>
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, background: form.visible_on_web ? '#f0f9ff' : '#f9fafb', border: `1px solid ${form.visible_on_web ? '#bae6fd' : 'var(--ivory)'}`, cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, background: form.visible_on_web ? '#EFF3F7' : '#f9fafb', border: `1px solid ${form.visible_on_web ? '#CBDAE6' : 'var(--ivory)'}`, cursor: 'pointer' }}>
                   <Checkbox checked={form.visible_on_web} onCheckedChange={(v) => setForm(f => ({ ...f, visible_on_web: v === true }))} />
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: form.visible_on_web ? '#0369a1' : 'var(--warm-gray)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: form.visible_on_web ? '#3D5E78' : 'var(--warm-gray)' }}>
                       Visible en web
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Aparece en la página de precios</div>
@@ -782,7 +782,7 @@ export default function PlanesPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 10 }} onClick={() => applyPreset(PERMISSIONS_BASIC)}>Preset Básico</button>
-                    <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 10, color: '#92400e' }} onClick={() => applyPreset(PERMISSIONS_PREMIUM)}>Preset Premium</button>
+                    <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 10, color: '#7A5A2E' }} onClick={() => applyPreset(PERMISSIONS_PREMIUM)}>Preset Premium</button>
                   </div>
                 </div>
 
@@ -809,8 +809,8 @@ export default function PlanesPage() {
                     if (!masterDef) return null
                     const isPremium     = masterDef.tier === 'premium'
                     const activeSubCount = section.subFeatures.filter(k => form.permissions?.[k] === true).length
-                    const borderColor   = masterOn ? (isPremium ? '#fde68a' : '#bbf7d0') : 'var(--ivory)'
-                    const bgColor       = masterOn ? (isPremium ? '#fef9ec' : '#f0fdf4') : '#f9fafb'
+                    const borderColor   = masterOn ? (isPremium ? '#E2D4AE' : '#D2DFD3') : 'var(--ivory)'
+                    const bgColor       = masterOn ? (isPremium ? '#F6F1E4' : '#EEF2EC') : '#f9fafb'
 
                     return (
                       <div key={section.id} style={{ borderRadius: 8, border: `1px solid ${borderColor}`, overflow: 'hidden' }}>
@@ -826,14 +826,14 @@ export default function PlanesPage() {
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', display: 'flex', alignItems: 'center', gap: 6 }}>
                               {section.label}
                               {isPremium && (
-                                <span style={{ fontSize: 9, background: '#fef9ec', color: '#92400e', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>PREMIUM</span>
+                                <span style={{ fontSize: 9, background: '#F6F1E4', color: '#7A5A2E', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>PREMIUM</span>
                               )}
                             </div>
                             <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>{masterDef.description}</div>
                           </div>
                           {section.subFeatures.length > 0 && (
                             <span style={{
-                              fontSize: 10, color: masterOn ? (isPremium ? '#92400e' : '#16a34a') : 'var(--warm-gray)',
+                              fontSize: 10, color: masterOn ? (isPremium ? '#7A5A2E' : '#4A6B52') : 'var(--warm-gray)',
                               background: 'rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: 10, flexShrink: 0, fontWeight: 600,
                             }}>
                               {activeSubCount}/{section.subFeatures.length} activas
@@ -900,16 +900,16 @@ export default function PlanesPage() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <div className="modal-header">
               <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertTriangle size={16} style={{ color: '#b45309' }} />
+                <AlertTriangle size={16} style={{ color: '#8A6A38' }} />
                 Desactivar plan con suscriptores
               </div>
             </div>
             <div className="modal-body">
-              <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 6 }}>
+              <div style={{ background: '#F7F3E8', border: '1px solid #C2A968', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#7A5A2E', marginBottom: 6 }}>
                   <AlertTriangle size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> {deactivateWarning.subscriber_count} suscriptor{deactivateWarning.subscriber_count !== 1 ? 'es' : ''} activo{deactivateWarning.subscriber_count !== 1 ? 's' : ''} en «{deactivateWarning.display_name || deactivateWarning.name}»
                 </div>
-                <ul style={{ fontSize: 12, color: '#92400e', margin: '6px 0 0', paddingLeft: 18, lineHeight: 1.8 }}>
+                <ul style={{ fontSize: 12, color: '#7A5A2E', margin: '6px 0 0', paddingLeft: 18, lineHeight: 1.8 }}>
                   <li>Los suscriptores <strong>continúan activos hasta que acabe su ciclo</strong></li>
                   <li>No se podrán crear <strong>nuevas</strong> suscripciones en este plan</li>
                   <li>Deberás <strong>migrar manualmente</strong> cada venue a otro plan antes de su renovación</li>
@@ -917,11 +917,11 @@ export default function PlanesPage() {
               </div>
 
               {/* Step-by-step migration guide */}
-              <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 8 }}>
+              <div style={{ background: '#EFF3F7', border: '1px solid #CBDAE6', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#3D5E78', marginBottom: 8 }}>
                   <ClipboardList size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> Cómo migrar los suscriptores (paso a paso)
                 </div>
-                <ol style={{ fontSize: 12, color: '#0369a1', paddingLeft: 18, lineHeight: 2, margin: 0 }}>
+                <ol style={{ fontSize: 12, color: '#3D5E78', paddingLeft: 18, lineHeight: 2, margin: 0 }}>
                   <li>Desactiva este plan (botón de abajo)</li>
                   <li>Ve al <strong>CRM de venues</strong> y filtra por «{deactivateWarning.display_name || deactivateWarning.name}»</li>
                   <li>Abre cada venue afectado → tab <strong>Suscripción</strong></li>
@@ -943,7 +943,7 @@ export default function PlanesPage() {
             <div className="modal-footer">
               <button className="btn btn-ghost" onClick={() => setDeactivateWarning(null)}>Cancelar</button>
               <button className="btn btn-primary"
-                style={{ background: '#b45309', borderColor: '#b45309' }}
+                style={{ background: '#8A6A38', borderColor: '#8A6A38' }}
                 onClick={async () => {
                   await patchPlan(deactivateWarning.id, { is_active: false })
                   setDeactivateWarning(null)

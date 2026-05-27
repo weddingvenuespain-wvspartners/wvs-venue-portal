@@ -13,7 +13,7 @@ function Skeleton({ w, h = 14, radius = 4 }: { w?: string | number; h?: number; 
   )
 }
 
-const AVAIL_COLOR: Record<string, string> = { pending: 'var(--warm-gray)', requested: '#3b82f6', available: '#22c55e', unavailable: '#ef4444' }
+const AVAIL_COLOR: Record<string, string> = { pending: 'var(--warm-gray)', requested: '#4F6D8C', available: '#5C7E64', unavailable: '#BC5249' }
 const AVAIL_LABEL: Record<string, string> = { pending: 'Sin solicitar', requested: 'Pendiente', available: 'Disponible', unavailable: 'No disponible' }
 
 export default function PlannerDashboard() {
@@ -66,9 +66,9 @@ export default function PlannerDashboard() {
 
   const kpis = [
     { label: 'Parejas activas',           value: stats.total,   color: 'var(--gold)',  icon: <Heart size={16} />,    href: '/wp/clients' },
-    { label: 'Propuestas enviadas',       value: stats.sent,    color: '#f59e0b',      icon: <Send size={16} />,     href: '/wp/clients' },
-    { label: 'Propuestas vistas',         value: stats.viewed,  color: '#22c55e',      icon: <Eye size={16} />,      href: '/wp/clients' },
-    { label: 'Disponibilidades pendientes', value: stats.pending, color: '#3b82f6',   icon: <Clock size={16} />,    href: '/wp/clients' },
+    { label: 'Propuestas enviadas',       value: stats.sent,    color: '#AC8B4C',      icon: <Send size={16} />,     href: '/wp/clients' },
+    { label: 'Propuestas vistas',         value: stats.viewed,  color: '#5C7E64',      icon: <Eye size={16} />,      href: '/wp/clients' },
+    { label: 'Disponibilidades pendientes', value: stats.pending, color: '#4F6D8C',   icon: <Clock size={16} />,    href: '/wp/clients' },
   ]
 
   return (
@@ -162,7 +162,7 @@ export default function PlannerDashboard() {
                         </div>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                           {pendingCount > 0 && (
-                            <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: 'rgba(59,130,246,0.1)', color: '#3b82f6', fontWeight: 700 }}>
+                            <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: 'rgba(79,109,140,0.1)', color: '#4F6D8C', fontWeight: 700 }}>
                               {pendingCount} pendiente{pendingCount > 1 ? 's' : ''}
                             </span>
                           )}
@@ -181,7 +181,7 @@ export default function PlannerDashboard() {
               <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 8px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
                 <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ivory)' }}>
                   <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--charcoal)', fontFamily: 'Inter, sans-serif' }}>
-                    <Clock size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 5, color: '#3b82f6' }} />
+                    <Clock size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 5, color: '#4F6D8C' }} />
                     Respuestas pendientes
                   </span>
                 </div>
@@ -189,7 +189,7 @@ export default function PlannerDashboard() {
                   <div style={{ padding: '14px 18px' }}><Skeleton /><div style={{ marginTop: 8 }}><Skeleton w="70%" /></div></div>
                 ) : pendingVenues.length === 0 ? (
                   <div style={{ padding: '24px 18px', textAlign: 'center' }}>
-                    <CheckCircle size={22} style={{ color: '#22c55e', marginBottom: 8 }} />
+                    <CheckCircle size={22} style={{ color: '#5C7E64', marginBottom: 8 }} />
                     <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Sin respuestas pendientes</div>
                   </div>
                 ) : (
@@ -198,12 +198,12 @@ export default function PlannerDashboard() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', borderBottom: '1px solid var(--ivory)', transition: 'background 0.12s' }}
                         onMouseOver={e => (e.currentTarget.style.background = 'rgba(196,151,90,0.03)')}
                         onMouseOut={e => (e.currentTarget.style.background = 'transparent')}>
-                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Building2 size={12} color="#3b82f6" />
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(79,109,140,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Building2 size={12} color="#4F6D8C" />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.clientName}</div>
-                          <div style={{ fontSize: 10, color: '#3b82f6', fontWeight: 600 }}>Esperando respuesta del venue</div>
+                          <div style={{ fontSize: 10, color: '#4F6D8C', fontWeight: 600 }}>Esperando respuesta del venue</div>
                         </div>
                       </div>
                     </Link>
@@ -218,8 +218,8 @@ export default function PlannerDashboard() {
                 </div>
                 {[
                   { href: '/wp/clients', icon: <Users size={14} />, label: 'Ver todas las parejas', color: 'var(--gold)' },
-                  { href: '/wp/venues',  icon: <Building2 size={14} />, label: 'Explorar venues', color: '#6366f1' },
-                  { href: '/wp/branding', icon: <Palette size={14} />, label: 'Branding de propuesta', color: '#ec4899' },
+                  { href: '/wp/venues',  icon: <Building2 size={14} />, label: 'Explorar venues', color: '#5F6196' },
+                  { href: '/wp/branding', icon: <Palette size={14} />, label: 'Branding de propuesta', color: '#C56A92' },
                 ].map(item => (
                   <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderBottom: '1px solid var(--ivory)', transition: 'background 0.12s' }}

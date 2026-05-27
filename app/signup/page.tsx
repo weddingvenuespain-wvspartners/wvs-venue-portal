@@ -12,7 +12,7 @@ const GoogleIcon = () => (
     <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/>
     <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.6 8.3 6.3 14.7z"/>
     <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.3l-6.3-5.2C29.2 35 26.7 36 24 36c-5.2 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
-    <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4 5.5l6.3 5.2c-.4.4 7.4-5.3 7.4-14.7 0-1.3-.1-2.4-.4-3.5z"/>
+    <path fill="#466A8C" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4 5.5l6.3 5.2c-.4.4 7.4-5.3 7.4-14.7 0-1.3-.1-2.4-.4-3.5z"/>
   </svg>
 )
 const ArrowIcon = () => (
@@ -333,7 +333,7 @@ function SignupPageInner() {
                       He leído y acepto los{' '}
                       <a href="/terminos" target="_blank" rel="noopener noreferrer" style={{ color: '#8FAA94', textDecoration: 'underline' }}>términos de servicio</a>{' '}y la{' '}
                       <a href="/privacidad" target="_blank" rel="noopener noreferrer" style={{ color: '#8FAA94', textDecoration: 'underline' }}>política de privacidad</a>
-                      {' '}<span style={{ color: 'rgba(239,68,68,0.8)' }}>*</span>
+                      {' '}<span style={{ color: 'rgba(188,82,73,0.8)' }}>*</span>
                     </span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
@@ -382,10 +382,10 @@ function SignupPageInner() {
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
               <div style={{
                 width: 56, height: 56, borderRadius: '50%',
-                background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)',
+                background: 'rgba(92,126,100,0.12)', border: '1px solid rgba(92,126,100,0.25)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px',
               }}>
-                <Check size={24} color="#4ade80" strokeWidth={2.5} />
+                <Check size={24} color="#6E9478" strokeWidth={2.5} />
               </div>
               <h2 style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontSize: 22, fontWeight: 700, color: '#E8E6DC', margin: '0 0 8px', letterSpacing: -0.5 }}>
                 ¡Cuenta creada!

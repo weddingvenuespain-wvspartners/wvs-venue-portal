@@ -12,8 +12,8 @@ import { DatePicker as ShadcnDatePicker } from '@/components/ui/date-picker'
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_LABEL: Record<string, string> = { draft: 'Borrador', sent: 'Enviada', viewed: 'Vista' }
-const STATUS_COLOR: Record<string, string>  = { draft: 'var(--warm-gray)', sent: '#f59e0b', viewed: '#22c55e' }
-const STATUS_BG: Record<string, string>     = { draft: 'rgba(100,100,100,0.08)', sent: 'rgba(245,158,11,0.1)', viewed: 'rgba(34,197,94,0.1)' }
+const STATUS_COLOR: Record<string, string>  = { draft: 'var(--warm-gray)', sent: '#AC8B4C', viewed: '#5C7E64' }
+const STATUS_BG: Record<string, string>     = { draft: 'rgba(100,100,100,0.08)', sent: 'rgba(172,139,76,0.1)', viewed: 'rgba(92,126,100,0.1)' }
 
 const BUDGET_OPTS: [string, string][] = [
   ['menos_5k',  '< 5.000 €'],
@@ -452,7 +452,7 @@ export default function ClientsPage() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                       {availPending > 0 && (
-                        <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 10, background: 'rgba(59,130,246,0.1)', color: '#3b82f6', fontWeight: 600 }}>
+                        <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 10, background: 'rgba(79,109,140,0.1)', color: '#4F6D8C', fontWeight: 600 }}>
                           {availPending} pendiente{availPending !== 1 ? 's' : ''}
                         </span>
                       )}
@@ -491,7 +491,7 @@ export default function ClientsPage() {
             <form onSubmit={handleCreate} style={{ padding: '20px 28px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
               {formError && (
-                <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13 }}>
+                <div style={{ background: 'rgba(188,82,73,0.08)', border: '1px solid rgba(188,82,73,0.2)', borderRadius: 8, padding: '10px 14px', color: '#B0473E', fontSize: 13 }}>
                   {formError}
                 </div>
               )}

@@ -170,10 +170,10 @@ function PricingPageInner() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--cream)', gap: 16 }}>
         <div style={{
           width: 52, height: 52, borderRadius: '50%',
-          background: 'rgba(22,163,74,0.1)', display: 'flex',
+          background: 'rgba(74,107,82,0.1)', display: 'flex',
           alignItems: 'center', justifyContent: 'center',
         }}>
-          <Check size={24} color="#16a34a" strokeWidth={2.5} />
+          <Check size={24} color="#4A6B52" strokeWidth={2.5} />
         </div>
         <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 600, color: 'var(--charcoal)' }}>
           ¡Tu período de prueba está activado!
@@ -295,8 +295,8 @@ function PricingPageInner() {
                 {trialDaysLeft !== null && (
                   <span style={{
                     display: 'inline-block', marginLeft: 8, padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
-                    background: trialDaysLeft <= 3 ? 'rgba(220,38,38,0.12)' : 'rgba(196,151,90,0.15)',
-                    color: trialDaysLeft <= 3 ? '#dc2626' : 'var(--gold)',
+                    background: trialDaysLeft <= 3 ? 'rgba(176,71,62,0.12)' : 'rgba(196,151,90,0.15)',
+                    color: trialDaysLeft <= 3 ? '#B0473E' : 'var(--gold)',
                   }}>
                     {trialDaysLeft} días restantes
                   </span>
@@ -307,8 +307,8 @@ function PricingPageInner() {
             {isLoggedIn && isTrialExpired && (
               <div style={{
                 padding: '12px 20px',
-                background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)',
-                borderRadius: 8, fontSize: 13, color: '#dc2626', textAlign: 'center', lineHeight: 1.6,
+                background: 'rgba(176,71,62,0.06)', border: '1px solid rgba(176,71,62,0.2)',
+                borderRadius: 8, fontSize: 13, color: '#B0473E', textAlign: 'center', lineHeight: 1.6,
               }}>
                 <strong>Tu período de prueba ha finalizado.</strong><br />
                 Escoge un plan para seguir utilizando la plataforma.
@@ -368,8 +368,8 @@ function PricingPageInner() {
             </span>
             {billingAnnual && (
               <span style={{
-                fontSize: 11, fontWeight: 600, color: '#16a34a',
-                background: 'rgba(22,163,74,0.08)', padding: '3px 8px', borderRadius: 4,
+                fontSize: 11, fontWeight: 600, color: '#4A6B52',
+                background: 'rgba(74,107,82,0.08)', padding: '3px 8px', borderRadius: 4,
               }}>
                 Ahorra 2 meses
               </span>
@@ -405,17 +405,17 @@ function PricingPageInner() {
 
         {isPendingVerification && hasPlan && !isTrial && (
           <div style={{
-            background: 'rgba(22,163,74,0.06)',
-            border: '1px solid rgba(22,163,74,0.25)',
+            background: 'rgba(74,107,82,0.06)',
+            border: '1px solid rgba(74,107,82,0.25)',
             borderRadius: 12, padding: '20px 24px',
             marginBottom: 28, display: 'flex', gap: 16, alignItems: 'flex-start',
           }}>
             <div style={{
               width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(22,163,74,0.1)',
+              background: 'rgba(74,107,82,0.1)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Check size={18} color="#16a34a" />
+              <Check size={18} color="#4A6B52" />
             </div>
             <div>
               <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', fontFamily: 'Inter, sans-serif' }}>
@@ -431,8 +431,8 @@ function PricingPageInner() {
         {/* Error */}
         {error && (
           <div style={{
-            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-            borderRadius: 8, padding: '10px 16px', color: '#dc2626', fontSize: 13,
+            background: 'rgba(188,82,73,0.08)', border: '1px solid rgba(188,82,73,0.2)',
+            borderRadius: 8, padding: '10px 16px', color: '#B0473E', fontSize: 13,
             textAlign: 'center', marginBottom: 24,
           }}>
             {error}

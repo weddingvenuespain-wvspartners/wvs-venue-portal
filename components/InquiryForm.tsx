@@ -213,7 +213,7 @@ export default function InquiryForm({
         </div>
 
         {error && (
-          <div style={{ fontSize: 12, color: '#dc2626', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6 }}>
+          <div style={{ fontSize: 12, color: '#B0473E', padding: '8px 12px', background: '#FAF3F2', border: '1px solid #E9D4D0', borderRadius: 6 }}>
             {error}
           </div>
         )}

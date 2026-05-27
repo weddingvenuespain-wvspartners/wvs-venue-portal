@@ -73,10 +73,10 @@ export default function CheckoutSuccessPage() {
           <>
             <div style={{
               width: 56, height: 56, borderRadius: '50%', margin: '0 auto 20px',
-              background: 'rgba(34,197,94,0.1)', display: 'flex',
+              background: 'rgba(92,126,100,0.1)', display: 'flex',
               alignItems: 'center', justifyContent: 'center',
             }}>
-              <CheckCircle size={28} color="#22c55e" />
+              <CheckCircle size={28} color="#5C7E64" />
             </div>
             <h1 style={{
               fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 500,

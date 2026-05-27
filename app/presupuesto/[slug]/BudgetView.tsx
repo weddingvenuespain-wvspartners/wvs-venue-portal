@@ -291,10 +291,10 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
               type="password" value={pwInput}
               onChange={e => { setPwInput(e.target.value); setPwError(false) }}
               placeholder="Contrasena"
-              style={{ width: '100%', padding: '12px 16px', borderRadius: 10, fontSize: 14, border: `1px solid ${pwError ? '#fca5a5' : '#e8e2d9'}`, outline: 'none', background: pwError ? '#fef2f2' : '#fff', marginBottom: 8, boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '12px 16px', borderRadius: 10, fontSize: 14, border: `1px solid ${pwError ? '#E0C2BD' : '#e8e2d9'}`, outline: 'none', background: pwError ? '#FAF3F2' : '#fff', marginBottom: 8, boxSizing: 'border-box' }}
               autoFocus
             />
-            {pwError && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>Contrasena incorrecta</div>}
+            {pwError && <div style={{ fontSize: 12, color: '#B0473E', marginBottom: 8 }}>Contrasena incorrecta</div>}
             <button type="submit" style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: primaryColor, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', marginTop: 8 }}>
               Acceder
             </button>
@@ -366,14 +366,14 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
 
         {/* Expired banner */}
         {isExpired && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#991b1b' }}>
+          <div style={{ background: '#FAF3F2', border: '1px solid #E0C2BD', borderRadius: 10, padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#7E332D' }}>
             <AlertCircle size={16} /> Este presupuesto ha expirado
           </div>
         )}
 
         {/* Payment success banner */}
         {paySuccess && (
-          <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '14px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#166534' }}>
+          <div style={{ background: '#EEF2EC', border: '1px solid #C3D4C5', borderRadius: 10, padding: '14px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#35513E' }}>
             <CheckCircle size={16} /> Pago realizado correctamente. Tu cuota ha sido registrada.
           </div>
         )}
@@ -408,7 +408,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                   <span>{subtotal.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>
                 </div>
                 {budget.discount_type && budget.discount_amount && budget.discount_amount > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 20px', fontSize: 13, color: '#16a34a' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 20px', fontSize: 13, color: '#4A6B52' }}>
                     <span>Descuento{budget.discount_label ? ` — ${budget.discount_label}` : ''}</span>
                     <span>-{budget.discount_type === 'percent' ? `${budget.discount_amount}%` : budget.discount_amount.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>
                   </div>
@@ -483,11 +483,11 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
           <>
             {/* ── Contract signature required warning ── */}
             {paymentBlocked && (
-              <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 12, padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <AlertCircle size={18} style={{ color: '#b45309', flexShrink: 0, marginTop: 2 }} />
+              <div style={{ background: '#F3EBD8', border: '1px solid #fbbf24', borderRadius: 12, padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <AlertCircle size={18} style={{ color: '#8A6A38', flexShrink: 0, marginTop: 2 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#78350f', marginBottom: 4 }}>Firma el contrato antes de pagar</div>
-                  <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.5, marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, color: '#7A5A2E', lineHeight: 1.5, marginBottom: 10 }}>
                     Para realizar el primer pago, debes firmar el contrato y rellenar tus datos de facturación.
                   </div>
                   <button
@@ -523,7 +523,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                     <div key={i} style={{ width: `${weight}%`, position: 'relative', borderRadius: i === 0 ? '6px 0 0 6px' : i === paymentPlan.length - 1 ? '0 6px 6px 0' : 0, overflow: 'hidden' }}>
                       <div style={{
                         height: '100%', width: `${fillPercent}%`,
-                        background: isFull ? '#16a34a' : isPartial ? '#f59e0b' : 'transparent',
+                        background: isFull ? '#4A6B52' : isPartial ? '#AC8B4C' : 'transparent',
                         transition: 'width .5s ease',
                       }} />
                     </div>
@@ -541,7 +541,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#666' }}>
                       <div style={{
                         width: 8, height: 8, borderRadius: '50%',
-                        background: isFull ? '#16a34a' : isPartial ? '#f59e0b' : '#e0dbd4',
+                        background: isFull ? '#4A6B52' : isPartial ? '#AC8B4C' : '#e0dbd4',
                       }} />
                       {p.label}
                     </div>
@@ -586,16 +586,16 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                           <div style={{
                             position: 'absolute', left: -17, top: 4,
                             width: 10, height: 10, borderRadius: '50%', border: '2px solid #fff',
-                            background: isOverdue ? '#dc2626' : isUrgent ? '#f59e0b' : primaryColor,
+                            background: isOverdue ? '#B0473E' : isUrgent ? '#AC8B4C' : primaryColor,
                           }} />
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                               <div style={{ fontSize: 12, fontWeight: 600, color: '#1a1a1a' }}>{p.label}</div>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: isOverdue ? '#dc2626' : '#1a1a1a' }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: isOverdue ? '#B0473E' : '#1a1a1a' }}>
                                 {remaining.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
                               </div>
                             </div>
-                            <div style={{ fontSize: 11, color: isOverdue ? '#dc2626' : isUrgent ? '#f59e0b' : '#888', marginTop: 1 }}>
+                            <div style={{ fontSize: 11, color: isOverdue ? '#B0473E' : isUrgent ? '#AC8B4C' : '#888', marginTop: 1 }}>
                               {dueDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
                               {isOverdue ? ` · Vencido hace ${Math.abs(daysLeft)} días` :
                                 daysLeft === 0 ? ' · Vence hoy' :
@@ -606,9 +606,9 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                               <div style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4,
                                 fontSize: 10, padding: '2px 8px', borderRadius: 10,
-                                background: p.refundable ? '#f0fdf4' : '#fef2f2',
-                                color: p.refundable ? '#166534' : '#991b1b',
-                                border: `1px solid ${p.refundable ? '#86efac' : '#fca5a5'}`,
+                                background: p.refundable ? '#EEF2EC' : '#FAF3F2',
+                                color: p.refundable ? '#35513E' : '#7E332D',
+                                border: `1px solid ${p.refundable ? '#C3D4C5' : '#E0C2BD'}`,
                               }}>
                                 <RotateCcw size={9} />
                                 {p.refundable
@@ -631,7 +631,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
             {stripeConnected && remainingCount > 1 && !isExpired && (
               <div style={{ background: '#fff', border: `2px solid ${primaryColor}`, borderRadius: 12, padding: '20px', marginBottom: 20 }}>
                 {payError === 'all' && (
-                  <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 10 }}>Error al procesar el pago. Inténtalo de nuevo.</div>
+                  <div style={{ fontSize: 12, color: '#B0473E', marginBottom: 10 }}>Error al procesar el pago. Inténtalo de nuevo.</div>
                 )}
                 <button
                   onClick={() => payInstallment('all')}
@@ -694,19 +694,19 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                 return (
                   <div key={i} style={{
                     background: '#fff', borderRadius: 12, overflow: 'hidden',
-                    border: `2px solid ${isPaid ? '#86efac' : isOverdue ? '#fca5a5' : isFirstUnpaid ? primaryColor : '#e8e2d9'}`,
+                    border: `2px solid ${isPaid ? '#C3D4C5' : isOverdue ? '#E0C2BD' : isFirstUnpaid ? primaryColor : '#e8e2d9'}`,
                   }}>
                     <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
                       <div style={{
                         width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                        background: isPaid ? '#16a34a' : isPartial ? '#f59e0b' : isOverdue ? '#dc2626' : isFirstUnpaid ? primaryColor : '#e8e2d9',
+                        background: isPaid ? '#4A6B52' : isPartial ? '#AC8B4C' : isOverdue ? '#B0473E' : isFirstUnpaid ? primaryColor : '#e8e2d9',
                         color: '#fff', fontSize: 14, fontWeight: 700,
                       }}>
                         {isPaid ? <CheckCircle size={18} /> : i + 1}
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a' }}>{p.label}</div>
-                        <div style={{ fontSize: 12, color: isPaid ? '#16a34a' : isPartial ? '#f59e0b' : isOverdue ? '#dc2626' : '#888', marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: isPaid ? '#4A6B52' : isPartial ? '#AC8B4C' : isOverdue ? '#B0473E' : '#888', marginTop: 2 }}>
                           {isPaid ? `Pagado${p.paid_at ? ' el ' + new Date(p.paid_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' }) : ''}` :
                             isPartial ? `${partialPercent}% pagado — faltan ${remaining.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}` :
                             isOverdue ? 'Vencido — ' + new Date(p.due_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) :
@@ -714,7 +714,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 18, fontWeight: 700, color: isPaid ? '#16a34a' : '#1a1a1a' }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: isPaid ? '#4A6B52' : '#1a1a1a' }}>
                           {p.amount.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
                         </div>
                         {!isPaid && stripeConnected && remaining > 0 && (
@@ -729,7 +729,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                     {isPartial && (
                       <div style={{ padding: '0 20px 8px' }}>
                         <div style={{ height: 4, background: '#f0ece6', borderRadius: 2, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${partialPercent}%`, background: '#f59e0b', borderRadius: 2 }} />
+                          <div style={{ height: '100%', width: `${partialPercent}%`, background: '#AC8B4C', borderRadius: 2 }} />
                         </div>
                       </div>
                     )}
@@ -745,8 +745,8 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                             display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
                             background: '#faf8f5', borderRadius: 8, marginBottom: 4, fontSize: 12,
                           }}>
-                            <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#16a34a20', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <Check size={12} style={{ color: '#16a34a' }} />
+                            <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#4A6B5220', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <Check size={12} style={{ color: '#4A6B52' }} />
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontWeight: 500, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -758,7 +758,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                                 </div>
                               )}
                             </div>
-                            <div style={{ fontWeight: 600, color: '#16a34a', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: '#4A6B52', whiteSpace: 'nowrap' }}>
                               {Number(pay.amount).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
                             </div>
                           </div>
@@ -770,7 +770,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                     {canPay && (
                       <div style={{ padding: '0 20px 16px' }}>
                         {hasError && (
-                          <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>Error al procesar el pago. Inténtalo de nuevo.</div>
+                          <div style={{ fontSize: 12, color: '#B0473E', marginBottom: 8 }}>Error al procesar el pago. Inténtalo de nuevo.</div>
                         )}
 
                         {!splitMode ? (
@@ -877,9 +877,9 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                         <div style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4,
                           fontSize: 10, padding: '3px 10px', borderRadius: 10,
-                          background: p.refundable ? '#f0fdf4' : '#fef2f2',
-                          color: p.refundable ? '#166534' : '#991b1b',
-                          border: `1px solid ${p.refundable ? '#86efac' : '#fca5a5'}`,
+                          background: p.refundable ? '#EEF2EC' : '#FAF3F2',
+                          color: p.refundable ? '#35513E' : '#7E332D',
+                          border: `1px solid ${p.refundable ? '#C3D4C5' : '#E0C2BD'}`,
                         }}>
                           <RotateCcw size={9} />
                           {p.refundable
@@ -904,10 +904,10 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
 
             {/* All paid celebration */}
             {paidPercent === 100 && (
-              <div style={{ textAlign: 'center', padding: '32px 20px', marginTop: 20, background: '#f0fdf4', borderRadius: 12, border: '1px solid #86efac' }}>
+              <div style={{ textAlign: 'center', padding: '32px 20px', marginTop: 20, background: '#EEF2EC', borderRadius: 12, border: '1px solid #C3D4C5' }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>🎉</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#166534', fontFamily }}>Presupuesto completamente pagado</div>
-                <div style={{ fontSize: 13, color: '#16a34a', marginTop: 6 }}>Todas las cuotas han sido abonadas. ¡Gracias!</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#35513E', fontFamily }}>Presupuesto completamente pagado</div>
+                <div style={{ fontSize: 13, color: '#4A6B52', marginTop: 6 }}>Todas las cuotas han sido abonadas. ¡Gracias!</div>
               </div>
             )}
           </>
@@ -984,7 +984,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                     <div style={{ height: 50, borderBottom: '1px solid #ccc' }} />
                   )}
                   <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>{ctr.venue_name}</div>
-                  {ctr.venue_signed_at && <div style={{ fontSize: 10, color: '#16a34a', marginTop: 2 }}>✓ Firmado</div>}
+                  {ctr.venue_signed_at && <div style={{ fontSize: 10, color: '#4A6B52', marginTop: 2 }}>✓ Firmado</div>}
                 </div>
                 <div style={{ flex: 1, textAlign: 'center' }}>
                   <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Firma del cliente</div>
@@ -1005,7 +1005,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
                     <div style={{ height: 50, borderBottom: '1px solid #ccc' }} />
                   )}
                   <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>{ctr.client_name}</div>
-                  {ctr.client_signed_at && <div style={{ fontSize: 10, color: '#16a34a', marginTop: 2 }}>✓ Firmado</div>}
+                  {ctr.client_signed_at && <div style={{ fontSize: 10, color: '#4A6B52', marginTop: 2 }}>✓ Firmado</div>}
                 </div>
               </div>
             </div>
@@ -1168,7 +1168,7 @@ export default function BudgetView({ budget, venue, branding, isPreview, hasPass
             />
 
             {signError && (
-              <div style={{ marginTop: 10, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, fontSize: 12, color: '#991b1b' }}>
+              <div style={{ marginTop: 10, padding: '8px 12px', background: '#FAF3F2', border: '1px solid #E9D4D0', borderRadius: 6, fontSize: 12, color: '#7E332D' }}>
                 {signError}
               </div>
             )}

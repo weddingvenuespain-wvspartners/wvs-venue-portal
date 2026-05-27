@@ -322,7 +322,7 @@ export default function Sidebar() {
                 {item.badge != null && item.badge > 0 && (
                   <span style={{
                     marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
-                    background: '#ef4444', color: '#fff',
+                    background: '#BC5249', color: '#fff',
                     fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: '0 5px',
                   }}>
@@ -378,7 +378,7 @@ export default function Sidebar() {
                 {item.href === '/catering/leads' && newLeadsCount > 0 && (
                   <span style={{
                     marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
-                    background: '#ef4444', color: '#fff',
+                    background: '#BC5249', color: '#fff',
                     fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: '0 5px',
                   }}>
@@ -426,7 +426,7 @@ export default function Sidebar() {
                       {item.href === '/leads' && newLeadsCount > 0 && (
                         <span style={{
                           marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
-                          background: '#ef4444', color: '#fff',
+                          background: '#BC5249', color: '#fff',
                           fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
                           padding: '0 5px',
                         }}>
@@ -510,16 +510,16 @@ export default function Sidebar() {
       <div className="sidebar-footer">
         {/* Trial / plan banners — solo venue owner */}
         {isVenueOwner && !features.loading && features.isTrialExpired && (
-          <Link href="/pricing" style={{ display: 'block', padding: '16px 20px', background: 'rgba(220,38,38,0.10)', borderBottom: '1px solid rgba(255,255,255,0.07)', textDecoration: 'none' }}>
+          <Link href="/pricing" style={{ display: 'block', padding: '16px 20px', background: 'rgba(176,71,62,0.10)', borderBottom: '1px solid rgba(255,255,255,0.07)', textDecoration: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-              <Hourglass size={13} style={{ color: '#f87171', flexShrink: 0 }} />
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#f87171', letterSpacing: '0.1em' }}>PRUEBA FINALIZADA</span>
+              <Hourglass size={13} style={{ color: '#C97D75', flexShrink: 0 }} />
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#C97D75', letterSpacing: '0.1em' }}>PRUEBA FINALIZADA</span>
             </div>
             <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff', marginBottom: 9, lineHeight: 1.3 }}>Tu periodo de prueba ha terminado</div>
             <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginBottom: 12 }}>
-              <div style={{ height: '100%', width: '100%', background: '#f87171' }} />
+              <div style={{ height: '100%', width: '100%', background: '#C97D75' }} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 8, background: '#dc2626', color: '#fff', fontSize: 12.5, fontWeight: 700 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 8, background: '#B0473E', color: '#fff', fontSize: 12.5, fontWeight: 700 }}>
               Activar plan <ArrowRight size={14} />
             </div>
           </Link>
@@ -553,10 +553,10 @@ export default function Sidebar() {
         {isVenueOwner && !features.loading && !features.isTrial && !features.isTrialExpired && !features.hasPlan && (
           <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 20px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.07)', textDecoration: 'none' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#f87171' }}>Sin suscripción</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#C97D75' }}>Sin suscripción</div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Activa tu plan</div>
             </div>
-            <span style={{ fontSize: 9, fontWeight: 600, color: '#f87171', whiteSpace: 'nowrap' }}>Ver planes →</span>
+            <span style={{ fontSize: 9, fontWeight: 600, color: '#C97D75', whiteSpace: 'nowrap' }}>Ver planes →</span>
           </Link>
         )}
 
@@ -615,7 +615,7 @@ export default function Sidebar() {
               <button onMouseDown={() => { setUserMenuOpen(false); handleLogout() }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(248,113,113,0.10)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'none', border: 'none', borderRadius: 7, color: '#f87171', fontSize: 12.5, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left', transition: 'background 0.12s' }}>
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'none', border: 'none', borderRadius: 7, color: '#C97D75', fontSize: 12.5, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left', transition: 'background 0.12s' }}>
                 <LogOut size={14} style={{ flexShrink: 0 }} />
                 Cerrar sesión
               </button>

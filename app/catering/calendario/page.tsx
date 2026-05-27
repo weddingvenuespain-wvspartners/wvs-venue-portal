@@ -74,13 +74,13 @@ export default function CateringCalendarioPage() {
   const firstDayOfWeek = getFirstDayOfMonth(year, month)
 
   const dayColor: Record<DayStatus, string> = {
-    available:   '#22c55e',
-    unavailable: '#ef4444',
+    available:   '#5C7E64',
+    unavailable: '#BC5249',
     neutral:     'var(--charcoal)',
   }
   const dayBg: Record<DayStatus, string> = {
-    available:   'rgba(34,197,94,0.1)',
-    unavailable: 'rgba(239,68,68,0.08)',
+    available:   'rgba(92,126,100,0.1)',
+    unavailable: 'rgba(188,82,73,0.08)',
     neutral:     'transparent',
   }
 
@@ -140,8 +140,8 @@ export default function CateringCalendarioPage() {
           {/* Legend */}
           <div style={{ display: 'flex', gap: 20, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--ivory)' }}>
             {[
-              { color: '#22c55e', bg: 'rgba(34,197,94,0.1)', label: 'Disponible' },
-              { color: '#ef4444', bg: 'rgba(239,68,68,0.08)', label: 'No disponible' },
+              { color: '#5C7E64', bg: 'rgba(92,126,100,0.1)', label: 'Disponible' },
+              { color: '#BC5249', bg: 'rgba(188,82,73,0.08)', label: 'No disponible' },
               { color: 'var(--charcoal)', bg: 'transparent', label: 'Sin definir' },
             ].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -157,7 +157,7 @@ export default function CateringCalendarioPage() {
         </div>
 
         <button onClick={handleSave} disabled={saving}
-          style={{ marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 8, border: 'none', background: saved ? '#22c55e' : 'var(--charcoal)', color: '#fff', fontSize: 13, fontWeight: 500, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.7 : 1, fontFamily: 'Inter, sans-serif' }}>
+          style={{ marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 8, border: 'none', background: saved ? '#5C7E64' : 'var(--charcoal)', color: '#fff', fontSize: 13, fontWeight: 500, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.7 : 1, fontFamily: 'Inter, sans-serif' }}>
           {saved ? <><CheckCircle size={14} /> Guardado</> : <><Save size={14} /> Guardar calendario</>}
         </button>
 

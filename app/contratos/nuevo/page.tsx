@@ -286,7 +286,7 @@ export default function NuevoContratoPage() {
                     style={{
                       flex: 1, padding: '8px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                       border: 'none', cursor: 'pointer',
-                      background: template === t.key ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                      background: template === t.key ? '#4F6D8C' : 'rgba(255,255,255,0.1)',
                       color: template === t.key ? 'white' : 'rgba(255,255,255,0.7)',
                     }}
                   >
@@ -360,7 +360,7 @@ export default function NuevoContratoPage() {
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Detalles del evento</div>
               <div style={{ marginBottom: 10 }}>
-                <DatePicker value={weddingDate} onChange={setWeddingDate} label="Fecha de la boda" accent="#3b82f6" dark allowPast placeholder="Seleccionar fecha" />
+                <DatePicker value={weddingDate} onChange={setWeddingDate} label="Fecha de la boda" accent="#4F6D8C" dark allowPast placeholder="Seleccionar fecha" />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <div>

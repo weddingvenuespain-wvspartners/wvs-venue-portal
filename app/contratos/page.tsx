@@ -211,7 +211,7 @@ export default function ContratosPage() {
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button
                               className="btn btn-ghost btn-sm"
-                              style={{ width: 30, height: 30, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: '#2563EB', color: 'white' }}
+                              style={{ width: 30, height: 30, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: '#47648A', color: 'white' }}
                               title="Ver / Imprimir"
                               onClick={() => router.push(`/contratos/${c.id}`)}
                             >
@@ -237,7 +237,7 @@ export default function ContratosPage() {
                             </button>
                             <button
                               className="btn btn-ghost btn-sm"
-                              style={{ width: 30, height: 30, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: '#EF4444', color: 'white' }}
+                              style={{ width: 30, height: 30, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: '#BC5249', color: 'white' }}
                               title="Eliminar"
                               onClick={async (e) => {
                                 e.stopPropagation()
