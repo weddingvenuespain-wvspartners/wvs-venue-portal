@@ -838,18 +838,19 @@ function UserPanel({
                     return (
                       <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: val === true ? '#EEF2EC' : val === false ? '#FAF3F2' : 'var(--cream)', borderRadius: 6, gap: 6 }}>
                         <span style={{ fontSize: 11, color: 'var(--charcoal)', flex: 1 }}>{label}</span>
-                        <select
+                        <Select
                           value={val === null ? 'auto' : val ? 'on' : 'off'}
-                          onChange={e => {
-                            const v = e.target.value
-                            setOverride(key, v === 'auto' ? null : v === 'on')
-                          }}
-                          style={{ fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid var(--ivory)', background: '#fff', color: val === true ? '#4A6B52' : val === false ? '#B0473E' : 'var(--warm-gray)', cursor: 'pointer' }}
+                          onValueChange={(v) => setOverride(key, v === 'auto' ? null : v === 'on')}
                         >
-                          <option value="auto">Auto (plan)</option>
-                          <option value="on">✓ Activado</option>
-                          <option value="off">✗ Desactivado</option>
-                        </select>
+                          <SelectTrigger style={{ width: 'auto', height: 'auto', fontSize: 10, padding: '2px 4px', borderRadius: 4, background: '#fff', color: val === true ? '#4A6B52' : val === false ? '#B0473E' : 'var(--warm-gray)' }}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="auto">Auto (plan)</SelectItem>
+                            <SelectItem value="on">✓ Activado</SelectItem>
+                            <SelectItem value="off">✗ Desactivado</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     )
                   })}

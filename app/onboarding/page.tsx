@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { createClient } from '@/lib/supabase'
-import { Check, ArrowRight, Building2, MapPin, Globe, Phone, User, Loader2, CalendarHeart, UtensilsCrossed, ChevronDown, CreditCard } from 'lucide-react'
+import { Check, ArrowRight, Building2, MapPin, Globe, Phone, User, Loader2, CalendarHeart, UtensilsCrossed, CreditCard } from 'lucide-react'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 type AccountType = 'venue_owner' | 'wedding_planner' | 'catering'
 
@@ -308,17 +309,13 @@ export default function OnboardingPage() {
               </div>
 
               <label style={labelStyle}>Región / Zona</label>
-              <div style={{ position: 'relative', marginBottom: 28 }}>
-                <MapPin size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', pointerEvents: 'none', zIndex: 1 }} />
-                <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', pointerEvents: 'none' }} />
-                <select
-                  value={region}
-                  onChange={e => setRegion(e.target.value)}
-                  style={{ ...inputStyle, paddingRight: 32, appearance: 'none', cursor: 'pointer' }}
-                >
-                  <option value="">Selecciona una región...</option>
-                  {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
+              <div style={{ marginBottom: 28 }}>
+                <Select value={region} onValueChange={(v) => setRegion(v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecciona una región..." /></SelectTrigger>
+                  <SelectContent>
+                    {REGIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
 
               <button type="submit" disabled={saving}

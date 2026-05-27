@@ -466,21 +466,23 @@ export default function ProposalMenuEditor({
                     El total de comensales se repartirá entre los menús seleccionados
                   </div>
                 </div>
-                <select
-                  className="form-input"
-                  style={{ width: 120, fontSize: 12, textAlign: 'center' }}
-                  value={sections.menu_pick_limit ?? ''}
-                  onChange={e => {
-                    const v = e.target.value
-                    setSections(s => ({ ...s, menu_pick_limit: v === '' ? null : parseInt(v) }))
-                  }}
-                >
-                  <option value="">Sin límite</option>
-                  <option value="1">Solo 1</option>
-                  {Array.from({ length: Math.min(menus.length, 5) - 1 }, (_, i) => i + 2).map(n => (
-                    <option key={n} value={n}>Hasta {n}</option>
-                  ))}
-                </select>
+                <div style={{ width: 120 }}>
+                  <Select
+                    value={sections.menu_pick_limit != null ? String(sections.menu_pick_limit) : 'all'}
+                    onValueChange={(v) => {
+                      setSections(s => ({ ...s, menu_pick_limit: v === 'all' ? null : parseInt(v) }))
+                    }}
+                  >
+                    <SelectTrigger style={{ fontSize: 12 }}><SelectValue placeholder="Sin límite" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Sin límite</SelectItem>
+                      <SelectItem value="1">Solo 1</SelectItem>
+                      {Array.from({ length: Math.min(menus.length, 5) - 1 }, (_, i) => i + 2).map(n => (
+                        <SelectItem key={n} value={String(n)}>Hasta {n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
 

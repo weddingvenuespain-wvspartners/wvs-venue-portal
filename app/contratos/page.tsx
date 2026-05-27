@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { Plus, FileText, Search, Eye, Printer, Mail, X, Calendar } from 'lucide-react'
+import DatePicker from '@/components/DatePicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -152,9 +153,13 @@ export default function ContratosPage() {
               style={{ padding: '5px 10px', fontSize: 12, width: 180 }}
             />
             <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Fecha contrato:</span>
-            <input className="form-input" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ padding: '5px 8px', fontSize: 12, width: 130 }} />
+            <div style={{ width: 130 }}>
+              <DatePicker value={dateFrom} onChange={(v) => setDateFrom(v)} allowPast placeholder="dd/mm/aaaa" />
+            </div>
             <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>&rarr;</span>
-            <input className="form-input" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ padding: '5px 8px', fontSize: 12, width: 130 }} />
+            <div style={{ width: 130 }}>
+              <DatePicker value={dateTo} onChange={(v) => setDateTo(v)} allowPast placeholder="dd/mm/aaaa" />
+            </div>
             {hasFilters && (
               <button className="btn btn-ghost btn-sm" onClick={clearFilters} style={{ fontSize: 11 }}>
                 <X size={11} /> Limpiar

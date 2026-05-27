@@ -94,7 +94,7 @@ export default function GuiasPage() {
         <div className="page-content" style={{ maxWidth: 860, margin: '0 auto' }}>
 
           {/* Hero */}
-          <div style={{ background: 'linear-gradient(135deg,#fdf8ee,#fef3d0)', border: '1px solid #f0d98a', borderRadius: 16, padding: '32px 36px', marginBottom: 24, textAlign: 'center' }}>
+          <div style={{ background: '#F7F3E8', border: '1px solid #E2D4AE', borderRadius: 16, padding: '32px 36px', marginBottom: 24, textAlign: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
               <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(201,150,58,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <HelpCircle size={24} style={{ color: 'var(--gold)' }} />
@@ -151,7 +151,7 @@ export default function GuiasPage() {
           </div>
 
           {/* Contact */}
-          <div style={{ background: 'linear-gradient(135deg,#EEF2EC,#DDE7DF)', border: '1px solid #C3D4C5', borderRadius: 14, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
+          <div style={{ background: '#EEF2EC', border: '1px solid #C3D4C5', borderRadius: 14, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
                 <CheckCircle size={15} style={{ color: '#4A6B52' }} />

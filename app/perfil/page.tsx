@@ -1099,18 +1099,18 @@ function PerfilPageContent() {
                   <Section title="Duración de sesión" description="Por defecto las sesiones se mantienen 7 días. Ajústalo según tus preferencias de seguridad.">
                     <div className="form-group">
                       <label className="form-label">Mantener sesión iniciada</label>
-                      <select
-                        className="form-input"
-                        value={sessionDuration}
-                        onChange={e => setSessionDuration(e.target.value)}
-                        style={{ maxWidth: 320 }}
-                      >
-                        <option value="1d">1 día — máxima seguridad</option>
-                        <option value="7d">7 días — recomendado</option>
-                        <option value="30d">30 días — cómodo</option>
-                        <option value="90d">90 días — mínima fricción</option>
-                        <option value="forever">Sin límite — hasta cerrar sesión manualmente</option>
-                      </select>
+                      <div style={{ maxWidth: 320 }}>
+                        <Select value={sessionDuration} onValueChange={(v) => setSessionDuration(v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1d">1 día — máxima seguridad</SelectItem>
+                            <SelectItem value="7d">7 días — recomendado</SelectItem>
+                            <SelectItem value="30d">30 días — cómodo</SelectItem>
+                            <SelectItem value="90d">90 días — mínima fricción</SelectItem>
+                            <SelectItem value="forever">Sin límite — hasta cerrar sesión manualmente</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 6, lineHeight: 1.6 }}>
                         {sessionDuration === '1d'     && 'Necesitarás iniciar sesión cada día.'}
                         {sessionDuration === '7d'     && 'Recomendado para la mayoría de usuarios.'}

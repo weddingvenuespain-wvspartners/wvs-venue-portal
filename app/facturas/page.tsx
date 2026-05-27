@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import { Download, FileText, ExternalLink, RefreshCw, Plus, Send, Eye, MoreHorizontal, Search, Receipt, CreditCard } from 'lucide-react'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ export default function FacturasPage() {
             <button
               onClick={() => setTab('venue')}
               style={{
-                padding: '10px 20px', fontSize: 13, fontWeight: 500, border: 'none', background: 'none', cursor: 'pointer',
+                padding: '10px 20px', fontSize: 13, fontWeight: tab === 'venue' ? 700 : 500, border: 'none', background: 'none', cursor: 'pointer',
                 borderBottom: tab === 'venue' ? '2px solid var(--gold)' : '2px solid transparent',
                 color: tab === 'venue' ? 'var(--espresso)' : 'var(--warm-gray)',
                 marginBottom: -2
@@ -209,7 +210,7 @@ export default function FacturasPage() {
             <button
               onClick={() => setTab('stripe')}
               style={{
-                padding: '10px 20px', fontSize: 13, fontWeight: 500, border: 'none', background: 'none', cursor: 'pointer',
+                padding: '10px 20px', fontSize: 13, fontWeight: tab === 'stripe' ? 700 : 500, border: 'none', background: 'none', cursor: 'pointer',
                 borderBottom: tab === 'stripe' ? '2px solid var(--gold)' : '2px solid transparent',
                 color: tab === 'stripe' ? 'var(--espresso)' : 'var(--warm-gray)',
                 marginBottom: -2
@@ -265,20 +266,18 @@ export default function FacturasPage() {
                         style={{ padding: '5px 8px 5px 28px', fontSize: 12, width: 180 }}
                       />
                     </div>
-                    <select
-                      className="form-input"
-                      style={{ padding: '5px 8px', fontSize: 12, width: 'auto' }}
-                      value={venueFilter}
-                      onChange={e => setVenueFilter(e.target.value)}
-                    >
-                      <option value="all">Todos</option>
-                      <option value="draft">Borrador</option>
-                      <option value="sent">Enviada</option>
-                      <option value="paid">Pagada</option>
-                      <option value="partial">Parcial</option>
-                      <option value="overdue">Vencida</option>
-                      <option value="cancelled">Anulada</option>
-                    </select>
+                    <Select value={venueFilter} onValueChange={(v) => setVenueFilter(v)}>
+                      <SelectTrigger style={{ fontSize: 12, width: 'auto' }}><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="draft">Borrador</SelectItem>
+                        <SelectItem value="sent">Enviada</SelectItem>
+                        <SelectItem value="paid">Pagada</SelectItem>
+                        <SelectItem value="partial">Parcial</SelectItem>
+                        <SelectItem value="overdue">Vencida</SelectItem>
+                        <SelectItem value="cancelled">Anulada</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -397,12 +396,15 @@ export default function FacturasPage() {
                   <FileText size={14} style={{ color: 'var(--warm-gray)' }} />
                   <span style={{ fontSize: 13, fontWeight: 500 }}>Historial de facturación</span>
                   <div style={{ marginLeft: 'auto' }}>
-                    <select className="form-input" style={{ padding: '4px 8px', fontSize: 12, width: 'auto' }} value={stripeFilter} onChange={e => setStripeFilter(e.target.value)}>
-                      <option value="all">Todos</option>
-                      <option value="paid">Pagadas</option>
-                      <option value="open">Pendientes</option>
-                      <option value="void">Anuladas</option>
-                    </select>
+                    <Select value={stripeFilter} onValueChange={(v) => setStripeFilter(v)}>
+                      <SelectTrigger style={{ fontSize: 12, width: 'auto' }}><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="paid">Pagadas</SelectItem>
+                        <SelectItem value="open">Pendientes</SelectItem>
+                        <SelectItem value="void">Anuladas</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="table-wrapper">

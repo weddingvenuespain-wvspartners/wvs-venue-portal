@@ -9,6 +9,7 @@ import { useRequireSubscription } from '@/lib/use-require-subscription'
 import NoVenueState from '@/components/NoVenueState'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
+import WvsDatePicker from '@/components/DatePicker'
 import { Calendar as CalendarWidget } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { format, parseISO } from 'date-fns'
@@ -1860,7 +1861,7 @@ export default function CalendarioPage() {
                     {/* Nueva tarea button */}
                     <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'flex-end' }}>
                       <button onClick={() => { setTaskForm({ title: '', description: '', due_date: todayIso, type: 'internal', lead_id: '' }); setTaskModal(true) }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#7E72A0', color: '#fff', cursor: 'pointer' }}>
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#4A6B52', color: '#fff', cursor: 'pointer' }}>
                         <Plus size={14} /> Nueva tarea
                       </button>
                     </div>
@@ -2088,7 +2089,7 @@ export default function CalendarioPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label" style={{ fontSize: 11 }}>Fecha límite *</label>
-                <input type="date" className="form-input" value={taskForm.due_date} onChange={e => setTaskForm(f => ({ ...f, due_date: e.target.value }))} />
+                <WvsDatePicker value={taskForm.due_date} onChange={(v) => setTaskForm(f => ({ ...f, due_date: v }))} allowPast placeholder="dd/mm/aaaa" />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label" style={{ fontSize: 11 }}>Tipo</label>

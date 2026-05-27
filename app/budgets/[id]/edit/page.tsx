@@ -17,7 +17,8 @@ import type {
 import { calcBudgetTotal, applyPaymentTemplate } from '@/lib/budget-types'
 import BudgetView from '@/app/presupuesto/[slug]/BudgetView'
 import ProposalDateModal from '@/components/ProposalDateModal'
-import { fmtDate } from '@/components/DatePicker'
+import DatePicker, { fmtDate } from '@/components/DatePicker'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { applyCommissionToBudget } from '@/lib/budget-commission'
 
 function nanoid(len = 6): string {
@@ -597,16 +598,17 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
                 </div>
                 <div>
                   <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Modo</label>
-                  <select
-                    className="form-input"
-                    value={commissionMode ?? ''}
-                    onChange={e => setCommissionMode((e.target.value || null) as 'comisionable' | 'neto' | null)}
-                    style={{ fontSize: 12 }}
+                  <Select
+                    value={commissionMode ?? 'none'}
+                    onValueChange={(v) => setCommissionMode((v === 'none' ? null : v) as 'comisionable' | 'neto' | null)}
                   >
-                    <option value="">—</option>
-                    <option value="comisionable">Comisionable</option>
-                    <option value="neto">Neto (suma encima)</option>
-                  </select>
+                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">—</SelectItem>
+                      <SelectItem value="comisionable">Comisionable</SelectItem>
+                      <SelectItem value="neto">Neto (suma encima)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               {commissionPercent && commissionMode && (
@@ -708,11 +710,16 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
             {/* Discount */}
             <div style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <select className="form-input" style={{ width: 110, fontSize: 12 }} value={discountType ?? ''} onChange={e => setDiscountType(e.target.value as any || null)}>
-                  <option value="">Sin descuento</option>
-                  <option value="fixed">Fijo (€)</option>
-                  <option value="percent">Porcentaje (%)</option>
-                </select>
+                <div style={{ width: 110 }}>
+                  <Select value={discountType ?? 'none'} onValueChange={(v) => setDiscountType(v === 'none' ? null : (v as any))}>
+                    <SelectTrigger><SelectValue placeholder="Sin descuento" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin descuento</SelectItem>
+                      <SelectItem value="fixed">Fijo (€)</SelectItem>
+                      <SelectItem value="percent">Porcentaje (%)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 {discountType && (
                   <>
                     <input className="form-input" type="number" min={0} step={0.01} style={{ width: 80, fontSize: 12 }} value={discountAmount} onChange={e => setDiscountAmount(Number(e.target.value))} />
@@ -761,14 +768,17 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Plan de pagos</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {templates.length > 0 && (
-                  <select className="form-input" style={{ width: 150, fontSize: 11 }} defaultValue="" onChange={e => {
-                    const t = templates.find(t => t.id === e.target.value)
-                    if (t) applyTpl(t)
-                    e.target.value = ''
-                  }}>
-                    <option value="" disabled>Plantilla...</option>
-                    {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
+                  <div style={{ width: 150 }}>
+                    <Select value="" onValueChange={(v) => {
+                      const t = templates.find(t => t.id === v)
+                      if (t) applyTpl(t)
+                    }}>
+                      <SelectTrigger><SelectValue placeholder="Plantilla..." /></SelectTrigger>
+                      <SelectContent>
+                        {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
                 <button onClick={addPayment} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: 3 }}><Plus size={11} /> Cuota</button>
               </div>
@@ -784,11 +794,14 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 110px 70px 24px', gap: 0, alignItems: 'center' }}>
                       <input value={p.label} onChange={e => updatePayment(i, 'label', e.target.value)} className="form-input" style={{ border: 'none', padding: '3px 0', fontSize: 12 }} placeholder="Cuota" />
                       <input type="number" min={0} step={0.01} value={p.amount} onChange={e => updatePayment(i, 'amount', Number(e.target.value))} className="form-input" style={{ border: 'none', padding: '3px', fontSize: 12, textAlign: 'right' }} />
-                      <input type="date" value={p.due_date} onChange={e => updatePayment(i, 'due_date', e.target.value)} className="form-input" style={{ border: 'none', padding: '3px', fontSize: 11, textAlign: 'center' }} />
-                      <select value={p.status} onChange={e => updatePayment(i, 'status', e.target.value)} className="form-input" style={{ border: 'none', padding: '3px', fontSize: 10 }}>
-                        <option value="pending">Pend.</option>
-                        <option value="paid">Pagado</option>
-                      </select>
+                      <DatePicker value={p.due_date} onChange={(v) => updatePayment(i, 'due_date', v)} placeholder="dd/mm/aaaa" />
+                      <Select value={p.status} onValueChange={(v) => updatePayment(i, 'status', v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pend.</SelectItem>
+                          <SelectItem value="paid">Pagado</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <button onClick={() => removePayment(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rose)', padding: 1 }}><X size={11} /></button>
                     </div>
                     {/* Refundable toggle + deadline */}
@@ -805,12 +818,10 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
                       {p.refundable && (
                         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--warm-gray)' }}>
                           hasta
-                          <input
-                            type="date"
+                          <DatePicker
                             value={p.refund_deadline || ''}
-                            onChange={e => updatePayment(i, 'refund_deadline', e.target.value)}
-                            className="form-input"
-                            style={{ border: 'none', padding: '1px 3px', fontSize: 10 }}
+                            onChange={(v) => updatePayment(i, 'refund_deadline', v)}
+                            placeholder="dd/mm/aaaa"
                           />
                         </label>
                       )}
@@ -986,7 +997,7 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Válido hasta</label>
-                <input className="form-input" type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} />
+                <DatePicker value={validUntil} onChange={(v) => setValidUntil(v)} placeholder="dd/mm/aaaa" />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import type { Client, ClientType } from '@/lib/clients'
 import { CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS } from '@/lib/clients'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import DatePicker from '@/components/DatePicker'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -512,10 +514,14 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                     )}
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                       {editing ? (
-                        <select value={editForm.client_type} onChange={e => setEditForm(f => ({ ...f, client_type: e.target.value as ClientType }))}
-                          style={{ fontSize: 12, padding: '3px 8px', border: '1px solid var(--ivory)', borderRadius: 6, background: tc.bg, color: tc.color, fontFamily: 'Inter, sans-serif' }}>
-                          {Object.entries(CLIENT_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                        </select>
+                        <Select value={editForm.client_type} onValueChange={(v) => setEditForm(f => ({ ...f, client_type: v as ClientType }))}>
+                          <SelectTrigger style={{ fontSize: 12, padding: '3px 8px', border: '1px solid var(--ivory)', borderRadius: 6, background: tc.bg, color: tc.color, fontFamily: 'Inter, sans-serif', height: 'auto', width: 'auto' }}>
+                            <SelectValue placeholder="Tipo de cliente" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(CLIENT_TYPE_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       ) : (
                         <span style={{ fontSize: 12, fontWeight: 600, background: tc.bg, color: tc.color, borderRadius: 6, padding: '3px 10px', border: `1px solid ${tc.border}` }}>
                           {CLIENT_TYPE_LABELS[client.client_type] ?? client.client_type}
@@ -974,27 +980,31 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                           </div>
                           <div className="form-group" style={{ width: 140, marginBottom: 0 }}>
                             <label className="form-label" style={{ fontSize: 11 }}>Tipo</label>
-                            <select className="form-input" value={agreementForm.commission_type}
-                              onChange={e => setAgreementForm(f => ({ ...f, commission_type: e.target.value }))}
-                              style={{ fontSize: 13 }}>
-                              <option value="percentage">Porcentaje</option>
-                              <option value="fixed">Fijo (€)</option>
-                            </select>
+                            <Select value={agreementForm.commission_type}
+                              onValueChange={(v) => setAgreementForm(f => ({ ...f, commission_type: v }))}>
+                              <SelectTrigger className="form-input" style={{ fontSize: 13 }}>
+                                <SelectValue placeholder="Tipo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="percentage">Porcentaje</SelectItem>
+                                <SelectItem value="fixed">Fijo (€)</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
 
                         <div style={{ display: 'flex', gap: 12 }}>
                           <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
                             <label className="form-label" style={{ fontSize: 11 }}>Inicio acuerdo</label>
-                            <input type="date" className="form-input" value={agreementForm.agreement_start}
-                              onChange={e => setAgreementForm(f => ({ ...f, agreement_start: e.target.value }))}
-                              style={{ fontSize: 13 }} />
+                            <DatePicker value={agreementForm.agreement_start}
+                              onChange={(v) => setAgreementForm(f => ({ ...f, agreement_start: v }))}
+                              allowPast placeholder="dd/mm/aaaa" />
                           </div>
                           <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
                             <label className="form-label" style={{ fontSize: 11 }}>Fin acuerdo</label>
-                            <input type="date" className="form-input" value={agreementForm.agreement_end}
-                              onChange={e => setAgreementForm(f => ({ ...f, agreement_end: e.target.value }))}
-                              style={{ fontSize: 13 }} />
+                            <DatePicker value={agreementForm.agreement_end}
+                              onChange={(v) => setAgreementForm(f => ({ ...f, agreement_end: v }))}
+                              allowPast placeholder="dd/mm/aaaa" />
                           </div>
                         </div>
 

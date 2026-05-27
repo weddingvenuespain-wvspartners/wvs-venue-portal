@@ -16,6 +16,7 @@ import {
   CheckCircle, Clock, ExternalLink,
 } from 'lucide-react'
 import type { Budget, BudgetStatus, PaymentTemplate, LineItemGroup } from '@/lib/budget-types'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 const S_BADGE: Record<BudgetStatus, string> = {
   draft: 'badge-inactive',
@@ -213,10 +214,15 @@ export default function BudgetsPage() {
                   <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
                   <input className="form-input" style={{ paddingLeft: 34 }} placeholder="Buscar por pareja..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                 </div>
-                <select className="form-input" style={{ width: 160 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}>
-                  <option value="all">Todos los estados</option>
-                  {Object.entries(S_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
+                <div style={{ width: 160 }}>
+                  <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                    <SelectTrigger><SelectValue placeholder="Todos los estados" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los estados</SelectItem>
+                      {Object.entries(S_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {filtered.length === 0 ? (
@@ -538,9 +544,12 @@ function PaymentTemplatesTab({ templates, userId, venueId, onRefresh }: {
                 <input className="form-input" type="number" min={0} max={100} value={inst.percent} onChange={e => updateInstallment(i, 'percent', Number(e.target.value))} style={{ paddingRight: 24 }} />
                 <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--warm-gray)' }}>%</span>
               </div>
-              <select className="form-input" value={inst.due_rule} onChange={e => updateInstallment(i, 'due_rule', e.target.value)}>
-                {Object.entries(DUE_RULE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
+              <Select value={inst.due_rule} onValueChange={(v) => updateInstallment(i, 'due_rule', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(DUE_RULE_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
               {(inst.due_rule === 'months_before' || inst.due_rule === 'days_before') ? (
                 <input className="form-input" type="number" min={1} value={inst.due_rule === 'months_before' ? (inst.months ?? 1) : (inst.days ?? 7)}
                   onChange={e => updateInstallment(i, inst.due_rule === 'months_before' ? 'months' : 'days', Number(e.target.value))}

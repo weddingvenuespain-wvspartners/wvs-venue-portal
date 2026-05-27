@@ -478,20 +478,22 @@ export default function PlanesPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Plan asignado durante el trial</label>
-                    <select
-                      className="form-input"
-                      value={trialConfig.trial_plan_id ?? ''}
-                      onChange={e => setTrialConfig(c => ({ ...c, trial_plan_id: e.target.value || null }))}
+                    <Select
+                      value={trialConfig.trial_plan_id ?? '__none__'}
+                      onValueChange={(v) => setTrialConfig(c => ({ ...c, trial_plan_id: v === '__none__' ? null : v }))}
                     >
-                      <option value="">Sin plan específico — acceso Premium completo</option>
-                      {plans.filter(p => p.is_active).map(p => (
-                        <option key={p.id} value={p.id}>{p.display_name || p.name}</option>
-                      ))}
-                      {plans.some(p => !p.is_active) && <option disabled>── Planes inactivos ──</option>}
-                      {plans.filter(p => !p.is_active).map(p => (
-                        <option key={p.id} value={p.id}>{p.display_name || p.name} (inactivo)</option>
-                      ))}
-                    </select>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Sin plan específico — acceso Premium completo</SelectItem>
+                        {plans.filter(p => p.is_active).map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.display_name || p.name}</SelectItem>
+                        ))}
+                        {plans.some(p => !p.is_active) && <SelectItem value="__inactive_separator__" disabled>── Planes inactivos ──</SelectItem>}
+                        {plans.filter(p => !p.is_active).map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.display_name || p.name} (inactivo)</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Dynamic summary pill */}

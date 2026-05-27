@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import FeatureGate from '@/components/FeatureGate'
 import { createClient } from '@/lib/supabase'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import DatePicker, { fmtDate } from '@/components/DatePicker'
 import type { VisitAvailability, DaySchedule, BlockedDate, VenueSpaceGroup, VenueSpace, PricingSeason, PriceTier } from '@/lib/proposal-types'
 
@@ -1190,16 +1191,17 @@ export default function EstructuraPage() {
                           Fijas + elegir extra
                         </span>
                       ) : (
-                        <div style={{ position: 'relative', flexShrink: 0 }}>
-                          <select value={g.selection_mode}
-                            onChange={e => updateGroup({ selection_mode: e.target.value as any, pick_n_min: undefined, pick_n_max: undefined, included_zone_ids: undefined })}
-                            style={{ fontSize: 12, padding: '5px 28px 5px 10px', border: '1px solid var(--ivory)', borderRadius: 6, background: '#fff', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer', color: 'var(--charcoal)' }}>
-                            <option value="none">Todas incluidas</option>
-                            <option value="pick_one">Elegir 1 espacio</option>
-                            <option value="pick_n">Elegir varios</option>
-                            <option value="included_then_pick">Fijas + elegir extra</option>
-                          </select>
-                          <ChevronDown size={13} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--warm-gray)' }} />
+                        <div style={{ flexShrink: 0 }}>
+                          <Select value={g.selection_mode}
+                            onValueChange={(v) => updateGroup({ selection_mode: v as any, pick_n_min: undefined, pick_n_max: undefined, included_zone_ids: undefined })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Todas incluidas</SelectItem>
+                              <SelectItem value="pick_one">Elegir 1 espacio</SelectItem>
+                              <SelectItem value="pick_n">Elegir varios</SelectItem>
+                              <SelectItem value="included_then_pick">Fijas + elegir extra</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       )}
 
@@ -1217,15 +1219,16 @@ export default function EstructuraPage() {
                       {g.selection_mode === 'pick_n' && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                           <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Elegir</span>
-                          <div style={{ position: 'relative' }}>
-                            <select value={g.pick_n_min ?? 1}
-                              onChange={e => updateGroup({ pick_n_min: Number(e.target.value), pick_n_max: Number(e.target.value) })}
-                              style={{ fontSize: 12, padding: '5px 28px 5px 10px', border: '1px solid var(--ivory)', borderRadius: 6, background: '#fff', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer', color: 'var(--charcoal)' }}>
-                              {Array.from({ length: Math.max(g.spaces.length, 1) }, (_, i) => i + 1).map(n => (
-                                <option key={n} value={n}>{n}</option>
-                              ))}
-                            </select>
-                            <ChevronDown size={13} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--warm-gray)' }} />
+                          <div>
+                            <Select value={String(g.pick_n_min ?? 1)}
+                              onValueChange={(v) => updateGroup({ pick_n_min: Number(v), pick_n_max: Number(v) })}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: Math.max(g.spaces.length, 1) }, (_, i) => i + 1).map(n => (
+                                  <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
                       )}
@@ -1311,15 +1314,16 @@ export default function EstructuraPage() {
                         {selectableSpaces.length > 0 && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--ivory)' }}>
                             <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>El cliente elige cuántas:</span>
-                            <div style={{ position: 'relative' }}>
-                              <select value={pickCount}
-                                onChange={e => updateAndSaveGroup({ pick_n_min: Number(e.target.value), pick_n_max: Number(e.target.value) })}
-                                style={{ fontSize: 12, padding: '5px 28px 5px 10px', border: '1px solid var(--ivory)', borderRadius: 6, background: '#fff', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer', color: 'var(--charcoal)' }}>
-                                {Array.from({ length: maxPick }, (_, i) => i + 1).map(n => (
-                                  <option key={n} value={n}>{n}</option>
-                                ))}
-                              </select>
-                              <ChevronDown size={13} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--warm-gray)' }} />
+                            <div>
+                              <Select value={String(pickCount)}
+                                onValueChange={(v) => updateAndSaveGroup({ pick_n_min: Number(v), pick_n_max: Number(v) })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {Array.from({ length: maxPick }, (_, i) => i + 1).map(n => (
+                                    <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
                           </div>
                         )}

@@ -23,6 +23,7 @@ import {
   AlertTriangle, PartyPopper, Snowflake, Sparkles, Eye, Landmark, XCircle,
   Sprout, Sun, Leaf, Zap, LockKeyhole, OctagonAlert, Flower2, Info,
   List, LayoutGrid, Receipt, ChevronDown, ChevronUp, Paperclip, Upload, CheckCircle2, CalendarDays, Package, Inbox, SlidersHorizontal, Link2, Unlink, UserPlus, Loader2,
+  Crown, Heart, ClipboardList, Building2, User,
 } from 'lucide-react'
 
 // ── Types & config ─────────────────────────────────────────────────────────────
@@ -1357,7 +1358,7 @@ function LeadsPageInner() {
                 value={search} onChange={e => setSearch(e.target.value)} />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 auto', flexWrap: 'wrap' }}>
               <div style={{ minWidth: 170 }}>
                 <Select value={filterSrc} onValueChange={(v) => setFilterSrc(v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1381,7 +1382,7 @@ function LeadsPageInner() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Contacto: Todos</SelectItem>
-                    <SelectItem value="wedding_planner">👑 Wedding Planner</SelectItem>
+                    <SelectItem value="wedding_planner"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Crown size={13} /> Wedding Planner</span></SelectItem>
                     <SelectItem value="no_wp">Sin Wedding Planner</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1445,7 +1446,7 @@ function LeadsPageInner() {
               background: '#F2F1F8', border: '1px solid #d8b4fe', borderRadius: 8, marginBottom: 10, fontSize: 12,
             }}>
               <div style={{ width: 32, height: 32, borderRadius: 8, background: '#E9E6F3', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <span style={{ fontSize: 16 }}>👑</span>
+                <Crown size={16} style={{ color: '#7E72A0' }} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, color: '#5A4878' }}>
@@ -3542,13 +3543,15 @@ function DateConfirmModal({
                   {/* Time picker */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>Hora</label>
-                    <select
-                      value={visitTime}
-                      onChange={e => setVisitTime(e.target.value)}
-                      style={{ fontSize: 13, padding: '6px 10px', borderRadius: 8, border: '1.5px solid #C3D4C5', background: '#fff', color: visitTime ? '#111827' : '#9ca3af', outline: 'none', cursor: 'pointer', minWidth: 110 }}>
-                      <option value=''>Sin especificar</option>
-                      {timeSlots.map(t => <option key={t} value={t}>{t}h</option>)}
-                    </select>
+                    <div style={{ minWidth: 110 }}>
+                      <Select value={visitTime || 'all'} onValueChange={(v) => setVisitTime(v === 'all' ? '' : v)}>
+                        <SelectTrigger style={{ fontSize: 13 }}><SelectValue placeholder="Sin especificar" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Sin especificar</SelectItem>
+                          {timeSlots.map(t => <SelectItem key={t} value={t}>{t}h</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   {/* Duration picker */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -3965,7 +3968,7 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
               const s = SOURCE_COLORS[lead.source] || { bg: 'var(--ivory)', color: 'var(--charcoal)' }
               return (
                 <span style={{ fontSize: 10, background: s.bg, color: s.color, padding: '2px 8px', borderRadius: 10, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                  {lead.source === 'wedding_planner' && '👑 '}{clientName || SOURCE_LABEL[lead.source] || lead.source}
+                  {lead.source === 'wedding_planner' && <Crown size={11} />}{clientName || SOURCE_LABEL[lead.source] || lead.source}
                 </span>
               )
             })()}
@@ -4400,8 +4403,8 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 20, fontWeight: 600, color: 'var(--espresso)' }}>{lead.name}</div>
               {lead.source === 'wedding_planner' && (
-                <span style={{ fontSize: 10, background: 'rgba(126,114,160,0.12)', color: '#6A5B95', padding: '3px 8px', borderRadius: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' }}>
-                  👑 Planner
+                <span style={{ fontSize: 10, background: 'rgba(126,114,160,0.12)', color: '#6A5B95', padding: '3px 8px', borderRadius: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                  <Crown size={11} /> Planner
                 </span>
               )}
             </div>
@@ -4796,14 +4799,14 @@ function KanbanColumn({ col, leads, isOver, draggingId, onDragOver, onDragLeave,
                 cursor: isDragging ? 'grabbing' : 'grab',
                 opacity: isDragging ? 0.35 : 1,
                 transition: 'box-shadow 0.15s, opacity 0.15s',
-                boxShadow: isRecent ? '0 0 8px rgba(22,163,106,0.12)' : isPlanner ? '0 1px 4px rgba(126,114,160,0.1)' : '0 1px 2px rgba(0,0,0,0.03)',
+                boxShadow: isRecent ? '0 0 8px rgba(74,107,82,0.12)' : isPlanner ? '0 1px 4px rgba(126,114,160,0.1)' : '0 1px 2px rgba(0,0,0,0.03)',
               }}
-              onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 12px rgba(22,163,106,0.2)' : isPlanner ? '0 3px 10px rgba(126,114,160,0.15)' : '0 3px 10px rgba(0,0,0,0.07)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 8px rgba(22,163,106,0.12)' : isPlanner ? '0 1px 4px rgba(126,114,160,0.1)' : '0 1px 2px rgba(0,0,0,0.03)' }}
+              onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 12px rgba(74,107,82,0.2)' : isPlanner ? '0 3px 10px rgba(126,114,160,0.15)' : '0 3px 10px rgba(0,0,0,0.07)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = isRecent ? '0 0 8px rgba(74,107,82,0.12)' : isPlanner ? '0 1px 4px rgba(126,114,160,0.1)' : '0 1px 2px rgba(0,0,0,0.03)' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600, color: 'var(--espresso)', fontSize: 12.5, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {isRecent && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4A6B52', flexShrink: 0, animation: 'pulse-dot 2s ease-in-out infinite' }} />}
-                {isPlanner && !isRecent && <span style={{ fontSize: 9 }}>👑</span>}
+                {isPlanner && !isRecent && <Crown size={11} style={{ color: '#7E72A0', flexShrink: 0 }} />}
                 {lead.name}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
@@ -6178,12 +6181,12 @@ function LanguagePicker({ value, onChange }: { value: string; onChange: (v: stri
 
 // ── Client Link Selector ──────────────────────────────────────────────────────
 // Modes: idle (two buttons) → 'search' (dropdown) or 'create' (type picker + confirm)
-const CLIENT_TYPES_FOR_PICKER: { value: ClientType; label: string; icon: string }[] = [
-  { value: 'pareja',          label: 'Pareja',          icon: '💍' },
-  { value: 'wedding_planner', label: 'Wedding Planner', icon: '👑' },
-  { value: 'organizador',     label: 'Organizador',     icon: '📋' },
-  { value: 'empresa',         label: 'Empresa',         icon: '🏢' },
-  { value: 'otro',            label: 'Otro',            icon: '👤' },
+const CLIENT_TYPES_FOR_PICKER: { value: ClientType; label: string; icon: React.ReactNode }[] = [
+  { value: 'pareja',          label: 'Pareja',          icon: <Heart size={14} /> },
+  { value: 'wedding_planner', label: 'Wedding Planner', icon: <Crown size={14} /> },
+  { value: 'organizador',     label: 'Organizador',     icon: <ClipboardList size={14} /> },
+  { value: 'empresa',         label: 'Empresa',         icon: <Building2 size={14} /> },
+  { value: 'otro',            label: 'Otro',            icon: <User size={14} /> },
 ]
 
 function ClientLinkSelector({ venueId, clientId, onChange, leadInfo }: {
@@ -6331,6 +6334,7 @@ function ClientLinkSelector({ venueId, clientId, onChange, leadInfo }: {
               return (
                 <button key={ct.value} type="button" onClick={() => setNewType(ct.value)}
                   style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
                     padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
                     fontSize: 11.5, fontWeight: isActive ? 700 : 500,
                     background: isActive ? colors.bg : '#fff',

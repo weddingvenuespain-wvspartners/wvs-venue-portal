@@ -1015,16 +1015,17 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                     </div>
                     <div>
                       <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Modo</label>
-                      <select
-                        className="form-input"
-                        value={form.commission_mode ?? ''}
-                        onChange={e => setForm(f => ({ ...f, commission_mode: (e.target.value || null) as CommissionMode | null }))}
-                        style={{ fontSize: 12 }}
+                      <Select
+                        value={form.commission_mode || 'all'}
+                        onValueChange={(v) => setForm(f => ({ ...f, commission_mode: (v === 'all' ? null : v) as CommissionMode | null }))}
                       >
-                        <option value="">—</option>
-                        <option value="comisionable">Comisionable</option>
-                        <option value="neto">Neto (suma encima)</option>
-                      </select>
+                        <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">—</SelectItem>
+                          <SelectItem value="comisionable">Comisionable</SelectItem>
+                          <SelectItem value="neto">Neto (suma encima)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   {form.commission_percent && form.commission_mode && (
@@ -1118,14 +1119,17 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                        <select className="form-input" style={{ fontSize: 12 }} value={currentFlex} onChange={e => setLdf({ date_flexibility: e.target.value, wedding_date: '', wedding_date_to: '', wedding_date_ranges: [{ from: '', to: '' }] })}>
-                          <option value="exact">Fecha exacta</option>
-                          <option value="range">Rango de fechas</option>
-                          <option value="multi_range">Varios rangos</option>
-                          <option value="month">Mes</option>
-                          <option value="season">Temporada</option>
-                          <option value="flexible">Flexible</option>
-                        </select>
+                        <Select value={String(currentFlex)} onValueChange={(v) => setLdf({ date_flexibility: v, wedding_date: '', wedding_date_to: '', wedding_date_ranges: [{ from: '', to: '' }] })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="exact">Fecha exacta</SelectItem>
+                            <SelectItem value="range">Rango de fechas</SelectItem>
+                            <SelectItem value="multi_range">Varios rangos</SelectItem>
+                            <SelectItem value="month">Mes</SelectItem>
+                            <SelectItem value="season">Temporada</SelectItem>
+                            <SelectItem value="flexible">Flexible</SelectItem>
+                          </SelectContent>
+                        </Select>
 
                         {currentFlex === 'exact' && (
                           <DatePicker value={ldf.wedding_date ?? ''} onChange={v => setLdf({ wedding_date: v })} placeholder="Fecha" />
@@ -1155,13 +1159,16 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
                           <input className="form-input" style={{ fontSize: 12 }} placeholder="Mes (1-12)" type="number" min={1} max={12} value={ldf.wedding_month ?? ''} onChange={e => setLdf({ wedding_month: e.target.value ? Number(e.target.value) : null })} />
                         )}
                         {currentFlex === 'season' && (
-                          <select className="form-input" style={{ fontSize: 12 }} value={ldf.wedding_season ?? ''} onChange={e => setLdf({ wedding_season: e.target.value })}>
-                            <option value="">— Temporada —</option>
-                            <option value="spring">Primavera</option>
-                            <option value="summer">Verano</option>
-                            <option value="autumn">Otoño</option>
-                            <option value="winter">Invierno</option>
-                          </select>
+                          <Select value={ldf.wedding_season || 'all'} onValueChange={(v) => setLdf({ wedding_season: v === 'all' ? '' : v })}>
+                            <SelectTrigger><SelectValue placeholder="— Temporada —" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">— Temporada —</SelectItem>
+                              <SelectItem value="spring">Primavera</SelectItem>
+                              <SelectItem value="summer">Verano</SelectItem>
+                              <SelectItem value="autumn">Otoño</SelectItem>
+                              <SelectItem value="winter">Invierno</SelectItem>
+                            </SelectContent>
+                          </Select>
                         )}
 
                         <button type="button" className="btn btn-primary btn-sm" onClick={saveLeadDates} disabled={savingLeadDates}>

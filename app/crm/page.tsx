@@ -428,34 +428,34 @@ export default function CrmListPage() {
         {/* ── View tabs (Todos / Wedding Planners) ───────────────────── */}
         <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '2px solid var(--border)' }}>
           {([
-            { key: 'todos' as ViewTab, label: 'Todos', count: clients.length },
-            { key: 'planners' as ViewTab, label: '👑 Wedding Planners', count: kpis.wps },
+            { key: 'todos' as ViewTab, label: 'Todos', icon: null as React.ReactNode, count: clients.length },
+            { key: 'planners' as ViewTab, label: 'Wedding Planners', icon: <Crown size={14} /> as React.ReactNode, count: kpis.wps },
           ]).map(t => (
             <button key={t.key} onClick={() => setViewTab(t.key)}
               style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '10px 20px', fontSize: 13, fontWeight: viewTab === t.key ? 700 : 500,
                 color: viewTab === t.key ? 'var(--charcoal)' : 'var(--warm-gray)',
                 background: 'none', border: 'none', borderBottom: viewTab === t.key ? '2px solid var(--gold)' : '2px solid transparent',
                 cursor: 'pointer', marginBottom: -2, fontFamily: 'Inter, sans-serif',
               }}>
-              {t.label} <span style={{ fontSize: 11, color: 'var(--warm-gray)', marginLeft: 4 }}>({t.count})</span>
+              {t.icon}{t.label} <span style={{ fontSize: 11, color: 'var(--warm-gray)', marginLeft: 4 }}>({t.count})</span>
             </button>
           ))}
         </div>
 
         {/* ── Search, filters & sort ────────────────────────────────── */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, position: 'relative', minWidth: 200 }}>
-            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
-            <input
+          <div style={{ flex: '1 1 260px', position: 'relative', minWidth: 220 }}>
+            <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)', zIndex: 1 }} />
+            <input className="form-input" style={{ paddingLeft: 32, paddingRight: search ? 32 : 12 }}
               placeholder="Buscar por nombre, email o teléfono..."
               value={search} onChange={e => setSearch(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px 8px 30px', fontSize: 13, border: '1px solid var(--border)', borderRadius: 8, outline: 'none', background: '#fff' }}
             />
             {search && (
               <button onClick={() => setSearch('')}
-                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}>
-                <X size={13} />
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex' }}>
+                <X size={14} />
               </button>
             )}
           </div>
@@ -472,7 +472,7 @@ export default function CrmListPage() {
               </Select>
             </div>
           )}
-          <div style={{ width: 160 }}>
+          <div style={{ width: 200 }}>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as LeadStatusFilter)}>
               <SelectTrigger><SelectValue placeholder="Todos los estados" /></SelectTrigger>
               <SelectContent>
