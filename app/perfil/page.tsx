@@ -1416,7 +1416,7 @@ function PerfilPageContent() {
                         <div style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           padding: 16, borderRadius: 8, marginBottom: 20, flexWrap: 'wrap', gap: 12,
-                          background: features.planTier === 'premium' ? 'linear-gradient(135deg, #fef9ec, #fef3c7)' : 'var(--cream)',
+                          background: features.planTier === 'premium' ? '#FCF4E2' : 'var(--cream)',
                           border: features.planTier === 'premium' ? '1px solid #fde68a' : '1px solid var(--ivory)',
                         }}>
                           <div>
@@ -1463,7 +1463,7 @@ function PerfilPageContent() {
                         </div>
 
                         {features.planTier === 'basic' && !features.isTrial && (
-                          <div style={{ padding: 14, background: 'linear-gradient(135deg, #fef9ec, #fef3c7)', borderRadius: 8, border: '1px solid #fde68a', marginBottom: 16 }}>
+                          <div style={{ padding: 14, background: '#FCF4E2', borderRadius: 8, border: '1px solid #fde68a', marginBottom: 16 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                               <Zap size={14} style={{ color: '#b45309' }} />
                               <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Pasa a Premium</span>
@@ -1727,7 +1727,7 @@ function PerfilPageContent() {
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
                         <div style={{
                           width: 42, height: 42, borderRadius: 10, flexShrink: 0,
-                          background: 'linear-gradient(135deg, #fef9ec, #fde68a)',
+                          background: '#FBEFCB',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           border: '1px solid #fde68a',
                         }}>

@@ -2813,12 +2813,12 @@ function DateConfirmModal({
   const nextMonth = () => { if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) } else setViewMonth(m => m + 1) }
 
   // Header config per mode
-  const modeConfig = isPdfDigital   ? { label: 'Selecciona las fechas para el dosier digital', icon: <CalendarDays size={16} />, gradient: 'linear-gradient(135deg,#f0f4ff 0%,#f8f9ff 100%)', accent: '#4f6ef7', avatarBg: '#4f6ef7' }
-    : isVisitMode    ? { label: 'Agendar visita',          icon: <Landmark    size={16} />, gradient: 'linear-gradient(135deg,#fef3c7 0%,#fdf6ee 100%)', accent: 'var(--gold)',      avatarBg: 'var(--gold)' }
-    : isWonMode      ? { label: 'Confirmar boda',            icon: <PartyPopper size={16} />, gradient: 'linear-gradient(135deg,#f0fdf4 0%,#fafdf8 100%)', accent: '#16a34a',        avatarBg: 'var(--sage)' }
-    : isBudgetMode   ? { label: 'Presupuesto',               icon: <Receipt     size={16} />, gradient: 'linear-gradient(135deg,#fef3c7 0%,#fdf6ee 100%)', accent: 'var(--gold)',      avatarBg: 'var(--gold)' }
-    : isEditDatesMode ? { label: 'Editar fechas propuestas', icon: <CalendarDays size={16} />, gradient: 'linear-gradient(135deg,#f0f4ff 0%,#f8f9ff 100%)', accent: '#4f6ef7',        avatarBg: '#4f6ef7' }
-    :                  { label: 'Selecciona las fechas propuestas', icon: <CalendarDays size={16} />, gradient: 'linear-gradient(135deg,#f5f0ea 0%,#fafaf8 100%)', accent: 'var(--espresso)', avatarBg: 'var(--espresso)' }
+  const modeConfig = isPdfDigital   ? { label: 'Selecciona las fechas para el dosier digital', icon: <CalendarDays size={16} />, gradient: '#EFF1FB', accent: '#4f6ef7', avatarBg: '#4f6ef7' }
+    : isVisitMode    ? { label: 'Agendar visita',          icon: <Landmark    size={16} />, gradient: '#EEF1EC', accent: 'var(--gold)',      avatarBg: 'var(--gold)' }
+    : isWonMode      ? { label: 'Confirmar boda',            icon: <PartyPopper size={16} />, gradient: '#EDF7F0', accent: '#16a34a',        avatarBg: 'var(--sage)' }
+    : isBudgetMode   ? { label: 'Presupuesto',               icon: <Receipt     size={16} />, gradient: '#EEF1EC', accent: 'var(--gold)',      avatarBg: 'var(--gold)' }
+    : isEditDatesMode ? { label: 'Editar fechas propuestas', icon: <CalendarDays size={16} />, gradient: '#EFF1FB', accent: '#4f6ef7',        avatarBg: '#4f6ef7' }
+    :                  { label: 'Selecciona las fechas propuestas', icon: <CalendarDays size={16} />, gradient: '#F4F2EC', accent: 'var(--espresso)', avatarBg: 'var(--espresso)' }
 
   const dcmInitials = getInitials(lead.name || '')
   const canConfirm = !saving && !budgetUploading && (!isVisitMode || selectedDates.length > 0 || isPdfDigital)
@@ -6013,7 +6013,7 @@ function DateSummaryCard({
   icon?: React.ReactNode
   right?: React.ReactNode
 }) {
-  const goldGrad = 'linear-gradient(135deg, #fef3c7 0%, #fdf6ee 100%)'
+  const goldGrad = '#EEF1EC'
   return (
     <div style={{
       marginTop: 10,
@@ -6612,7 +6612,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
       <div className="modal" style={{ maxWidth: 620, width: '100%' }} onClick={e => e.stopPropagation()}>
 
         {/* Header — gradient with avatar */}
-        <div style={{ position: 'relative', padding: '20px 24px 18px', background: 'linear-gradient(135deg, #fef3c7 0%, #fdf6ee 100%)', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+        <div style={{ position: 'relative', padding: '20px 24px 18px', background: '#EEF1EC', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
           <div style={{ position: 'absolute', top: 14, right: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
             {onReturnToCalendar && (
               <button
@@ -8373,7 +8373,7 @@ function VisitScheduleModal({
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ position: 'relative', padding: '22px 24px 20px 54px', background: 'linear-gradient(135deg, #fef3c7 0%, #fdf6ee 100%)', borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+        <div style={{ position: 'relative', padding: '22px 24px 20px 54px', background: '#EEF1EC', borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
           {/* Back arrow — top left: vuelve a editar el lead si vino del edit modal, si no cierra */}
           <button
             onClick={onBack ?? onClose}
@@ -8670,7 +8670,7 @@ function VisitScheduleModal({
             style={{
               borderRadius: 14,
               padding: '16px 18px',
-              background: selected ? 'linear-gradient(135deg, #fef3c7 0%, #fdf6ee 100%)' : 'var(--cream)',
+              background: selected ? 'rgba(74,107,82,0.10)' : 'var(--cream)',
               border: `1.5px solid ${selected ? 'var(--gold)' : 'var(--ivory)'}`,
               display: 'flex', alignItems: 'center', gap: 14,
               transition: 'all 0.2s',
