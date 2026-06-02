@@ -110,7 +110,7 @@ function AdminDashboard() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
                 {[
                   { href: '/admin',            icon: <Users size={15} />,     label: 'CRM',            sub: 'Gestionar usuarios'    },
-                  { href: '/admin/planes',      icon: <CreditCard size={15} />, label: 'Planes',        sub: 'Precios y funciones'   },
+                  { href: '/admin/plans',       icon: <CreditCard size={15} />, label: 'Planes',        sub: 'Precios y funciones'   },
                   { href: '/admin/onboarding',  icon: <ClipboardList size={15} />, label: 'Solicitudes', sub: 'Revisar registros'    },
                   { href: '/admin/wedding-planners', icon: <Heart size={15} />, label: 'Peticiones WP', sub: `${wpStats.new} nuevas` },
                 ].map((item, i, arr) => (
@@ -458,57 +458,52 @@ function VenueDashboard() {
           )}
 
           {/* KPI cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
             {[
-              {
-                label: 'Leads este mes', icon: <Sparkles size={16} />,
-                value: leadsMonthCount,
-                href: '/leads',
-                sub: 'Desde tu ficha y canales',
-                accent: 'var(--espresso)', bg: '#fff',
-                border: 'var(--ivory)', stripe: 'var(--gold)',
-              },
-              {
-                label: 'En seguimiento', icon: <Users size={16} />,
-                value: kpiActive,
-                href: '/leads?tab=en_seguimiento',
-                sub: 'Leads activos en pipeline',
-                accent: 'var(--espresso)', bg: '#fff',
-                border: 'var(--ivory)', stripe: '#6A5B95',
-              },
-              {
-                label: 'Sin responder', icon: <Bell size={16} />,
-                value: kpiNew,
-                href: '/leads?tab=new',
-                sub: (kpiNew ?? 0) > 0 ? 'Requieren atención' : 'Al día ✓',
-                accent: (kpiNew ?? 0) > 0 ? '#B0473E' : 'var(--espresso)',
-                bg: (kpiNew ?? 0) > 0 ? '#fff8f8' : '#fff',
-                border: (kpiNew ?? 0) > 0 ? '#E0C2BD' : 'var(--ivory)',
-                stripe: (kpiNew ?? 0) > 0 ? '#B0473E' : '#4A6B52',
-              },
-              {
-                label: 'Bodas confirmadas', icon: <PartyPopper size={16} />,
-                value: kpiBooked,
-                href: '/leads?tab=confirmed',
-                sub: 'Reservas cerradas',
-                accent: 'var(--espresso)', bg: '#fff',
-                border: 'var(--ivory)', stripe: '#9A3F5F',
-              },
-            ].map((k: any, i) => (
+              { label: 'Leads este mes',    value: leadsMonthCount, href: '/leads',                   sub: new Date().toLocaleDateString('es-ES', { month: 'long' }),  alert: false, color: '#4A6B52', border: '#c8d9cc', bg: '#fff', icon: <TrendingUp size={18} /> },
+              { label: 'En seguimiento',    value: kpiActive,       href: '/leads?tab=en_seguimiento', sub: 'en proceso',    alert: false, color: '#4F6D8C', border: '#c5d2e0', bg: '#fff', icon: <Users size={18} /> },
+              { label: 'Sin responder',     value: kpiNew,          href: '/leads?tab=new',            sub: (kpiNew ?? 0) > 0 ? 'pendientes' : 'todo al día', alert: (kpiNew ?? 0) > 0, color: (kpiNew ?? 0) > 0 ? '#9A3530' : '#8B7355', border: (kpiNew ?? 0) > 0 ? '#e0b8b5' : '#d5cfc5', bg: '#fff', icon: <Bell size={18} /> },
+              { label: 'Confirmadas',       value: kpiBooked,       href: '/leads?tab=confirmed',      sub: 'bodas cerradas',      alert: false, color: '#AC8B4C', border: '#ddd2b8', bg: '#fff', icon: <PartyPopper size={18} /> },
+            ].map((k, i) => (
               <Link key={i} href={k.href}
-                style={{ display: 'block', textDecoration: 'none', background: k.bg, border: `1px solid ${k.border}`, borderRadius: 14, padding: '18px 20px', position: 'relative', overflow: 'hidden', borderTop: `3px solid ${k.stripe}`, transition: 'box-shadow 0.15s, transform 0.15s' }}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'translateY(0)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{k.label}</div>
-                  <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: k.stripe }}>
-                    {k.icon}
-                  </div>
+                style={{
+                  display: 'flex', flexDirection: 'column',
+                  textDecoration: 'none', padding: '20px 20px 18px',
+                  background: k.bg, border: `1.5px solid ${k.border}`,
+                  borderRadius: 12, transition: 'transform 0.15s, box-shadow 0.15s',
+                  position: 'relative', overflow: 'hidden',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}>
+
+                {/* Top row: label + icon */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 600, color: k.color,
+                    letterSpacing: '0.02em', opacity: 0.8,
+                  }}>{k.label}</div>
+                  <div style={{ color: k.color, opacity: 0.25 }}>{k.icon}</div>
                 </div>
-                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 34, fontWeight: 700, color: k.accent, lineHeight: 1, marginBottom: 6 }}>
-                  {k.value !== null ? k.value : <Skeleton w={40} h={28} radius={4} />}
+
+                {/* Number */}
+                <div style={{
+                  fontSize: 36, fontWeight: 800, lineHeight: 1,
+                  color: k.color,
+                  fontVariantNumeric: 'tabular-nums',
+                  marginBottom: 6,
+                }}>
+                  {k.value !== null ? k.value : <Skeleton w={36} h={28} radius={2} />}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{k.sub}</div>
+
+                {/* Sub */}
+                <div style={{
+                  fontSize: 11, color: k.color, opacity: 0.6,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  fontWeight: 500,
+                }}>
+                  {k.alert && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#9A3530', display: 'inline-block', animation: 'pulse-dot 2s infinite' }} />}
+                  {k.sub}
+                </div>
               </Link>
             ))}
           </div>
@@ -517,7 +512,7 @@ function VenueDashboard() {
           {(() => {
             const actions = [
               { href: '/leads?new=1', icon: <UserPlus size={16} />,    label: 'Nuevo lead',   sub: 'Añadir manualmente'   },
-              { href: '/calendario',  icon: <CalendarDays size={16} />, label: 'Calendario',   sub: 'Ver disponibilidad'   },
+              { href: '/calendar',    icon: <CalendarDays size={16} />, label: 'Calendario',   sub: 'Ver disponibilidad'   },
               { href: '/leads',       icon: <Users size={16} />,        label: 'Leads',        sub: 'Gestionar pipeline'   },
               { href: '/ficha',       icon: <TrendingUp size={16} />,   label: 'Editar ficha', sub: 'Info, fotos y precios'},
             ]
@@ -607,7 +602,10 @@ function VenueDashboard() {
           </div>
         </div>
       </div>
-      <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
+      <style>{`
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+        @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.3)} }
+      `}</style>
     </div>
   )
 }

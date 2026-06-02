@@ -49,7 +49,7 @@ const GoogleIcon = () => (
     <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/>
     <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.6 8.3 6.3 14.7z"/>
     <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.3l-6.3-5.2C29.2 35 26.7 36 24 36c-5.2 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
-    <path fill="#466A8C" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4 5.5l6.3 5.2c-.4.4 7.4-5.3 7.4-14.7 0-1.3-.1-2.4-.4-3.5z"/>
+    <path fill="#4285F4" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4 5.5l6.3 5.2c-.4.4 7.4-5.3 7.4-14.7 0-1.3-.1-2.4-.4-3.5z"/>
   </svg>
 )
 const ShieldIcon = () => (
@@ -124,8 +124,8 @@ function Hero() {
       borderRadius: 24,
       overflow: 'hidden',
       background: `
-        radial-gradient(ellipse 70% 55% at 50% 30%, rgba(143,170,148,0.55), transparent 65%),
-        radial-gradient(ellipse 80% 60% at 50% 20%, rgba(74,107,82,0.55), transparent 70%),
+        radial-gradient(ellipse 70% 55% at 50% 30%, rgba(143,170,148,0.30), transparent 65%),
+        radial-gradient(ellipse 80% 60% at 50% 20%, rgba(74,107,82,0.28), transparent 70%),
         linear-gradient(180deg, #1A2419 0%, #0C1410 100%)
       `,
       border: '1px solid rgba(255,255,255,0.06)',
@@ -176,14 +176,14 @@ function Hero() {
               gap: 12,
               padding: '12px 14px',
               borderRadius: 12,
-              background: i === 0 ? 'rgba(255,255,255,0.97)' : 'rgba(143,170,148,0.08)',
-              border: i === 0 ? '1px solid rgba(255,255,255,1)' : '1px solid rgba(143,170,148,0.16)',
+              background: i === 0 ? 'rgba(255,255,255,0.97)' : 'rgba(143,170,148,0.06)',
+              border: i === 0 ? '1px solid rgba(255,255,255,1)' : '1px solid rgba(143,170,148,0.14)',
               boxShadow: i === 0 ? '0 10px 26px rgba(20,30,22,0.40)' : undefined,
               textAlign: 'left',
             }}>
               <span style={{
                 width: 24, height: 24, borderRadius: '50%',
-                background: i === 0 ? '#4A6B52' : 'rgba(143,170,148,0.18)',
+                background: i === 0 ? '#4A6B52' : 'rgba(143,170,148,0.15)',
                 color: i === 0 ? '#fff' : '#8FAA94',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 11, fontWeight: 700, flexShrink: 0,
@@ -313,12 +313,12 @@ function LoginPageInner() {
           transition: border-color .2s, box-shadow .2s, background .2s;
           outline: none;
         }
-        .fe-input::placeholder { color: #5a6878; }
+        .fe-input::placeholder { color: #7A8A7E; }
         .fe-input:hover { border-color: rgba(255,255,255,0.16); }
         .fe-input:focus {
           border-color: #4A6B52;
           background: rgba(255,255,255,0.06);
-          box-shadow: 0 0 0 3px rgba(143,170,148,0.20);
+          box-shadow: 0 0 0 3px rgba(74,107,82,0.18);
         }
         .fe-input.has-icon { padding-left: 42px; }
         .fe-input.has-right { padding-right: 42px; }
@@ -333,7 +333,7 @@ function LoginPageInner() {
           border-radius: 10px;
           background: #4A6B52;
           border: none;
-          box-shadow: 0 4px 14px rgba(74,107,82,0.35);
+          box-shadow: 0 4px 14px rgba(74,107,82,0.30);
           color: #fff;
           font-weight: 600;
           font-size: 14px;
@@ -403,7 +403,7 @@ function LoginPageInner() {
           position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
           width: 32px; height: 32px; border-radius: 8px;
           display: flex; align-items: center; justify-content: center;
-          background: transparent; border: none; color: #5a6878; cursor: pointer;
+          background: transparent; border: none; color: #7A8A7E; cursor: pointer;
           transition: color .2s, background .2s;
         }
         .fe-eye-btn:hover { color: #8FAA94; background: rgba(255,255,255,0.04); }
@@ -432,8 +432,8 @@ function LoginPageInner() {
       <div style={{
         position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden',
         background: `
-          radial-gradient(ellipse 800px 600px at 15% 20%, rgba(74,107,82,0.18), transparent 60%),
-          radial-gradient(ellipse 700px 500px at 85% 85%, rgba(143,170,148,0.10), transparent 60%),
+          radial-gradient(ellipse 800px 600px at 15% 20%, rgba(74,107,82,0.14), transparent 60%),
+          radial-gradient(ellipse 700px 500px at 85% 85%, rgba(74,107,82,0.08), transparent 60%),
           #141E16
         `,
       }}>
@@ -520,7 +520,7 @@ function LoginPageInner() {
                         onChange={e => setEmail(e.target.value)}
                         required
                       />
-                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#5a6878', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#7A8A7E', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
                         <MailIcon />
                       </span>
                     </div>
@@ -541,7 +541,7 @@ function LoginPageInner() {
                         onChange={e => setPassword(e.target.value)}
                         required
                       />
-                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#5a6878', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#7A8A7E', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
                         <LockIcon />
                       </span>
                       <button type="button" className="fe-eye-btn" onClick={() => setShowPwd(s => !s)} aria-label={showPwd ? 'Ocultar' : 'Mostrar'}>
@@ -580,7 +580,7 @@ function LoginPageInner() {
                   </button>
 
                   {/* Social */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '16px 0 12px', color: '#5a6878', fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', fontWeight: 500 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '16px 0 12px', color: '#7A8A7E', fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', fontWeight: 500 }}>
                     <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.10)' }} />
                     o continúa con
                     <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.10)' }} />
@@ -605,7 +605,7 @@ function LoginPageInner() {
                   </div>
 
                   {/* Trust */}
-                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontSize: 11, color: '#5a6878' }}>
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontSize: 11, color: '#7A8A7E' }}>
                     <ShieldIcon /> <span>Cifrado RGPD</span>
                     <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'currentColor', opacity: 0.5, display: 'inline-block' }} />
                     <EuIcon /> <span>Servidores en la UE</span>
@@ -628,7 +628,7 @@ function LoginPageInner() {
                         onChange={e => setEmail(e.target.value)}
                         required
                       />
-                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#5a6878', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#7A8A7E', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
                         <MailIcon />
                       </span>
                     </div>
@@ -643,7 +643,7 @@ function LoginPageInner() {
                     <button
                       type="button"
                       className="fe-btn-ghost"
-                      style={{ color: '#8A9489', fontSize: 13 }}
+                      style={{ color: '#9A947E', fontSize: 13 }}
                       onClick={() => { setMode('login'); setError(''); setSuccess('') }}
                     >
                       ← Volver al login
@@ -667,7 +667,7 @@ function LoginPageInner() {
                         onChange={e => setNewPassword(e.target.value)}
                         required
                       />
-                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#5a6878', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#7A8A7E', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
                         <LockIcon />
                       </span>
                       <button type="button" className="fe-eye-btn" onClick={() => setShowPwd(s => !s)} aria-label={showPwd ? 'Ocultar' : 'Mostrar'}>

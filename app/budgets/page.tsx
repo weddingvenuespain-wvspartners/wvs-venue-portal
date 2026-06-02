@@ -130,7 +130,7 @@ export default function BudgetsPage() {
   }
 
   const copyLink = (slug: string) => {
-    const url = `${window.location.origin}/presupuesto/${slug}`
+    const url = `${window.location.origin}/budget/${slug}`
     navigator.clipboard.writeText(url)
     setCopied(slug)
     setTimeout(() => setCopied(null), 2000)
@@ -729,7 +729,7 @@ function SendBudgetModal({ budget, leads, onClose }: {
   const [search, setSearch] = useState('')
   const [copied, setCopied] = useState(false)
 
-  const budgetUrl = `${window.location.origin}/presupuesto/${budget.slug}`
+  const budgetUrl = `${window.location.origin}/budget/${budget.slug}`
   const filtered = leads.filter(l => !search || l.name.toLowerCase().includes(search.toLowerCase())).slice(0, 6)
   const waText = `Hola${lead ? ` ${lead.name.split(' ')[0]}` : ''}\n\nOs enviamos el presupuesto detallado para vuestra boda:\n\n${budgetUrl}\n\nAhí encontraréis el desglose completo y el plan de pagos. ¡Cualquier pregunta, aquí estamos!`
   const waLink = `https://wa.me/${lead?.phone?.replace(/[^0-9]/g, '') || ''}?text=${encodeURIComponent(waText)}`

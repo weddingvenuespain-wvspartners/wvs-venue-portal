@@ -1,9 +1,9 @@
 'use client'
-// Standardized sticky tab bar — used across /proposals, /comunicacion, /estructura, /ficha…
+// Standardized sticky tab bar — used across /dossier, /communication, /estructura, /ficha…
 //
 // Renders right below the topbar (top: 64) with cream bg + 2px ivory bottom border.
 // Each tab supports: icon (lucide), label, optional subtitle, optional badge.
-// When `href` is set the tab is a <Link> (cross-page navigation, e.g. /proposals ↔ /proposals/templates).
+// When `href` is set the tab is a <Link> (cross-page navigation, e.g. /dossier ↔ /dossier/templates).
 // Otherwise it's a <button> calling `onChange(key)` on click.
 
 import Link from 'next/link'

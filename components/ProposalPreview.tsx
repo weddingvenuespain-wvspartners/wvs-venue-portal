@@ -49,7 +49,7 @@ export default function ProposalPreview({ slug, patch, onReload }: { slug: strin
     if (iframeRef.current) iframeRef.current.src = iframeRef.current.src
   }
 
-  const src = slug ? `/proposal/${slug}?preview=1` : ''
+  const src = slug ? `/dossier/${slug}?preview=1` : ''
   const frameWidth = device === 'mobile' ? 390 : '100%'
   const frameHeight = device === 'mobile' ? 844 : '100%'
 
@@ -99,7 +99,7 @@ export default function ProposalPreview({ slug, patch, onReload }: { slug: strin
           </button>
           {slug && (
             <a
-              href={`/proposal/${slug}`}
+              href={`/dossier/${slug}`}
               target="_blank"
               rel="noopener"
               title="Abrir en pestaña nueva"

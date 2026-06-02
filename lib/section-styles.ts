@@ -97,6 +97,14 @@ export const SECTION_STYLES: Record<string, SectionStyleConfig> = {
       { id: 'rental_grid', label: 'Grid de alquiler', description: 'Tarifas por horario × temporada (requiere venue_rental)' },
     ],
   },
+  accommodation: {
+    sectionId: 'accommodation',
+    defaultVariant: 'informational',
+    variants: [
+      { id: 'informational', label: 'Informativo',  description: 'Descripción y listado de habitaciones sin reserva' },
+      { id: 'interactive',   label: 'Interactivo',  description: 'Tarjetas de habitación con selector de cantidad y precio', badge: 'Nuevo' },
+    ],
+  },
   schedule_visit: {
     sectionId: 'schedule_visit',
     defaultVariant: 'cta',

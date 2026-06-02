@@ -414,6 +414,13 @@ function LeadsPageInner() {
   const [inquiriesByLead, setInquiriesByLead] = useState<Record<string, any[]>>({})
   const [inquiryModalLead, setInquiryModalLead] = useState<any | null>(null)
 
+  // Task counts per lead (pending tasks)
+  const [taskCountsByLead, setTaskCountsByLead] = useState<Record<string, number>>({})
+  const [quickTaskLead, setQuickTaskLead] = useState<any | null>(null)
+  const [quickTaskForm, setQuickTaskForm] = useState({ title: '', due_date: '', category: 'seguimiento' })
+  const [quickTaskSaving, setQuickTaskSaving] = useState(false)
+  const [taskSuggestLead, setTaskSuggestLead] = useState<any | null>(null)
+
   // Deep-link: pick tab from ?tab= (e.g. dashboard KPIs link here)
   useEffect(() => {
     const t = searchParams.get('tab')
@@ -572,6 +579,20 @@ function LeadsPageInner() {
           setClientTypes(typeMap)
         }
       }
+
+      // Fetch pending task counts per lead
+      if (leadIds.length > 0) {
+        const { data: taskData } = await supabase
+          .from('venue_tasks').select('lead_id')
+          .eq('venue_id', activeVenue.id)
+          .eq('completed', false)
+          .in('lead_id', leadIds)
+        if (taskData) {
+          const counts: Record<string, number> = {}
+          taskData.forEach((t: any) => { counts[t.lead_id] = (counts[t.lead_id] || 0) + 1 })
+          setTaskCountsByLead(counts)
+        }
+      }
     }
     setLoading(false)
   }
@@ -590,6 +611,30 @@ function LeadsPageInner() {
       else setLostBanner({ name: '' })
       setTimeout(() => setLostBanner(null), 4000)
     }
+  }
+
+  // Quick-add task for a lead
+  const saveQuickTask = async () => {
+    if (!quickTaskLead || !quickTaskForm.title.trim() || !quickTaskForm.due_date || !activeVenue) return
+    setQuickTaskSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from('venue_tasks').insert({
+      user_id: user!.id,
+      venue_id: activeVenue.id,
+      title: quickTaskForm.title.trim(),
+      due_date: quickTaskForm.due_date,
+      type: 'lead',
+      lead_id: quickTaskLead.id,
+      priority: 'normal',
+      category: quickTaskForm.category,
+    })
+    if (!error) {
+      setTaskCountsByLead(prev => ({ ...prev, [quickTaskLead.id]: (prev[quickTaskLead.id] || 0) + 1 }))
+      showToast('Tarea creada')
+    }
+    setQuickTaskSaving(false)
+    setQuickTaskLead(null)
+    setQuickTaskForm({ title: '', due_date: '', category: 'seguimiento' })
   }
 
   // Tab counts (ignoring filters so counts are always real)
@@ -658,9 +703,8 @@ function LeadsPageInner() {
       if (filterBudget !== 'all' && l.budget !== filterBudget) return false
       if (filterContactType !== 'all') {
         const ct = l.client_id ? clientTypes[l.client_id] : null
-        const isWP = ct === 'wedding_planner' || l.source === 'wedding_planner'
-        if (filterContactType === 'wedding_planner' && !isWP) return false
-        if (filterContactType === 'no_wp' && isWP) return false
+        const leadType = ct || l.contact_type || (l.source === 'wedding_planner' ? 'wedding_planner' : 'pareja')
+        if (leadType !== filterContactType) return false
       }
       if (filterDateFrom || filterDateTo) {
         const dates = expandLeadDates(l)
@@ -775,6 +819,14 @@ function LeadsPageInner() {
     if (newTab && newTab !== activeTab) {
       setActiveTab(newTab)
       showToast(`Lead movido a "${TABS.find(t => t.key === newTab)?.label}"`, newTab)
+    }
+    // Suggest task creation for non-terminal status changes
+    if (status !== 'lost' && status !== 'won') {
+      const lead = leads.find(l => l.id === id)
+      if (lead) {
+        setTaskSuggestLead({ ...lead, ...leadUpdates })
+        setTimeout(() => setTaskSuggestLead((prev: any) => prev?.id === id ? null : prev), 6000)
+      }
     }
   }
 
@@ -1073,13 +1125,25 @@ function LeadsPageInner() {
   // Dosier digital: takes the selected dates from the calendar modal and creates a proposal
   const handlePdfDigitalDates = async (_leadUpdates: any, calendarDates: string[], _calStatus: any, _isVisit: boolean) => {
     if (!pdfDigitalLead || !user) return
-    const dateSlots = calendarDates.length > 0
-      ? [{ label: 'Fechas propuestas', dates: calendarDates.sort() }]
+    const sorted = calendarDates.slice().sort()
+    const dateSlots = sorted.length > 0
+      ? [{ label: 'Fechas propuestas', dates: sorted }]
       : []
+
+    // Persist chosen dates on the lead so the editor sidebar shows them all
+    if (sorted.length > 0) {
+      const supabase = createClient()
+      const leadDatePayload = sorted.length === 1
+        ? { date_flexibility: 'exact', wedding_date: sorted[0], wedding_date_to: null, wedding_date_ranges: null }
+        : { date_flexibility: 'multi_range', wedding_date: sorted[0], wedding_date_to: sorted[sorted.length - 1], wedding_date_ranges: sorted.map(d => ({ from: d, to: d })) }
+      await supabase.from('leads').update(leadDatePayload).eq('id', pdfDigitalLead.id)
+      setLeads(prev => prev.map(l => l.id === pdfDigitalLead.id ? { ...l, ...leadDatePayload } : l))
+    }
+
     const params = new URLSearchParams({ lead_id: pdfDigitalLead.id })
     if (dateSlots.length > 0) params.set('ds', btoa(JSON.stringify(dateSlots)))
     setPdfDigitalLead(null)
-    router.push(`/proposals/new?${params.toString()}`)
+    router.push(`/dossier/new?${params.toString()}`)
   }
 
   const requestDeleteLead = (id: string) => { setDeleteConfirmId(id) }
@@ -1349,73 +1413,73 @@ function LeadsPageInner() {
 
         <div className="page-content">
 
-          {/* Toolbar: search + filters + view toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: 280 }}>
+          {/* Toolbar: search + filters — single row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, background: '#fff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 12, padding: '8px 12px', boxShadow: '0 1px 4px rgba(20,30,22,0.04)' }}>
+            <div style={{ position: 'relative', width: 200, flexShrink: 0 }}>
               <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
-              <input className="form-input" style={{ paddingLeft: 32 }}
-                placeholder="Buscar por nombre o email…"
+              <input className="form-input" style={{ paddingLeft: 32, fontSize: 12.5, background: 'var(--fe-bg-light)', border: '1px solid rgba(0,0,0,0.06)' }}
+                placeholder="Buscar…"
                 value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 auto', flexWrap: 'wrap' }}>
-              <div style={{ minWidth: 170 }}>
-                <Select value={filterSrc} onValueChange={(v) => setFilterSrc(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Fuente: Todas</SelectItem>
-                    {Object.entries(SOURCE_LABEL).map(([v, l]) => <SelectItem key={v} value={v}>{l as string}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div style={{ minWidth: 200 }}>
-                <Select value={filterBudget} onValueChange={(v) => setFilterBudget(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Presupuesto: Todos</SelectItem>
-                    {BUDGET_OPTS.filter(v => v !== 'sin_definir').map(v => <SelectItem key={v} value={v}>{BUDGET_LABEL[v]}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div style={{ minWidth: 180 }}>
-                <Select value={filterContactType} onValueChange={(v) => setFilterContactType(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Contacto: Todos</SelectItem>
-                    <SelectItem value="wedding_planner"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Crown size={13} /> Wedding Planner</span></SelectItem>
-                    <SelectItem value="no_wp">Sin Wedding Planner</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {/* Date range filter */}
-              <FilterDateRangePicker
-                from={filterDateFrom} to={filterDateTo}
-                onChange={(f, t) => { setFilterDateFrom(f); setFilterDateTo(t) }}
-              />
-              {features.leads_date_filter && (
-                <button onClick={() => setHidePast(p => !p)}
-                  style={{ padding: '8px 12px', border: '1px solid var(--ivory)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap',
-                    background: hidePast ? 'var(--gold)' : '#fff',
-                    color: hidePast ? '#fff' : 'var(--warm-gray)',
-                    transition: 'all 0.15s' }}>
-                  <Clock size={13} /> Ocultar pasadas
-                </button>
-              )}
-              {(filterSrc !== 'all' || filterBudget !== 'all' || filterContactType !== 'all' || filterDateFrom || filterDateTo) && (
-                <button onClick={() => { setFilterSrc('all'); setFilterBudget('all'); setFilterContactType('all'); setFilterDateFrom(''); setFilterDateTo('') }}
-                  style={{ padding: '8px 10px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--warm-gray)', fontSize: 12, textDecoration: 'underline', whiteSpace: 'nowrap' }}>
-                  Limpiar
-                </button>
-              )}
+            <div style={{ flexShrink: 0 }}>
+              <Select value={filterSrc} onValueChange={(v) => setFilterSrc(v)}>
+                <SelectTrigger style={{ whiteSpace: 'nowrap', fontSize: 11.5, padding: '6px 10px', height: 34, background: 'var(--fe-bg-light)', border: '1px solid rgba(0,0,0,0.06)' }}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Fuente: Todas</SelectItem>
+                  {Object.entries(SOURCE_LABEL).map(([v, l]) => <SelectItem key={v} value={v}>{l as string}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-
+            <div style={{ flexShrink: 0 }}>
+              <Select value={filterBudget} onValueChange={(v) => setFilterBudget(v)}>
+                <SelectTrigger style={{ whiteSpace: 'nowrap', fontSize: 11.5, padding: '6px 10px', height: 34, background: 'var(--fe-bg-light)', border: '1px solid rgba(0,0,0,0.06)' }}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Presupuesto: Todos</SelectItem>
+                  {BUDGET_OPTS.filter(v => v !== 'sin_definir').map(v => <SelectItem key={v} value={v}>{BUDGET_LABEL[v]}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div style={{ flexShrink: 0 }}>
+              <Select value={filterContactType} onValueChange={(v) => setFilterContactType(v)}>
+                <SelectTrigger style={{ whiteSpace: 'nowrap', fontSize: 11.5, padding: '6px 10px', height: 34, background: 'var(--fe-bg-light)', border: '1px solid rgba(0,0,0,0.06)' }}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Contacto: Todos</SelectItem>
+                  <SelectItem value="pareja">Pareja</SelectItem>
+                  <SelectItem value="wedding_planner"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Crown size={13} /> Wedding Planner</span></SelectItem>
+                  <SelectItem value="organizador">Organizador</SelectItem>
+                  <SelectItem value="empresa">Empresa</SelectItem>
+                  <SelectItem value="cliente">Cliente</SelectItem>
+                  <SelectItem value="otro">Otro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Date range filter */}
+            <FilterDateRangePicker
+              from={filterDateFrom} to={filterDateTo}
+              onChange={(f, t) => { setFilterDateFrom(f); setFilterDateTo(t) }}
+            />
+            {features.leads_date_filter && (
+              <button onClick={() => setHidePast(p => !p)}
+                style={{ padding: '8px 12px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap',
+                  background: hidePast ? 'var(--gold)' : 'var(--fe-bg-light)',
+                  color: hidePast ? '#fff' : 'var(--warm-gray)',
+                  transition: 'all 0.15s' }}>
+                <Clock size={13} /> Ocultar pasadas
+              </button>
+            )}
+            {(filterSrc !== 'all' || filterBudget !== 'all' || filterContactType !== 'all' || filterDateFrom || filterDateTo) && (
+              <button onClick={() => { setFilterSrc('all'); setFilterBudget('all'); setFilterContactType('all'); setFilterDateFrom(''); setFilterDateTo('') }}
+                style={{ padding: '8px 10px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--warm-gray)', fontSize: 12, textDecoration: 'underline', whiteSpace: 'nowrap' }}>
+                Limpiar
+              </button>
+            )}
           </div>
 
           {/* Plan restriction notice */}
           {features.leads_new_only && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: 'var(--cream)', border: '1px solid var(--gold-light)', borderRadius: 8, marginBottom: 16, fontSize: 12, color: 'var(--charcoal)' }}>
               <AlertTriangle size={12} style={{ color: 'var(--gold)' }} />
-              <span>Tu plan <strong>{features.planName}</strong> muestra únicamente los leads nuevos recibidos. <a href="/perfil" style={{ color: 'var(--gold)', fontWeight: 600 }}>Actualiza tu plan</a> para acceder a todo el CRM de leads.</span>
+              <span>Tu plan <strong>{features.planName}</strong> muestra únicamente los leads nuevos recibidos. <a href="/profile" style={{ color: 'var(--gold)', fontWeight: 600 }}>Actualiza tu plan</a> para acceder a todo el CRM de leads.</span>
             </div>
           )}
 
@@ -1631,14 +1695,15 @@ function LeadsPageInner() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {activeTab === 'visit' ? (() => {
-                  const rowProps = { tab: activeTab as Tab, onMove: moveToStatusWithVisitCheck, onEdit: openEdit, onDelete: requestDeleteLead, onDetail: openEdit, onDateConfirm: triggerStatusChangeWithVisitCheck, onPdfDigital: (l: any) => { setPdfDigitalLead(l); setPdfDigitalKey(k => k + 1) }, onInquiries: (l: any) => setInquiryModalLead(l) }
+                  const rowProps = { tab: activeTab as Tab, onMove: moveToStatusWithVisitCheck, onEdit: openEdit, onDelete: requestDeleteLead, onDetail: openEdit, onDateConfirm: triggerStatusChangeWithVisitCheck, onPdfDigital: (l: any) => { setPdfDigitalLead(l); setPdfDigitalKey(k => k + 1) }, onInquiries: (l: any) => setInquiryModalLead(l), onQuickTask: (l: any) => setQuickTaskLead(l) }
                   const filtered = visibleLeads.filter(l =>
                     visitSubFilter === 'scheduled' ? l.status === 'visit_scheduled' :
                     visitSubFilter === 'post'      ? l.status === 'post_visit' : true
                   )
                   return filtered.map(lead => <LeadRow key={lead.id} lead={lead} {...rowProps} inquiries={inquiriesByLead[lead.id]}
                     selected={selectedIds.has(lead.id)} onToggleSelect={toggleSelect}
-                    clientName={lead.client_id ? clientNames[lead.client_id] : undefined} />)
+                    clientName={lead.client_id ? clientNames[lead.client_id] : undefined}
+                    taskCount={taskCountsByLead[lead.id]} />)
                 })() : visibleLeads.map(lead => (
                   <LeadRow key={lead.id} lead={lead} tab={activeTab}
                     onMove={moveToStatusWithVisitCheck} onEdit={openEdit}
@@ -1648,7 +1713,9 @@ function LeadsPageInner() {
                     inquiries={inquiriesByLead[lead.id]}
                     onInquiries={(l: any) => setInquiryModalLead(l)}
                     selected={selectedIds.has(lead.id)} onToggleSelect={toggleSelect}
-                    clientName={lead.client_id ? clientNames[lead.client_id] : undefined} />
+                    clientName={lead.client_id ? clientNames[lead.client_id] : undefined}
+                    taskCount={taskCountsByLead[lead.id]}
+                    onQuickTask={(l: any) => setQuickTaskLead(l)} />
                 ))}
               </div>
             )}
@@ -1701,6 +1768,28 @@ function LeadsPageInner() {
         </div>
       )}
 
+      {/* Task suggestion after status change */}
+      {taskSuggestLead && (
+        <div style={{
+          position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
+          background: '#fff', border: '1px solid rgba(126,114,160,0.3)', padding: '10px 16px',
+          borderRadius: 10, fontSize: 12, fontWeight: 500, zIndex: 2001,
+          boxShadow: '0 6px 24px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap',
+          animation: 'fe-cardRise 0.25s ease-out',
+        }}>
+          <ClipboardList size={14} style={{ color: '#7E72A0', flexShrink: 0 }} />
+          <span style={{ color: 'var(--charcoal)' }}>¿Añadir tarea para <strong>{taskSuggestLead.name}</strong>?</span>
+          <button onClick={() => { setQuickTaskLead(taskSuggestLead); setTaskSuggestLead(null) }}
+            style={{ fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 7, border: 'none', background: '#7E72A0', color: '#fff', cursor: 'pointer' }}>
+            + Tarea
+          </button>
+          <button onClick={() => setTaskSuggestLead(null)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c0bbb4', padding: 2, display: 'flex' }}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* DetailDrawer rendering removed — detail view disabled */}
 
       <ImportLeadsModal
@@ -1716,7 +1805,7 @@ function LeadsPageInner() {
         <LeadFormModal form={form} setForm={setForm} isEdit={!!editLead} editLead={editLead}
           saving={saving} onSubmit={handleSubmit} userId={user!.id} venueId={activeVenue!.id}
           onClose={() => { setShowForm(false); setEditLead(null) }}
-          onReturnToCalendar={returnToCalendarDate ? () => { setReturnToCalendarDate(null); router.push(`/calendario?openDate=${returnToCalendarDate}`) } : undefined}
+          onReturnToCalendar={returnToCalendarDate ? () => { setReturnToCalendarDate(null); router.push(`/calendar?openDate=${returnToCalendarDate}`) } : undefined}
           onEditVisit={() => {
             if (!editLead) return
             setReturnToEditAfterVisit(true)
@@ -2033,6 +2122,60 @@ function LeadsPageInner() {
           </div>
         )
       })()}
+
+      {/* Quick Task Modal */}
+      {quickTaskLead && (
+        <div onClick={() => setQuickTaskLead(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 380, boxShadow: '0 16px 48px rgba(0,0,0,0.16)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <ClipboardList size={16} style={{ color: '#7E72A0' }} /> Tarea rápida
+              </div>
+              <button onClick={() => setQuickTaskLead(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={16} /></button>
+            </div>
+
+            <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 12, padding: '6px 10px', background: '#E9E6F3', borderRadius: 6 }}>
+              Lead: <strong style={{ color: '#4F417A' }}>{quickTaskLead.name}</strong>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label className="form-label" style={{ fontSize: 11 }}>Título *</label>
+              <input className="form-input" value={quickTaskForm.title}
+                onChange={e => setQuickTaskForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Ej: Llamar para seguimiento" autoFocus />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Fecha *</label>
+                <input type="date" className="form-input" style={{ fontSize: 12 }}
+                  value={quickTaskForm.due_date}
+                  onChange={e => setQuickTaskForm(f => ({ ...f, due_date: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Categoría</label>
+                <select className="form-input" style={{ fontSize: 12 }}
+                  value={quickTaskForm.category}
+                  onChange={e => setQuickTaskForm(f => ({ ...f, category: e.target.value }))}>
+                  <option value="llamar">📞 Llamar</option>
+                  <option value="enviar_dossier">📄 Enviar dossier</option>
+                  <option value="seguimiento">🔄 Seguimiento</option>
+                  <option value="visita">🏠 Visita</option>
+                  <option value="otro">📌 Otro</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setQuickTaskLead(null)}>Cancelar</button>
+              <button onClick={saveQuickTask} disabled={quickTaskSaving || !quickTaskForm.title.trim() || !quickTaskForm.due_date}
+                style={{ fontSize: 12, fontWeight: 600, padding: '7px 18px', borderRadius: 8, border: 'none', background: '#7E72A0', color: '#fff', cursor: quickTaskSaving ? 'not-allowed' : 'pointer', opacity: (quickTaskSaving || !quickTaskForm.title.trim() || !quickTaskForm.due_date) ? 0.6 : 1 }}>
+                {quickTaskSaving ? 'Creando...' : 'Crear tarea'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -3878,7 +4021,7 @@ function timeAgo(dateStr: string): { text: string; urgent: boolean; warning: boo
 }
 
 // ── Lead Row ───────────────────────────────────────────────────────────────────
-function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm, onPdfDigital, inquiries, onInquiries, selected, onToggleSelect, clientName }: {
+function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm, onPdfDigital, inquiries, onInquiries, selected, onToggleSelect, clientName, taskCount, onQuickTask }: {
   lead: any; tab: Tab
   onMove: (id: string, s: DbStatus) => void
   onEdit: (l: any) => void
@@ -3891,6 +4034,8 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
   selected?: boolean
   onToggleSelect?: (id: string) => void
   clientName?: string
+  taskCount?: number
+  onQuickTask?: (lead: any) => void
 }) {
 
   // Fresh lead highlight: < 2h old in the "new" tab
@@ -3959,6 +4104,13 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
                 ⚠ Sin responder
               </span>
             )}
+            {/* Task count badge */}
+            {(taskCount ?? 0) > 0 && (
+              <span style={{ fontSize: 10, fontWeight: 700, background: 'rgba(126,114,160,0.12)', color: '#6A5B95', padding: '2px 8px', borderRadius: 10, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                title={`${taskCount} tarea${taskCount! > 1 ? 's' : ''} pendiente${taskCount! > 1 ? 's' : ''}`}>
+                <ClipboardList size={10} /> {taskCount}
+              </span>
+            )}
           </div>
 
           {/* Row 2: Metadata pills */}
@@ -3968,7 +4120,7 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
               const s = SOURCE_COLORS[lead.source] || { bg: 'var(--ivory)', color: 'var(--charcoal)' }
               return (
                 <span style={{ fontSize: 10, background: s.bg, color: s.color, padding: '2px 8px', borderRadius: 10, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                  {lead.source === 'wedding_planner' && <Crown size={11} />}{clientName || SOURCE_LABEL[lead.source] || lead.source}
+                  {lead.source === 'wedding_planner' && <Crown size={11} />}{(clientName && clientName !== lead.name) ? clientName : (SOURCE_LABEL[lead.source] || lead.source)}
                 </span>
               )
             })()}
@@ -4086,8 +4238,17 @@ function LeadRow({ lead, tab, onMove, onEdit, onDelete, onDetail, onDateConfirm,
       </div>
 
       {/* Actions row */}
-      <div style={{ padding: '7px 14px 10px', background: 'var(--cream)', borderTop: '1px solid var(--ivory)', borderRadius: '0 0 13px 13px' }}>
-        <QuickActions lead={lead} tab={tab} onMove={onMove} onEdit={onEdit} onDelete={onDelete} onDateConfirm={onDateConfirm} onPdfDigital={onPdfDigital} />
+      <div style={{ padding: '7px 14px 10px', background: 'var(--cream)', borderTop: '1px solid var(--ivory)', borderRadius: '0 0 13px 13px', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ flex: 1 }}>
+          <QuickActions lead={lead} tab={tab} onMove={onMove} onEdit={onEdit} onDelete={onDelete} onDateConfirm={onDateConfirm} onPdfDigital={onPdfDigital} />
+        </div>
+        {onQuickTask && (
+          <button onClick={(e) => { e.stopPropagation(); onQuickTask(lead) }}
+            style={{ fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 7, border: '1px solid rgba(126,114,160,0.25)', background: 'rgba(126,114,160,0.06)', color: '#6A5B95', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+            title="Crear tarea rápida">
+            <ClipboardList size={11} /> + Tarea
+          </button>
+        )}
       </div>
     </div>
   )
@@ -4154,7 +4315,7 @@ function PresupuestoBtn({ lead, canProposal, onMove, onDateConfirm }: {
             <ChevronRight size={11} /> Mover a presupuesto
           </button>
           {canProposal
-            ? <a href={`/proposals/new?lead_id=${lead.id}`} className="qa qa-ghost"
+            ? <a href={`/dossier/new?lead_id=${lead.id}`} className="qa qa-ghost"
                 style={{ width: '100%', borderRadius: 7, border: 'none', justifyContent: 'flex-start', background: 'transparent' }}
                 onClick={() => setOpen(false)}>
                 <Zap size={11} /> Presupuesto digital
@@ -4317,7 +4478,7 @@ function QuickActions({ lead, tab, onMove, onEdit, onDelete, onDateConfirm, onPd
 
       {tab === 'confirmed' && (<>
         {canProposal
-          ? <a href="/proposals" className="qa qa-ghost"><ExternalLink size={11} /> Dosier</a>
+          ? <a href="/dossier" className="qa qa-ghost"><ExternalLink size={11} /> Dosier</a>
           : <span className="qa qa-ghost qa-locked" title="Disponible en plan Premium"><FileText size={11} /> Dosier <LockKeyhole size={11} /></span>}
         <MoreMenu items={[
           { label: 'Cancelar boda', icon: <XCircle size={11} />, danger: true, onClick: () => onMove(lead.id, 'lost') },
@@ -4707,7 +4868,7 @@ function DetailDrawer({ lead, tab, onClose, onEdit, onDelete, onMove, onDateConf
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {canProposal ? (
-              <a href={`/proposals/new?lead_id=${lead.id}`}
+              <a href={`/dossier/new?lead_id=${lead.id}`}
                 style={{ flex: 1, fontSize: 12, padding: '8px', borderRadius: 6, border: '1px solid var(--gold)', color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 500 }}>
                 <FileText size={12} /> Propuesta
               </a>
@@ -7483,7 +7644,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               {/* Create buttons */}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 {canPropuesta && (
-                  <a href={`/proposals/new?lead_id=${editLead?.id}`} style={{
+                  <a href={`/dossier/new?lead_id=${editLead?.id}`} style={{
                     display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8,
                     background: 'var(--espresso)', color: '#fff', fontSize: 11, fontWeight: 700, textDecoration: 'none',
                   }}>
@@ -7642,7 +7803,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
               {/* Create buttons */}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 {canPropuesta && (
-                  <a href={`/proposals/new?lead_id=${editLead?.id}`} style={{
+                  <a href={`/dossier/new?lead_id=${editLead?.id}`} style={{
                     display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8,
                     background: 'var(--espresso)', color: '#fff', fontSize: 11, fontWeight: 700, textDecoration: 'none',
                   }}>
@@ -7809,7 +7970,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                     <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
                       Respuestas del dosier digital
                     </div>
-                    <a href={`/proposals/${proposalResponse.proposal.id}/edit`}
+                    <a href={`/dossier/${proposalResponse.proposal.id}/edit`}
                       style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <ExternalLink size={10} /> Ver dosier
                     </a>
@@ -8078,7 +8239,7 @@ function LeadFormModal({ form, setForm, isEdit, editLead, saving, onSubmit, onCl
                 <div className="modal-footer" style={{ display: 'flex', gap: 8 }}>
                   <button className="btn btn-ghost btn-sm" onClick={() => setComercialDetailModal(null)}>Cerrar</button>
                   <div style={{ flex: 1 }} />
-                  <a href={`/proposals/${item.id}/edit`} className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <a href={`/dossier/${item.id}/edit`} className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                     <ExternalLink size={11} /> Ver dosier completo
                   </a>
                 </div>

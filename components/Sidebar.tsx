@@ -145,20 +145,20 @@ export default function Sidebar() {
   const comercialItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
     { href: '/leads',        label: 'Leads',                                          icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', feature: 'leads'        },
     { href: '/crm',          label: 'Contactos',                                     icon: 'M1 12s2-4 7-4 7 4 7 4M8 8a3 3 0 100-6 3 3 0 000 6zM15 12s-1-2.5-3.5-3.5M12.5 5.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z', feature: 'leads' },
-    { href: '/calendario',   label: isMultiVenue ? 'Calendarios'    : 'Calendario',  icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
+    { href: '/calendar',   label: isMultiVenue ? 'Calendarios'    : 'Calendario',  icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
   ]
   const propuestasItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/proposals',    label: isMultiVenue ? 'Mis dosieres'   : 'Dosieres',    icon: 'M2 2h12v10H2zM14 8l2 4M5 6h6M5 9h4',                feature: 'propuestas'   },
+    { href: '/dossier',      label: 'Dosieres',                                      icon: 'M2 2h12v10H2zM14 8l2 4M5 6h6M5 9h4',                feature: 'propuestas'   },
     { href: '/budgets',      label: 'Presupuestos',                                     icon: 'M2 3h12v11H2zM5 1v3M11 1v3M5 7h6M5 10h3',             feature: 'presupuestos' },
   ]
   const canalesItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/canales',      label: 'Canales de venta',                               icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
-    { href: '/comunicacion', label: 'Comunicación',                                   icon: 'M14 2H2v9h5l1 3 1-3h5V2zM5 6h6M5 9h3',              feature: 'comunicacion' },
+    { href: '/channels',      label: 'Canales de venta',                               icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
+    { href: '/communication', label: 'Comunicación',                                   icon: 'M14 2H2v9h5l1 3 1-3h5V2zM5 6h6M5 9h3',              feature: 'comunicacion' },
   ]
   const datosItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/estadisticas', label: 'Estadísticas', icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z', feature: 'estadisticas' },
+    { href: '/stats', label: 'Estadísticas', icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z', feature: 'estadisticas' },
   ]
-  const facturasItem = { href: '/facturas', label: 'Facturas', icon: 'M3 1h10v14l-2-1-2 1-2-1-2 1-2-1V1zM5 5h6M5 8h6M5 11h4' }
+  const facturasItem = { href: '/invoices', label: 'Facturas', icon: 'M3 1h10v14l-2-1-2 1-2-1-2 1-2-1V1zM5 5h6M5 8h6M5 11h4' }
   const contratosItem = { href: '/contratos', label: 'Contratos', icon: 'M4 1h8l3 3v11H1V1zM8 1v3h4M4 7h8M4 10h8M4 13h5' }
   const configItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
     { href: '/venue-settings', label: 'Configuración',                                 icon: 'M1 3h14M1 7h9M1 11h5M11 9l2 2 4-4',                  feature: 'estructura'   },
@@ -174,22 +174,22 @@ export default function Sidebar() {
 
   const cateringItems = [
     { href: '/catering',              label: 'Dashboard',     icon: 'M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z' },
-    { href: '/catering/ficha',        label: 'Mi ficha',      icon: 'M2 2h12v12H2zM5 6h6M5 9h4' },
+    { href: '/catering/venue-profile',        label: 'Mi ficha',      icon: 'M2 2h12v12H2zM5 6h6M5 9h4' },
     { href: '/catering/leads',        label: 'Solicitudes',   icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4' },
-    { href: '/catering/calendario',   label: 'Calendario',    icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14' },
-    { href: '/catering/propuestas',   label: 'Propuestas',    icon: 'M2 2h12v10H2zM5 6h6M5 9h4' },
-    { href: '/catering/estadisticas', label: 'Estadísticas',  icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z' },
+    { href: '/catering/calendar',   label: 'Calendario',    icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14' },
+    { href: '/catering/proposals',   label: 'Propuestas',    icon: 'M2 2h12v10H2zM5 6h6M5 9h4' },
+    { href: '/catering/stats', label: 'Estadísticas',  icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z' },
   ]
 
   const adminItems: { href: string; label: string; icon: string; badge?: number }[] = [
     { href: '/admin',                    label: 'CRM',             icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', badge: pendingUsersCount },
-    { href: '/admin/planes',             label: 'Planes',          icon: 'M1 4h14v8H1zM4 4V2M12 4V2M1 8h14' },
+    { href: '/admin/plans',             label: 'Planes',          icon: 'M1 4h14v8H1zM4 4V2M12 4V2M1 8h14' },
     { href: '/admin/onboarding',         label: 'Solicitudes',     icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4M12 5v4M10 7h4', badge: pendingOnboardingCount },
     { href: '/admin/wedding-planners',   label: 'Peticiones WP', icon: 'M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z', badge: wpNewCount },
   ]
 
   const helpItems = [
-    { href: '/guias', label: 'Centro de ayuda', icon: 'M8 1a7 7 0 100 14A7 7 0 008 1zM8 6v.5M8 9.5V11' },
+    { href: '/guides', label: 'Centro de ayuda', icon: 'M8 1a7 7 0 100 14A7 7 0 008 1zM8 6v.5M8 9.5V11' },
   ]
 
   const isActive = (href: string) =>
@@ -210,8 +210,14 @@ export default function Sidebar() {
   return (
     <div className="sidebar">
       <div className="sidebar-logo">
-        <span className="brand">FOREVENTOS</span>
-        <span className="venue-name">{portalLabel}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <img src="/foreventos-assets/favicon.png" alt="" style={{ height: 22, width: 'auto', borderRadius: 5, opacity: 0.9 }} />
+          <span className="brand">FOREVENTOS</span>
+        </div>
+        <span className="venue-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4A6B52', display: 'inline-block', flexShrink: 0 }} />
+          {portalLabel}
+        </span>
 
         {/* Venue switcher — only for venue owners with an active venue */}
         {isVenueOwner && activeVenue && (
@@ -510,35 +516,32 @@ export default function Sidebar() {
       <div className="sidebar-footer">
         {/* Trial / plan banners — solo venue owner */}
         {isVenueOwner && !features.loading && features.isTrialExpired && (
-          <Link href="/pricing" style={{ display: 'block', padding: '16px 20px', background: 'rgba(176,71,62,0.10)', borderBottom: '1px solid rgba(255,255,255,0.07)', textDecoration: 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-              <Hourglass size={13} style={{ color: '#C97D75', flexShrink: 0 }} />
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#C97D75', letterSpacing: '0.1em' }}>PRUEBA FINALIZADA</span>
+          <Link href="/pricing" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: 'rgba(176,71,62,0.10)', borderBottom: '1px solid rgba(255,255,255,0.07)', textDecoration: 'none' }}>
+            <Hourglass size={13} style={{ color: '#C97D75', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#C97D75', letterSpacing: '0.08em' }}>PRUEBA FINALIZADA</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>Activa tu plan para continuar</div>
             </div>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff', marginBottom: 9, lineHeight: 1.3 }}>Tu periodo de prueba ha terminado</div>
-            <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginBottom: 12 }}>
-              <div style={{ height: '100%', width: '100%', background: '#C97D75' }} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 8, background: '#B0473E', color: '#fff', fontSize: 12.5, fontWeight: 700 }}>
-              Activar plan <ArrowRight size={14} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6, background: '#B0473E', color: '#fff', fontSize: 10, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap' }}>
+              Activar <ArrowRight size={11} />
             </div>
           </Link>
         )}
 
         {isVenueOwner && !features.loading && features.isTrial && !features.isTrialExpired && (
-          <Link href="/pricing" style={{ display: 'block', padding: '16px 20px', background: 'linear-gradient(135deg, rgba(196,151,90,0.16), rgba(196,151,90,0.05))', borderBottom: '1px solid rgba(255,255,255,0.07)', textDecoration: 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-              <Hourglass size={13} style={{ color: '#D4A867', flexShrink: 0 }} />
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#D4A867', letterSpacing: '0.1em' }}>PRUEBA GRATIS</span>
+          <Link href="/pricing" style={{ display: 'block', padding: '14px 16px', background: 'linear-gradient(135deg, rgba(196,151,90,0.14), rgba(196,151,90,0.04))', borderBottom: '1px solid rgba(255,255,255,0.07)', textDecoration: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Hourglass size={12} style={{ color: '#D4A867' }} />
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#D4A867', letterSpacing: '0.08em' }}>PRUEBA GRATIS</span>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{features.trialDaysLeft ?? 0} días</span>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 9, lineHeight: 1.15 }}>
-              {features.trialDaysLeft ?? 0} {features.trialDaysLeft === 1 ? 'día restante' : 'días restantes'}
+            <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.1)', overflow: 'hidden', marginBottom: 10 }}>
+              <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #C4975A, #E0B978)', width: `${Math.max(6, Math.min(100, ((features.trialDaysLeft ?? 0) / 14) * 100))}%`, transition: 'width .3s' }} />
             </div>
-            <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginBottom: 12 }}>
-              <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #C4975A, #E0B978)', width: `${Math.max(6, Math.min(100, ((features.trialDaysLeft ?? 0) / 14) * 100))}%` }} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 8, background: '#C4975A', color: '#1A1208', fontSize: 12.5, fontWeight: 700 }}>
-              Activar plan <ArrowRight size={14} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, height: 30, borderRadius: 7, background: '#C4975A', color: '#1A1208', fontSize: 11, fontWeight: 700 }}>
+              Activar plan <ArrowRight size={12} />
             </div>
           </Link>
         )}
@@ -574,7 +577,7 @@ export default function Sidebar() {
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{
-                color: pathname === '/perfil' ? 'var(--fe-accent)' : '#fff',
+                color: pathname === '/profile' ? 'var(--fe-accent)' : '#fff',
                 fontSize: 12.5, fontWeight: 500,
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
               }}>
@@ -604,7 +607,7 @@ export default function Sidebar() {
               overflow: 'hidden', zIndex: 200, padding: 4,
               boxShadow: '12px 0 36px rgba(0,0,0,0.45)',
             }}>
-              <button onMouseDown={() => { setUserMenuOpen(false); router.push('/perfil') }}
+              <button onMouseDown={() => { setUserMenuOpen(false); router.push('/profile') }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'none'}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'none', border: 'none', borderRadius: 7, color: 'rgba(255,255,255,0.88)', fontSize: 12.5, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', textAlign: 'left', transition: 'background 0.12s' }}>

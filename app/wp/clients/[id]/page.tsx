@@ -463,7 +463,7 @@ export default function ClientDetailPage() {
     })
   }
 
-  const publicUrl = client ? `${typeof window !== 'undefined' ? window.location.origin : ''}/para/${client.slug}` : ''
+  const publicUrl = client ? `${typeof window !== 'undefined' ? window.location.origin : ''}/for/${client.slug}` : ''
   const copyLink = () => { navigator.clipboard.writeText(publicUrl); setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000) }
 
   if (id === 'new') { router.replace('/wp/clients'); return null }

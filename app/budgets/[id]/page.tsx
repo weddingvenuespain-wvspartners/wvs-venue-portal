@@ -127,7 +127,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
 
   const copyLink = () => {
     if (!budget) return
-    navigator.clipboard.writeText(`${window.location.origin}/presupuesto/${budget.slug}`)
+    navigator.clipboard.writeText(`${window.location.origin}/budget/${budget.slug}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -248,7 +248,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
                   {copied ? <Check size={13} style={{ color: '#4A6B52' }} /> : <Copy size={13} />}
                   {copied ? 'Copiado' : 'Enlace'}
                 </button>
-                <a href={`/presupuesto/${budget.slug}`} target="_blank" rel="noopener" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
+                <a href={`/budget/${budget.slug}`} target="_blank" rel="noopener" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
                   <Eye size={13} /> Vista pública
                 </a>
                 <button onClick={() => router.push(`/budgets/${id}/edit`)} className="btn btn-ghost btn-sm">
@@ -393,7 +393,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
                 <div className="card" style={{ padding: '16px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Dosier vinculado</div>
-                    <a href={`/proposals/${dossierData.proposal.id}/edit`} style={{ fontSize: 11, color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+                    <a href={`/dossier/${dossierData.proposal.id}/edit`} style={{ fontSize: 11, color: 'var(--gold)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
                       <ExternalLink size={10} /> Ver
                     </a>
                   </div>
@@ -567,7 +567,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
               <div className="card" style={{ marginBottom: 16 }}>
                 <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Facturas emitidas</div>
-                  <button onClick={() => router.push('/facturas/nueva')} className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}>
+                  <button onClick={() => router.push('/invoices/new')} className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}>
                     <Plus size={11} /> Nueva
                   </button>
                 </div>
@@ -593,8 +593,8 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
                             <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
                             <td>
                               <div style={{ display: 'flex', gap: 4 }}>
-                                <button className="btn btn-ghost btn-sm" onClick={() => router.push(`/facturas/${inv.id}`)} title="Ver"><Eye size={12} /></button>
-                                {inv.status === 'draft' && <button className="btn btn-ghost btn-sm" onClick={() => router.push(`/facturas/${inv.id}`)} title="Editar"><Pencil size={12} /></button>}
+                                <button className="btn btn-ghost btn-sm" onClick={() => router.push(`/invoices/${inv.id}`)} title="Ver"><Eye size={12} /></button>
+                                {inv.status === 'draft' && <button className="btn btn-ghost btn-sm" onClick={() => router.push(`/invoices/${inv.id}`)} title="Editar"><Pencil size={12} /></button>}
                                 {inv.status === 'draft' && (
                                   <button className="btn btn-ghost btn-sm" title="Aprobar" onClick={async () => {
                                     const supabase = createClient()
@@ -656,10 +656,10 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
               )}
 
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                <button onClick={() => router.push('/facturas/nueva')} className="btn btn-primary btn-sm">
+                <button onClick={() => router.push('/invoices/new')} className="btn btn-primary btn-sm">
                   <Plus size={12} /> Crear factura
                 </button>
-                <button onClick={() => router.push('/facturas')} className="btn btn-ghost btn-sm">
+                <button onClick={() => router.push('/invoices')} className="btn btn-ghost btn-sm">
                   <FileText size={12} /> Ver todas
                 </button>
               </div>

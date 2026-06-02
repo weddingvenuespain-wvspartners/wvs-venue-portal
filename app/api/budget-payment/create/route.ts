@@ -78,8 +78,8 @@ export async function POST(req: NextRequest) {
       amountCents,
       order,
       notificationUrl: `${origin}/api/budget-payment/notification`,
-      successUrl: `${origin}/presupuesto/${budget.slug}?paid=1&cuota=${installmentIndex}`,
-      errorUrl: `${origin}/presupuesto/${budget.slug}?error=1&cuota=${installmentIndex}`,
+      successUrl: `${origin}/budget/${budget.slug}?paid=1&cuota=${installmentIndex}`,
+      errorUrl: `${origin}/budget/${budget.slug}?error=1&cuota=${installmentIndex}`,
       merchantData,
       language: '1',
     })

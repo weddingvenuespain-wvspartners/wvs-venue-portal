@@ -1,0 +1,3453 @@
+﻿'use client'
+import * as React from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase'
+import Sidebar from '@/components/Sidebar'
+import { useAuth } from '@/lib/auth-context'
+import { useRequireSubscription } from '@/lib/use-require-subscription'
+import NoVenueState from '@/components/NoVenueState'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
+import WvsDatePicker from '@/components/DatePicker'
+import { Calendar as CalendarWidget } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { format, parseISO } from 'date-fns'
+import { es } from 'date-fns/locale'
+import Spinner from '@/components/Spinner'
+import {
+  ChevronLeft, ChevronRight, X, Plus, User, ExternalLink,
+  FileText, Calendar, Search, AlertCircle, Trash2, Flower2, Edit2, Link2, Download,
+  CheckCircle2, Circle, ClipboardList, Flag, Maximize2, Minimize2,
+} from 'lucide-react'
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+type Status = 'libre' | 'negociacion' | 'reservado' | 'bloqueado'
+
+type Entry = {
+  id?: string
+  date: string
+  status: Status
+  note?: string
+  lead_id?: string | null
+}
+
+type Lead = {
+  id: string
+  name: string
+  email?: string
+  phone?: string
+  whatsapp?: string
+  wedding_date?: string
+  wedding_date_to?: string
+  wedding_date_ranges?: { from: string; to: string }[]
+  date_flexibility?: string
+  wedding_year?: number
+  wedding_month?: number
+  guests?: number
+  status: string
+  budget?: string
+  ceremony_type?: string
+  visit_date?: string
+  visit_time?: string
+  visit_duration?: number
+  notes?: string
+  budget_date?: string
+  budget_date_to?: string
+  budget_date_ranges?: { from: string; to: string }[]
+  budget_date_flexibility?: string
+}
+
+type ModalityPackage = {
+  id: string
+  day_from: number  // Mon=0 … Sun=6
+  day_to: number
+  label: string | null
+  sort_order: number
+}
+
+type Modality = {
+  id: string
+  name: string
+  duration_type: string
+  packages: ModalityPackage[]
+}
+
+type TaskPriority = 'alta' | 'media' | 'normal'
+type TaskCategory = 'llamar' | 'enviar_dossier' | 'seguimiento' | 'visita' | 'otro'
+
+type Task = {
+  id: string
+  user_id: string
+  title: string
+  description?: string | null
+  due_date: string
+  type: 'internal' | 'lead'
+  lead_id?: string | null
+  completed: boolean
+  completed_at?: string | null
+  priority: TaskPriority
+  category: TaskCategory
+  created_at: string
+}
+
+const TASK_PRIORITY_CFG: Record<TaskPriority, { label: string; color: string; bg: string }> = {
+  alta:   { label: 'Alta',   color: '#933B34', bg: '#FAF3F2' },
+  media:  { label: 'Media',  color: '#92610E', bg: '#FEF9EE' },
+  normal: { label: 'Normal', color: '#5C6B5E', bg: '#F2F4F2' },
+}
+
+const TASK_CATEGORY_CFG: Record<TaskCategory, { label: string; icon: string }> = {
+  llamar:          { label: 'Llamar',          icon: '📞' },
+  enviar_dossier:  { label: 'Enviar dossier',  icon: '📄' },
+  seguimiento:     { label: 'Seguimiento',     icon: '🔄' },
+  visita:          { label: 'Visita',           icon: '🏠' },
+  otro:            { label: 'Otro',             icon: '📌' },
+}
+
+// Lead-driven inbox events with date hints (call, video, visit).
+// Visits with a linked lead already surface via leads.visit_date — we dedupe
+// those so the same booking doesn't appear twice on the same cell.
+type PendingInquiry = {
+  id: string
+  proposal_id: string
+  kind: 'call' | 'video' | 'visit' | string
+  kind_label: string | null
+  name: string
+  email: string | null
+  phone: string | null
+  preferred_dates: string[]
+  message: string | null
+  status: 'new' | 'replied' | 'closed'
+  created_at: string
+  payload: Record<string, any> | null
+  event_at: string | null
+  proposals?: { id: string; couple_name: string | null; lead_id: string | null } | null
+}
+
+const DOW_NAMES_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']  // Mon=0 … Sun=6
+
+// ── Config ───────────────────────────────────────────────────────────────────
+
+const STATUS_CFG: Record<Status, { label: string; bg: string; border: string; color: string; dot: string; badge: string }> = {
+  libre:       { label: 'Libre',          bg: '#fff',     border: '#e8ddd3', color: 'var(--charcoal)', dot: '#c5b9aa', badge: '#f5f0eb' },
+  negociacion: { label: 'En negociación', bg: '#fef7ec',  border: '#f5deb3', color: '#8a6d2b',         dot: '#d4a24c', badge: '#fef7ec' },
+  reservado:   { label: 'Reservado',      bg: '#DCE7DE',  border: '#467A60', color: '#064e3b',         dot: '#3C5945', badge: '#DCE7DE' },
+  bloqueado:   { label: 'Bloqueado',      bg: '#f0eeec',  border: '#d6d2ce', color: '#8b8580',         dot: '#a8a3a0', badge: '#f0eeec' },
+}
+
+const LEAD_STATUS: Record<string, { label: string; color: string }> = {
+  new:            { label: 'Nuevo',            color: '#4F6D8C' },
+  contacted:      { label: 'Contactado',       color: '#7E72A0' },
+  proposal_sent:  { label: 'Propuesta enviada', color: '#AC8B4C' },
+  visit_scheduled:{ label: 'Visita agendada',  color: '#5C8570' },
+  post_visit:     { label: 'Post-visita',      color: '#5B8794' },
+  budget_sent:    { label: 'Presupuesto',      color: '#5F6196' },
+  won:            { label: 'Reservado',         color: '#4A6B52' },
+  lost:           { label: 'Perdido',          color: '#B0473E' },
+}
+
+const BUDGET_LABEL: Record<string, string> = {
+  sin_definir: 'Sin definir', menos_5k: '< 5.000 €', '5k_10k': '5.000–10.000 €',
+  '10k_20k': '10.000–20.000 €', '20k_40k': '20.000–40.000 €', mas_40k: '> 40.000 €',
+  // WVS ranges
+  menos_20k: '< 20.000 €', '20k_35k': '20.000–35.000 €',
+  wvs_menos_20k: '< 20.000 €', wvs_20k_35k: '20.000–35.000 €',
+  wvs_35k_40k: '35.000–40.000 €', wvs_40k_51k: '40.000–51.000 €',
+  wvs_51k_60k: '51.000–60.000 €', wvs_mas_60k: '> 60.000 €',
+}
+const CEREMONY_LABEL: Record<string, string> = {
+  sin_definir: 'Sin definir', civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica', mixta: 'Mixta',
+}
+
+const MONTHS     = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const DAYS_SHORT = ['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM']
+const HIGH_SEASON = [4,5,6,7,8,9]
+
+const SEASON_NAME: Record<number, string> = {
+  0: 'Invierno', 1: 'Invierno', 2: 'Primavera', 3: 'Primavera', 4: 'Primavera',
+  5: 'Verano', 6: 'Verano', 7: 'Verano', 8: 'Otoño', 9: 'Otoño', 10: 'Otoño', 11: 'Invierno',
+}
+
+function pad(n: number) { return String(n).padStart(2, '0') }
+function dateStr(y: number, m: number, d: number) { return `${y}-${pad(m+1)}-${pad(d)}` }
+
+function offsetDate(base: string, offset: number): string {
+  const d = new Date(base + 'T12:00:00')
+  d.setDate(d.getDate() + offset)
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+}
+
+// Returns span length (days) for a modality package (Mon=0 convention, supports cross-week)
+function pkgSpanDays(day_from: number, day_to: number): number {
+  if (day_from === day_to) return 1
+  let count = 1, d = day_from
+  while (d !== day_to) { d = (d + 1) % 7; count++ }
+  return count
+}
+
+function formatDateEs(ds: string): string {
+  const d = new Date(ds + 'T12:00:00')
+  return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+// ── Date range filter (single calendar with DESDE/HASTA header) ──────────────
+
+function DateRangeFilter({ from, to, onChange }: { from: string; to: string; onChange: (f: string, t: string) => void }) {
+  const [open, setOpen] = React.useState(false)
+  const [draft, setDraft] = React.useState<{ from: string; to: string }>({ from, to })
+  const hasRange = !!(from || to)
+
+  // Sync draft when props change or popover opens
+  React.useEffect(() => { if (open) setDraft({ from, to }) }, [open]) // eslint-disable-line
+
+  const draftFromDate = draft.from ? parseISO(draft.from + 'T12:00:00') : undefined
+  const draftToDate   = draft.to   ? parseISO(draft.to   + 'T12:00:00') : undefined
+
+  const fmtShort = (iso: string) => {
+    const d = parseISO(iso + 'T12:00:00')
+    return format(d, 'd MMM', { locale: es })
+  }
+
+  const label = from && to
+    ? `${fmtShort(from)} – ${fmtShort(to)}`
+    : from ? `Desde ${fmtShort(from)}`
+    : 'Filtrar por fecha'
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button style={{
+          fontSize: 11, padding: '3px 10px', borderRadius: 20, border: '1.5px solid',
+          borderColor: hasRange ? 'var(--gold)' : 'var(--ivory)',
+          background: hasRange ? 'var(--gold)' : 'transparent',
+          color: hasRange ? '#fff' : 'var(--warm-gray)',
+          cursor: 'pointer', fontWeight: hasRange ? 600 : 400,
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          fontFamily: 'Inter, sans-serif', transition: 'all 0.15s',
+        }}>
+          <Calendar size={11} /> {label}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 z-[300]" align="end" style={{ borderRadius: 14, overflow: 'hidden' }}>
+        {/* DESDE / HASTA header */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+          <div style={{ flex: 1, padding: '10px 14px', background: draft.from ? '#fefce8' : '#fafaf8', borderRight: '1px solid #e5e7eb' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 3 }}>Desde</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: draft.from ? 'var(--charcoal)' : '#c0bbb4' }}>
+              {draft.from ? fmtShort(draft.from) : '—'}
+            </div>
+          </div>
+          <div style={{ flex: 1, padding: '10px 14px', background: draft.to ? '#fefce8' : '#fafaf8' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 3 }}>Hasta</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: draft.to ? 'var(--charcoal)' : '#c0bbb4' }}>
+              {draft.to ? fmtShort(draft.to) : '—'}
+            </div>
+          </div>
+        </div>
+        {/* Calendar */}
+        <CalendarWidget
+          mode="range"
+          selected={draftFromDate && draftToDate ? { from: draftFromDate, to: draftToDate } : draftFromDate ? { from: draftFromDate, to: undefined } : undefined}
+          onSelect={(range) => {
+            setDraft({
+              from: range?.from ? format(range.from, 'yyyy-MM-dd') : '',
+              to:   range?.to   ? format(range.to,   'yyyy-MM-dd') : '',
+            })
+          }}
+          numberOfMonths={1}
+          autoFocus
+        />
+        {/* Footer: Borrar / Aplicar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 14px', borderTop: '1px solid #e5e7eb' }}>
+          <button onClick={() => { onChange('', ''); setOpen(false) }}
+            style={{ fontSize: 12, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif', padding: '4px 8px', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            Borrar
+          </button>
+          <button onClick={() => { onChange(draft.from, draft.to); setOpen(false) }}
+            disabled={!draft.from}
+            style={{ fontSize: 12, fontWeight: 600, padding: '6px 18px', borderRadius: 8, border: 'none',
+              background: draft.from ? '#4A6B52' : '#e5e7eb', color: draft.from ? '#fff' : '#9ca3af',
+              cursor: draft.from ? 'pointer' : 'default', fontFamily: 'Inter, sans-serif' }}>
+            Aplicar
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
+export default function CalendarioPage() {
+  const router = useRouter()
+  const { user, loading: authLoading, activeVenue } = useAuth()
+  const { isBlocked } = useRequireSubscription()
+
+  const [entries,      setEntries]      = useState<Record<string, Entry>>({})
+  const [entries2,     setEntries2]     = useState<Record<string, Entry>>({}) // secondary half-day slot per date
+  const [leads,        setLeads]        = useState<Lead[]>([])
+  const [pendingInquiries, setPendingInquiries] = useState<PendingInquiry[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [saving,       setSaving]       = useState(false)
+  const [modalities,   setModalities]   = useState<Modality[]>([])
+
+  const today  = new Date()
+  const [year,  setYear]  = useState(today.getFullYear())
+  const [month, setMonth] = useState(today.getMonth())
+  const [calView, setCalView] = useState<'month' | 'week' | 'day' | 'agenda' | 'tasks'>('month')
+  const [calFullscreen, setCalFullscreen] = useState(false)
+
+  // Escape exits fullscreen
+  useEffect(() => {
+    if (!calFullscreen) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setCalFullscreen(false) }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [calFullscreen])
+  const [subView, setSubView] = useState<'list' | 'cal'>('list')
+  const [filterFrom, setFilterFrom] = useState<string>('')
+  const [filterTo, setFilterTo]     = useState<string>('')
+  const [weekStart, setWeekStart] = useState<string>(() => {
+    const t = new Date(); const day = t.getDay(); const diff = day === 0 ? -6 : 1 - day; t.setDate(t.getDate() + diff)
+    return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
+  })
+  const [dayDate, setDayDate] = useState<string>(() => {
+    const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
+  })
+
+  // Modal state
+  const [modalDate, setModalDate] = useState<string | null>(null)
+
+  // Bulk mode
+  const [bulkMode,   setBulkMode]   = useState(false)
+  const [bulkDates,  setBulkDates]  = useState<Set<string>>(new Set())
+  const [bulkStatus, setBulkStatus] = useState<Status>('reservado')
+  const [bulkStart,  setBulkStart]  = useState<string | null>(null)
+
+  const [dragStart, setDragStart]   = useState<string | null>(null)
+  const wasDraggingRef = useRef(false)
+  const wasDragBulkRef = useRef(false)  // true when bulkMode was activated by drag
+
+  // Calendar filter — multi-select; empty Set means "all"
+  const [calendarFilters, setCalendarFilters] = useState<Set<string>>(new Set())
+  const toggleCalendarFilter = (f: string) => {
+    setCalendarFilters(prev => {
+      if (f === 'all') return new Set()
+      const next = new Set(prev)
+      if (next.has(f)) { next.delete(f) } else { next.add(f) }
+      // If all three specific filters are active → reset to "Todos"
+      if (next.has('visitas') && next.has('bodas') && next.has('leads')) return new Set()
+      return next
+    })
+  }
+  const filterAll = calendarFilters.size === 0
+
+  // Tasks
+  const [tasks,          setTasks]          = useState<Task[]>([])
+  const [taskModal,      setTaskModal]      = useState(false)
+  const [editingTask,    setEditingTask]    = useState<Task | null>(null)
+  const [taskForm,       setTaskForm]       = useState({ title: '', description: '', due_date: '', type: 'internal' as 'internal' | 'lead', lead_id: '', priority: 'normal' as TaskPriority, category: 'otro' as TaskCategory })
+  const [taskSaving,     setTaskSaving]     = useState(false)
+  const [taskError,      setTaskError]      = useState('')
+  const [taskLeadSearch, setTaskLeadSearch] = useState('')
+
+  // Lead search
+  const [leadSearch,        setLeadSearch]        = useState('')
+  const [leadSearchResults, setLeadSearchResults] = useState<Lead[]>([])
+  const [searchOpen,        setSearchOpen]        = useState(false)
+
+  useEffect(() => {
+    if (authLoading) return
+    if (!user) { router.push('/login'); return }
+    load()
+  }, [user, authLoading, year, month, calView, subView, weekStart, dayDate, activeVenue?.id])
+
+  // Deep-link: reabrir modal de fecha al volver desde ?openDate=YYYY-MM-DD
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const openDate = params.get('openDate')
+    if (!openDate) return
+    setModalDate(openDate)
+    window.history.replaceState({}, '', '/calendar')
+  }, [])
+
+  const load = async () => {
+    if (!activeVenue) { setLoading(false); return }
+    setLoading(true)
+    const supabase = createClient()
+    const pad2 = (n: number) => String(n).padStart(2, '0')
+    let from: string, to: string
+    if (calView === 'week') {
+      from = weekStart
+      const endD = new Date(weekStart + 'T12:00:00'); endD.setDate(endD.getDate() + 6)
+      to = `${endD.getFullYear()}-${pad2(endD.getMonth()+1)}-${pad2(endD.getDate())}`
+    } else if (calView === 'day') {
+      from = dayDate; to = dayDate
+    } else if (calView === 'agenda' && subView === 'list') {
+      from = dayDate
+      const endD = new Date(dayDate + 'T12:00:00'); endD.setDate(endD.getDate() + 29)
+      to = `${endD.getFullYear()}-${pad2(endD.getMonth()+1)}-${pad2(endD.getDate())}`
+    } else {
+      const lastDay = new Date(year, month + 1, 0).getDate()
+      from = dateStr(year, month, 1)
+      to   = dateStr(year, month, lastDay)
+    }
+
+    const [entriesRes, leadsRes, modalitiesRes, inquiriesRes, tasksRes] = await Promise.all([
+      supabase.from('calendar_entries').select('*').eq('venue_id', activeVenue.id).gte('date', from).lte('date', to),
+      supabase.from('leads').select('id,name,email,phone,whatsapp,wedding_date,wedding_date_to,wedding_date_ranges,date_flexibility,wedding_year,wedding_month,guests,status,budget,ceremony_type,visit_date,visit_time,visit_duration,notes,budget_date,budget_date_to,budget_date_ranges,budget_date_flexibility').eq('venue_id', activeVenue.id).order('wedding_date', { ascending: true }),
+      supabase.from('venue_modalities').select('id,name,duration_type,packages:venue_modality_packages(id,day_from,day_to,label,sort_order)').eq('venue_id', activeVenue.id).order('sort_order'),
+      supabase
+        .from('proposal_inquiries')
+        .select('id, proposal_id, kind, kind_label, name, email, phone, preferred_dates, message, status, created_at, payload, event_at, proposals!inner(id, couple_name, lead_id, venue_id)')
+        .eq('proposals.venue_id', activeVenue.id)
+        .in('kind', ['call', 'video', 'visit'])
+        .neq('status', 'closed')
+        .order('created_at', { ascending: false }),
+      supabase.from('venue_tasks').select('*').eq('user_id', user!.id).eq('venue_id', activeVenue.id).order('due_date', { ascending: true }),
+    ])
+
+    const map: Record<string, Entry> = {}
+    const map2: Record<string, Entry> = {}
+    if (entriesRes.data) {
+      entriesRes.data.forEach((e: Entry) => {
+        if (!map[e.date]) {
+          map[e.date] = e
+        } else {
+          // Second entry on same date — secondary half-day slot (different lead/half)
+          map2[e.date] = e
+        }
+      })
+    }
+    setEntries(map)
+    setEntries2(map2)
+    if (leadsRes.data) setLeads(leadsRes.data)
+    if (modalitiesRes.data) setModalities(modalitiesRes.data as Modality[])
+    if (inquiriesRes.data) setPendingInquiries((inquiriesRes.data as any[]).map(r => ({ ...r, preferred_dates: r.preferred_dates ?? [] })) as PendingInquiry[])
+    if (tasksRes.data) setTasks(tasksRes.data as Task[])
+    setLoading(false)
+  }
+
+  // Expand a date range into all ISO dates within it
+  function expandRange(from: string, to: string): string[] {
+    const result: string[] = []
+    const d = new Date(from + 'T12:00:00')
+    const end = new Date((to || from) + 'T12:00:00')
+    while (d <= end) {
+      result.push(d.toISOString().slice(0, 10))
+      d.setDate(d.getDate() + 1)
+    }
+    return result
+  }
+
+  // Leads indexed by date for fast calendar lookup — handles all flexibility types
+  const leadsByDate = useMemo(() => {
+    const m: Record<string, Lead[]> = {}
+    const add = (date: string, lead: Lead) => {
+      if (!m[date]) m[date] = []
+      if (!m[date].some(x => x.id === lead.id)) m[date].push(lead)
+    }
+    leads.filter(l => l.status !== 'lost').forEach(l => {
+      // Index by wedding_date (what the couple originally requested)
+      const flex = l.date_flexibility || 'exact'
+      if (flex === 'exact' && l.wedding_date) {
+        if (l.wedding_date_to) {
+          expandRange(l.wedding_date, l.wedding_date_to).forEach(d => add(d, l))
+        } else {
+          add(l.wedding_date, l)
+        }
+      } else if (flex === 'range' && l.wedding_date) {
+        expandRange(l.wedding_date, l.wedding_date_to || l.wedding_date).forEach(d => add(d, l))
+      } else if (flex === 'multi_range' && l.wedding_date_ranges?.length) {
+        l.wedding_date_ranges.forEach(r => {
+          if (r.from) expandRange(r.from, r.to || r.from).forEach(d => add(d, l))
+        })
+      } else if (flex === 'month' && l.wedding_year && l.wedding_month) {
+        const y = l.wedding_year, mo = l.wedding_month
+        const days = new Date(y, mo, 0).getDate()
+        for (let d = 1; d <= days; d++) {
+          add(`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`, l)
+        }
+      }
+
+      // Also index by budget_date* for budget_sent / won leads
+      if ((l.status === 'budget_sent' || l.status === 'won') && l.budget_date) {
+        const bflex = l.budget_date_flexibility || 'exact'
+        if (bflex === 'exact') {
+          if (l.budget_date_to) {
+            expandRange(l.budget_date, l.budget_date_to).forEach(d => add(d, l))
+          } else {
+            add(l.budget_date, l)
+          }
+        } else if (bflex === 'range') {
+          expandRange(l.budget_date, l.budget_date_to || l.budget_date).forEach(d => add(d, l))
+        } else if (bflex === 'multi_range' && l.budget_date_ranges?.length) {
+          l.budget_date_ranges.forEach(r => {
+            if (r.from) expandRange(r.from, r.to || r.from).forEach(d => add(d, l))
+          })
+        }
+      }
+    })
+    return m
+  }, [leads])
+
+  // Leads whose lead_id is linked in an entry (for display names on cells)
+  const leadsById = useMemo(() => {
+    const m: Record<string, Lead> = {}
+    leads.forEach(l => { m[l.id] = l })
+    return m
+  }, [leads])
+
+  // Leads with a scheduled visit indexed by visit_date
+  const visitsByDate = useMemo(() => {
+    const m: Record<string, Lead[]> = {}
+    leads.forEach(l => {
+      if (l.visit_date) {
+        if (!m[l.visit_date]) m[l.visit_date] = []
+        m[l.visit_date].push(l)
+      }
+    })
+    return m
+  }, [leads])
+
+  // Pending inquiry requests (call/video/visit) indexed by event date.
+  // Visits already linked to a lead are deduped against visitsByDate so the
+  // same booking doesn't show up twice on the cell.
+  const inquiriesByDate = useMemo(() => {
+    const m: Record<string, PendingInquiry[]> = {}
+    pendingInquiries.forEach(inq => {
+      if (inq.kind === 'visit') {
+        // Visit: use payload.date (single confirmed slot, not preferred options)
+        const visitDate: string | null =
+          (typeof inq.payload?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(inq.payload.date))
+            ? inq.payload.date
+            : (inq.preferred_dates?.[0] && /^\d{4}-\d{2}-\d{2}$/.test(inq.preferred_dates[0]) ? inq.preferred_dates[0] : null)
+        if (!visitDate) return
+        // Dedupe: skip if a linked lead already shows this exact date+time
+        const visitTime: string | null = typeof inq.payload?.time === 'string' ? inq.payload.time : null
+        const linkedLeadId = inq.proposals?.lead_id ?? null
+        const alreadyOnLead = linkedLeadId && (visitsByDate[visitDate] ?? []).some(
+          l => l.id === linkedLeadId && (!visitTime || l.visit_time === visitTime)
+        )
+        if (alreadyOnLead) return
+        if (!m[visitDate]) m[visitDate] = []
+        m[visitDate].push(inq)
+      } else {
+        // call / video: index by every preferred_date the couple gave
+        ;(inq.preferred_dates || []).forEach(d => {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return
+          if (!m[d]) m[d] = []
+          m[d].push(inq)
+        })
+      }
+    })
+    return m
+  }, [pendingInquiries, visitsByDate])
+
+  const [exporting, setExporting] = useState(false)
+
+  // ── Export CSV ──────────────────────────────────────────────────────────────
+  const exportCSV = async () => {
+    if (!activeVenue || exporting) return
+    setExporting(true)
+    try {
+      const supabase = createClient()
+      const { data: allEntries } = await supabase
+        .from('calendar_entries')
+        .select('*')
+        .eq('venue_id', activeVenue.id)
+        .neq('status', 'libre')
+        .order('date')
+
+      const header = ['Fecha', 'Tipo', 'Estado', 'Pareja', 'Email', 'Teléfono', 'Invitados', 'Notas', 'Medio día']
+
+      const rows: string[][] = []
+
+      // Calendar entries (negociacion, reservado, bloqueado)
+      ;(allEntries || []).forEach((e: any) => {
+        const lead = e.lead_id ? leadsById[e.lead_id] : null
+        const _HALF = ['medio_dia', 'medio_dia_manana', 'medio_dia_tarde']
+        const noteRaw = e.note || ''
+        const parts = noteRaw.split('|')
+        const isHalf = _HALF.includes(parts[0])
+        const halfLabel = parts[0] === 'medio_dia_manana' ? 'Mañana' : parts[0] === 'medio_dia_tarde' ? 'Tarde' : isHalf ? 'Sí' : ''
+        const freeNote = isHalf ? (parts[1] || '') : noteRaw
+
+        rows.push([
+          e.date,
+          e.status === 'reservado' ? 'Boda' : e.status === 'negociacion' ? 'Negociación' : 'Bloqueado',
+          STATUS_CFG[e.status as Status]?.label || e.status,
+          lead?.name || '',
+          lead?.email || '',
+          lead?.phone || lead?.whatsapp || '',
+          lead?.guests ? String(lead.guests) : '',
+          freeNote,
+          halfLabel,
+        ])
+      })
+
+      // Visits from leads
+      leads.forEach(l => {
+        if (!l.visit_date) return
+        rows.push([
+          l.visit_date,
+          'Visita',
+          l.visit_time ? `Visita ${l.visit_time}` : 'Visita programada',
+          l.name || '',
+          l.email || '',
+          l.phone || l.whatsapp || '',
+          l.guests ? String(l.guests) : '',
+          l.notes || '',
+          '',
+        ])
+      })
+
+      // Sort all rows by date
+      rows.sort((a, b) => a[0].localeCompare(b[0]))
+
+      const escaped = rows.map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"'))
+      const csv = [header.join(';'), ...escaped.map(r => r.join(';'))].join('\n')
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const today = new Date().toISOString().slice(0, 10)
+      a.href = url; a.download = `calendario-${today}.csv`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) { console.error('CSV export error:', err) }
+    setExporting(false)
+  }
+
+  // ── Export ICS ──────────────────────────────────────────────────────────────
+  const exportICS = async () => {
+    if (!activeVenue || exporting) return
+    setExporting(true)
+    try {
+      const supabase = createClient()
+      const { data: allEntries } = await supabase
+        .from('calendar_entries')
+        .select('*')
+        .eq('venue_id', activeVenue.id)
+        .neq('status', 'libre')
+        .order('date')
+
+      const venueName = activeVenue.name || 'Venue'
+      const lines: string[] = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//WVS//Calendario//ES',
+        `X-WR-CALNAME:${venueName} - Calendario`,
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+      ]
+
+      const uid = (i: number, prefix: string) => `${prefix}-${i}-${Date.now()}@wvs`
+      const icsDate = (d: string) => d.replace(/-/g, '')
+      const nextDay = (d: string) => {
+        const dt = new Date(d + 'T12:00:00')
+        dt.setDate(dt.getDate() + 1)
+        return `${dt.getFullYear()}${pad(dt.getMonth()+1)}${pad(dt.getDate())}`
+      }
+
+      // Calendar entries
+      ;(allEntries || []).forEach((e: any, i: number) => {
+        const lead = e.lead_id ? leadsById[e.lead_id] : null
+        const tipo = e.status === 'reservado' ? '🟢 Boda' : e.status === 'negociacion' ? '🟡 Negociación' : '⬛ Bloqueado'
+        const summary = lead ? `${tipo} — ${lead.name}` : tipo
+
+        const noteRaw = e.note || ''
+        const parts = noteRaw.split('|')
+        const _HALF = ['medio_dia', 'medio_dia_manana', 'medio_dia_tarde']
+        const freeNote = _HALF.includes(parts[0]) ? (parts[1] || '') : noteRaw
+
+        const desc: string[] = []
+        if (lead?.email) desc.push(`Email: ${lead.email}`)
+        if (lead?.phone) desc.push(`Tel: ${lead.phone}`)
+        if (lead?.guests) desc.push(`Invitados: ${lead.guests}`)
+        if (freeNote) desc.push(freeNote)
+
+        lines.push('BEGIN:VEVENT')
+        lines.push(`UID:${uid(i, 'cal')}`)
+        lines.push(`DTSTART;VALUE=DATE:${icsDate(e.date)}`)
+        lines.push(`DTEND;VALUE=DATE:${nextDay(e.date)}`)
+        lines.push(`SUMMARY:${summary}`)
+        if (desc.length) lines.push(`DESCRIPTION:${desc.join('\\n')}`)
+        lines.push(`STATUS:CONFIRMED`)
+        lines.push('END:VEVENT')
+      })
+
+      // Visits
+      leads.forEach((l, i) => {
+        if (!l.visit_date) return
+        const summary = `📍 Visita — ${l.name || 'Pareja'}`
+        const desc: string[] = []
+        if (l.email) desc.push(`Email: ${l.email}`)
+        if (l.phone) desc.push(`Tel: ${l.phone}`)
+        if (l.guests) desc.push(`Invitados: ${l.guests}`)
+        if (l.notes) desc.push(l.notes)
+
+        lines.push('BEGIN:VEVENT')
+        lines.push(`UID:${uid(i, 'visit')}`)
+
+        if (l.visit_time) {
+          // Timed event
+          const [hh, mm] = l.visit_time.split(':')
+          const dtStart = `${icsDate(l.visit_date)}T${hh}${mm}00`
+          const dur = l.visit_duration || 60
+          const endDate = new Date(`${l.visit_date}T${l.visit_time}:00`)
+          endDate.setMinutes(endDate.getMinutes() + dur)
+          const dtEnd = `${endDate.getFullYear()}${pad(endDate.getMonth()+1)}${pad(endDate.getDate())}T${pad(endDate.getHours())}${pad(endDate.getMinutes())}00`
+          lines.push(`DTSTART:${dtStart}`)
+          lines.push(`DTEND:${dtEnd}`)
+        } else {
+          // All-day
+          lines.push(`DTSTART;VALUE=DATE:${icsDate(l.visit_date)}`)
+          lines.push(`DTEND;VALUE=DATE:${nextDay(l.visit_date)}`)
+        }
+
+        lines.push(`SUMMARY:${summary}`)
+        if (desc.length) lines.push(`DESCRIPTION:${desc.join('\\n')}`)
+        lines.push('END:VEVENT')
+      })
+
+      lines.push('END:VCALENDAR')
+
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const today = new Date().toISOString().slice(0, 10)
+      a.href = url; a.download = `calendario-${venueName.replace(/\s+/g, '-')}-${today}.ics`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) { console.error('ICS export error:', err) }
+    setExporting(false)
+  }
+
+  const saveEntry = async (entry: Partial<Entry> & { date: string }, extraBlocks?: { date: string; isHalf: boolean }[]) => {
+    setSaving(true)
+    const supabase = createClient()
+
+    const upsertOne = async (e: Partial<Entry> & { date: string }) => {
+      // Only delete if there's no lead_id, no meaningful status AND no note
+      if ((!e.status || e.status === 'libre') && !e.lead_id && !e.note?.trim()) {
+        const existing = entries[e.date]
+        if (existing?.id) await supabase.from('calendar_entries').delete().eq('id', existing.id)
+        setEntries(prev => { const n = { ...prev }; delete n[e.date]; return n })
+      } else {
+        const statusToSave = (!e.status || e.status === 'libre') && e.lead_id ? 'negociacion' : e.status!
+        const existing = entries[e.date]
+        let result
+        if (existing?.id) {
+          const { data } = await supabase.from('calendar_entries')
+            .update({ status: statusToSave, note: e.note ?? null, lead_id: e.lead_id ?? null })
+            .eq('id', existing.id).select().single()
+          result = data
+        } else {
+          const { data } = await supabase.from('calendar_entries')
+            .insert({ user_id: user!.id, venue_id: activeVenue!.id, date: e.date, status: statusToSave, note: e.note ?? null, lead_id: e.lead_id ?? null })
+            .select().single()
+          result = data
+        }
+        if (result) setEntries(prev => ({ ...prev, [e.date]: result }))
+      }
+    }
+
+    await upsertOne(entry)
+    if (extraBlocks && extraBlocks.length > 0) {
+      for (const b of extraBlocks) {
+        await upsertOne({ date: b.date, status: 'bloqueado', note: b.isHalf ? 'medio_dia' : 'Auto-bloqueado por reglas de venue' })
+      }
+    }
+    setSaving(false)
+  }
+
+  const applyBulk = async () => {
+    if (bulkDates.size === 0) return
+    setSaving(true)
+    const supabase = createClient()
+    const todayStr = dateStr(today.getFullYear(), today.getMonth(), today.getDate())
+    for (const d of bulkDates) {
+      if (d >= todayStr) await saveEntry({ date: d, status: bulkStatus })
+    }
+    setBulkDates(new Set()); setBulkMode(false); setBulkStart(null)
+    wasDragBulkRef.current = false
+    setSaving(false)
+  }
+
+  const handleDayClick = (d: string, isPast: boolean) => {
+    if (bulkMode) {
+      if (wasDragBulkRef.current) {
+        // Bulk mode was entered via drag — a single click exits it and opens the DayModal
+        setBulkMode(false)
+        setBulkDates(new Set())
+        setBulkStart(null)
+        wasDragBulkRef.current = false
+        if (!isPast) setModalDate(d)
+        return
+      }
+      // Button-triggered bulk mode: click-click range selection
+      if (!bulkStart) {
+        setBulkStart(d)
+        setBulkDates(new Set([d]))
+      } else {
+        // Fill range from bulkStart to d
+        const start = bulkStart < d ? bulkStart : d
+        const end   = bulkStart < d ? d : bulkStart
+        const range = new Set<string>()
+        const lastDay = new Date(year, month + 1, 0).getDate()
+        for (let i = 1; i <= lastDay; i++) {
+          const ds = dateStr(year, month, i)
+          if (ds >= start && ds <= end) range.add(ds)
+        }
+        setBulkDates(range)
+        setBulkStart(null)
+      }
+      return
+    }
+    setModalDate(d)
+  }
+
+  // Lead search logic
+  useEffect(() => {
+    if (!leadSearch.trim()) { setLeadSearchResults([]); return }
+    const q = leadSearch.toLowerCase()
+    setLeadSearchResults(
+      leads.filter(l => l.status !== 'lost' && (
+        l.name.toLowerCase().includes(q) ||
+        (l.email || '').toLowerCase().includes(q)
+      )).slice(0, 6)
+    )
+  }, [leadSearch, leads])
+
+  // Drag to select range
+  useEffect(() => {
+    const onMouseUp = () => {
+      if (dragStart) {
+        setDragStart(null)
+        // Reset bulkStart after drag so next single click doesn't extend the range
+        if (wasDraggingRef.current) {
+          setBulkStart(null)
+        }
+      }
+    }
+    window.addEventListener('mouseup', onMouseUp)
+    return () => window.removeEventListener('mouseup', onMouseUp)
+  }, [dragStart])
+
+  const navigateToLead = (lead: Lead) => {
+    const flex = lead.date_flexibility || 'exact'
+    let targetDate: string | null = null
+    if (flex === 'exact' || flex === 'range') targetDate = lead.wedding_date || null
+    else if (flex === 'multi_range') targetDate = lead.wedding_date_ranges?.[0]?.from || null
+    else if (flex === 'month' && lead.wedding_year && lead.wedding_month)
+      targetDate = `${lead.wedding_year}-${String(lead.wedding_month).padStart(2,'0')}-01`
+    if (targetDate) {
+      const d = new Date(targetDate + 'T12:00:00')
+      setYear(d.getFullYear())
+      setMonth(d.getMonth())
+    }
+    setLeadSearch('')
+    setLeadSearchResults([])
+    setSearchOpen(false)
+  }
+
+  // ── Task CRUD ─────────────────────────────────────────────────────────────
+  const resetTaskForm = () => {
+    setTaskForm({ title: '', description: '', due_date: '', type: 'internal', lead_id: '', priority: 'normal', category: 'otro' })
+    setTaskLeadSearch('')
+    setEditingTask(null)
+  }
+
+  const openEditTask = (task: Task) => {
+    setEditingTask(task)
+    setTaskForm({
+      title: task.title,
+      description: task.description || '',
+      due_date: task.due_date,
+      type: task.type,
+      lead_id: task.lead_id || '',
+      priority: task.priority || 'normal',
+      category: task.category || 'otro',
+    })
+    setTaskModal(true)
+  }
+
+  const saveTask = async () => {
+    if (!taskForm.title.trim()) { setTaskError('El título es obligatorio'); return }
+    if (!taskForm.due_date) { setTaskError('La fecha límite es obligatoria'); return }
+    if (!activeVenue) return
+    setTaskSaving(true); setTaskError('')
+    const supabase = createClient()
+    const payload: Record<string, any> = {
+      title: taskForm.title.trim(),
+      description: taskForm.description.trim() || null,
+      due_date: taskForm.due_date,
+      type: taskForm.type,
+      lead_id: taskForm.type === 'lead' && taskForm.lead_id ? taskForm.lead_id : null,
+      priority: taskForm.priority,
+      category: taskForm.category,
+    }
+
+    if (editingTask) {
+      // Update
+      const { data, error: err } = await supabase.from('venue_tasks').update(payload).eq('id', editingTask.id).select().single()
+      if (err) { setTaskError('Error al actualizar'); setTaskSaving(false); return }
+      setTasks(prev => prev.map(t => t.id === editingTask.id ? (data as Task) : t).sort((a, b) => a.due_date.localeCompare(b.due_date)))
+    } else {
+      // Create
+      const { data, error: err } = await supabase.from('venue_tasks').insert({ ...payload, user_id: user!.id, venue_id: activeVenue.id }).select().single()
+      if (err) { setTaskError('Error al crear la tarea'); setTaskSaving(false); return }
+      setTasks(prev => [...prev, data as Task].sort((a, b) => a.due_date.localeCompare(b.due_date)))
+    }
+
+    setTaskModal(false)
+    resetTaskForm()
+    setTaskSaving(false)
+  }
+
+  const toggleTask = async (task: Task) => {
+    const supabase = createClient()
+    const updates = { completed: !task.completed, completed_at: !task.completed ? new Date().toISOString() : null }
+    await supabase.from('venue_tasks').update(updates).eq('id', task.id)
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, ...updates } : t))
+  }
+
+  const deleteTask = async (id: string) => {
+    const supabase = createClient()
+    await supabase.from('venue_tasks').delete().eq('id', id)
+    setTasks(prev => prev.filter(t => t.id !== id))
+  }
+
+  // Tasks indexed by date (due_date) for calendar cell dots
+  const tasksByDate = useMemo(() => {
+    const m: Record<string, Task[]> = {}
+    tasks.filter(t => !t.completed).forEach(t => {
+      if (!m[t.due_date]) m[t.due_date] = []
+      m[t.due_date].push(t)
+    })
+    return m
+  }, [tasks])
+
+  // Calendar grid
+  const lastDay    = new Date(year, month + 1, 0).getDate()
+  let   startDow   = new Date(year, month, 1).getDay() - 1
+  if (startDow < 0) startDow = 6
+  const cells      = [...Array(startDow).fill(null), ...Array.from({ length: lastDay }, (_, i) => i + 1)]
+  const todayIso   = dateStr(today.getFullYear(), today.getMonth(), today.getDate())
+  const isHighSeason = HIGH_SEASON.includes(month)
+
+  const countByStatus = (s: Status) => Object.values(entries).filter(e => e.status === s).length
+
+  const prevMonth = () => { if (month === 0) { setYear(y => y-1); setMonth(11) } else setMonth(m => m-1) }
+  const nextMonth = () => { if (month === 11) { setYear(y => y+1); setMonth(0) } else setMonth(m => m+1) }
+  const pad2cal = (n: number) => String(n).padStart(2,'0')
+  const prevPeriod = () => {
+    if (calView === 'month') prevMonth()
+    else if (calView === 'week') { const d = new Date(weekStart+'T12:00:00'); d.setDate(d.getDate()-7); setWeekStart(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+    else if (calView === 'day') { const d = new Date(dayDate+'T12:00:00'); d.setDate(d.getDate()-1); setDayDate(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+    else if (calView === 'tasks') return
+    else { const d = new Date(dayDate+'T12:00:00'); d.setDate(d.getDate()-7); setDayDate(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+  }
+  const nextPeriod = () => {
+    if (calView === 'month') nextMonth()
+    else if (calView === 'week') { const d = new Date(weekStart+'T12:00:00'); d.setDate(d.getDate()+7); setWeekStart(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+    else if (calView === 'day') { const d = new Date(dayDate+'T12:00:00'); d.setDate(d.getDate()+1); setDayDate(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+    else if (calView === 'tasks') return
+    else { const d = new Date(dayDate+'T12:00:00'); d.setDate(d.getDate()+7); setDayDate(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`) }
+  }
+  const periodLabel = (() => {
+    if (calView === 'month') return `${MONTHS[month]} ${year}`
+    if (calView === 'week') {
+      const s = new Date(weekStart+'T12:00:00'); const e = new Date(weekStart+'T12:00:00'); e.setDate(e.getDate()+6)
+      return `${pad2cal(s.getDate())} ${MONTHS[s.getMonth()].slice(0,3)} – ${pad2cal(e.getDate())} ${MONTHS[e.getMonth()].slice(0,3)} ${e.getFullYear()}`
+    }
+    if (calView === 'day') { const d = new Date(dayDate+'T12:00:00'); return `${pad2cal(d.getDate())} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` }
+    // agenda
+    const s = new Date(dayDate+'T12:00:00'); const e = new Date(dayDate+'T12:00:00'); e.setDate(e.getDate()+29)
+    return `${pad2cal(s.getDate())} ${MONTHS[s.getMonth()].slice(0,3)} – ${pad2cal(e.getDate())} ${MONTHS[e.getMonth()].slice(0,3)} ${e.getFullYear()}`
+  })()
+
+  // Upcoming events for sidebar (next 60 days)
+  const upcomingEntries = useMemo(() => {
+    const all: (Entry & { leadName?: string })[] = []
+    Object.values(entries).forEach(e => {
+      if (e.date >= todayIso && e.status !== 'libre') {
+        all.push({ ...e, leadName: e.lead_id ? leadsById[e.lead_id]?.name : undefined })
+      }
+    })
+    return all.sort((a, b) => a.date.localeCompare(b.date)).slice(0, 8)
+  }, [entries, leadsById, todayIso])
+
+  // Leads with future wedding dates (for sidebar)
+  const upcomingLeads = useMemo(() => {
+    return leads
+      .filter(l => l.status !== 'won' && l.status !== 'lost')
+      .filter(l => {
+        const flex = l.date_flexibility || 'exact'
+        if (flex === 'exact') return l.wedding_date && l.wedding_date >= todayIso
+        if (flex === 'range') return (l.wedding_date_to || l.wedding_date || '') >= todayIso
+        if (flex === 'multi_range') return (l.wedding_date_ranges || []).some(r => (r.to || r.from) >= todayIso)
+        if (flex === 'month') return l.wedding_year && l.wedding_month
+          ? `${l.wedding_year}-${String(l.wedding_month).padStart(2,'0')}-28` >= todayIso
+          : false
+        return false // flexible/season not shown in sidebar
+      })
+      .sort((a, b) => {
+        const getDate = (l: Lead) => {
+          const flex = l.date_flexibility || 'exact'
+          if (flex === 'exact' || flex === 'range') return l.wedding_date || '9999'
+          if (flex === 'multi_range') return l.wedding_date_ranges?.[0]?.from || '9999'
+          if (flex === 'month') return `${l.wedding_year}-${String(l.wedding_month).padStart(2,'0')}-01`
+          return '9999'
+        }
+        return getDate(a).localeCompare(getDate(b))
+      })
+      .slice(0, 6)
+  }, [leads, todayIso])
+
+  if (isBlocked) return null
+
+  if (!authLoading && !activeVenue) {
+    return <><Sidebar /><div className="main-layout" style={{ padding: '24px 28px' }}><NoVenueState /></div></>
+  }
+
+  return (
+    <div style={{ display: 'flex' }}>
+      {!calFullscreen && <Sidebar />}
+      <div className="main-layout" style={calFullscreen ? { marginLeft: 0, width: '100vw' } : undefined}>
+        {!calFullscreen && <div className="topbar">
+          <div className="topbar-title">Calendario</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+
+            {/* Lead search */}
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#faf8f5', border: '1px solid var(--ivory)', borderRadius: 6, padding: '0 12px', minHeight: 40, boxSizing: 'border-box' }}>
+                <Search size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                <input
+                  value={leadSearch}
+                  onChange={e => { setLeadSearch(e.target.value); setSearchOpen(true) }}
+                  onFocus={() => setSearchOpen(true)}
+                  onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+                  placeholder="Buscar pareja…"
+                  style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, width: 160, color: 'var(--charcoal)', height: '100%' }}
+                />
+                {leadSearch && (
+                  <button type="button" onClick={() => { setLeadSearch(''); setLeadSearchResults([]) }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 0, display: 'flex' }}>
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+              {searchOpen && leadSearchResults.length > 0 && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff',
+                  border: '1px solid var(--ivory)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+                  zIndex: 100, marginTop: 4, overflow: 'hidden', minWidth: 240,
+                }}>
+                  {leadSearchResults.map(l => {
+                    const flex = l.date_flexibility || 'exact'
+                    const dateLabel = flex === 'exact' && l.wedding_date
+                      ? new Date(l.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : flex === 'range' && l.wedding_date
+                      ? `${new Date(l.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} – ${l.wedding_date_to ? new Date(l.wedding_date_to + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '?'}`
+                      : flex === 'month' && l.wedding_year && l.wedding_month
+                      ? `${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][l.wedding_month - 1]} ${l.wedding_year}`
+                      : 'Fecha flexible'
+                    return (
+                      <button key={l.id} type="button"
+                        onMouseDown={() => navigateToLead(l)}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          width: '100%', padding: '9px 14px', border: 'none', background: 'none',
+                          cursor: 'pointer', textAlign: 'left', gap: 10,
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                      >
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)' }}>{l.name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--warm-gray)', whiteSpace: 'nowrap' }}>{dateLabel}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {searchOpen && leadSearch.trim() && leadSearchResults.length === 0 && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, background: '#fff',
+                  border: '1px solid var(--ivory)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+                  zIndex: 100, marginTop: 4, padding: '10px 14px', fontSize: 12, color: 'var(--warm-gray)', whiteSpace: 'nowrap',
+                }}>Sin resultados</div>
+              )}
+            </div>
+
+            <button className="btn btn-ghost btn-sm" onClick={exportCSV} disabled={exporting} title="Exportar calendario a CSV" style={exporting ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
+              <Download size={13} /> {exporting ? 'Exportando…' : 'CSV'}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={exportICS} disabled={exporting} title="Descargar archivo .ics para Google Calendar" style={exporting ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
+              <Calendar size={13} /> {exporting ? 'Exportando…' : 'Google Cal'}
+            </button>
+
+            {bulkMode ? (
+              <>
+                <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>
+                  {bulkStart ? 'Haz click en otra fecha para completar el rango' : `${bulkDates.size} fecha${bulkDates.size !== 1 ? 's' : ''} seleccionada${bulkDates.size !== 1 ? 's' : ''}`}
+                </span>
+                <button className="btn btn-sm" onClick={() => { setBulkStatus('bloqueado'); applyBulk() }} disabled={saving || bulkDates.size === 0}
+                  style={{ background: '#1c1917', color: '#fff', border: 'none' }}>
+                  {saving ? 'Guardando...' : 'Bloquear'}
+                </button>
+                <button className="btn btn-sm" onClick={() => { setBulkStatus('libre'); applyBulk() }} disabled={saving || bulkDates.size === 0}
+                  style={{ background: '#DCE7DE', color: '#35513E', border: '1px solid #BFD2C5' }}>
+                  {saving ? 'Guardando...' : 'Desbloquear'}
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setBulkMode(false); setBulkDates(new Set()); setBulkStart(null); wasDragBulkRef.current = false }}>
+                  Cancelar
+                </button>
+              </>
+            ) : (
+              <button className="btn btn-ghost btn-sm" onClick={() => setBulkMode(true)}>
+                <Calendar size={13} /> Seleccionar rango
+              </button>
+            )}
+          </div>
+        </div>}
+
+        <div className="page-content" style={calFullscreen ? { padding: '12px 16px', height: '100vh', display: 'flex', flexDirection: 'column' } : undefined}>
+          {/* Stats — hidden in fullscreen */}
+          <div style={{ display: calFullscreen ? 'none' : 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 20 }}>
+            {[
+              { value: lastDay - countByStatus('negociacion') - countByStatus('reservado') - countByStatus('bloqueado'), label: 'Fechas libres', color: 'var(--espresso)' },
+              { value: countByStatus('negociacion'), label: 'En negociación', color: 'var(--gold)' },
+              { value: countByStatus('reservado'), label: 'Reservados', color: '#5c4033' },
+            ].map((s, i) => (
+              <div key={i} style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, padding: '20px 22px' }}>
+                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 36, fontWeight: 500, color: s.color, lineHeight: 1, marginBottom: 8 }}>
+                  {String(s.value).padStart(2, '0')}
+                </div>
+                <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>
+                  {s.label}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: calFullscreen ? '1fr' : 'repeat(4,1fr)', gap: 14, alignItems: 'start', flex: calFullscreen ? 1 : undefined, minHeight: calFullscreen ? 0 : undefined }}>
+            {/* Calendar */}
+            <div className="card" style={{ overflow: 'hidden', gridColumn: calFullscreen ? undefined : 'span 3', display: calFullscreen ? 'flex' : undefined, flexDirection: calFullscreen ? 'column' : undefined, height: calFullscreen ? '100%' : undefined }}>
+              {/* Calendar header */}
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                {/* Left: period label + Hoy (calendar views) OR title + date picker (agenda/tasks) */}
+                {calView !== 'agenda' && calView !== 'tasks' ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, color: 'var(--espresso)', fontWeight: 500, letterSpacing: '0.01em' }}>
+                      {periodLabel}
+                    </span>
+                    <button onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); const t = new Date(); const dy = t.getDay(); const df = dy === 0 ? -6 : 1 - dy; t.setDate(t.getDate() + df); const p2=(n:number)=>String(n).padStart(2,'0'); setWeekStart(`${t.getFullYear()}-${p2(t.getMonth()+1)}-${p2(t.getDate())}`); setDayDate(dateStr(today.getFullYear(), today.getMonth(), today.getDate())) }}
+                      style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
+                      Hoy
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, color: 'var(--espresso)', fontWeight: 500, letterSpacing: '0.01em' }}>
+                      {calView === 'agenda' ? 'Agenda' : 'Tareas'}
+                    </span>
+                    {/* Sub-toggle: Lista / Calendario */}
+                    <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 6, padding: 2, gap: 1 }}>
+                      {(['list', 'cal'] as const).map(sv => (
+                        <button key={sv} onClick={() => setSubView(sv)}
+                          style={{ fontSize: 10, padding: '2px 9px', borderRadius: 5, border: 'none', cursor: 'pointer', fontWeight: 600,
+                            background: subView === sv ? '#fff' : 'transparent',
+                            color: subView === sv ? 'var(--charcoal)' : 'var(--warm-gray)',
+                            boxShadow: subView === sv ? '0 1px 3px rgba(0,0,0,.08)' : 'none',
+                            fontFamily: 'Inter, sans-serif' }}>
+                          {sv === 'list' ? 'Lista' : 'Calendario'}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Date range filter */}
+                    <DateRangeFilter from={filterFrom} to={filterTo} onChange={(f, t) => { setFilterFrom(f); setFilterTo(t); if (f) setDayDate(f) }} />
+                    {/* Month nav for calendar sub-view */}
+                    {subView === 'cal' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button onClick={prevMonth} style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
+                          <ChevronLeft size={13} />
+                        </button>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', minWidth: 110, textAlign: 'center' }}>{MONTHS[month]} {year}</span>
+                        <button onClick={nextMonth} style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
+                          <ChevronRight size={13} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {/* View tabs — two groups */}
+                  {calView !== 'agenda' && calView !== 'tasks' ? (
+                    <>
+                      {/* Calendar views group */}
+                      <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
+                        {(['month','week','day'] as const).map(v => (
+                          <button key={v} type="button" onClick={() => setCalView(v)}
+                            style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
+                              background: calView === v ? '#fff' : 'transparent',
+                              color: calView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
+                              boxShadow: calView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none',
+                              fontFamily: 'Inter, sans-serif' }}>
+                            {v === 'month' ? 'Mes' : v === 'week' ? 'Semana' : 'Día'}
+                          </button>
+                        ))}
+                      </div>
+                      {/* Link to Agenda/Tareas */}
+                      <div style={{ display: 'flex', gap: 2 }}>
+                        {(['agenda','tasks'] as const).map(v => {
+                          const pendingOverdue = v === 'tasks' ? tasks.filter(t => !t.completed && t.due_date <= todayIso).length : 0
+                          return (
+                            <button key={v} type="button" onClick={() => { setCalView(v); setSubView('list') }}
+                              style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', cursor: 'pointer', fontWeight: 500,
+                                color: 'var(--warm-gray)', fontFamily: 'Inter, sans-serif', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              {v === 'agenda' ? 'Agenda' : 'Tareas'}
+                              {pendingOverdue > 0 && (
+                                <span style={{ background: '#BC5249', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
+                                  {pendingOverdue}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {/* Period nav arrows */}
+                      <button onClick={prevPeriod}
+                        style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
+                        <ChevronLeft size={15} />
+                      </button>
+                      <button onClick={nextPeriod}
+                        style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
+                        <ChevronRight size={15} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* Agenda/Tareas group */}
+                      <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
+                        {(['agenda','tasks'] as const).map(v => {
+                          const pendingOverdue = v === 'tasks' ? tasks.filter(t => !t.completed && t.due_date <= todayIso).length : 0
+                          return (
+                            <button key={v} type="button" onClick={() => { setCalView(v); setSubView('list') }}
+                              style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
+                                background: calView === v ? '#fff' : 'transparent',
+                                color: calView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
+                                boxShadow: calView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none',
+                                fontFamily: 'Inter, sans-serif', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              {v === 'agenda' ? 'Agenda' : 'Tareas'}
+                              {pendingOverdue > 0 && (
+                                <span style={{ background: '#BC5249', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
+                                  {pendingOverdue}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {/* Link back to Calendar */}
+                      <button type="button" onClick={() => setCalView('month')}
+                        style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', cursor: 'pointer', fontWeight: 500,
+                          color: 'var(--warm-gray)', fontFamily: 'Inter, sans-serif' }}>
+                        Calendario
+                      </button>
+                    </>
+                  )}
+                  {/* Fullscreen toggle */}
+                  <button
+                    onClick={() => setCalFullscreen(f => !f)}
+                    title={calFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                    style={{
+                      width: 32, height: 32, borderRadius: '50%',
+                      border: '1px solid var(--ivory)', background: calFullscreen ? 'var(--gold)' : '#fff',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: calFullscreen ? '#fff' : 'var(--charcoal)',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    {calFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Filter buttons + date range — calendar views only */}
+              {calView !== 'agenda' && calView !== 'tasks' && (
+              <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {([
+                  { key: 'all',    label: 'Todos',             color: 'var(--gold)' },
+                  { key: 'visitas', label: 'Visitas',           color: '#5C8570' },
+                  { key: 'bodas',  label: 'Bodas confirmadas', color: '#467A60' },
+                  { key: 'leads',  label: 'Leads',             color: '#4F6D8C' },
+                ] as const).map(({ key, label, color }) => {
+                  const isActive = key === 'all' ? filterAll : calendarFilters.has(key)
+                  return (
+                    <button key={key} onClick={() => toggleCalendarFilter(key)} style={{
+                      fontSize: 11, padding: '3px 10px', borderRadius: 20, border: '1.5px solid',
+                      borderColor: isActive ? color : 'var(--ivory)',
+                      background: isActive ? color : 'transparent',
+                      color: isActive ? '#fff' : 'var(--warm-gray)',
+                      cursor: 'pointer', fontWeight: isActive ? 600 : 400, transition: 'all 0.15s',
+                    }}>
+                      {label}
+                    </button>
+                  )
+                })}
+                {/* Date range filter — single calendar popover */}
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <DateRangeFilter from={filterFrom} to={filterTo} onChange={(f, t) => { setFilterFrom(f); setFilterTo(t) }} />
+                </div>
+              </div>
+              )}
+
+              {/* Day headers — month view only */}
+              {calView === 'month' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid var(--ivory)' }}>
+                {DAYS_SHORT.map((d, i) => (
+                  <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '0.08em', padding: '12px 0' }}>
+                    {d}
+                  </div>
+                ))}
+              </div>}
+
+                {loading ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Spinner /></div>
+                ) : calView !== 'month' ? null : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
+                    {cells.map((day, i) => {
+                      if (!day) return <div key={`e-${i}`} style={{ minHeight: 90, borderBottom: '1px solid var(--ivory)', borderRight: i % 7 !== 6 ? '1px solid var(--ivory)' : 'none' }} />
+                      const dow       = (startDow + day - 1) % 7
+                      const isWeekend = dow >= 5
+                      const ds        = dateStr(year, month, day)
+                      const entry     = entries[ds]
+                      const entry2nd  = entries2[ds]
+                      const status    = entry?.status as Status | undefined
+                      const cfg       = STATUS_CFG[status || 'libre']
+                      const isHalfDayBlock = !!(entry?.note?.startsWith('medio_dia'))
+                      // Double half-day: two separate bookings share the day
+                      const isDoubleHalf = isHalfDayBlock && !!entry2nd?.note?.startsWith('medio_dia')
+                      const cfg2nd = STATUS_CFG[(entry2nd?.status as Status) || 'libre']
+                      const isToday   = ds === todayIso
+                      const isPast    = ds < todayIso
+                      const isOutOfRange = (filterFrom && ds < filterFrom) || (filterTo && ds > filterTo)
+                      const isBulkSel = bulkDates.has(ds)
+                      const isBulkStart = bulkStart === ds
+                      const dayLeads   = leadsByDate[ds] || []
+                      const linkedLead = entry?.lead_id ? leadsById[entry.lead_id] : null
+                      const visitLeads = visitsByDate[ds] || []
+                      const dayTasks   = tasksByDate[ds] || []
+                      const hasOverdueTasks = dayTasks.some(t => t.due_date < todayIso)
+                      const hasVisits  = visitLeads.length > 0
+                      const dayInquiries = inquiriesByDate[ds] || []
+                      const hasInquiries = dayInquiries.length > 0
+
+                      // Effective status — derived from actual lead statuses (bloqueado stays from DB)
+                      const NEG_LEAD_STATUSES = ['contacted', 'post_visit', 'proposal_sent', 'budget_sent']
+                      const effectiveStatus: Status | undefined = status === 'bloqueado' ? 'bloqueado'
+                        : dayLeads.some((l: any) => l.status === 'won') ? 'reservado'
+                        : dayLeads.some((l: any) => NEG_LEAD_STATUSES.includes(l.status)) ? 'negociacion'
+                        : undefined
+
+                      // Filter: does this cell match the active filter?
+                      const filterIncludesVisitas = !filterAll && calendarFilters.has('visitas')
+                      // Show cross only when visitas filter active + bodas filter NOT active + cell is reservado/bloqueado
+                      const showCross = filterIncludesVisitas && !calendarFilters.has('bodas') && (effectiveStatus === 'reservado' || status === 'bloqueado')
+                      const hideStatusLabel = filterIncludesVisitas && !(calendarFilters.has('bodas') && effectiveStatus === 'reservado')
+                      const matchesFilter =
+                        filterAll ||
+                        (calendarFilters.has('visitas') && hasVisits) ||
+                        (calendarFilters.has('bodas') && effectiveStatus === 'reservado') ||
+                        (calendarFilters.has('leads') && dayLeads.length > 0)
+                      const effectiveCfg = STATUS_CFG[effectiveStatus || 'libre']
+
+                      // Name to show on cell — status takes priority; visit only wins if no status
+                      const visitOnly = hasVisits && !effectiveStatus
+                      const displayName = !matchesFilter ? null
+                        : visitOnly ? visitLeads[0].name
+                        : linkedLead?.name || (dayLeads.length === 1 ? dayLeads[0].name : null)
+                      // True when the displayed lead also has a visit that day
+                      const displayLeadHasVisit = hasVisits && (visitOnly || visitLeads.some((v: any) => v.id === linkedLead?.id))
+                      const hasUnlinkedLeads = matchesFilter && dayLeads.length > 0 && !linkedLead && !visitOnly
+
+                      // Duration suffix for exact leads with multi-day weddings
+                      const singleLead = !hasVisits && dayLeads.length === 1 ? dayLeads[0] : null
+                      const durationSuffix = singleLead && singleLead.date_flexibility === 'exact' && singleLead.wedding_date && singleLead.wedding_date_to
+                        ? (() => {
+                            const from = new Date(singleLead.wedding_date + 'T12:00:00')
+                            const to   = new Date(singleLead.wedding_date_to + 'T12:00:00')
+                            const days = Math.round((to.getTime() - from.getTime()) / 86400000) + 1
+                            return days > 1 ? `·${days}d` : ''
+                          })()
+                        : ''
+
+                      // Half-day split: use actual status color + white (or second booking's color)
+                      const statusColor  = (status && status !== 'libre') ? cfg.bg : '#f3f4f6'
+                      const statusColor2 = (entry2nd?.status && entry2nd.status !== 'libre') ? cfg2nd.bg : '#f3f4f6'
+                      const isTarde = entry?.note?.startsWith('medio_dia_tarde')
+                      const halfDayBg = isDoubleHalf
+                        ? `linear-gradient(135deg, ${statusColor} 50%, ${statusColor2} 50%)`
+                        : isTarde
+                          ? `linear-gradient(135deg, #ffffff 50%, ${statusColor} 50%)`
+                          : `linear-gradient(135deg, ${statusColor} 50%, #ffffff 50%)`
+                      const cellBg = isBulkSel ? '#F3EBD8' : isPast ? '#faf8f5' : hasVisits && !effectiveStatus ? 'rgba(92,133,112,0.06)' : isHalfDayBlock ? halfDayBg : effectiveStatus ? effectiveCfg.bg : '#fff'
+                      const colIndex = (startDow + day - 1 + startDow === 0 ? 0 : i) % 7
+
+                      return (
+                        <button
+                          key={ds}
+                          onMouseDown={(e) => {
+                            if (e.button !== 0) return
+                            wasDraggingRef.current = false
+                            setDragStart(ds)
+                          }}
+                          onMouseEnter={() => {
+                            if (!dragStart || ds === dragStart) return
+                            // Start or extend drag selection
+                            if (!wasDraggingRef.current) {
+                              wasDraggingRef.current = true
+                              wasDragBulkRef.current = true
+                              setBulkMode(true)
+                              setBulkStart(dragStart)
+                            }
+                            // Compute range
+                            const start = dragStart < ds ? dragStart : ds
+                            const end   = dragStart < ds ? ds : dragStart
+                            const range = new Set<string>()
+                            for (let i = 1; i <= lastDay; i++) {
+                              const d2 = dateStr(year, month, i)
+                              if (d2 >= start && d2 <= end) range.add(d2)
+                            }
+                            setBulkDates(range)
+                          }}
+                          onClick={() => {
+                            if (wasDraggingRef.current) {
+                              wasDraggingRef.current = false
+                              return
+                            }
+                            handleDayClick(ds, isPast && !bulkMode)
+                          }}
+                          style={{
+                            width: '100%', minHeight: 90, border: 'none',
+                            borderBottom: '1px solid var(--ivory)',
+                            borderRight: i % 7 !== 6 ? '1px solid var(--ivory)' : 'none',
+                            background: cellBg,
+                            cursor: isPast && !bulkMode ? 'default' : 'pointer',
+                            transition: 'background 0.15s',
+                            display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                            justifyContent: 'space-between', padding: '8px 10px', outline: 'none',
+                            boxShadow: isToday ? 'inset 0 0 0 2px var(--gold)' : isBulkStart ? 'inset 0 0 0 2px var(--gold)' : 'none',
+                            opacity: saving ? 0.7 : isOutOfRange ? 0.25 : 1,
+                            position: 'relative',
+                          }}
+                        >
+                          {/* Day number */}
+                          <span style={{
+                            fontSize: 15, fontWeight: isToday ? 700 : 500, lineHeight: 1,
+                            color: isPast ? 'var(--stone)' : isToday ? 'var(--gold)' : 'var(--charcoal)',
+                            fontFamily: 'Inter, sans-serif',
+                            position: 'relative', zIndex: 1,
+                          }}>
+                            {day}
+                          </span>
+
+                          {/* Big ✕ overlay for reservado/bloqueado when visitas filter active but bodas filter not */}
+                          {showCross && (
+                            <div style={{
+                              position: 'absolute', inset: 0,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              pointerEvents: 'none', zIndex: 0,
+                            }}>
+                              <svg viewBox="0 0 24 24" style={{ width: '65%', height: '65%', opacity: 0.22 }} fill="none" stroke={cfg.dot} strokeWidth={2.5} strokeLinecap="round">
+                                <line x1="4" y1="4" x2="20" y2="20" />
+                                <line x1="20" y1="4" x2="4" y2="20" />
+                              </svg>
+                            </div>
+                          )}
+
+                          {/* Lead name / visit name — hidden when cross is shown */}
+                          {displayName && !isPast && !showCross && (
+                            <span style={{
+                              fontSize: 9, lineHeight: 1.3,
+                              color: visitOnly && matchesFilter ? '#467A60' : effectiveCfg.color,
+                              fontWeight: 600, maxWidth: '100%', overflow: 'hidden',
+                              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                              textAlign: 'left', wordBreak: 'break-word', marginTop: 2,
+                            }}>
+                              {displayLeadHasVisit && matchesFilter ? `${displayName} - visita` : `${displayName}${durationSuffix}`}
+                            </span>
+                          )}
+
+                          {/* Bottom: status label or indicators — stacked column */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', marginTop: 'auto', overflow: 'hidden' }}>
+                            {/* Row 1: calendar status — hidden when visitas filter active (except reservado+bodas) */}
+                            {matchesFilter && !hideStatusLabel && effectiveStatus && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: effectiveCfg.dot, flexShrink: 0 }} />
+                                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: effectiveCfg.color, whiteSpace: 'nowrap' }}>
+                                  {isHalfDayBlock ? (entry?.note?.startsWith('medio_dia_manana') ? '½ Mañ' : entry?.note?.startsWith('medio_dia_tarde') ? '½ Tar' : '½ Día') : effectiveStatus === 'negociacion' ? 'Negociación' : effectiveCfg.label}
+                                </span>
+                                {isDoubleHalf && entry2nd?.status && entry2nd.status !== 'libre' && (
+                                  <>
+                                    <span style={{ fontSize: 7, color: 'var(--stone)' }}>·</span>
+                                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg2nd.dot, flexShrink: 0 }} />
+                                    <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: cfg2nd.color, whiteSpace: 'nowrap' }}>
+                                      {entry2nd.note?.startsWith('medio_dia_manana') ? '½ Mañ' : '½ Tar'}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                            {/* Row 2b: pending request indicator (visit/call/video without linked lead) */}
+                            {matchesFilter && hasInquiries && (() => {
+                              const visitInq = dayInquiries.find(i => i.kind === 'visit')
+                              const visitTime: string | null = visitInq && typeof visitInq.payload?.time === 'string' ? visitInq.payload.time : null
+                              const tip = dayInquiries.map(i => {
+                                const k = i.kind === 'visit' ? 'Visita' : i.kind === 'video' ? 'Videollamada' : 'Llamada'
+                                const t = i.kind === 'visit' && typeof i.payload?.time === 'string' ? ` · ${i.payload.time}` : ''
+                                return `${k} · ${i.name}${t}`
+                              }).join(' · ')
+                              const label = visitInq
+                                ? (visitTime ? `Visita ${visitTime}` : 'Visita')
+                                : dayInquiries.length === 1 ? 'Solicitud' : `${dayInquiries.length} solicitudes`
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={tip}>
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
+                                  <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--gold)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                                    {label}
+                                  </span>
+                                </div>
+                              )
+                            })()}
+                            {/* Row 2: visit indicator (always its own line, below status) */}
+                            {matchesFilter && hasVisits && (() => {
+                              const sorted = [...visitLeads].sort((a: any, b: any) => ((a as any).visit_time || 'zz').localeCompare((b as any).visit_time || 'zz'))
+                              const first = sorted[0] as any
+                              const firstTime = first.visit_time as string | undefined
+                              const tipParts = sorted.map((v: any) => `${v.name}${v.visit_time ? ' · ' + v.visit_time : ''}`).join(' · ')
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={`Visita: ${tipParts}`}>
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#5C8570', flexShrink: 0 }} />
+                                  <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#467A60', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                                    {firstTime ? firstTime : 'Visita'}
+                                  </span>
+                                  {visitLeads.length > 1 && (
+                                    <span style={{ fontSize: 8, color: '#5C8570', fontWeight: 700 }}>+{visitLeads.length - 1}</span>
+                                  )}
+                                </div>
+                              )
+                            })()}
+                            {/* Dots for libre dates with leads/notes */}
+                            {(!status || status === 'libre') && !hasVisits ? (
+                              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                {hasUnlinkedLeads && (
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} title={`${dayLeads.length} lead(s)`} />
+                                )}
+                                {matchesFilter && entry?.note && (
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--stone)', flexShrink: 0 }} />
+                                )}
+                              </div>
+                            ) : null}
+                            {!visitOnly && matchesFilter && (() => {
+                              const nonVisitLeadCount = dayLeads.filter((l: any) => !visitLeads.some((v: any) => v.id === l.id)).length
+                              // If a name is shown already (displayName), count = extras beyond that one
+                              const extraCount = displayName ? nonVisitLeadCount - 1 : nonVisitLeadCount
+                              return extraCount > 0 ? (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 7, fontWeight: 700, background: '#F3EBD8', color: '#7A5A2E', borderRadius: 5, padding: '1px 5px', letterSpacing: '0.03em' }}>
+                                  +{extraCount} {extraCount === 1 ? 'lead' : 'leads'}
+                                </span>
+                              ) : null
+                            })()}
+                            {/* Task indicator dot */}
+                            {dayTasks.length > 0 && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                                title={dayTasks.map(t => t.title).join(' · ')}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: dayTasks.some(t => t.due_date < todayIso) ? '#BC5249' : '#7E72A0', flexShrink: 0 }} />
+                                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: dayTasks.some(t => t.due_date < todayIso) ? '#BC5249' : '#6A5B95', whiteSpace: 'nowrap' }}>
+                                  {dayTasks.length === 1 ? 'Tarea' : `${dayTasks.length} tareas`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+              {/* ── Week view ─────────────────────────────────────────────── */}
+              {!loading && calView === 'week' && (() => {
+                const weekDates: string[] = []
+                for (let i = 0; i < 7; i++) {
+                  const d = new Date(weekStart + 'T12:00:00'); d.setDate(d.getDate() + i)
+                  weekDates.push(`${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`)
+                }
+                const DOW_SHORT = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+                return (
+                  <div style={{ overflowX: 'auto' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', minWidth: 560, borderBottom: '1px solid var(--ivory)', background: '#faf8f5' }}>
+                      {weekDates.map((iso, wi) => {
+                        const d = new Date(iso + 'T12:00:00')
+                        const isToday = iso === todayIso
+                        const isPast = iso < todayIso
+                        return (
+                          <div key={iso} style={{ textAlign: 'center', padding: '10px 4px', borderLeft: wi > 0 ? '1px solid var(--ivory)' : 'none', background: isPast ? '#eae7e2' : 'transparent' }}>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: isPast ? '#b0a99e' : wi >= 5 ? 'var(--gold)' : 'var(--warm-gray)', letterSpacing: '.07em', textTransform: 'uppercase' }}>{DOW_SHORT[wi]}</div>
+                            <div style={{ fontSize: 18, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--gold)' : isPast ? '#9e978d' : 'var(--charcoal)', width: 30, height: 30, borderRadius: '50%', background: isToday ? '#F3EBD8' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '2px auto 0', fontFamily: 'Inter, sans-serif' }}>{d.getDate()}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', minWidth: 560 }}>
+                      {weekDates.map((iso, wi) => {
+                        const entry = entries[iso]
+                        const isPast = iso < todayIso
+                        const cfg = entry?.status ? STATUS_CFG[entry.status as Status] ?? STATUS_CFG['libre'] : STATUS_CFG['libre']
+                        const dayLeads = (leadsByDate[iso] || []).filter(l => (filterAll || (calendarFilters.has('leads') || calendarFilters.has('bodas') && l.status === 'won')))
+                        const visitLeads = leads.filter(l => l.visit_date === iso)
+                        const dayInqs = pendingInquiries.filter(i => { const ev = i.event_at ? i.event_at.slice(0,10) : null; return ev === iso })
+                        return (
+                          <div key={iso} onClick={() => !isPast && setModalDate(iso)}
+                            style={{ minHeight: 120, borderLeft: wi > 0 ? '1px solid var(--ivory)' : 'none', borderTop: '1px solid var(--ivory)', padding: '8px 8px', background: isPast ? (entry?.status && entry.status !== 'libre' ? cfg.bg + '88' : '#f0ede8') : (entry?.status && entry.status !== 'libre' ? cfg.bg : '#fff'), cursor: isPast ? 'default' : 'pointer', opacity: ((filterFrom && iso < filterFrom) || (filterTo && iso > filterTo)) ? 0.25 : isPast ? 0.6 : 1, transition: 'background .15s', position: 'relative', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {entry?.status && entry.status !== 'libre' && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                                <span style={{ fontSize: 9, fontWeight: 700, color: cfg.color, textTransform: 'uppercase', letterSpacing: '.05em' }}>{cfg.label}</span>
+                              </div>
+                            )}
+                            {entry?.lead_id && leadsById[entry.lead_id] && (
+                              <span style={{ fontSize: 10, fontWeight: 600, color: cfg.color, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{leadsById[entry.lead_id].name}</span>
+                            )}
+                            {visitLeads.slice(0,2).map(vl => (
+                              <div key={vl.id} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#5C8570', flexShrink: 0 }} />
+                                <span style={{ fontSize: 9, fontWeight: 600, color: '#467A60', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{vl.name}{(vl as any).visit_time ? ` · ${(vl as any).visit_time}` : ''}</span>
+                              </div>
+                            ))}
+                            {dayInqs.length > 0 && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
+                                <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--gold)' }}>{dayInqs.length === 1 ? dayInqs[0].kind === 'visit' ? 'Visita' : 'Solicitud' : `${dayInqs.length} solicitudes`}</span>
+                              </div>
+                            )}
+                            {dayLeads.filter(l => !visitLeads.some(v => v.id === l.id) && l.id !== entry?.lead_id).slice(0,2).map(l => (
+                              <span key={l.id} style={{ fontSize: 9, color: '#4F6D8C', fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{l.name}</span>
+                            ))}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* ── Day view ──────────────────────────────────────────────── */}
+              {!loading && calView === 'day' && (() => {
+                const iso = dayDate
+                const entry = entries[iso]
+                const isPast = iso < todayIso
+                const isToday = iso === todayIso
+                const cfg = entry?.status ? STATUS_CFG[entry.status as Status] ?? STATUS_CFG['libre'] : STATUS_CFG['libre']
+                const dLeads = (leadsByDate[iso] || [])
+                const vLeads = leads.filter(l => l.visit_date === iso)
+                const dInqs = pendingInquiries.filter(i => i.event_at?.slice(0,10) === iso)
+                const d = new Date(iso + 'T12:00:00')
+                const DOW = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
+                return (
+                  <div style={{ padding: '20px 24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap' }}>
+                      {/* Date stamp */}
+                      <div style={{ textAlign: 'center', minWidth: 64 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: d.getDay() >= 6 ? 'var(--gold)' : 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.07em' }}>{DOW[d.getDay()]}</div>
+                        <div style={{ fontSize: 48, fontWeight: 700, color: isToday ? 'var(--gold)' : 'var(--charcoal)', lineHeight: 1, fontFamily: 'Inter, sans-serif' }}>{d.getDate()}</div>
+                        <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginTop: 2 }}>{MONTHS[d.getMonth()]} {d.getFullYear()}</div>
+                      </div>
+                      {/* Details */}
+                      <div style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 10, opacity: isPast ? 0.55 : 1 }}>
+                        {/* Status */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: entry?.status && entry.status !== 'libre' ? cfg.bg : '#f9f8f6', border: `1px solid ${entry?.status && entry.status !== 'libre' ? cfg.border : 'var(--ivory)'}` }}>
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: cfg.color, textTransform: 'uppercase', letterSpacing: '.06em' }}>{cfg.label}</div>
+                            {entry?.lead_id && leadsById[entry.lead_id] && <div style={{ fontSize: 11, color: 'var(--charcoal)', marginTop: 2 }}>{leadsById[entry.lead_id].name}</div>}
+                            {entry?.note && <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 2 }}>{entry.note}</div>}
+                          </div>
+                          {!isPast && <button onClick={() => setModalDate(iso)} style={{ marginLeft: 'auto', fontSize: 11, padding: '4px 12px', borderRadius: 7, border: '1px solid var(--ivory)', background: '#fff', color: 'var(--charcoal)', cursor: 'pointer', fontWeight: 600 }}>Editar</button>}
+                        </div>
+                        {/* Visits */}
+                        {vLeads.length > 0 && <div style={{ borderRadius: 10, border: '1px solid #DCE7DE', background: '#EEF2EC', padding: '10px 14px' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#3C5945', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 6 }}>Visitas agendadas</div>
+                          {vLeads.map(vl => <div key={vl.id} style={{ fontSize: 12, color: '#064e3b' }}>{vl.name}{(vl as any).visit_time ? ` · ${(vl as any).visit_time}` : ''}</div>)}
+                        </div>}
+                        {/* Inquiries */}
+                        {dInqs.length > 0 && <div style={{ borderRadius: 10, border: '1px solid #E2D4AE', background: '#F7F3E8', padding: '10px 14px' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#7A5A2E', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 6 }}>Solicitudes pendientes</div>
+                          {dInqs.map(inq => <div key={inq.id} style={{ fontSize: 12, color: '#78350f' }}>{inq.name} · {inq.kind === 'visit' ? 'Visita' : inq.kind === 'video' ? 'Videollamada' : 'Llamada'}{typeof inq.payload?.time === 'string' ? ` · ${inq.payload.time}` : ''}</div>)}
+                        </div>}
+                        {/* Leads */}
+                        {dLeads.filter(l => !vLeads.some(v => v.id === l.id)).length > 0 && <div style={{ borderRadius: 10, border: '1px solid #CCD9E6', background: '#EEF2F7', padding: '10px 14px' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#3F5980', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 6 }}>Leads</div>
+                          {dLeads.filter(l => !vLeads.some(v => v.id === l.id)).map(l => <div key={l.id} style={{ fontSize: 12, color: '#39527A' }}>{l.name}</div>)}
+                        </div>}
+                        {!entry && vLeads.length === 0 && dInqs.length === 0 && dLeads.length === 0 && (
+                          <div style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin eventos</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* ── Agenda/Tasks calendar sub-view (mini month) ────────── */}
+              {!loading && (calView === 'agenda' || calView === 'tasks') && subView === 'cal' && (() => {
+                const lastDayCal = new Date(year, month + 1, 0).getDate()
+                const startDowCal = new Date(year, month, 1).getDay()
+                const offsetCal = startDowCal === 0 ? 6 : startDowCal - 1
+                const cellsCal: (number | null)[] = Array(offsetCal).fill(null)
+                for (let d = 1; d <= lastDayCal; d++) cellsCal.push(d)
+                while (cellsCal.length % 7 !== 0) cellsCal.push(null)
+                const DOW_H = ['L','M','X','J','V','S','D']
+                return (
+                  <div style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 0, marginBottom: 4 }}>
+                      {DOW_H.map((d,i) => (
+                        <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: i >= 5 ? 'var(--gold)' : 'var(--warm-gray)', padding: '6px 0' }}>{d}</div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 0 }}>
+                      {cellsCal.map((day, i) => {
+                        if (!day) return <div key={`e-${i}`} style={{ minHeight: 44 }} />
+                        const ds = dateStr(year, month, day)
+                        const isToday = ds === todayIso
+                        const entry = entries[ds]
+                        const hasReservado = entry?.status === 'reservado'
+                        const hasNegociacion = entry?.status === 'negociacion'
+                        const hasBloqueado = entry?.status === 'bloqueado'
+                        const hasVisit = leads.some(l => l.visit_date === ds)
+                        const hasLead = !!(leadsByDate[ds]?.length)
+                        const hasTasks = !!(tasksByDate[ds]?.length)
+                        const taskCount = tasksByDate[ds]?.length || 0
+                        const showDots = calView === 'tasks'
+                          ? hasTasks
+                          : (hasReservado || hasNegociacion || hasBloqueado || hasVisit || hasLead || hasTasks)
+                        return (
+                          <button key={ds} onClick={() => {
+                            setDayDate(ds)
+                            setSubView('list')
+                            if (calView === 'tasks') { /* tasks list doesn't use dayDate but stays on tasks */ }
+                          }}
+                            style={{ minHeight: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                              border: 'none', background: isToday ? '#fffbf0' : 'transparent', cursor: 'pointer', borderRadius: 8,
+                              fontFamily: 'Inter, sans-serif' }}>
+                            <span style={{ fontSize: 13, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--gold)' : ds < todayIso ? '#c0bbb4' : 'var(--charcoal)' }}>{day}</span>
+                            {showDots && (
+                              <div style={{ display: 'flex', gap: 2 }}>
+                                {calView === 'tasks' ? (
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: '#7E72A0' }}>{taskCount}</span>
+                                ) : (
+                                  <>
+                                    {hasReservado && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#5c4033' }} />}
+                                    {hasNegociacion && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--gold)' }} />}
+                                    {hasBloqueado && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#6b7280' }} />}
+                                    {hasVisit && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#5C8570' }} />}
+                                    {hasLead && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4F6D8C' }} />}
+                                    {hasTasks && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#7E72A0' }} />}
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {/* Mini legend */}
+                    <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+                      {calView === 'tasks' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7E72A0' }} />
+                          <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Tareas pendientes</span>
+                        </div>
+                      ) : (
+                        <>
+                          {[{ c: '#5c4033', l: 'Reservado' }, { c: 'var(--gold)', l: 'Negociación' }, { c: '#5C8570', l: 'Visita' }, { c: '#4F6D8C', l: 'Lead' }, { c: '#7E72A0', l: 'Tarea' }].map(x => (
+                            <div key={x.l} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: x.c }} />
+                              <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{x.l}</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* ── Agenda list view ──────────────────────────────────────── */}
+              {!loading && calView === 'agenda' && subView === 'list' && (() => {
+                const startDate = filterFrom || dayDate
+                const endDate = filterTo || undefined
+                const agendaDates: string[] = []
+                for (let i = 0; i < (endDate ? 365 : 30); i++) {
+                  const d = new Date(startDate + 'T12:00:00'); d.setDate(d.getDate() + i)
+                  const iso = `${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`
+                  if (endDate && iso > endDate) break
+                  agendaDates.push(iso)
+                }
+                const DOW_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+                return (
+                  <div style={{ maxHeight: 520, overflowY: 'auto' }}>
+                    {agendaDates.map(iso => {
+                      const d = new Date(iso + 'T12:00:00')
+                      const entry = entries[iso]
+                      const isPast = iso < todayIso
+                      const isToday = iso === todayIso
+                      const cfg = entry?.status ? STATUS_CFG[entry.status as Status] ?? STATUS_CFG['libre'] : STATUS_CFG['libre']
+                      const dLeads = (leadsByDate[iso] || [])
+                      const vLeads = leads.filter(l => l.visit_date === iso)
+                      const dInqs = pendingInquiries.filter(i => i.event_at?.slice(0,10) === iso)
+                      const dTasks = tasksByDate[iso] || []
+                      const hasContent = (entry && entry.status !== 'libre') || vLeads.length > 0 || dInqs.length > 0 || dLeads.length > 0 || dTasks.length > 0
+                      return (
+                        <div key={iso} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--ivory)', background: isToday ? '#fffbf0' : 'transparent', opacity: isPast ? 0.45 : 1 }}>
+                          {/* Date */}
+                          <div style={{ minWidth: 52, textAlign: 'center', paddingTop: 2 }}>
+                            <div style={{ fontSize: 9, fontWeight: 600, color: d.getDay() >= 6 ? 'var(--gold)' : 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{DOW_SHORT[d.getDay()]}</div>
+                            <div style={{ fontSize: 17, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--gold)' : 'var(--charcoal)', fontFamily: 'Inter, sans-serif', lineHeight: 1.1 }}>{d.getDate()}</div>
+                            <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{MONTHS[d.getMonth()].slice(0,3)}</div>
+                          </div>
+                          {/* Events */}
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 2 }}>
+                            {!hasContent && <span style={{ fontSize: 11, color: '#c0bbB4', fontStyle: 'italic' }}>Libre</span>}
+                            {entry && entry.status !== 'libre' && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, fontWeight: 600, color: cfg.color }}>{cfg.label}{entry.lead_id && leadsById[entry.lead_id] ? ` · ${leadsById[entry.lead_id].name}` : ''}</span>
+                              </div>
+                            )}
+                            {vLeads.map(vl => (
+                              <div key={vl.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#5C8570', flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#467A60' }}>Visita · {vl.name}{(vl as any).visit_time ? ` · ${(vl as any).visit_time}` : ''}</span>
+                              </div>
+                            ))}
+                            {dInqs.map(inq => (
+                              <div key={inq.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)' }}>{inq.kind === 'visit' ? 'Visita' : inq.kind === 'video' ? 'Videollamada' : 'Llamada'} · {inq.name}</span>
+                              </div>
+                            ))}
+                            {dLeads.filter(l => !vLeads.some(v => v.id === l.id)).map(l => (
+                              <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4F6D8C', flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, color: '#3F5980' }}>{l.name}</span>
+                              </div>
+                            ))}
+                            {dTasks.map(t => (
+                              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7E72A0', flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, color: '#4F417A', fontWeight: 500 }}>{t.title}</span>
+                                <button onClick={() => toggleTask(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#7E72A0', display: 'flex', alignItems: 'center' }} title="Marcar completada">
+                                  <CheckCircle2 size={12} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          {!isPast && <button onClick={() => setModalDate(iso)} style={{ fontSize: 10, padding: '3px 9px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#faf8f5', color: 'var(--warm-gray)', cursor: 'pointer', flexShrink: 0 }}>Editar</button>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+
+              {/* ── Tasks list view ──────────────────────────────────────── */}
+              {!loading && calView === 'tasks' && subView === 'list' && (() => {
+                const hasDateFilter = !!(filterFrom || filterTo)
+                const allPending = tasks.filter(t => !t.completed)
+                const allDone    = tasks.filter(t => t.completed)
+                // Apply date range filter
+                const pendingTasks = hasDateFilter
+                  ? allPending.filter(t => (!filterFrom || t.due_date >= filterFrom) && (!filterTo || t.due_date <= filterTo))
+                  : allPending
+                const doneTasks = hasDateFilter
+                  ? allDone.filter(t => (!filterFrom || t.due_date >= filterFrom) && (!filterTo || t.due_date <= filterTo))
+                  : allDone
+                const overdue  = pendingTasks.filter(t => t.due_date < todayIso).sort((a,b) => a.due_date.localeCompare(b.due_date))
+                const dueToday = pendingTasks.filter(t => t.due_date === todayIso)
+                const upcoming = pendingTasks.filter(t => t.due_date > todayIso).sort((a,b) => a.due_date.localeCompare(b.due_date))
+
+                const TaskRow = ({ task }: { task: Task }) => {
+                  const linkedLead = task.lead_id ? leads.find(l => l.id === task.lead_id) : null
+                  const isPast = task.due_date < todayIso && !task.completed
+                  const dt = new Date(task.due_date + 'T12:00:00')
+                  const priCfg = TASK_PRIORITY_CFG[task.priority || 'normal']
+                  const catCfg = TASK_CATEGORY_CFG[task.category || 'otro']
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--ivory)', background: task.completed ? '#faf8f5' : 'transparent' }}>
+                      <button onClick={() => toggleTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 1, flexShrink: 0, color: task.completed ? '#5C8570' : isPast ? '#BC5249' : '#7E72A0' }}>
+                        {task.completed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+                      </button>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: task.completed ? 'var(--warm-gray)' : 'var(--charcoal)', textDecoration: task.completed ? 'line-through' : 'none', wordBreak: 'break-word' }}>
+                          {task.title}
+                        </div>
+                        {task.description && (
+                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{task.description}</div>
+                        )}
+                        <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: isPast && !task.completed ? '#BC5249' : 'var(--warm-gray)' }}>
+                            {dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: dt.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })}
+                            {isPast && !task.completed && ' · Vencida'}
+                          </span>
+                          {task.priority && task.priority !== 'normal' && (
+                            <span style={{ fontSize: 10, fontWeight: 600, background: priCfg.bg, color: priCfg.color, borderRadius: 5, padding: '1px 7px' }}>
+                              {priCfg.label}
+                            </span>
+                          )}
+                          <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{catCfg.icon} {catCfg.label}</span>
+                          {task.type === 'lead' && linkedLead && (
+                            <span style={{ fontSize: 11, background: '#E9E6F3', color: '#4F417A', borderRadius: 5, padding: '1px 7px', fontWeight: 500 }}>
+                              {linkedLead.name}
+                            </span>
+                          )}
+                          {task.type === 'internal' && (
+                            <span style={{ fontSize: 10, background: '#f3f4f6', color: '#6b7280', borderRadius: 5, padding: '1px 7px', fontWeight: 500 }}>
+                              Interna
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button onClick={() => openEditTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#d1cac3', flexShrink: 0 }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#7E72A0')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#d1cac3')}
+                        title="Editar tarea">
+                        <Edit2 size={13} />
+                      </button>
+                      <button onClick={() => deleteTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#d1cac3', flexShrink: 0 }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#BC5249')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#d1cac3')}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )
+                }
+
+                const SectionHeader = ({ label, count, color }: { label: string; count: number; color: string }) => (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px 6px', background: '#faf8f5', borderBottom: '1px solid var(--ivory)' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color }}>{label}</span>
+                    <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{count}</span>
+                  </div>
+                )
+
+                return (
+                  <div style={{ flex: 1, overflowY: 'auto', maxHeight: 560 }}>
+                    {/* Nueva tarea button */}
+                    <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button onClick={() => { resetTaskForm(); setTaskForm(f => ({ ...f, due_date: todayIso })); setTaskModal(true) }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#4A6B52', color: '#fff', cursor: 'pointer' }}>
+                        <Plus size={14} /> Nueva tarea
+                      </button>
+                    </div>
+
+                    {tasks.length === 0 && (
+                      <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                        <ClipboardList size={32} style={{ color: '#d1cac3', marginBottom: 12 }} />
+                        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--warm-gray)', marginBottom: 6 }}>Sin tareas todavía</div>
+                        <div style={{ fontSize: 12, color: '#c0bbb4' }}>Crea tareas internas o vinculadas a leads para hacer seguimiento.</div>
+                      </div>
+                    )}
+
+                    {overdue.length > 0 && (
+                      <>
+                        <SectionHeader label="Vencidas" count={overdue.length} color="#BC5249" />
+                        {overdue.map(t => <TaskRow key={t.id} task={t} />)}
+                      </>
+                    )}
+
+                    {dueToday.length > 0 && (
+                      <>
+                        <SectionHeader label="Hoy" count={dueToday.length} color="var(--gold)" />
+                        {dueToday.map(t => <TaskRow key={t.id} task={t} />)}
+                      </>
+                    )}
+
+                    {upcoming.length > 0 && (
+                      <>
+                        <SectionHeader label="Próximamente" count={upcoming.length} color="#7E72A0" />
+                        {upcoming.map(t => <TaskRow key={t.id} task={t} />)}
+                      </>
+                    )}
+
+                    {doneTasks.length > 0 && (
+                      <>
+                        <SectionHeader label="Completadas" count={doneTasks.length} color="var(--warm-gray)" />
+                        {doneTasks.slice(0, 10).map(t => <TaskRow key={t.id} task={t} />)}
+                      </>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* Legend — hidden in agenda/tasks views */}
+              {calView !== 'tasks' && calView !== 'agenda' && (
+              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--ivory)', display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+                {Object.entries(STATUS_CFG).map(([key, cfg]) => (
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 11, height: 11, borderRadius: 3, background: cfg.bg, border: `1px solid ${cfg.border}` }} />
+                    <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>{cfg.label}</span>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#5C8570' }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>Visita agendada</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#7E72A0' }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>Tareas</span>
+                </div>
+              </div>
+              )}
+            </div>
+
+            {/* Sidebar — hidden in fullscreen */}
+            <div style={{ display: calFullscreen ? 'none' : 'flex', flexDirection: 'column', gap: 12, alignSelf: 'stretch' }}>
+              {/* Tasks summary widget */}
+              {(() => {
+                const overdueTasks  = tasks.filter(t => !t.completed && t.due_date < todayIso)
+                const todayTasks    = tasks.filter(t => !t.completed && t.due_date === todayIso)
+                const pendingCount  = tasks.filter(t => !t.completed).length
+                return (
+                  <div className="card" style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <ClipboardList size={14} style={{ color: '#7E72A0' }} /> Tareas
+                      </div>
+                      <button onClick={() => { resetTaskForm(); setTaskForm(f => ({ ...f, due_date: todayIso })); setTaskModal(true) }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 7, border: 'none', background: '#7E72A0', color: '#fff', cursor: 'pointer' }}>
+                        <Plus size={11} /> Nueva
+                      </button>
+                    </div>
+                    {pendingCount === 0 ? (
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin tareas pendientes</div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {overdueTasks.length > 0 && (
+                          <div onClick={() => setCalView('tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: '#FAF3F2', border: '1px solid #E0C2BD', borderRadius: 7, padding: '5px 10px' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#BC5249', flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#BC5249' }}>{overdueTasks.length} vencida{overdueTasks.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        )}
+                        {todayTasks.length > 0 && (
+                          <div onClick={() => setCalView('tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: '#F7F3E8', border: '1px solid #C2A968', borderRadius: 7, padding: '5px 10px' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)' }}>{todayTasks.length} para hoy</span>
+                          </div>
+                        )}
+                        {overdueTasks.length === 0 && todayTasks.length === 0 && (
+                          <div onClick={() => setCalView('tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: '#F2F1F8', border: '1px solid #C3BBDA', borderRadius: 7, padding: '5px 10px' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7E72A0', flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#4F417A' }}>{pendingCount} pendiente{pendingCount !== 1 ? 's' : ''}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* Upcoming booked */}
+              <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div className="card-header" style={{ padding: '12px 16px' }}>
+                  <div className="card-title" style={{ fontSize: 13 }}>Próximas fechas</div>
+                </div>
+                <div style={{ padding: '0 0 8px', flex: 1, overflowY: 'auto' }}>
+                  {upcomingEntries.length === 0 ? (
+                    <div style={{ padding: '12px 16px', fontSize: 12, color: 'var(--warm-gray)' }}>Sin fechas marcadas</div>
+                  ) : upcomingEntries.map(e => {
+                    const cfg = STATUS_CFG[e.status]
+                    const dt  = new Date(e.date + 'T12:00:00')
+                    return (
+                      <div key={e.date}
+                        onClick={() => setModalDate(e.date)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', cursor: 'pointer', borderBottom: '1px solid var(--ivory)' }}
+                      >
+                        <div style={{ textAlign: 'center', minWidth: 36 }}>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--espresso)', lineHeight: 1 }}>{dt.getDate()}</div>
+                          <div style={{ fontSize: 9, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{MONTHS[dt.getMonth()].slice(0,3)}</div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {(() => {
+                              // Decode compound note: "medio_dia_manana|texto libre" or plain text
+                              const raw = e.note || ''
+                              const pipeIdx = raw.indexOf('|')
+                              const prefix = pipeIdx >= 0 ? raw.slice(0, pipeIdx) : raw
+                              const freeText = pipeIdx >= 0 ? raw.slice(pipeIdx + 1) : ''
+                              if (prefix === 'medio_dia_manana') return e.leadName || freeText || '½ Mañana'
+                              if (prefix === 'medio_dia_tarde')  return e.leadName || freeText || '½ Tarde'
+                              if (prefix === 'medio_dia')        return e.leadName || freeText || '½ Día'
+                              return e.leadName || raw || cfg.label
+                            })()}
+                          </div>
+                          <span style={{ fontSize: 10, background: cfg.badge, color: cfg.color, padding: '1px 6px', borderRadius: 10, fontWeight: 500 }}>
+                            {e.note?.startsWith('medio_dia_manana') ? `${cfg.label} · ½ Mañ` : e.note?.startsWith('medio_dia_tarde') ? `${cfg.label} · ½ Tar` : e.note?.startsWith('medio_dia') ? `${cfg.label} · ½ Día` : cfg.label}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Leads with upcoming dates */}
+              <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div className="card-header" style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="card-title" style={{ fontSize: 13 }}>Leads con fecha</div>
+                  <a href="/leads" style={{ fontSize: 11, color: 'var(--gold)', textDecoration: 'none' }}>Ver todos →</a>
+                </div>
+                <div style={{ padding: '0 0 8px', flex: 1, overflowY: 'auto' }}>
+                  {upcomingLeads.length === 0 ? (
+                    <div style={{ padding: '12px 16px', fontSize: 12, color: 'var(--warm-gray)' }}>Sin leads con fecha</div>
+                  ) : upcomingLeads.map(l => {
+                    const st  = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
+                    const flex = l.date_flexibility || 'exact'
+                    const dateLabel = flex === 'range' ? `${l.wedding_date} – ${l.wedding_date_to || '?'}`
+                      : flex === 'multi_range' ? `${l.wedding_date_ranges?.[0]?.from || '?'}${(l.wedding_date_ranges?.length || 0) > 1 ? ` +${(l.wedding_date_ranges?.length || 0) - 1}` : ''}`
+                      : flex === 'month' ? `${MONTHS[(l.wedding_month || 1) - 1]} ${l.wedding_year || ''}`
+                      : l.wedding_date ? new Date(l.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Sin fecha'
+                    const durationLabel = flex === 'exact' && l.wedding_date && l.wedding_date_to
+                      ? (() => {
+                          const from = new Date(l.wedding_date + 'T12:00:00')
+                          const to   = new Date(l.wedding_date_to + 'T12:00:00')
+                          const days = Math.round((to.getTime() - from.getTime()) / 86400000) + 1
+                          return days > 1 ? ` · Boda ${days} días` : ''
+                        })()
+                      : ''
+                    const dt  = l.wedding_date ? new Date(l.wedding_date + 'T12:00:00') : null
+                    return (
+                      <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', borderBottom: '1px solid var(--ivory)' }}>
+                        <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <User size={13} style={{ color: 'var(--warm-gray)' }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+                            {dateLabel}{durationLabel}{l.guests ? ` · ${l.guests} inv.` : ''}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 10, color: st.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{st.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Task create/edit modal */}
+      {taskModal && (
+        <div onClick={() => { setTaskModal(false); resetTaskForm() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ClipboardList size={18} style={{ color: '#7E72A0' }} /> {editingTask ? 'Editar tarea' : 'Nueva tarea'}
+              </div>
+              <button onClick={() => { setTaskModal(false); resetTaskForm() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={18} /></button>
+            </div>
+
+            {taskError && <div style={{ fontSize: 12, color: '#BC5249', marginBottom: 12, padding: '8px 12px', background: '#FAF3F2', borderRadius: 8 }}>{taskError}</div>}
+
+            <div className="form-group" style={{ marginBottom: 14 }}>
+              <label className="form-label" style={{ fontSize: 11 }}>Título *</label>
+              <input className="form-input" value={taskForm.title} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} placeholder="Ej: Enviar contrato a María & Pablo" autoFocus />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 14 }}>
+              <label className="form-label" style={{ fontSize: 11 }}>Descripción (opcional)</label>
+              <textarea className="form-input" value={taskForm.description} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} placeholder="Detalles adicionales..." rows={2} style={{ resize: 'vertical' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Fecha límite *</label>
+                <WvsDatePicker value={taskForm.due_date} onChange={(v) => setTaskForm(f => ({ ...f, due_date: v }))} allowPast placeholder="dd/mm/aaaa" />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Tipo</label>
+                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  {(['internal', 'lead'] as const).map(t => (
+                    <button key={t} type="button" onClick={() => setTaskForm(f => ({ ...f, type: t, lead_id: '' }))}
+                      style={{ flex: 1, fontSize: 11, fontWeight: 600, padding: '6px 4px', borderRadius: 7, border: '1.5px solid',
+                        borderColor: taskForm.type === t ? '#7E72A0' : 'var(--ivory)',
+                        background: taskForm.type === t ? '#E9E6F3' : 'transparent',
+                        color: taskForm.type === t ? '#4F417A' : 'var(--warm-gray)', cursor: 'pointer' }}>
+                      {t === 'internal' ? 'Interna' : 'Lead'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Priority + Category row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Prioridad</label>
+                <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                  {(['alta', 'media', 'normal'] as TaskPriority[]).map(p => (
+                    <button key={p} type="button" onClick={() => setTaskForm(f => ({ ...f, priority: p }))}
+                      style={{ flex: 1, fontSize: 10, fontWeight: 600, padding: '5px 2px', borderRadius: 6, border: '1.5px solid',
+                        borderColor: taskForm.priority === p ? TASK_PRIORITY_CFG[p].color : 'var(--ivory)',
+                        background: taskForm.priority === p ? TASK_PRIORITY_CFG[p].bg : 'transparent',
+                        color: taskForm.priority === p ? TASK_PRIORITY_CFG[p].color : 'var(--warm-gray)', cursor: 'pointer' }}>
+                      {TASK_PRIORITY_CFG[p].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Categoría</label>
+                <select className="form-input" style={{ fontSize: 12, height: 34, marginTop: 4 }}
+                  value={taskForm.category} onChange={e => setTaskForm(f => ({ ...f, category: e.target.value as TaskCategory }))}>
+                  {(Object.entries(TASK_CATEGORY_CFG) as [TaskCategory, { label: string; icon: string }][]).map(([k, v]) => (
+                    <option key={k} value={k}>{v.icon} {v.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {taskForm.type === 'lead' && (
+              <div className="form-group" style={{ marginBottom: 14 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Lead vinculado</label>
+                <div style={{ position: 'relative' }}>
+                  <input className="form-input" value={taskLeadSearch || (taskForm.lead_id ? leads.find(l => l.id === taskForm.lead_id)?.name || '' : '')}
+                    onChange={e => { setTaskLeadSearch(e.target.value); setTaskForm(f => ({ ...f, lead_id: '' })) }}
+                    placeholder="Buscar lead..." />
+                  {taskLeadSearch && !taskForm.lead_id && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--ivory)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: 160, overflowY: 'auto', marginTop: 2 }}>
+                      {leads.filter(l => l.name.toLowerCase().includes(taskLeadSearch.toLowerCase())).slice(0, 8).map(l => (
+                        <button key={l.id} type="button" onClick={() => { setTaskForm(f => ({ ...f, lead_id: l.id })); setTaskLeadSearch('') }}
+                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--charcoal)' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                          {l.name}
+                        </button>
+                      ))}
+                      {leads.filter(l => l.name.toLowerCase().includes(taskLeadSearch.toLowerCase())).length === 0 && (
+                        <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--warm-gray)' }}>Sin resultados</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setTaskModal(false); resetTaskForm() }}>Cancelar</button>
+              <button onClick={saveTask} disabled={taskSaving}
+                style={{ fontSize: 12, fontWeight: 600, padding: '8px 20px', borderRadius: 8, border: 'none', background: '#7E72A0', color: '#fff', cursor: taskSaving ? 'not-allowed' : 'pointer', opacity: taskSaving ? 0.7 : 1 }}>
+                {taskSaving ? 'Guardando...' : editingTask ? 'Guardar cambios' : 'Crear tarea'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Day Modal */}
+      {modalDate && (
+        <DayModal
+          date={modalDate}
+          entry={entries[modalDate] || null}
+          entry2={entries2[modalDate] || null}
+          leadsOnDate={leadsByDate[modalDate] || []}
+          visitsOnDate={visitsByDate[modalDate] || []}
+          inquiriesOnDate={inquiriesByDate[modalDate] || []}
+          allLeads={leads}
+          leadsById={leadsById}
+          saving={saving}
+          modalities={modalities}
+          onSave={async (updated, extraBlocks) => { await saveEntry(updated, extraBlocks); setModalDate(null); await load() }}
+          onSave2={async (updated) => {
+            const supabase = createClient()
+            const existing = entries2[modalDate]
+            if ((!updated.status || updated.status === 'libre') && !updated.lead_id && !updated.note?.trim()) {
+              if (existing?.id) await supabase.from('calendar_entries').delete().eq('id', existing.id)
+              setEntries2(prev => { const n = { ...prev }; delete n[modalDate]; return n })
+            } else {
+              const statusToSave = (!updated.status || updated.status === 'libre') && updated.lead_id ? 'negociacion' : updated.status!
+              let result
+              if (existing?.id) {
+                const { data } = await supabase.from('calendar_entries')
+                  .update({ status: statusToSave, note: updated.note ?? null, lead_id: updated.lead_id ?? null })
+                  .eq('id', existing.id).select().single()
+                result = data
+              } else {
+                const { data } = await supabase.from('calendar_entries')
+                  .insert({ user_id: user!.id, date: modalDate, status: statusToSave, note: updated.note ?? null, lead_id: updated.lead_id ?? null })
+                  .select().single()
+                result = data
+              }
+              if (result) setEntries2(prev => ({ ...prev, [modalDate]: result }))
+            }
+            await load()
+          }}
+          onDelete={async () => { await saveEntry({ date: modalDate, status: 'libre' }); setModalDate(null) }}
+          onClose={() => setModalDate(null)}
+          onLeadCreated={async (lead) => { setLeads(prev => [lead, ...prev]) }}
+          onUpdateLead={async (leadId, fields) => {
+            const supabase = createClient()
+            await supabase.from('leads').update(fields).eq('id', leadId)
+            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, ...fields } : l))
+          }}
+          onCancelWedding={async (lead, reason) => {
+            const supabase = createClient()
+            const notes = [lead.notes, reason ? `Boda cancelada: ${reason}` : 'Boda cancelada'].filter(Boolean).join('\n')
+            await supabase.from('leads').update({ status: 'lost', notes }).eq('id', lead.id)
+            await supabase.from('calendar_entries')
+              .update({ status: 'libre', lead_id: null, note: null })
+              .eq('venue_id', activeVenue!.id).eq('lead_id', lead.id).eq('status', 'reservado')
+            setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'lost', notes } : l))
+            setModalDate(null)
+            await load()
+          }}
+          venueId={activeVenue!.id}
+        />
+      )}
+
+    </div>
+  )
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+function getSpanDates(startDate: string, spanDays: number): string[] {
+  return Array.from({ length: spanDays }, (_, i) => addDays(startDate, i))
+}
+
+// ── Day Modal ─────────────────────────────────────────────────────────────────
+
+function DayModal({
+  date, entry, entry2, leadsOnDate, visitsOnDate, inquiriesOnDate, allLeads, leadsById, saving, modalities,
+  onSave, onSave2, onDelete, onClose, onLeadCreated, onUpdateLead, onCancelWedding, venueId
+}: {
+  date: string
+  entry: Entry | null
+  entry2: Entry | null
+  leadsOnDate: Lead[]
+  visitsOnDate: Lead[]
+  inquiriesOnDate: PendingInquiry[]
+  allLeads: Lead[]
+  leadsById: Record<string, Lead>
+  saving: boolean
+  modalities: Modality[]
+  onSave: (e: Entry, extraBlocks?: { date: string; isHalf: boolean }[]) => Promise<void>
+  onSave2: (e: Partial<Entry> & { date: string }) => Promise<void>
+  onDelete: () => Promise<void>
+  onClose: () => void
+  onLeadCreated: (l: Lead) => Promise<void>
+  onUpdateLead: (leadId: string, fields: Partial<Lead>) => Promise<void>
+  onCancelWedding: (lead: Lead, reason: string) => Promise<void>
+  venueId: string
+}) {
+  const [status,      setStatus]      = useState<Status>(entry?.status || 'libre')
+  // Separate half-day state from free-text note.
+  // DB stores compound format: "medio_dia_manana|Texto libre" or just "medio_dia_manana"
+  const _rawNote = entry?.note || ''
+  const _HALF = ['medio_dia', 'medio_dia_manana', 'medio_dia_tarde']
+  const _pipeIdx = _rawNote.indexOf('|')
+  const _notePrefix = _pipeIdx >= 0 ? _rawNote.slice(0, _pipeIdx) : _rawNote
+  const _noteSuffix = _pipeIdx >= 0 ? _rawNote.slice(_pipeIdx + 1) : ''
+  const [halfDay,     setHalfDay]     = useState<'' | 'medio_dia_manana' | 'medio_dia_tarde'>(
+    _HALF.includes(_notePrefix) ? (_notePrefix === 'medio_dia' ? 'medio_dia_manana' : _notePrefix as 'medio_dia_manana' | 'medio_dia_tarde') : ''
+  )
+  const [note,        setNote]        = useState(_HALF.includes(_notePrefix) ? _noteSuffix : _rawNote)
+  // Derived: medio día active when halfDay is set
+  const isMedioDia = halfDay !== ''
+  const [leadId,      setLeadId]      = useState<string | null>(entry?.lead_id || null)
+
+  // ── Secondary half-day slot (otro medio día del mismo día) ─────────────────
+  const _raw2 = entry2?.note || ''
+  const _pipe2 = _raw2.indexOf('|')
+  const _pref2 = _pipe2 >= 0 ? _raw2.slice(0, _pipe2) : _raw2
+  const _suf2  = _pipe2 >= 0 ? _raw2.slice(_pipe2 + 1) : ''
+  const initHalf2: '' | 'medio_dia_manana' | 'medio_dia_tarde' = _HALF.includes(_pref2)
+    ? (_pref2 === 'medio_dia' ? 'medio_dia_manana' : _pref2 as 'medio_dia_manana' | 'medio_dia_tarde')
+    : ''
+  const [status2,  setStatus2]  = useState<Status>(entry2?.status || 'libre')
+  const [halfDay2, setHalfDay2] = useState<'' | 'medio_dia_manana' | 'medio_dia_tarde'>(initHalf2)
+  const [note2,    setNote2]    = useState(_HALF.includes(_pref2) ? _suf2 : _raw2)
+  const [leadId2,  setLeadId2]  = useState<string | null>(entry2?.lead_id || null)
+  const [search2,  setSearch2]  = useState('')
+  const [showSecondSlot, setShowSecondSlot] = useState(!!entry2)
+  const [slot2Saving, setSlot2Saving] = useState(false)
+  const [search,      setSearch]      = useState('')
+  const [showCreate,  setShowCreate]  = useState(false)
+  const [localSaving, setLocalSaving] = useState(false)
+  const [showQuickLink, setShowQuickLink] = useState(false)
+  const [showAllLeads, setShowAllLeads] = useState(false)
+  const LEADS_PREVIEW = 3
+
+  // Post-save: leads afectados por fecha bloqueada/reservada
+  const [affectedLeads, setAffectedLeads] = useState<Lead[]>([])
+  const [showAffected,  setShowAffected]  = useState(false)
+  const [newDateFor,    setNewDateFor]    = useState<Record<string, string>>({})
+  const [affectedSaving, setAffectedSaving] = useState<Record<string, boolean>>({})
+
+  const [removeLeadConfirmId, setRemoveLeadConfirmId] = useState<string | null>(null)
+  const [removingSaving, setRemovingSaving] = useState(false)
+  // Local ordering for the "En negociación" section in the day modal
+  const [negOrderIds, setNegOrderIds] = useState<string[]>([])
+  const [deleteVisitConfirmId, setDeleteVisitConfirmId] = useState<string | null>(null)
+  const [deletingVisit, setDeletingVisit] = useState(false)
+  const [removedLeadForCrm, setRemovedLeadForCrm] = useState<Lead | null>(null)
+
+  // Modality picker: which modality applies when linking a lead to this date
+  const estructuraDow = (new Date(date + 'T12:00:00').getDay() + 6) % 7
+  const modalityOptions = modalities
+    .map(m => {
+      const pkg = m.packages?.find(p => p.day_from === estructuraDow)
+      if (!pkg) return null
+      const span = pkgSpanDays(pkg.day_from, pkg.day_to)
+      const endDate = addDays(date, span - 1)
+      const pkgLabel = pkg.label || `${DOW_NAMES_ES[pkg.day_from]}→${DOW_NAMES_ES[pkg.day_to]}`
+      return { modality: m, pkg, span, endDate, pkgLabel }
+    })
+    .filter(Boolean) as { modality: Modality; pkg: ModalityPackage; span: number; endDate: string; pkgLabel: string }[]
+  const [selectedModalityId, setSelectedModalityId] = useState<string>('')
+  const selectedOption = modalityOptions.find(o => o.modality.id === selectedModalityId) ?? null
+
+  // Cancel wedding confirmation
+  const [showCancelWedding,   setShowCancelWedding]   = useState(false)
+  const [cancelWeddingReason, setCancelWeddingReason] = useState('')
+  const [cancelWeddingSaving, setCancelWeddingSaving] = useState(false)
+
+  const dt = new Date(date + 'T12:00:00')
+  const isPast = date < new Date().toISOString().split('T')[0]
+  const selectedLead = leadId ? leadsById[leadId] : null
+
+  // ── Affected leads helpers ────────────────────────────────────────────────
+  const fmtShort = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+
+  const getOtherDatesLabel = (l: Lead): string | null => {
+    let others: string[] = []
+    if ((l.status === 'budget_sent') && l.budget_date) {
+      const bflex = l.budget_date_flexibility || 'exact'
+      if (bflex === 'multi_range' && l.budget_date_ranges) {
+        others = l.budget_date_ranges.filter(r => r.from !== date).map(r => r.from)
+      } else if (l.budget_date !== date) {
+        others = [l.budget_date]
+      }
+    } else {
+      const flex = l.date_flexibility || 'exact'
+      if (flex === 'multi_range' && l.wedding_date_ranges) {
+        others = l.wedding_date_ranges.filter(r => r.from !== date).map(r => r.from)
+      } else if (flex === 'exact' && l.wedding_date && l.wedding_date !== date) {
+        others = [l.wedding_date]
+      } else if (flex === 'range' && l.wedding_date) {
+        if (l.wedding_date !== date) others.push(l.wedding_date)
+        if (l.wedding_date_to && l.wedding_date_to !== date) others.push(l.wedding_date_to)
+      }
+    }
+    if (others.length === 0) return null
+    return others.slice(0, 2).map(fmtShort).join(', ') + (others.length > 2 ? ` +${others.length - 2}` : '')
+  }
+
+  const handleRemoveFromDate = async (l: Lead) => {
+    setAffectedSaving(s => ({ ...s, [l.id]: true }))
+    const updates: any = {}
+    if ((l.status === 'budget_sent') && l.budget_date) {
+      const bflex = l.budget_date_flexibility || 'exact'
+      if (bflex === 'multi_range' && l.budget_date_ranges) {
+        const filtered = l.budget_date_ranges.filter(r => r.from !== date)
+        if (filtered.length === 0) { updates.budget_date = null; updates.budget_date_to = null; updates.budget_date_ranges = null }
+        else if (filtered.length === 1) { updates.budget_date = filtered[0].from; updates.budget_date_to = filtered[0].to || null; updates.budget_date_ranges = null; updates.budget_date_flexibility = 'exact' }
+        else { updates.budget_date_ranges = filtered }
+      } else { updates.budget_date = null; updates.budget_date_to = null; updates.budget_date_ranges = null }
+    } else {
+      const flex = l.date_flexibility || 'exact'
+      if (flex === 'multi_range' && l.wedding_date_ranges) {
+        const filtered = l.wedding_date_ranges.filter(r => r.from !== date)
+        if (filtered.length === 0) { updates.wedding_date = null; updates.wedding_date_to = null; updates.date_flexibility = 'flexible'; updates.wedding_date_ranges = null }
+        else if (filtered.length === 1) { updates.wedding_date = filtered[0].from; updates.wedding_date_to = filtered[0].to || null; updates.wedding_date_ranges = null; updates.date_flexibility = 'exact' }
+        else { updates.wedding_date_ranges = filtered }
+      } else { updates.wedding_date = null; updates.wedding_date_to = null; updates.date_flexibility = 'flexible'; updates.wedding_date_ranges = null }
+    }
+    await onUpdateLead(l.id, updates)
+    setAffectedLeads(prev => prev.filter(x => x.id !== l.id))
+    setAffectedSaving(s => ({ ...s, [l.id]: false }))
+  }
+
+  // Auto-upgrade calendar status when lead changes
+  useEffect(() => {
+    if (leadId) {
+      setStatus(prev => prev === 'libre' ? 'negociacion' : prev)
+    } else {
+      setStatus(prev => { if (prev === 'libre') setHalfDay(''); return prev })
+    }
+  }, [leadId])
+
+  // Al abrir el modal: si la fecha ya está reservada/bloqueada, mostrar panel de afectados
+  useEffect(() => {
+    const entryStatus = entry?.status
+    if (entryStatus !== 'reservado' && entryStatus !== 'bloqueado') return
+    const linked = entry?.lead_id
+    const others = leadsOnDate.filter(l => l.id !== linked && l.status !== 'lost' && l.status !== 'won')
+    if (others.length > 0) {
+      setAffectedLeads(others)
+      setShowAffected(true)
+    }
+  }, [date])
+
+  const filteredLeads = allLeads
+    .filter(l => l.status !== 'lost' && (
+      !search || l.name.toLowerCase().includes(search.toLowerCase()) || (l.email || '').toLowerCase().includes(search.toLowerCase())
+    ))
+    .sort((a, b) => {
+      if (a.status === 'new' && b.status !== 'new') return -1
+      if (a.status !== 'new' && b.status === 'new') return 1
+      return 0
+    })
+    .slice(0, 8)
+
+  const handleSave = async () => {
+    setLocalSaving(true)
+
+    const supabaseExtra = createClient()
+    const calStatus = status === 'libre' && leadId ? 'negociacion' : status
+
+    // If a modality with a package is selected, expand calendar entries across the span
+    if (selectedOption && leadId && calStatus === 'negociacion') {
+      const spanDates = getSpanDates(date, selectedOption.span)
+      for (const spanDate of spanDates) {
+        if (spanDate === date) continue
+        const { data: existingSpan } = await supabaseExtra.from('calendar_entries')
+          .select('id').eq('venue_id', venueId).eq('date', spanDate).maybeSingle()
+        if (existingSpan?.id) {
+          await supabaseExtra.from('calendar_entries').update({ status: calStatus, lead_id: leadId }).eq('id', existingSpan.id)
+        } else {
+          await supabaseExtra.from('calendar_entries').insert({ venue_id: venueId, date: spanDate, status: calStatus, lead_id: leadId })
+        }
+      }
+      await onUpdateLead(leadId, {
+        date_flexibility: 'range',
+        wedding_date: date,
+        wedding_date_to: selectedOption.endDate,
+      })
+    }
+
+    // Combine halfDay variant + free-text note into a single note field
+    // halfDay only applies when status is not libre
+    const freeNote = note.trim()
+    const effectiveHalfDay = status !== 'libre' ? halfDay : ''
+    const savedNote = effectiveHalfDay
+      ? (freeNote ? `${effectiveHalfDay}|${freeNote}` : effectiveHalfDay)
+      : freeNote || undefined
+    await onSave({ date, status, note: savedNote, lead_id: leadId })
+
+    // Detectar leads afectados (otros leads con esta fecha que NO son el vinculado)
+    if (status === 'reservado' || status === 'bloqueado') {
+      const others = leadsOnDate.filter(l => l.id !== leadId && l.status !== 'lost' && l.status !== 'won')
+      if (others.length > 0) {
+        setAffectedLeads(others)
+        setShowAffected(true)
+        setLocalSaving(false)
+        return // no cierres el modal todavía
+      }
+    }
+    setLocalSaving(false)
+  }
+
+  const handleDelete = async () => {
+    setLocalSaving(true)
+    await onDelete()
+    setLocalSaving(false)
+  }
+
+  const isSaving = saving || localSaving
+
+  const handleRemoveLeadFromDate = async (leadToRemove: Lead) => {
+    setRemovingSaving(true)
+    const supabase = createClient()
+    // Remove calendar entry on this date linked to this lead
+    await supabase.from('calendar_entries')
+      .update({ lead_id: null })
+      .eq('venue_id', venueId)
+      .eq('lead_id', leadToRemove.id)
+      .eq('date', date)
+    // Check if lead has other calendar entries linked to it
+    const { data: otherEntries } = await supabase.from('calendar_entries')
+      .select('id')
+      .eq('venue_id', venueId)
+      .eq('lead_id', leadToRemove.id)
+      .limit(1)
+    // Clear all lead date fields
+    await supabase.from('leads').update({
+      wedding_date: null, wedding_date_to: null, wedding_date_ranges: null,
+      date_flexibility: 'flexible', wedding_year: null, wedding_month: null,
+    }).eq('id', leadToRemove.id)
+    if (leadId === leadToRemove.id) setLeadId(null)
+    await onUpdateLead(leadToRemove.id, {
+      wedding_date: undefined, wedding_date_to: undefined, wedding_date_ranges: undefined,
+      date_flexibility: 'flexible', wedding_year: undefined, wedding_month: undefined,
+    })
+    setRemoveLeadConfirmId(null)
+    setRemovingSaving(false)
+    // If no other entries exist, prompt to delete from CRM
+    if (!otherEntries || otherEntries.length === 0) {
+      setRemovedLeadForCrm(leadToRemove)
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
+      onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.25)' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--espresso)', textTransform: 'capitalize' }}>
+              {dt.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </div>
+            {isPast && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 3 }}>Fecha pasada · solo lectura</div>}
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}><X size={18} /></button>
+        </div>
+
+        <div style={{ padding: '20px 24px' }}>
+
+          {showCreate ? (
+            <QuickCreateLead
+              defaultDate={date}
+              venueId={venueId}
+              onCreated={async (lead) => { await onLeadCreated(lead); setLeadId(lead.id); setShowCreate(false) }}
+              onCancel={() => setShowCreate(false)}
+            />
+          ) : (
+            <>
+
+              {/* ══ ① BODA CONFIRMADA ══ */}
+              {status === 'reservado' && selectedLead?.status === 'won' && (
+                <div style={{ marginBottom: 16, borderRadius: 10, overflow: 'hidden', border: '1.5px solid #a7d9b5' }}>
+                  <div style={{ background: 'linear-gradient(135deg, #2d6a4f 0%, #40916c 100%)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Flower2 size={14} style={{ color: '#d8f3dc', flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#d8f3dc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Boda confirmada</span>
+                  </div>
+                  <div style={{ background: '#f0faf4', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#1b4332', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedLead.name}</div>
+                      <div style={{ fontSize: 11, color: '#40916c', marginTop: 2 }}>
+                        {selectedLead.guests ? `${selectedLead.guests} inv.` : ''}
+                        {selectedLead.guests && selectedLead.budget && selectedLead.budget !== 'sin_definir' ? ' · ' : ''}
+                        {selectedLead.budget && selectedLead.budget !== 'sin_definir' ? BUDGET_LABEL[selectedLead.budget] || selectedLead.budget : ''}
+                      </div>
+                    </div>
+                    <a href={`/leads?open=${selectedLead.id}&returnDate=${date}`}
+                      style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, background: '#40916c', color: '#fff', textDecoration: 'none', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      Ver lead
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* ══ ② VISITAS PROGRAMADAS ══ */}
+              {visitsOnDate.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#467A60', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#5C8570', display: 'inline-block' }} /> Visitas programadas
+                  </div>
+                  {[...visitsOnDate].sort((a, b) => (a.visit_time || 'zz').localeCompare(b.visit_time || 'zz')).map(l => {
+                    const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
+                    const dur = l.visit_duration || 60
+                    let endTime: string | null = null
+                    if (l.visit_time) {
+                      const [h, m] = l.visit_time.split(':').map(Number)
+                      if (!isNaN(h) && !isNaN(m)) {
+                        const total = h * 60 + m + dur
+                        endTime = `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+                      }
+                    }
+                    return (
+                      <div key={l.id} style={{ display: 'flex', alignItems: 'stretch', gap: 0, background: 'rgba(92,133,112,0.06)', border: '1px solid rgba(92,133,112,0.25)', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
+                        <div style={{ width: 64, flexShrink: 0, background: l.visit_time ? '#5C8570' : 'rgba(92,133,112,0.18)', color: l.visit_time ? '#fff' : '#3C5945', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 4px', fontVariantNumeric: 'tabular-nums' }}>
+                          {l.visit_time ? (
+                            <>
+                              <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1, fontFamily: 'Inter, sans-serif' }}>{l.visit_time}</div>
+                              {endTime && <div style={{ fontSize: 9, fontWeight: 500, opacity: 0.85, marginTop: 3, lineHeight: 1 }}>– {endTime}</div>}
+                              <div style={{ fontSize: 8, fontWeight: 600, opacity: 0.85, marginTop: 4, letterSpacing: '0.05em' }}>{dur} MIN</div>
+                            </>
+                          ) : (
+                            <>
+                              <Calendar size={16} />
+                              <div style={{ fontSize: 8, fontWeight: 700, marginTop: 4, letterSpacing: '0.05em' }}>SIN HORA</div>
+                            </>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#35513E' }}>{l.name}</div>
+                            <div style={{ fontSize: 11, color: '#467A60' }}>
+                              {l.guests ? `${l.guests} inv.` : ''}
+                              {l.guests && (l.budget && l.budget !== 'sin_definir') ? ' · ' : ''}
+                              {l.budget && l.budget !== 'sin_definir' ? BUDGET_LABEL[l.budget] || l.budget : ''}
+                              {l.wedding_date ? ` · Boda: ${new Date(l.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 11, color: st.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{st.label}</span>
+                          {deleteVisitConfirmId === l.id ? (
+                            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                              <button disabled={deletingVisit} onClick={async () => {
+                                setDeletingVisit(true)
+                                const { createClient } = await import('@/lib/supabase')
+                                const sb = createClient()
+                                const updates: any = { visit_date: null, visit_time: null, visit_duration: null }
+                                if (l.status === 'visit_scheduled') updates.status = 'post_visit'
+                                await sb.from('leads').update(updates).eq('id', l.id)
+                                onUpdateLead(l.id, updates)
+                                setDeleteVisitConfirmId(null)
+                                setDeletingVisit(false)
+                              }} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: '#BC5249', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                {deletingVisit ? '...' : '¿Eliminar?'}
+                              </button>
+                              <button onClick={() => setDeleteVisitConfirmId(null)} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 11, cursor: 'pointer' }}>
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                              <a href={`/leads?openVisit=${l.id}`} title="Editar visita" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6, background: '#5C8570', color: '#fff', textDecoration: 'none', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                <Edit2 size={11} /> Editar
+                              </a>
+                              <button onClick={() => setDeleteVisitConfirmId(l.id)} title="Eliminar visita" style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid rgba(188,82,73,0.3)', background: 'rgba(188,82,73,0.06)', color: '#BC5249', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* ══ SOLICITUDES PENDIENTES (call/video/visit con fecha) ══ */}
+              {inquiriesOnDate.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--gold)', display: 'inline-block' }} /> Solicitudes pendientes
+                  </div>
+                  {inquiriesOnDate.map(inq => {
+                    const isVisit = inq.kind === 'visit'
+                    const kindLabel = inq.kind_label
+                      || (inq.kind === 'call' ? 'Llamada'
+                          : inq.kind === 'video' ? 'Videollamada'
+                          : isVisit ? 'Visita solicitada'
+                          : 'Solicitud')
+                    const otherDates = (inq.preferred_dates || []).filter(d => d !== date)
+                    const coupleName = inq.proposals?.couple_name
+                    const visitTime: string | null = isVisit && typeof inq.payload?.time === 'string' ? inq.payload.time : null
+                    const cornerLabel = isVisit ? 'VISITA' : 'SOLICITUD'
+                    return (
+                      <div key={inq.id} style={{ display: 'flex', alignItems: 'stretch', gap: 0, background: 'rgba(196,151,90,0.06)', border: '1px solid rgba(196,151,90,0.25)', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
+                        <div style={{ width: 64, flexShrink: 0, background: visitTime ? 'var(--gold)' : 'rgba(196,151,90,0.18)', color: visitTime ? '#fff' : 'var(--gold)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 4px', fontVariantNumeric: 'tabular-nums' }}>
+                          {visitTime ? (
+                            <>
+                              <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1, fontFamily: 'Inter, sans-serif' }}>{visitTime}</div>
+                              <div style={{ fontSize: 8, fontWeight: 700, marginTop: 4, letterSpacing: '0.05em' }}>{cornerLabel}</div>
+                            </>
+                          ) : (
+                            <>
+                              <Calendar size={16} />
+                              <div style={{ fontSize: 8, fontWeight: 700, marginTop: 4, letterSpacing: '0.05em' }}>{cornerLabel}</div>
+                            </>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)' }}>
+                              {inq.name}
+                              {coupleName && coupleName !== inq.name && <span style={{ color: 'var(--warm-gray)', fontWeight: 400, fontSize: 11 }}> · propuesta de {coupleName}</span>}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                              {kindLabel}
+                              {inq.email ? ` · ${inq.email}` : ''}
+                              {inq.phone ? ` · ${inq.phone}` : ''}
+                              {!isVisit && otherDates.length > 0 && ` · 2ª opción: ${new Date(otherDates[0] + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 11, color: inq.status === 'new' ? 'var(--gold)' : 'var(--warm-gray)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {inq.status === 'new' ? 'Nueva' : 'Contestada'}
+                          </span>
+                          <a href={`/dossier?tab=inquiries`} title="Ver en Respuestas" style={{ padding: '5px 10px', borderRadius: 6, background: 'var(--gold)', color: '#fff', textDecoration: 'none', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <ExternalLink size={11} /> Ver
+                          </a>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* ══ ② PAREJAS ══ */}
+              {(() => {
+                const NEG_STATUSES  = ['contacted', 'post_visit']
+                const PROP_STATUSES = ['proposal_sent', 'budget_sent']
+                // won y visit_scheduled tienen su propia sección — no aparecen en las listas de leads
+                const HIDDEN_STATUSES = ['visit_scheduled', 'won']
+
+                // Exclude leads already shown in "Visitas programadas" to avoid duplication
+                const visitIds = new Set(visitsOnDate.map(v => v.id))
+                const leadsForSections = leadsOnDate.filter(l => !visitIds.has(l.id) && !HIDDEN_STATUSES.includes(l.status))
+
+                const newLeads  = leadsForSections.filter(l => l.status === 'new')
+                const extraLead = selectedLead && !leadsForSections.some(l => l.id === leadId) && !HIDDEN_STATUSES.includes(selectedLead.status) ? [selectedLead] : []
+                const allNonNew = [...leadsForSections.filter(l => l.status !== 'new'), ...extraLead]
+                const negLeads  = allNonNew.filter(l => NEG_STATUSES.includes(l.status))
+                const propLeads = allNonNew.filter(l => PROP_STATUSES.includes(l.status))
+                // cualquier estado no contemplado cae en negociación
+                const otherLeads = allNonNew.filter(l => !NEG_STATUSES.includes(l.status) && !PROP_STATUSES.includes(l.status))
+                const negAllBase = [...negLeads, ...otherLeads]
+                // Apply local ordering if available (user reordered via arrows)
+                const negAll = negOrderIds.length
+                  ? [...negAllBase].sort((a, b) => {
+                      const ai = negOrderIds.indexOf(a.id)
+                      const bi = negOrderIds.indexOf(b.id)
+                      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+                    })
+                  : negAllBase
+
+                if (newLeads.length === 0 && negAll.length === 0 && propLeads.length === 0) return null
+
+                const SC = { new: '#4F6D8C', neg: '#9A7A40', prop: '#467A60' }
+
+                const SectionLabel = ({ label, count, color }: { label: string; count: number; color: string }) => (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '0 2px' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color, letterSpacing: '0.01em' }}>{label}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: color, borderRadius: 4, padding: '1px 6px', minWidth: 18, textAlign: 'center' }}>{count}</span>
+                  </div>
+                )
+
+                const isBlocking = status === 'bloqueado'
+
+                const LeadRow = (l: Lead, sectionColor: string) => {
+                  const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
+                  return (
+                    <div key={l.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '9px 12px',
+                      background: isBlocking ? '#f5f0eb' : '#faf9f7',
+                      borderRadius: 8,
+                      border: isBlocking ? '1px dashed #d4c9bb' : '1px solid #eae6e1',
+                      marginBottom: 4,
+                      opacity: isBlocking ? 0.6 : 1,
+                      transition: 'opacity 0.2s, border 0.2s',
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: st.color }}>{st.label}</span>
+                          {l.guests ? <><span style={{ fontSize: 9, color: '#ccc' }}>·</span><span style={{ fontSize: 10, color: '#9c8f88' }}>{l.guests} inv.</span></> : null}
+                          {l.budget && l.budget !== 'sin_definir' ? <><span style={{ fontSize: 9, color: '#ccc' }}>·</span><span style={{ fontSize: 10, color: '#9c8f88' }}>{BUDGET_LABEL[l.budget] || l.budget}</span></> : null}
+                        </div>
+                      </div>
+                      {removeLeadConfirmId === l.id ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                          <span style={{ fontSize: 11, color: '#B0473E', fontWeight: 500 }}>¿Quitar?</span>
+                          <button onClick={() => handleRemoveLeadFromDate(l)} disabled={removingSaving}
+                            style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, cursor: 'pointer', border: 'none', background: '#B0473E', color: '#fff', fontWeight: 600 }}>
+                            {removingSaving ? '...' : 'Sí'}
+                          </button>
+                          <button onClick={() => setRemoveLeadConfirmId(null)}
+                            style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)' }}>
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                          <a href={`/leads?open=${l.id}&returnDate=${date}`}
+                            style={{ fontSize: 10, padding: '4px 10px', borderRadius: 6, background: 'var(--espresso)', color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+                            <FileText size={10} /> Ver
+                          </a>
+                          {!isPast && l.status !== 'won' && (
+                            <button onClick={() => setRemoveLeadConfirmId(l.id)}
+                              style={{ fontSize: 10, padding: '4px 7px', borderRadius: 6, cursor: 'pointer', border: '1px solid #eae6e1', background: '#fff', color: '#B0473E', display: 'flex', alignItems: 'center' }}>
+                              <Trash2 size={10} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+
+                return (
+                  <div style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                    {propLeads.length > 0 && (
+                      <div>
+                        <SectionLabel label="Propuesta enviada" count={propLeads.length} color={SC.prop} />
+                        {propLeads.map(l => LeadRow(l, SC.prop))}
+                      </div>
+                    )}
+
+                    {negAll.length > 0 && (() => {
+                      const isReorderMode = negOrderIds.length > 0 && negAll.length > 1
+                      return (
+                        <div>
+                          {/* Section header with optional pencil toggle */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '0 2px' }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: SC.neg, letterSpacing: '0.01em' }}>En negociación</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: SC.neg, borderRadius: 4, padding: '1px 6px', minWidth: 18, textAlign: 'center' }}>{negAll.length}</span>
+                            {negAll.length > 1 && (
+                              <button
+                                onClick={() => setNegOrderIds(ids => ids.length ? [] : negAll.map(l => l.id))}
+                                title={isReorderMode ? 'Salir del modo orden' : 'Cambiar orden de prioridad'}
+                                style={{
+                                  width: 20, height: 20, borderRadius: 5, border: `1px solid ${isReorderMode ? SC.neg : 'var(--ivory)'}`,
+                                  background: isReorderMode ? SC.neg + '18' : '#fff',
+                                  color: isReorderMode ? SC.neg : 'var(--warm-gray)',
+                                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, marginLeft: 2,
+                                }}
+                              >
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                            )}
+                          </div>
+                          {negAll.map((l, idx) => (
+                            <div key={l.id} style={{ display: 'flex', alignItems: 'stretch', gap: 4, marginBottom: 4 }}>
+                              {/* Reorder arrows — only in reorder mode */}
+                              {isReorderMode && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center', flexShrink: 0 }}>
+                                  <button
+                                    disabled={idx === 0}
+                                    onClick={() => { const ids = negAll.map(x => x.id); [ids[idx-1], ids[idx]] = [ids[idx], ids[idx-1]]; setNegOrderIds(ids) }}
+                                    style={{ width: 18, height: 18, borderRadius: 4, border: '1px solid var(--ivory)', background: idx === 0 ? 'transparent' : '#fff', cursor: idx === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: idx === 0 ? '#d1d5db' : SC.neg, padding: 0, fontSize: 10 }}
+                                  >▴</button>
+                                  <button
+                                    disabled={idx === negAll.length - 1}
+                                    onClick={() => { const ids = negAll.map(x => x.id); [ids[idx], ids[idx+1]] = [ids[idx+1], ids[idx]]; setNegOrderIds(ids) }}
+                                    style={{ width: 18, height: 18, borderRadius: 4, border: '1px solid var(--ivory)', background: idx === negAll.length-1 ? 'transparent' : '#fff', cursor: idx === negAll.length-1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: idx === negAll.length-1 ? '#d1d5db' : SC.neg, padding: 0, fontSize: 10 }}
+                                  >▾</button>
+                                </div>
+                              )}
+                              <div style={{ flex: 1 }}>{LeadRow(l, SC.neg)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
+
+                    {newLeads.length > 0 && (
+                      <div>
+                        <SectionLabel label="Leads nuevos" count={newLeads.length} color={SC.new} />
+                        {(showAllLeads ? newLeads : newLeads.slice(0, LEADS_PREVIEW)).map(l => LeadRow(l, SC.new))}
+                        {newLeads.length > LEADS_PREVIEW && (
+                          <button onClick={() => setShowAllLeads(v => !v)}
+                            style={{ width: '100%', marginTop: 2, padding: '4px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>
+                            {showAllLeads ? 'Ver menos ↑' : `+ Ver ${newLeads.length - LEADS_PREVIEW} más`}
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                  </div>
+                )
+              })()}
+
+              {/* ══ ③ DETALLES SEGÚN ESTADO ══ */}
+
+              {/* RESERVADO: boda card */}
+              {!isPast && status === 'reservado' && (
+                <div style={{ marginBottom: 20, padding: '14px 16px', background: '#F6EEF2', border: '1px solid #E8D2DC', borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#8A3A5A', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                    <Flower2 size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Boda reservada
+                  </div>
+                  {selectedLead ? (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                        {[
+                          { label: 'Pareja', value: selectedLead.name },
+                          { label: 'Invitados', value: selectedLead.guests ? `${selectedLead.guests} personas` : '—' },
+                          { label: 'Presupuesto', value: BUDGET_LABEL[selectedLead.budget || ''] || selectedLead.budget || '—' },
+                          { label: 'Ceremonia', value: CEREMONY_LABEL[selectedLead.ceremony_type || ''] || selectedLead.ceremony_type || '—' },
+                          { label: 'Teléfono', value: selectedLead.phone || selectedLead.whatsapp || '—' },
+                          { label: 'Email', value: selectedLead.email || '—' },
+                        ].map(({ label, value }) => (
+                          <div key={label}>
+                            <div style={{ fontSize: 10, color: '#9A3F5F', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+                            <div style={{ fontSize: 12, color: '#6E3049', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {!showCancelWedding ? (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <a href={`/leads?open=${selectedLead.id}&returnDate=${date}`} style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #E8D2DC', color: '#9A3F5F', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <User size={12} /> Ver lead
+                          </a>
+                          <a href="/dossier" style={{ flex: 1, fontSize: 12, padding: '6px', borderRadius: 6, border: '1px solid #E8D2DC', color: '#9A3F5F', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <FileText size={12} /> Propuesta
+                          </a>
+                          <button onClick={() => setShowCancelWedding(true)}
+                            style={{ flex: 1, fontSize: 12, color: '#B0473E', background: 'none', border: '1px solid #E0C2BD', borderRadius: 6, padding: '6px', cursor: 'pointer' }}>
+                            Cancelar boda
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ fontSize: 11, color: '#8A3A5A', marginBottom: 8, lineHeight: 1.5 }}>Esta acción liberará la fecha y moverá el lead a Perdidos.</div>
+                          <textarea value={cancelWeddingReason} onChange={e => setCancelWeddingReason(e.target.value)}
+                            placeholder="Motivo de la cancelación (opcional)..." className="form-input" rows={2}
+                            style={{ fontSize: 12, marginBottom: 8, resize: 'none', width: '100%', boxSizing: 'border-box' }} />
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button onClick={() => { setShowCancelWedding(false); setCancelWeddingReason('') }}
+                              style={{ flex: 1, fontSize: 12, background: 'none', border: '1px solid var(--ivory)', borderRadius: 8, padding: '7px 0', cursor: 'pointer', color: 'var(--warm-gray)' }}>
+                              Volver
+                            </button>
+                            <button disabled={cancelWeddingSaving}
+                              onClick={async () => { setCancelWeddingSaving(true); await onCancelWedding(selectedLead, cancelWeddingReason); setCancelWeddingSaving(false); onClose() }}
+                              style={{ flex: 2, fontSize: 12, color: '#fff', background: '#B0473E', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 600 }}>
+                              {cancelWeddingSaving ? 'Cancelando...' : 'Confirmar cancelación'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* No lead linked: show lead search */
+                    <div>
+                      <div style={{ fontSize: 12, color: '#9A3F5F', marginBottom: 10 }}>Vincula la pareja que reservó esta boda.</div>
+                      {!showQuickLink ? (
+                        <button onClick={() => setShowQuickLink(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid #E8D2DC', color: '#9A3F5F', background: 'transparent', cursor: 'pointer', fontWeight: 500 }}><Link2 size={13} /> Vincular lead</button>
+                      ) : (
+                        <div>
+                          <div style={{ position: 'relative', marginBottom: 8 }}>
+                            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
+                            <input className="form-input" style={{ paddingLeft: 32 }} value={search}
+                              onChange={e => setSearch(e.target.value)} placeholder="Buscar lead por nombre o email..." autoFocus />
+                          </div>
+                          {search && (
+                            <div style={{ border: '1px solid var(--ivory)', borderRadius: 8, overflow: 'hidden' }}>
+                              {filteredLeads.length === 0 ? (
+                                <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--warm-gray)' }}>Sin resultados</div>
+                              ) : filteredLeads.map(l => (
+                                <div key={l.id} onClick={() => { setLeadId(l.id); setSearch(''); setShowQuickLink(false) }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--ivory)', background: '#fff' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--cream)')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
+                                  <User size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 500 }}>{l.name}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{l.guests ? `${l.guests} inv.` : ''}</div>
+                                  </div>
+                                  <span style={{ fontSize: 11, color: (LEAD_STATUS[l.status] || {}).color || '#6b7280', fontWeight: 500 }}>{(LEAD_STATUS[l.status] || { label: l.status }).label}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ══ BLOQUEAR FECHA — compact pills ══ */}
+              {!isPast && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', flexShrink: 0 }}>Bloquear:</span>
+                    {([
+                      { noteVal: '' as const,                 label: 'Día completo' },
+                      { noteVal: 'medio_dia_manana' as const, label: '½ Mañana'     },
+                      { noteVal: 'medio_dia_tarde'  as const, label: '½ Tarde'      },
+                    ]).map(opt => {
+                      const isActive = status === 'bloqueado' && halfDay === opt.noteVal
+                      return (
+                        <button key={opt.noteVal || 'full'} onClick={() => {
+                          if (isActive) { setStatus('libre'); setHalfDay('') }
+                          else          { setStatus('bloqueado'); setHalfDay(opt.noteVal) }
+                        }} style={{
+                          padding: '4px 12px', borderRadius: 20, cursor: 'pointer', fontSize: 12,
+                          border: `1.5px solid ${isActive ? '#6b7280' : 'var(--ivory)'}`,
+                          background: isActive ? '#6b7280' : 'transparent',
+                          color: isActive ? '#fff' : 'var(--warm-gray)',
+                          fontWeight: isActive ? 600 : 400, transition: 'all 0.12s',
+                        }}>
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {status === 'bloqueado' && (
+                    <>
+                      {/* Warning: leads affected by blocking */}
+                      {leadsOnDate.filter(l => l.status !== 'lost' && l.status !== 'won').length > 0 && (
+                        <div style={{ marginTop: 10, padding: '10px 12px', background: '#fef3cd', border: '1px solid #f0d78c', borderRadius: 8 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#7a5a0b', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <AlertCircle size={13} />
+                            {leadsOnDate.filter(l => l.status !== 'lost' && l.status !== 'won').length === 1
+                              ? 'Hay 1 lead en esta fecha'
+                              : `Hay ${leadsOnDate.filter(l => l.status !== 'lost' && l.status !== 'won').length} leads en esta fecha`}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#7a5a0b', lineHeight: 1.4 }}>
+                            Al guardar podrás moverlos a otra fecha o quitarlos de esta.
+                          </div>
+                        </div>
+                      )}
+                      <div style={{ marginTop: 10 }}>
+                        <textarea className="form-textarea" style={{ minHeight: 60 }} value={note}
+                          onChange={e => setNote(e.target.value)}
+                          placeholder={isMedioDia ? 'Nota interna (opcional)...' : 'Motivo del bloqueo (opcional)...'} />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* NEGOCIACIÓN: pareja vinculada + detalles */}
+              {!isPast && status === 'negociacion' && (
+                <div style={{ marginBottom: 20 }}>
+                  {selectedLead ? (
+                    <>
+
+                      {/* Modality picker — only shown when modalities with matching packages exist */}
+                      {modalityOptions.length > 0 && (
+                        <div style={{ padding: '10px 12px', background: '#EEF2EC', border: '1px solid #D2DFD3', borderRadius: 8, marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: '#3C5945', marginBottom: 8 }}>Modalidad</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                            {[{ modality: { id: '', name: 'Sin modalidad (1 día)' }, pkgLabel: '', span: 1, endDate: date } as any,
+                              ...modalityOptions].map(opt => (
+                              <button key={opt.modality.id} type="button"
+                                onClick={() => setSelectedModalityId(opt.modality.id)}
+                                style={{
+                                  padding: '7px 10px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                                  border: `2px solid ${selectedModalityId === opt.modality.id ? '#4A6B52' : 'var(--ivory)'}`,
+                                  background: selectedModalityId === opt.modality.id ? '#EEF2EC' : '#fff',
+                                  fontSize: 12, fontWeight: 500,
+                                  color: selectedModalityId === opt.modality.id ? '#3C5945' : 'var(--charcoal)',
+                                }}>
+                                {opt.modality.name}
+                                {opt.span > 1 && (
+                                  <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--warm-gray)', fontWeight: 400 }}>
+                                    · {opt.pkgLabel} ({opt.span} días, hasta {opt.endDate})
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Nota */}
+                      <div>
+                        <label className="form-label">Nota interna (opcional)</label>
+                        <textarea className="form-textarea" style={{ minHeight: 60 }} value={note}
+                          onChange={e => setNote(e.target.value)}
+                          placeholder="Ej: Esperando confirmación, visita el lunes..." />
+                      </div>
+                    </>
+                  ) : (
+                    /* No lead linked */
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                        Pareja en negociación
+                      </div>
+                      {!showQuickLink ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: 'var(--cream)', border: '1px solid var(--ivory)', borderRadius: 8, marginBottom: 12 }}>
+                          <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>Sin pareja vinculada</span>
+                          <button onClick={() => setShowQuickLink(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, padding: '3px 10px', borderRadius: 20, cursor: 'pointer', border: '1px solid var(--gold)', background: 'transparent', color: 'var(--gold)', fontWeight: 600 }}>
+                            <Link2 size={12} /> Vincular lead
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--charcoal)' }}>Buscar lead existente</span>
+                            <button onClick={() => { setShowQuickLink(false); setSearch('') }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 2 }}><X size={13} /></button>
+                          </div>
+                          <div style={{ position: 'relative', marginBottom: 8 }}>
+                            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
+                            <input className="form-input" style={{ paddingLeft: 32 }} value={search}
+                              onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o email..." autoFocus />
+                          </div>
+                          {search && (
+                            <div style={{ border: '1px solid var(--ivory)', borderRadius: 8, overflow: 'hidden' }}>
+                              {filteredLeads.length === 0 ? (
+                                <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--warm-gray)' }}>Sin resultados</div>
+                              ) : filteredLeads.map(l => (
+                                <div key={l.id} onClick={() => { setLeadId(l.id); setSearch(''); setShowQuickLink(false) }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--ivory)', background: '#fff' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--cream)')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
+                                  <User size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 500 }}>{l.name}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
+                                      {l.wedding_date ? new Date(l.wedding_date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Sin fecha'}
+                                      {l.guests ? ` · ${l.guests} inv.` : ''}
+                                    </div>
+                                  </div>
+                                  <span style={{ fontSize: 11, color: (LEAD_STATUS[l.status] || {}).color || '#6b7280', fontWeight: 500 }}>{(LEAD_STATUS[l.status] || { label: l.status }).label}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Note when no lead */}
+                      <div>
+                        <label className="form-label">Nota interna (opcional)</label>
+                        <textarea className="form-textarea" style={{ minHeight: 60 }} value={note}
+                          onChange={e => setNote(e.target.value)}
+                          placeholder="Ej: Pareja por confirmar, esperando señal..." />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* LIBRE: nota */}
+              {!isPast && status === 'libre' && (
+                <div style={{ marginBottom: 20 }}>
+                  <label className="form-label">Nota interna (opcional)</label>
+                  <textarea className="form-textarea" style={{ minHeight: 60 }} value={note}
+                    onChange={e => setNote(e.target.value)}
+                    placeholder="Ej: Festivo, pendiente de confirmar..." />
+                </div>
+              )}
+
+              {/* Past date message */}
+              {isPast && !entry && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px', background: 'var(--cream)', borderRadius: 8, fontSize: 12, color: 'var(--warm-gray)' }}>
+                  <AlertCircle size={14} /> Esta fecha ya ha pasado.
+                </div>
+              )}
+
+              {/* Affected leads overlay — rendered via portal below */}
+
+            </>
+          )}
+        </div>
+
+        {/* ── Overlay: leads afectados por fecha reservada/bloqueada ── */}
+        {showAffected && affectedLeads.length > 0 && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+            onClick={() => setShowAffected(false)}>
+            <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', maxHeight: '80vh', overflow: 'hidden' }}
+              onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid #E2D4AE', background: '#F7F3E8' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <AlertCircle size={15} style={{ color: '#9A7A40', flexShrink: 0 }} />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#7A5A2E' }}>
+                    {affectedLeads.length === 1 ? '1 lead pendiente de gestionar' : `${affectedLeads.length} leads pendientes de gestionar`}
+                  </span>
+                </div>
+                <p style={{ fontSize: 12, color: '#78350f', margin: 0, lineHeight: 1.4 }}>
+                  Esta fecha está {entry?.status === 'reservado' ? 'reservada' : 'bloqueada'}. Los siguientes leads tienen esta fecha en su propuesta.
+                </p>
+              </div>
+
+              {/* Lead list */}
+              <div style={{ overflowY: 'auto', padding: '14px 20px', flex: 1 }}>
+                {affectedLeads.map(l => {
+                  const st = LEAD_STATUS[l.status] || { label: l.status, color: '#6b7280' }
+                  const otherDates = getOtherDatesLabel(l)
+                  const isSav = affectedSaving[l.id]
+                  return (
+                    <div key={l.id} style={{ border: '1px solid var(--ivory)', borderRadius: 10, padding: '12px 14px', marginBottom: 10, background: 'var(--cream)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <User size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--espresso)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
+                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: st.color + '1a', color: st.color, fontWeight: 600, flexShrink: 0 }}>{st.label}</span>
+                      </div>
+                      {otherDates ? (
+                        <div style={{ fontSize: 11, color: '#467A60', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          ✓ Tiene otras fechas propuestas: <strong>{otherDates}</strong>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 11, color: '#9A7A40', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          ⚠ Esta es su única fecha propuesta
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <a href={`/leads?changeDates=${l.id}&returnDate=${date}`}
+                          style={{ flex: 1, textAlign: 'center', fontSize: 11, padding: '6px 8px', borderRadius: 7, border: '1px solid var(--ivory)', color: 'var(--charcoal)', textDecoration: 'none', fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
+                          + Añadir otra fecha
+                        </a>
+                        <button onClick={() => handleRemoveFromDate(l)} disabled={isSav}
+                          style={{ flex: 1, fontSize: 11, padding: '6px 8px', borderRadius: 7, border: '1px solid #E0C2BD', color: '#B0473E', background: 'transparent', cursor: 'pointer', fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
+                          {isSav ? '...' : '✗ Quitar de esta fecha'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Footer */}
+              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--ivory)', display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={() => setShowAffected(false)}
+                  style={{ fontSize: 12, padding: '7px 16px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--warm-gray)', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
+                  Gestionar más tarde
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete from CRM popup */}
+        {removedLeadForCrm && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 16 }}>
+            <div style={{ background: '#fff', borderRadius: 14, maxWidth: 380, width: '100%', padding: '24px', boxShadow: '0 24px 60px rgba(0,0,0,0.25)' }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#FAF3F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <User size={18} style={{ color: '#BC5249' }} />
+                </div>
+                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--espresso)' }}>Lead sin fechas asignadas</div>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.6, marginBottom: 20 }}>
+                <strong>{removedLeadForCrm.name}</strong> ya no tiene ninguna fecha de boda asignada en el calendario. ¿Qué quieres hacer?
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button
+                  onClick={async () => {
+                    const supabase = createClient()
+                    await supabase.from('leads').update({ status: 'lost' }).eq('id', removedLeadForCrm.id)
+                    await onUpdateLead(removedLeadForCrm.id, { status: 'lost' })
+                    setRemovedLeadForCrm(null)
+                  }}
+                  style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: '#BC5249', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  Mover a Perdidos
+                </button>
+                <button onClick={() => setRemovedLeadForCrm(null)}
+                  style={{ padding: '10px 16px', borderRadius: 8, border: '1px solid var(--ivory)', background: 'transparent', color: 'var(--charcoal)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                  Mantener en CRM
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {/* Footer */}
+        {!isPast && !showCreate && (
+          <div style={{ padding: '16px 24px', borderTop: '1px solid var(--ivory)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              {entry && (
+                <button onClick={handleDelete} disabled={isSaving}
+                  style={{ fontSize: 12, color: '#B0473E', background: 'none', border: '1px solid #E0C2BD', borderRadius: 6, padding: '6px 12px', cursor: 'pointer' }}>
+                  Liberar fecha
+                </button>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+              <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── (DateRulesModal removed — prep/teardown chosen per booking in leads) ──────
+
+// ── Quick Create Lead ──────────────────────────────────────────────────────────
+
+function QuickCreateLead({
+  defaultDate, venueId, onCreated, onCancel
+}: {
+  defaultDate: string
+  venueId: string
+  onCreated: (lead: Lead) => Promise<void>
+  onCancel: () => void
+}) {
+  const { user } = useAuth()
+  const [form, setForm] = useState({
+    name: '', email: '', phone: '', guests: '', wedding_date: defaultDate, ceremony_type: 'sin_definir', budget: 'sin_definir'
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError]   = useState('')
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  const handleCreate = async () => {
+    if (!form.name.trim()) { setError('El nombre es obligatorio'); return }
+    setSaving(true); setError('')
+    const supabase = createClient()
+    const { data, error: err } = await supabase.from('leads').insert({
+      user_id: user!.id,
+      venue_id: venueId,
+      name: form.name.trim(),
+      email: form.email.trim() || null,
+      phone: form.phone.trim() || null,
+      guests: form.guests ? parseInt(form.guests) : null,
+      wedding_date: form.wedding_date || null,
+      ceremony_type: form.ceremony_type,
+      budget: form.budget,
+      status: 'contacted',
+      date_flexibility: 'exact',
+      source: 'manual',
+    }).select().single()
+    if (err) { setError('Error al crear el lead'); setSaving(false); return }
+    await onCreated(data as Lead)
+    setSaving(false)
+  }
+
+  return (
+    <div style={{ marginBottom: 20, padding: '16px', background: '#EEF2EC', border: '1px solid #C3D4C5', borderRadius: 10 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#3C5945', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        Nuevo lead
+        <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4A6B52' }}><X size={14} /></button>
+      </div>
+      {error && <div style={{ fontSize: 12, color: '#B0473E', marginBottom: 8 }}>{error}</div>}
+      <div className="form-group" style={{ marginBottom: 10 }}>
+        <label className="form-label" style={{ fontSize: 11 }}>Nombre de la pareja *</label>
+        <input className="form-input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Ej: Laura & Carlos" />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label className="form-label" style={{ fontSize: 11 }}>Email</label>
+          <input className="form-input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@..." />
+        </div>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label className="form-label" style={{ fontSize: 11 }}>Teléfono</label>
+          <input className="form-input" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+34..." />
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label className="form-label" style={{ fontSize: 11 }}>Nº invitados</label>
+          <input className="form-input" type="number" value={form.guests} onChange={e => set('guests', e.target.value)} placeholder="150" />
+        </div>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label className="form-label" style={{ fontSize: 11 }}>Fecha de boda</label>
+          <DatePicker value={form.wedding_date} onChange={(v) => set('wedding_date', v)} placeholder="Fecha de boda" />
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancelar</button>
+        <button className="btn btn-primary btn-sm" onClick={handleCreate} disabled={saving}>
+          {saving ? 'Creando...' : <><Plus size={12} /> Crear lead</>}
+        </button>
+      </div>
+    </div>
+  )
+}

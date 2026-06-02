@@ -447,7 +447,7 @@ function InquiryRow({
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
         {inq.proposals?.id && (
-          <Link href={`/proposals/${inq.proposals.id}/edit`} className="btn btn-ghost btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <Link href={`/dossier/${inq.proposals.id}/edit`} className="btn btn-ghost btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <ExternalLink size={11} /> Ver propuesta
           </Link>
         )}
@@ -486,7 +486,7 @@ export default function InquiriesPanel({ onCountChange }: InquiriesPanelProps) {
   const load = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/proposals/inquiries', { cache: 'no-store' })
+      const res = await fetch('/api/dossier/inquiries', { cache: 'no-store' })
       const data = await res.json().catch(() => ({}))
       if (data.ok) {
         setInquiries(data.inquiries as Inquiry[])
@@ -503,7 +503,7 @@ export default function InquiriesPanel({ onCountChange }: InquiriesPanelProps) {
     const previous = inquiries
     setInquiries(prev => prev.map(i => i.id === id ? { ...i, status } : i))
     onCountChange?.(inquiries.filter(i => i.id !== id ? i.status === 'new' : status === 'new').length)
-    const res = await fetch(`/api/proposals/inquiries/${id}`, {
+    const res = await fetch(`/api/dossier/inquiries/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -516,7 +516,7 @@ export default function InquiriesPanel({ onCountChange }: InquiriesPanelProps) {
     const previous = inquiries
     setInquiries(prev => prev.filter(i => i.id !== id))
     onCountChange?.(previous.filter(i => i.id !== id && i.status === 'new').length)
-    const res = await fetch(`/api/proposals/inquiries/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/dossier/inquiries/${id}`, { method: 'DELETE' })
     if (!res.ok) setInquiries(previous)
   }
 

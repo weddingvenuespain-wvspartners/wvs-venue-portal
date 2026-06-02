@@ -15,7 +15,7 @@ export default function ProposalGate({ slug, coupleName }: { slug: string; coupl
     setError(null)
     setLoading(true)
     try {
-      const res = await fetch('/api/proposals/unlock', {
+      const res = await fetch('/api/dossier/unlock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug, password }),

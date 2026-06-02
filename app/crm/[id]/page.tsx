@@ -11,6 +11,7 @@ import {
   Banknote, Tag, MapPin, Clock, FileText, ExternalLink, Edit2, Save, X,
   Landmark, UtensilsCrossed, Globe, Palette, Sparkles, CheckCircle2,
   Heart, Paperclip, CalendarCheck, Trash2, Receipt, CheckCircle, Inbox, Loader2,
+  Plus, Circle, ClipboardList,
 } from 'lucide-react'
 import type { Client, ClientType } from '@/lib/clients'
 import { CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS } from '@/lib/clients'
@@ -65,7 +66,40 @@ type Lead = {
   updated_at?: string | null
 }
 
-type Tab = 'info' | 'peticiones' | 'oferta' | 'notas' | 'historial' | 'colaboracion'
+type Tab = 'info' | 'peticiones' | 'oferta' | 'tareas' | 'notas' | 'historial' | 'colaboracion'
+
+type TaskPriority = 'alta' | 'media' | 'normal'
+type TaskCategory = 'llamar' | 'enviar_dossier' | 'seguimiento' | 'visita' | 'otro'
+
+type CrmTask = {
+  id: string
+  user_id: string
+  venue_id: string
+  title: string
+  description?: string | null
+  due_date: string
+  type: 'internal' | 'lead'
+  lead_id?: string | null
+  completed: boolean
+  completed_at?: string | null
+  priority: TaskPriority
+  category: TaskCategory
+  created_at: string
+}
+
+const TASK_PRIORITY_CFG: Record<TaskPriority, { label: string; color: string; bg: string }> = {
+  alta:   { label: 'Alta',   color: '#933B34', bg: '#FAF3F2' },
+  media:  { label: 'Media',  color: '#92610E', bg: '#FEF9EE' },
+  normal: { label: 'Normal', color: '#5C6B5E', bg: '#F2F4F2' },
+}
+
+const TASK_CATEGORY_CFG: Record<TaskCategory, { label: string; icon: string }> = {
+  llamar:          { label: 'Llamar',          icon: '📞' },
+  enviar_dossier:  { label: 'Enviar dossier',  icon: '📄' },
+  seguimiento:     { label: 'Seguimiento',     icon: '🔄' },
+  visita:          { label: 'Visita',           icon: '🏠' },
+  otro:            { label: 'Otro',             icon: '📌' },
+}
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -243,6 +277,14 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
   const [agreementForm, setAgreementForm] = useState({ commission_percent: '', commission_type: 'percentage', agreement_notes: '', agreement_start: '', agreement_end: '' })
   const [savingAgreement, setSavingAgreement] = useState(false)
 
+  // Tasks
+  const [crmTasks,       setCrmTasks]       = useState<CrmTask[]>([])
+  const [taskModal,      setTaskModal]      = useState(false)
+  const [editingTask,    setEditingTask]    = useState<CrmTask | null>(null)
+  const [taskForm,       setTaskForm]       = useState({ title: '', description: '', due_date: '', type: 'lead' as 'internal' | 'lead', lead_id: '', priority: 'normal' as TaskPriority, category: 'otro' as TaskCategory })
+  const [taskSaving,     setTaskSaving]     = useState(false)
+  const [taskError,      setTaskError]      = useState('')
+
   // ── Load data ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (authLoading) return
@@ -317,6 +359,14 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
     const leadIds = new Set(leads.map(l => l.id))
     setProposals((proposalsRes.data ?? []).filter((p: any) => p.lead_id && leadIds.has(p.lead_id)))
     setBudgets((budgetsRes.data ?? []).filter((b: any) => b.lead_id && leadIds.has(b.lead_id)))
+
+    // Load tasks linked to this client's leads
+    if (leadIds.size > 0) {
+      const { data: tasksData } = await supabase.from('venue_tasks').select('*').in('lead_id', Array.from(leadIds)).order('due_date', { ascending: true })
+      setCrmTasks((tasksData ?? []) as CrmTask[])
+    } else {
+      setCrmTasks([])
+    }
 
     // WP: load couples
     if (c.client_type === 'wedding_planner') {
@@ -399,6 +449,76 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
     setSavingAgreement(false)
     loadData()
   }
+
+  // ── Task CRUD ──────────────────────────────────────────────────────────────
+  const todayIso = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
+
+  const resetTaskForm = () => {
+    setTaskForm({ title: '', description: '', due_date: '', type: 'lead', lead_id: clientLeads[0]?.id || '', priority: 'normal', category: 'otro' })
+    setEditingTask(null)
+    setTaskError('')
+  }
+
+  const openNewTask = (leadId?: string) => {
+    resetTaskForm()
+    setTaskForm(f => ({ ...f, due_date: todayIso, lead_id: leadId || clientLeads[0]?.id || '' }))
+    setTaskModal(true)
+  }
+
+  const openEditCrmTask = (task: CrmTask) => {
+    setEditingTask(task)
+    setTaskForm({
+      title: task.title,
+      description: task.description || '',
+      due_date: task.due_date,
+      type: task.type,
+      lead_id: task.lead_id || '',
+      priority: task.priority || 'normal',
+      category: task.category || 'otro',
+    })
+    setTaskModal(true)
+  }
+
+  const saveCrmTask = async () => {
+    if (!taskForm.title.trim()) { setTaskError('El título es obligatorio'); return }
+    if (!taskForm.due_date) { setTaskError('La fecha límite es obligatoria'); return }
+    if (!activeVenue) return
+    setTaskSaving(true); setTaskError('')
+    const payload: Record<string, any> = {
+      title: taskForm.title.trim(),
+      description: taskForm.description.trim() || null,
+      due_date: taskForm.due_date,
+      type: taskForm.type,
+      lead_id: taskForm.type === 'lead' && taskForm.lead_id ? taskForm.lead_id : null,
+      priority: taskForm.priority,
+      category: taskForm.category,
+    }
+    if (editingTask) {
+      const { data, error: err } = await supabase.from('venue_tasks').update(payload).eq('id', editingTask.id).select().single()
+      if (err) { setTaskError('Error al actualizar'); setTaskSaving(false); return }
+      setCrmTasks(prev => prev.map(t => t.id === editingTask.id ? (data as CrmTask) : t).sort((a, b) => a.due_date.localeCompare(b.due_date)))
+    } else {
+      const { data, error: err } = await supabase.from('venue_tasks').insert({ ...payload, user_id: user!.id, venue_id: activeVenue.id }).select().single()
+      if (err) { setTaskError('Error al crear'); setTaskSaving(false); return }
+      setCrmTasks(prev => [...prev, data as CrmTask].sort((a, b) => a.due_date.localeCompare(b.due_date)))
+    }
+    setTaskModal(false)
+    resetTaskForm()
+    setTaskSaving(false)
+  }
+
+  const toggleCrmTask = async (task: CrmTask) => {
+    const updates = { completed: !task.completed, completed_at: !task.completed ? new Date().toISOString() : null }
+    await supabase.from('venue_tasks').update(updates).eq('id', task.id)
+    setCrmTasks(prev => prev.map(t => t.id === task.id ? { ...t, ...updates } as CrmTask : t))
+  }
+
+  const deleteCrmTask = async (taskId: string) => {
+    await supabase.from('venue_tasks').delete().eq('id', taskId)
+    setCrmTasks(prev => prev.filter(t => t.id !== taskId))
+  }
+
+  const pendingTaskCount = crmTasks.filter(t => !t.completed).length
 
   const handleDelete = async () => {
     if (!confirm('Se eliminará este cliente. Sus peticiones se desvincularán pero no se borrarán.')) return
@@ -606,9 +726,9 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
               {/* ── Tabs ──────────────────────────────────────────────────── */}
               <div>
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--ivory)', gap: 0 }}>
-                  {([...(['info', 'peticiones', 'oferta', 'notas', 'historial'] as Tab[]), ...(isWP ? ['colaboracion' as Tab] : [])]).map(t => (
+                  {([...(['info', 'peticiones', 'oferta', 'tareas', 'notas', 'historial'] as Tab[]), ...(isWP ? ['colaboracion' as Tab] : [])]).map(t => (
                     <button key={t} onClick={() => setTab(t)} style={tabStyle(tab === t)}>
-                      {{ info: 'Info', peticiones: `Peticiones (${clientLeads.length})`, oferta: `Oferta (${proposals.length + budgets.length + docFiles.length})`, notas: 'Notas', historial: 'Historial', colaboracion: 'Colaboración' }[t]}
+                      {{ info: 'Info', peticiones: `Peticiones (${clientLeads.length})`, oferta: `Oferta (${proposals.length + budgets.length + docFiles.length})`, tareas: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>Tareas{pendingTaskCount > 0 && <span style={{ fontSize: 10, fontWeight: 700, background: '#7E72A0', color: '#fff', borderRadius: 10, padding: '0 6px', minWidth: 18, textAlign: 'center', lineHeight: '18px' }}>{pendingTaskCount}</span>}</span>, notas: 'Notas', historial: 'Historial', colaboracion: 'Colaboración' }[t]}
                     </button>
                   ))}
                 </div>
@@ -882,6 +1002,111 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
                       )}
                     </>
                   )}
+
+                  {/* ── Tab: Tareas ─────────────────────────────────── */}
+                  {tab === 'tareas' && (() => {
+                    const pending = crmTasks.filter(t => !t.completed).sort((a, b) => a.due_date.localeCompare(b.due_date))
+                    const done = crmTasks.filter(t => t.completed).sort((a, b) => (b.completed_at || b.due_date).localeCompare(a.completed_at || a.due_date))
+                    const overdue = pending.filter(t => t.due_date < todayIso)
+                    const upcoming = pending.filter(t => t.due_date >= todayIso)
+                    return (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                          <SectionLabel>Tareas ({pending.length} pendientes)</SectionLabel>
+                          <button onClick={() => openNewTask()}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#7E72A0', color: '#fff', cursor: 'pointer' }}>
+                            <Plus size={13} /> Nueva tarea
+                          </button>
+                        </div>
+
+                        {crmTasks.length === 0 && (
+                          <div style={{ textAlign: 'center', padding: '30px 20px' }}>
+                            <ClipboardList size={28} style={{ color: '#d1cac3', marginBottom: 8 }} />
+                            <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>Sin tareas para este cliente</div>
+                            <div style={{ fontSize: 11, color: '#c0bbb4', marginTop: 4 }}>Crea tareas de seguimiento, llamadas o envío de dossiers.</div>
+                          </div>
+                        )}
+
+                        {overdue.length > 0 && (
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#BC5249', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Vencidas ({overdue.length})</div>
+                            {overdue.map(task => {
+                              const priCfg = TASK_PRIORITY_CFG[task.priority || 'normal']
+                              const catCfg = TASK_CATEGORY_CFG[task.category || 'otro']
+                              const linkedLead = task.lead_id ? clientLeads.find(l => l.id === task.lead_id) : null
+                              return (
+                                <div key={task.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--ivory)' }}>
+                                  <button onClick={() => toggleCrmTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 1, flexShrink: 0, color: '#BC5249' }}>
+                                    <Circle size={17} />
+                                  </button>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)' }}>{task.title}</div>
+                                    {task.description && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{task.description}</div>}
+                                    <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                                      <span style={{ fontSize: 11, fontWeight: 600, color: '#BC5249' }}>{fmtDate(task.due_date)} · Vencida</span>
+                                      {task.priority !== 'normal' && <span style={{ fontSize: 10, fontWeight: 600, background: priCfg.bg, color: priCfg.color, borderRadius: 5, padding: '1px 7px' }}>{priCfg.label}</span>}
+                                      <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{catCfg.icon} {catCfg.label}</span>
+                                      {linkedLead && <span style={{ fontSize: 10, background: '#E9E6F3', color: '#4F417A', borderRadius: 5, padding: '1px 7px', fontWeight: 500 }}>{linkedLead.name}</span>}
+                                    </div>
+                                  </div>
+                                  <button onClick={() => openEditCrmTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, color: '#d1cac3', flexShrink: 0 }} title="Editar"><Edit2 size={13} /></button>
+                                  <button onClick={() => deleteCrmTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, color: '#d1cac3', flexShrink: 0 }} title="Eliminar"><Trash2 size={13} /></button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {upcoming.length > 0 && (
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#7E72A0', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Pendientes ({upcoming.length})</div>
+                            {upcoming.map(task => {
+                              const priCfg = TASK_PRIORITY_CFG[task.priority || 'normal']
+                              const catCfg = TASK_CATEGORY_CFG[task.category || 'otro']
+                              const linkedLead = task.lead_id ? clientLeads.find(l => l.id === task.lead_id) : null
+                              const isToday = task.due_date === todayIso
+                              return (
+                                <div key={task.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--ivory)' }}>
+                                  <button onClick={() => toggleCrmTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 1, flexShrink: 0, color: '#7E72A0' }}>
+                                    <Circle size={17} />
+                                  </button>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal)' }}>{task.title}</div>
+                                    {task.description && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{task.description}</div>}
+                                    <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                                      <span style={{ fontSize: 11, fontWeight: 600, color: isToday ? 'var(--gold)' : 'var(--warm-gray)' }}>{isToday ? 'Hoy' : fmtDate(task.due_date)}</span>
+                                      {task.priority !== 'normal' && <span style={{ fontSize: 10, fontWeight: 600, background: priCfg.bg, color: priCfg.color, borderRadius: 5, padding: '1px 7px' }}>{priCfg.label}</span>}
+                                      <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{catCfg.icon} {catCfg.label}</span>
+                                      {linkedLead && <span style={{ fontSize: 10, background: '#E9E6F3', color: '#4F417A', borderRadius: 5, padding: '1px 7px', fontWeight: 500 }}>{linkedLead.name}</span>}
+                                    </div>
+                                  </div>
+                                  <button onClick={() => openEditCrmTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, color: '#d1cac3', flexShrink: 0 }} title="Editar"><Edit2 size={13} /></button>
+                                  <button onClick={() => deleteCrmTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, color: '#d1cac3', flexShrink: 0 }} title="Eliminar"><Trash2 size={13} /></button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {done.length > 0 && (
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Completadas ({done.length})</div>
+                            {done.slice(0, 10).map(task => (
+                              <div key={task.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--ivory)', opacity: 0.6 }}>
+                                <button onClick={() => toggleCrmTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 1, flexShrink: 0, color: '#5C8570' }}>
+                                  <CheckCircle2 size={17} />
+                                </button>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--warm-gray)', textDecoration: 'line-through' }}>{task.title}</div>
+                                  <div style={{ fontSize: 11, color: '#c0bbb4', marginTop: 2 }}>{fmtDate(task.due_date)}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
 
                   {/* ── Tab: Notas ──────────────────────────────────── */}
                   {tab === 'notas' && (
@@ -1344,7 +1569,7 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
               <div className="modal-footer" style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => setDosierModal(null)}>Cerrar</button>
                 <div style={{ flex: 1 }} />
-                <a href={`/proposals/${p.id}/edit`} className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <a href={`/dossier/${p.id}/edit`} className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                   <ExternalLink size={11} /> Ver dosier completo
                 </a>
               </div>
@@ -1448,6 +1673,81 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
           </div>
         )
       })()}
+
+      {/* Task create/edit modal */}
+      {taskModal && (
+        <div onClick={() => { setTaskModal(false); resetTaskForm() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ClipboardList size={18} style={{ color: '#7E72A0' }} /> {editingTask ? 'Editar tarea' : 'Nueva tarea'}
+              </div>
+              <button onClick={() => { setTaskModal(false); resetTaskForm() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)' }}><X size={18} /></button>
+            </div>
+
+            {taskError && <div style={{ fontSize: 12, color: '#BC5249', marginBottom: 12, padding: '8px 12px', background: '#FAF3F2', borderRadius: 8 }}>{taskError}</div>}
+
+            <div className="form-group" style={{ marginBottom: 14 }}>
+              <label className="form-label" style={{ fontSize: 11 }}>Título *</label>
+              <input className="form-input" value={taskForm.title} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} placeholder="Ej: Llamar para confirmar visita" autoFocus />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 14 }}>
+              <label className="form-label" style={{ fontSize: 11 }}>Descripción (opcional)</label>
+              <textarea className="form-input" value={taskForm.description} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} placeholder="Detalles..." rows={2} style={{ resize: 'vertical' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Fecha límite *</label>
+                <DatePicker value={taskForm.due_date} onChange={(v) => setTaskForm(f => ({ ...f, due_date: v }))} allowPast placeholder="dd/mm/aaaa" />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Categoría</label>
+                <select className="form-input" style={{ fontSize: 12, height: 34, marginTop: 4 }}
+                  value={taskForm.category} onChange={e => setTaskForm(f => ({ ...f, category: e.target.value as TaskCategory }))}>
+                  {(Object.entries(TASK_CATEGORY_CFG) as [TaskCategory, { label: string; icon: string }][]).map(([k, v]) => (
+                    <option key={k} value={k}>{v.icon} {v.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Prioridad</label>
+                <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                  {(['alta', 'media', 'normal'] as TaskPriority[]).map(p => (
+                    <button key={p} type="button" onClick={() => setTaskForm(f => ({ ...f, priority: p }))}
+                      style={{ flex: 1, fontSize: 10, fontWeight: 600, padding: '5px 2px', borderRadius: 6, border: '1.5px solid',
+                        borderColor: taskForm.priority === p ? TASK_PRIORITY_CFG[p].color : 'var(--ivory)',
+                        background: taskForm.priority === p ? TASK_PRIORITY_CFG[p].bg : 'transparent',
+                        color: taskForm.priority === p ? TASK_PRIORITY_CFG[p].color : 'var(--warm-gray)', cursor: 'pointer' }}>
+                      {TASK_PRIORITY_CFG[p].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 11 }}>Lead vinculado</label>
+                <select className="form-input" style={{ fontSize: 12, height: 34, marginTop: 4 }}
+                  value={taskForm.lead_id} onChange={e => setTaskForm(f => ({ ...f, lead_id: e.target.value, type: e.target.value ? 'lead' : 'internal' }))}>
+                  <option value="">Sin vincular</option>
+                  {clientLeads.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setTaskModal(false); resetTaskForm() }}>Cancelar</button>
+              <button onClick={saveCrmTask} disabled={taskSaving}
+                style={{ fontSize: 12, fontWeight: 600, padding: '8px 20px', borderRadius: 8, border: 'none', background: '#7E72A0', color: '#fff', cursor: taskSaving ? 'not-allowed' : 'pointer', opacity: taskSaving ? 0.7 : 1 }}>
+                {taskSaving ? 'Guardando...' : editingTask ? 'Guardar cambios' : 'Crear tarea'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

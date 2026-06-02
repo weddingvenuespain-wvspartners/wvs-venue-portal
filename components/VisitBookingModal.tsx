@@ -101,7 +101,7 @@ export default function VisitBookingModal({
   const today = todayIso()
 
   useEffect(() => {
-    fetch(`/api/proposals/${proposalId}/visit-slots`)
+    fetch(`/api/dossier/${proposalId}/visit-slots`)
       .then(r => r.json())
       .then(d => { setSlots(d.slots ?? {}); setLoading(false) })
       .catch(() => setLoading(false))
@@ -134,7 +134,7 @@ export default function VisitBookingModal({
     if (!isValidEmail(email)) { setError('Email no válido'); return }
     setSubmitting(true); setError('')
     try {
-      const res = await fetch(`/api/proposals/${proposalId}/visit-request`, {
+      const res = await fetch(`/api/dossier/${proposalId}/visit-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -42,7 +42,7 @@ export type VisitRequest = {
 
 
 // Imported by:
-//  - app/proposal/[slug]/tpl/shared.tsx (re-exports these to templates)
+//  - app/dossier/[slug]/tpl/shared.tsx (re-exports these to templates)
 //  - components/ProposalEditor.tsx / ProposalMenuEditor.tsx
 
 // ── Menu structured types (WeddingProposal) ────────────────────────────────────
@@ -284,6 +284,7 @@ export type SectionsData = {
   testimonials?: Array<{ names: string; couple_name?: string; date?: string; wedding_date?: string; guests?: number; text: string; rating?: number; photo_url?: string }>
   accommodation?: {
     rooms?: string
+    rooms_list?: string[]
     description?: string
     price_info?: string
     nearby?: string
@@ -293,6 +294,10 @@ export type SectionsData = {
       included?: boolean
       price_info?: string
       prices?: Array<{ season: string; price: string }>
+      /** Interactive mode: max bookable quantity (default 1) */
+      max_qty?: number
+      /** Interactive mode: image URL for the room card */
+      image_url?: string
     }>
   }
 }

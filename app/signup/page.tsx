@@ -332,7 +332,7 @@ function SignupPageInner() {
                     <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
                       He leído y acepto los{' '}
                       <a href="/terminos" target="_blank" rel="noopener noreferrer" style={{ color: '#8FAA94', textDecoration: 'underline' }}>términos de servicio</a>{' '}y la{' '}
-                      <a href="/privacidad" target="_blank" rel="noopener noreferrer" style={{ color: '#8FAA94', textDecoration: 'underline' }}>política de privacidad</a>
+                      <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#8FAA94', textDecoration: 'underline' }}>política de privacidad</a>
                       {' '}<span style={{ color: 'rgba(188,82,73,0.8)' }}>*</span>
                     </span>
                   </label>

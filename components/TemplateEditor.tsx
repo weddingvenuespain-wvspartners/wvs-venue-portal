@@ -24,7 +24,7 @@ import {
   isSectionGroupEnabled,
   toggleSectionGroup,
 } from '@/lib/section-styles'
-import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
+import { INCLUSION_ICON_CHOICES } from '@/app/dossier/[slug]/tpl/shared'
 import { getSectionLabel, isSectionAllowed, SECTION_SPACE_TYPES, SPACE_TYPE_LABELS } from '@/lib/section-visibility'
 import { DEFAULT_TEMPLATES } from '@/lib/proposal-starter-templates'
 
@@ -157,8 +157,8 @@ export default function TemplateEditor({
   // visual_template_id coincide con el del borrador, para que el iframe inicial
   // tenga algo razonable que mostrar antes de que el postMessage live-updatee.
   const iframeUrl = template.id === 'new'
-    ? `/proposals/templates/t${(sections.visual_template_id as number | undefined) ?? 1}/preview`
-    : `/proposals/templates/${template.id}/preview`
+    ? `/dossier/templates/t${(sections.visual_template_id as number | undefined) ?? 1}/preview`
+    : `/dossier/templates/${template.id}/preview`
 
   // ── postMessage live preview ──────────────────────────────────────────────
   const buildPatch = useCallback(() => ({
@@ -282,7 +282,7 @@ export default function TemplateEditor({
     try {
       const isDraft = template.id === 'new'
       const res = await fetch(
-        isDraft ? '/api/proposal-templates' : `/api/proposal-templates/${template.id}`,
+        isDraft ? '/api/dossier-templates' : `/api/dossier-templates/${template.id}`,
         {
           method: isDraft ? 'POST' : 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -1133,9 +1133,49 @@ export default function TemplateEditor({
       const options: any[] = Array.isArray(acc.options) ? acc.options : []
       const setOptions = (next: any[]) => p({ options: next })
       const updateOpt = (idx: number, patch: any) => setOptions(options.map((o, i) => i === idx ? { ...o, ...patch } : o))
+      const accomStyleConfig = SECTION_STYLES.accommodation
+      const activeAccomVariantId = getActiveStyle(sections, 'accommodation')
+      const selectAccomVariant = (variantId: string) => {
+        setSections(s => setActiveStyle(s, 'accommodation', variantId) as SectionsData)
+        markDirty()
+      }
 
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Mode picker */}
+          {accomStyleConfig && (
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Modo</div>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${accomStyleConfig.variants.length}, 1fr)`, gap: 6 }}>
+                {accomStyleConfig.variants.map(v => {
+                  const active = activeAccomVariantId === v.id
+                  return (
+                    <button key={v.id} type="button" onClick={() => selectAccomVariant(v.id)}
+                      style={{
+                        padding: '7px 8px', textAlign: 'center', fontSize: 11, fontWeight: 600,
+                        border: `1.5px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                        borderRadius: 6, cursor: 'pointer',
+                        background: active ? 'rgba(196,151,90,0.08)' : '#fff',
+                        color: active ? 'var(--gold)' : 'var(--charcoal)',
+                      }}>
+                      {v.label}
+                      {v.badge && <span style={{ fontSize: 8, color: 'var(--gold)', display: 'block', marginTop: 1 }}>{v.badge}</span>}
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4 }}>
+                {accomStyleConfig.variants.find(v => v.id === activeAccomVariantId)?.description}
+              </div>
+            </div>
+          )}
+          {/* Title */}
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Título</div>
+            <input className="form-input" style={{ fontSize: 12 }} placeholder="Quedaos a dormir"
+              value={(sections as any).accommodation_title ?? ''}
+              onChange={e => { setSections(s => ({ ...s, accommodation_title: e.target.value } as any)); markDirty() }} />
+          </div>
           {/* Description */}
           <div>
             <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Descripción</div>
@@ -1168,12 +1208,20 @@ export default function TemplateEditor({
                   </div>
                   <input className="form-input" style={{ fontSize: 11, marginBottom: 4, width: '100%' }} placeholder="Descripción (opcional)" value={opt.description ?? ''} onChange={e => updateOpt(oi, { description: e.target.value })} />
 
-                  {/* Included toggle */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  {/* Included toggle + max qty */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
                     <label style={{ fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
                       <input type="checkbox" checked={!!opt.included} onChange={e => updateOpt(oi, { included: e.target.checked })} />
                       Incluido en tarifa
                     </label>
+                    {activeAccomVariantId === 'interactive' && !opt.included && (
+                      <label style={{ fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        Máx. uds:
+                        <input type="number" min={1} max={50} className="form-input" style={{ width: 50, fontSize: 11, padding: '2px 6px' }}
+                          value={opt.max_qty ?? 1}
+                          onChange={e => updateOpt(oi, { max_qty: parseInt(e.target.value) || 1 })} />
+                      </label>
+                    )}
                   </div>
 
                   {/* Prices by season (when not included) */}

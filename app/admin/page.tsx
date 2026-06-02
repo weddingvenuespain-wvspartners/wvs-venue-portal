@@ -2034,7 +2034,7 @@ export default function AdminPage() {
             <button className="btn btn-primary btn-sm" onClick={() => setShowCreateUser(true)}>
               <UserPlus size={13} /> {crmTab === 'venue_owner' ? 'Nuevo venue' : crmTab === 'wedding_planner' ? 'Nuevo planner' : 'Nuevo catering'}
             </button>
-            <a href="/admin/planes"     className="btn btn-ghost btn-sm">Planes →</a>
+            <a href="/admin/plans"     className="btn btn-ghost btn-sm">Planes →</a>
             <a href="/admin/onboarding" className="btn btn-ghost btn-sm">Solicitudes →</a>
           </div>
         </div>

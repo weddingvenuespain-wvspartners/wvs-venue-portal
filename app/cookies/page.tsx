@@ -159,7 +159,7 @@
       <div style={sectionStyle}>
         <h2 style={headingStyle}>4. Cómo gestionar o desactivar las cookies</h2>
         <div style={bodyStyle}>
-          <p>Puedes controlar las cookies analíticas directamente desde el portal en <a href="/perfil?tab=privacidad" style={{ color: '#c9a84c' }}>Configuración &gt; Privacidad y datos</a>.</p>
+          <p>Puedes controlar las cookies analíticas directamente desde el portal en <a href="/profile?tab=privacidad" style={{ color: '#c9a84c' }}>Configuración &gt; Privacidad y datos</a>.</p>
           <p style={{ marginTop: 10 }}>Además, la mayoría de navegadores te permiten controlar las cookies a través de su configuración. A continuación encontrarás enlaces a las instrucciones de los navegadores más comunes:</p>
           <ul style={{ paddingLeft: 20, marginTop: 8 }}>
             <li><a href="https://support.google.com/chrome/answer/95647" target="_blank" rel="noopener" style={{ color: '#c9a84c' }}>Google Chrome</a></li>
@@ -188,7 +188,7 @@
       {/* Footer */}
       <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid #ede8df', textAlign: 'center', fontSize: 12, color: '#b8a898' }}>
         FOREVENTOS Venue Portal · © 2025 ·{' '}
-        <a href="/privacidad" style={{ color: '#c9a84c' }}>Política de Privacidad</a>
+        <a href="/privacy" style={{ color: '#c9a84c' }}>Política de Privacidad</a>
       </div>
     </div>
   )

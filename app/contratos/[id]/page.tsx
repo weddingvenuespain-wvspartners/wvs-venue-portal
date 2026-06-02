@@ -637,7 +637,7 @@ export default function ContractDetailPage() {
                   </button>
                 )}
                 {contract.invoice_id && (
-                  <button className="btn btn-ghost btn-sm" style={{ width: '100%', justifyContent: 'flex-start', marginBottom: 4 }} onClick={() => router.push(`/facturas/${contract.invoice_id}`)}>
+                  <button className="btn btn-ghost btn-sm" style={{ width: '100%', justifyContent: 'flex-start', marginBottom: 4 }} onClick={() => router.push(`/invoices/${contract.invoice_id}`)}>
                     🧾 Ver factura
                   </button>
                 )}

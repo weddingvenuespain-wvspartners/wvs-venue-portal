@@ -9,15 +9,15 @@ const PUBLIC_ROUTES: Array<string | RegExp> = [
   '/api/admin/backup',          // uses Bearer API key for GitHub Actions cron
   '/api/redsys/notification',   // Redsys webhook (server-to-server, no session)
   '/api/plans',                 // public plan listing for pricing page
-  '/api/proposals/track-view',  // anonymous couple opens a proposal — RPC handles dedupe + self-view
-  '/api/proposals/unlock',      // password gate for private proposals — anonymous by design
-  '/api/proposals/inquiries',   // public POST: couple submits inquiry from proposal landing
-  '/api/proposals/track-section', // public POST: section-level view tracking
-  // Per-proposal endpoints — public by design, called from /proposal/[slug]
-  /^\/api\/proposals\/[^/]+\/visit-slots$/,
-  /^\/api\/proposals\/[^/]+\/visit-request$/,
-  /^\/api\/proposals\/[^/]+\/select-date$/,
-  /^\/api\/proposals\/[^/]+\/menu-selection$/,
+  '/api/dossier/track-view',  // anonymous couple opens a dossier — RPC handles dedupe + self-view
+  '/api/dossier/unlock',      // password gate for private dossiers — anonymous by design
+  '/api/dossier/inquiries',   // public POST: couple submits inquiry from dossier landing
+  '/api/dossier/track-section', // public POST: section-level view tracking
+  // Per-dossier endpoints — public by design, called from /dossier/[slug]
+  /^\/api\/dossier\/[^/]+\/visit-slots$/,
+  /^\/api\/dossier\/[^/]+\/visit-request$/,
+  /^\/api\/dossier\/[^/]+\/select-date$/,
+  /^\/api\/dossier\/[^/]+\/menu-selection$/,
 ]
 
 const isPublicRoute = (pathname: string) =>

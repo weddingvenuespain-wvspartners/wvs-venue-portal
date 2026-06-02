@@ -16,7 +16,7 @@ import { ImageUploader } from './ImageUploader'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Checkbox } from '@/components/ui/checkbox'
-import { INCLUSION_ICON_CHOICES } from '@/app/proposal/[slug]/tpl/shared'
+import { INCLUSION_ICON_CHOICES } from '@/app/dossier/[slug]/tpl/shared'
 import { isSectionAllowed, getSectionLabel } from '@/lib/section-visibility'
 import { getLeadDateRanges } from '@/lib/lead-dates'
 import { DEFAULT_TEMPLATES } from '@/lib/proposal-starter-templates'
@@ -220,7 +220,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
           ? supabase.from('venue_settings').select('commercial_config, menu_catalog, space_groups').eq('user_id', user.id).eq('venue_id', activeVenue.id).limit(1)
           : supabase.from('venue_settings').select('commercial_config, menu_catalog, space_groups').eq('user_id', user.id).limit(1)),
         fetch('/api/estructura/modalities'),
-        fetch('/api/proposal-templates'),
+        fetch('/api/dossier-templates'),
       ])
       if (leadsData) setLeads(leadsData)
       if (tplData) setTemplates(tplData as ProposalTemplate[])
@@ -749,7 +749,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
   }
 
   const copyUrl = () => {
-    const url = `${window.location.origin}/proposal/${proposal.slug}`
+    const url = `${window.location.origin}/dossier/${proposal.slug}`
     navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -917,7 +917,7 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
             <button
               type="button"
-              onClick={() => confirmLeave(() => router.push('/proposals'))}
+              onClick={() => confirmLeave(() => router.push('/dossier'))}
               title="Volver a propuestas"
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4, display: 'inline-flex', alignItems: 'center', borderRadius: 6 }}
             >

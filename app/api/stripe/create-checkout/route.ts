@@ -185,8 +185,8 @@ export async function POST(req: NextRequest) {
           destination: stripeAccount.stripe_account_id,
         },
       },
-      success_url: `${origin}/presupuesto/${budget.slug}?paid=1&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/presupuesto/${budget.slug}`,
+      success_url: `${origin}/budget/${budget.slug}?paid=1&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/budget/${budget.slug}`,
       metadata: {
         type: 'budget_installment',
         budget_id: budget.id,

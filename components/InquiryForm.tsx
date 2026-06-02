@@ -82,7 +82,7 @@ export default function InquiryForm({
     setError(null); setLoading(true)
     try {
       const selectedLabel = visibleKinds.find(k => k.id === kind)?.label
-      const res = await fetch('/api/proposals/inquiries', {
+      const res = await fetch('/api/dossier/inquiries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

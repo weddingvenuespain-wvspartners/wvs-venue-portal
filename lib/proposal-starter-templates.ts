@@ -1,6 +1,6 @@
 // Plantillas por defecto: 5 estilos visuales (T1–T5) con datos ricos de ejemplo.
 // Sirven a la vez como:
-//   • Muestras estáticas en /proposals/templates (no se borran ni se modifican)
+//   • Muestras estáticas en /dossier/templates (no se borran ni se modifican)
 //   • Starter al crear una propuesta nueva (En blanco + 5 plantillas)
 // Comparten el mismo contenido (Finca Son Vell). Lo que cambia es el
 // visual_template_id y el branding (color_mode/primary/secondary/font).
@@ -17,6 +17,7 @@ export type DefaultTemplate = {
   name: string
   description: string
   icon: DefaultTemplateIcon
+  preview_url: string | null      // URL de ejemplo para abrir en nueva pestaña
   is_default: boolean             // primero de la lista (sólo uno) — al duplicar se marca is_default
   couple_name: string
   guest_count: number
@@ -165,10 +166,12 @@ const BASE_SECTIONS: SectionsData = {
   accommodation: {
     description: 'La finca dispone de 8 habitaciones renovadas con arte mallorquín contemporáneo.',
     rooms: '1 Suite Nupcial · 4 Suites dobles · 2 Habitaciones premium · 1 Habitación de cortesía',
+    rooms_list: ['1 Suite Nupcial', '4 Suites dobles', '2 Habitaciones premium', '1 Habitación de cortesía'],
     options: [
-      { label: 'Noche de bodas (pareja)', description: 'Suite Nupcial con desayuno en habitación.', included: true },
-      { label: 'Suite Nupcial individual', description: 'Noche extra pre o post boda.', prices: [{ season: 'Todo el año', price: '380 € / noche' }] },
-      { label: 'Habitación doble', prices: [{ season: 'Temporada baja', price: '220 € / noche' }, { season: 'Temporada alta', price: '320 € / noche' }] },
+      { label: 'Noche de bodas (pareja)', description: 'Suite Nupcial con desayuno en habitación.', included: true, max_qty: 1 },
+      { label: 'Suite Nupcial individual', description: 'Noche extra pre o post boda.', prices: [{ season: 'Todo el año', price: '380 € / noche' }], max_qty: 1 },
+      { label: 'Habitación doble', description: 'Habitación con baño privado y vistas al jardín.', prices: [{ season: 'Temporada baja', price: '220 € / noche' }, { season: 'Temporada alta', price: '320 € / noche' }], max_qty: 4 },
+      { label: 'Habitación premium', description: 'Habitación superior con terraza privada.', prices: [{ season: 'Temporada baja', price: '280 € / noche' }, { season: 'Temporada alta', price: '380 € / noche' }], max_qty: 2 },
     ],
     nearby: 'Hotel Son Brull (10 min), Castell Son Claret (15 min).',
   },
@@ -204,6 +207,7 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
     name: 'Impacto Directo',
     description: 'Dark luxury · precio visible · CTA al frente',
     icon: 'zap',
+    preview_url: '/dossier/templates/t1/preview',
     is_default: true,
     ...BASE_PROPOSAL,
     branding: { primary_color: '#C4975A', font_family: "'Cormorant Garamond', serif" },
@@ -214,6 +218,7 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
     name: 'Emoción Primero',
     description: 'Cream editorial · galería arriba · emotivo',
     icon: 'sparkles',
+    preview_url: '/dossier/templates/t2/preview',
     is_default: false,
     ...BASE_PROPOSAL,
     branding: { primary_color: '#8B6914', font_family: "'Cormorant Garamond', serif" },
@@ -224,6 +229,7 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
     name: 'Todo Claro',
     description: 'Sidebar + índice · estructurado',
     icon: 'clipboard-list',
+    preview_url: '/dossier/templates/t3/preview',
     is_default: false,
     ...BASE_PROPOSAL,
     branding: { primary_color: '#2D4A3A', font_family: "'Inter', sans-serif" },
@@ -234,6 +240,7 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
     name: 'Social Proof',
     description: 'Stats + testimonios · confianza',
     icon: 'message-circle',
+    preview_url: '/dossier/templates/t4/preview',
     is_default: false,
     ...BASE_PROPOSAL,
     branding: { primary_color: '#4A5C8A', font_family: "'Inter', sans-serif" },
@@ -244,6 +251,7 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
     name: 'Minimalista',
     description: 'Limpio · CTA muy prominente',
     icon: 'target',
+    preview_url: '/dossier/templates/t5/preview',
     is_default: false,
     ...BASE_PROPOSAL,
     branding: { primary_color: '#1A1A1A', font_family: "'Cormorant Garamond', serif" },

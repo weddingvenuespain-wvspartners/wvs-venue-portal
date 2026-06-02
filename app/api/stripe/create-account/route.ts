@@ -72,8 +72,8 @@ export async function POST(req: NextRequest) {
     // Create Account Link for onboarding
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: `${origin}/perfil?tab=facturacion&stripe=refresh`,
-      return_url: `${origin}/perfil?tab=facturacion&stripe=success`,
+      refresh_url: `${origin}/profile?tab=facturacion&stripe=refresh`,
+      return_url: `${origin}/profile?tab=facturacion&stripe=success`,
       type: 'account_onboarding',
     })
 

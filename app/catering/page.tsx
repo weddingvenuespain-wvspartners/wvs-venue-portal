@@ -137,9 +137,9 @@ export default function CateringDashboard() {
         {/* Quick links */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           {[
-            { href: '/catering/ficha',        label: 'Mi ficha',    sub: 'Actualiza tu perfil y menús' },
+            { href: '/catering/venue-profile', label: 'Mi ficha',    sub: 'Actualiza tu perfil y menús' },
             { href: '/catering/leads',         label: 'Solicitudes', sub: 'Gestiona tus peticiones' },
-            { href: '/catering/propuestas',    label: 'Propuestas',  sub: 'Crea propuestas digitales' },
+            { href: '/catering/proposals',     label: 'Propuestas',  sub: 'Crea propuestas digitales' },
           ].map(item => (
             <Link key={item.href} href={item.href} style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '18px 20px', background: '#fff', borderRadius: 12, textDecoration: 'none', boxShadow: '0 1px 8px rgba(0,0,0,0.05)', transition: 'box-shadow 0.15s' }}
               onMouseOver={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)')}

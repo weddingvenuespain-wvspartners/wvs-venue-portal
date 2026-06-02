@@ -15,7 +15,7 @@ import type {
   PaymentTemplate, PaymentTemplateRule, DossierResponse,
 } from '@/lib/budget-types'
 import { calcBudgetTotal, applyPaymentTemplate } from '@/lib/budget-types'
-import BudgetView from '@/app/presupuesto/[slug]/BudgetView'
+import BudgetView from '@/app/budget/[slug]/BudgetView'
 import ProposalDateModal from '@/components/ProposalDateModal'
 import DatePicker, { fmtDate } from '@/components/DatePicker'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -409,7 +409,7 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
 
   const copyUrl = () => {
     if (!budget) return
-    navigator.clipboard.writeText(`${window.location.origin}/presupuesto/${budget.slug}`)
+    navigator.clipboard.writeText(`${window.location.origin}/budget/${budget.slug}`)
     setLinkCopied(true)
     setTimeout(() => setLinkCopied(false), 2000)
   }
@@ -488,7 +488,7 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
               {linkCopied ? <><Check size={12} /> Copiado</> : <><Link2 size={12} /> URL</>}
             </button>
             <a
-              href={`/presupuesto/${budget.slug}?preview=1`}
+              href={`/budget/${budget.slug}?preview=1`}
               target="_blank"
               rel="noopener noreferrer"
               title="Abrir en nueva pestaña"

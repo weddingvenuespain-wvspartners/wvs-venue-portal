@@ -426,7 +426,7 @@ export default function CrmListPage() {
         )}
 
         {/* ── View tabs (Todos / Wedding Planners) ───────────────────── */}
-        <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '2px solid var(--border)' }}>
+        <div style={{ display: 'inline-flex', gap: 0, background: '#fff', borderRadius: '8px 8px 0 0', border: '1px solid var(--border)', borderBottom: '2px solid var(--border)', marginBottom: 16 }}>
           {([
             { key: 'todos' as ViewTab, label: 'Todos', icon: null as React.ReactNode, count: clients.length },
             { key: 'planners' as ViewTab, label: 'Wedding Planners', icon: <Crown size={14} /> as React.ReactNode, count: kpis.wps },
@@ -462,7 +462,7 @@ export default function CrmListPage() {
           {viewTab !== 'planners' && (
             <div style={{ width: 160 }}>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger><SelectValue placeholder="Todos los tipos" /></SelectTrigger>
+                <SelectTrigger style={{ background: '#fff' }}><SelectValue placeholder="Todos los tipos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los tipos</SelectItem>
                   {(Object.keys(CLIENT_TYPE_LABELS) as ClientType[]).map(t => (
@@ -474,7 +474,7 @@ export default function CrmListPage() {
           )}
           <div style={{ width: 200 }}>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as LeadStatusFilter)}>
-              <SelectTrigger><SelectValue placeholder="Todos los estados" /></SelectTrigger>
+              <SelectTrigger style={{ background: '#fff' }}><SelectValue placeholder="Todos los estados" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los estados</SelectItem>
                 <SelectItem value="active">Con lead activo</SelectItem>
@@ -486,7 +486,7 @@ export default function CrmListPage() {
           </div>
           <div style={{ width: 160 }}>
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-              <SelectTrigger>
+              <SelectTrigger style={{ background: '#fff' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <ArrowUpDown size={12} />
                   <SelectValue placeholder="Ordenar" />
@@ -560,7 +560,7 @@ export default function CrmListPage() {
                         </span>
                       )}
                     </div>
-                    <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#aaa' }}>
+                    <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--warm-gray)' }}>
                       {c.email && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{c.email}</span>}
                       {c.phone && <span>{c.phone}</span>}
                       {ll?.wedding_date && (
@@ -637,7 +637,7 @@ export default function CrmListPage() {
                   </div>
 
                   {/* Last contact date */}
-                  <span style={{ fontSize: 10, color: '#bbb', flexShrink: 0, minWidth: 68, textAlign: 'right' }}>
+                  <span style={{ fontSize: 10, color: 'var(--warm-gray)', flexShrink: 0, minWidth: 68, textAlign: 'right' }}>
                     {fmtDate(c.last_contact)}
                   </span>
 

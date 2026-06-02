@@ -47,7 +47,7 @@ export default function FeatureGate({ feature, title, description, icon: Icon = 
             </div>
             <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--espresso)', fontFamily: 'Inter, sans-serif', marginBottom: 10 }}>{title}</div>
             <div style={{ fontSize: 14, color: 'var(--warm-gray)', lineHeight: 1.6, marginBottom: 24 }}>{description}</div>
-            <a href="/perfil" style={{ display: 'inline-block', padding: '10px 24px', background: 'var(--gold)', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>
+            <a href="/profile" style={{ display: 'inline-block', padding: '10px 24px', background: 'var(--gold)', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>
               Actualizar plan →
             </a>
           </div>
