@@ -23,7 +23,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('proposal_content_templates')
-    .select('id, name, description, is_default, sections_data, created_at, updated_at')
+    .select('id, name, description, is_default, sections_data, commercial_config_id, lodging_config_id, created_at, updated_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const body = await req.json()
-  const { name, description, sections_data, is_default } = body
+  const { name, description, sections_data, is_default, commercial_config_id, lodging_config_id } = body
 
   if (!name?.trim()) return NextResponse.json({ error: 'El nombre es obligatorio' }, { status: 400 })
 
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('proposal_content_templates')
-    .insert({ user_id: user.id, name: name.trim(), description: description ?? null, sections_data: sections_data ?? {}, is_default: !!is_default })
+    .insert({ user_id: user.id, name: name.trim(), description: description ?? null, sections_data: sections_data ?? {}, is_default: !!is_default, commercial_config_id: commercial_config_id ?? null, lodging_config_id: lodging_config_id ?? null })
     .select()
     .single()
 

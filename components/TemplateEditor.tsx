@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef, Fragment } from 'react'
 import {
   ChevronLeft, ChevronDown, Check, Loader2, ChefHat, LayoutTemplate,
   X, Monitor, Smartphone, RefreshCcw, ExternalLink,
-  PanelLeftOpen, PanelLeftClose, Info, Palette, Image as ImageIcon,
+  PanelLeftOpen, PanelLeftClose, Info, Palette, Image as ImageIcon, SlidersHorizontal,
 } from 'lucide-react'
 import type { SectionsData, VenueSpaceGroup } from '@/lib/proposal-types'
 import { createClient } from '@/lib/supabase'
@@ -78,6 +78,8 @@ export type ContentTemplate = {
   description: string | null
   sections_data: SectionsData
   is_default: boolean
+  commercial_config_id?: string | null
+  lodging_config_id?: string | null
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -97,7 +99,8 @@ export default function TemplateEditor({
   const [description, setDescription] = useState(template.description ?? '')
   const [isDefault, setIsDefault]     = useState(template.is_default)
   const [sections, setSections]       = useState<SectionsData>(template.sections_data ?? {})
-  const [activeTab, setActiveTab]     = useState<'sections' | 'menus' | 'visual'>('sections')
+  const [activeTab, setActiveTab]     = useState<'ajustes' | 'sections' | 'menus' | 'visual'>('ajustes')
+  // Note: when has_catering becomes false, redirect from menus tab to sections (effect below)
   const [saving, setSaving]           = useState(false)
   const [saved, setSaved]             = useState(false)
   const [saveError, setSaveError]     = useState<string | null>(null)
@@ -123,12 +126,88 @@ export default function TemplateEditor({
     return 'style'
   })
 
+  // Commercial configs — for template association
+  type CCRow = { id: string; name: string; config: { space_type: string; price_model: string }; config_type?: 'space' | 'lodging'; is_default: boolean }
+  const [allConfigs, setAllConfigs] = useState<CCRow[]>([])
+  const commercialConfigs = allConfigs.filter(c => (c.config_type ?? 'space') === 'space')
+  const lodgingConfigs    = allConfigs.filter(c => c.config_type === 'lodging')
+  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(template.commercial_config_id ?? null)
+  // Re-sync when template prop changes (e.g., URL params arrive late from picker)
+  useEffect(() => {
+    if (template.commercial_config_id && template.commercial_config_id !== selectedConfigId) {
+      setSelectedConfigId(template.commercial_config_id)
+    }
+  }, [template.commercial_config_id]) // eslint-disable-line
+  const [selectedLodgingId, setSelectedLodgingId] = useState<string | null>(template.lodging_config_id ?? null)
+  // Preview of selected lodging config (room types + extras + price counts)
+  const [lodgingPreview, setLodgingPreview] = useState<{ rooms: any[]; extras: any[]; priceCount: number } | null>(null)
+  useEffect(() => {
+    if (!selectedLodgingId) { setLodgingPreview(null); return }
+    let cancelled = false
+    Promise.all([
+      fetch(`/api/estructura/room-types?commercial_config_id=${selectedLodgingId}`).then(r => r.ok ? r.json() : { room_types: [] }).catch(() => ({ room_types: [] })),
+      fetch(`/api/estructura/room-extras?commercial_config_id=${selectedLodgingId}`).then(r => r.ok ? r.json() : { extras: [] }).catch(() => ({ extras: [] })),
+    ]).then(([rts, exs]) => {
+      if (cancelled) return
+      const rooms = rts.room_types ?? []
+      const priceCount = rooms.reduce((s: number, r: any) => s + (r.prices?.length ?? 0), 0)
+      setLodgingPreview({ rooms, extras: exs.extras ?? [], priceCount })
+    })
+    return () => { cancelled = true }
+  }, [selectedLodgingId])
+  const [configDdOpen, setConfigDdOpen] = useState(false)
+  const [modalityDdOpen, setModalityDdOpen] = useState(false)
+  const [lodgingDdOpen, setLodgingDdOpen] = useState(false)
+  useEffect(() => {
+    if (!activeVenue) return
+    fetch(`/api/estructura/commercial-configs?venue_id=${activeVenue.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.configs) {
+          setAllConfigs(d.configs)
+          const spaceConfigs = d.configs.filter((c: CCRow) => (c.config_type ?? 'space') === 'space')
+          // If template doesn't have a config, auto-select the default space config
+          if (!selectedConfigId && spaceConfigs.length > 0) {
+            // No "default" concept — leave unselected, user must pick explicitly
+            const def = spaceConfigs[0]
+            setSelectedConfigId(def.id)
+          }
+        }
+      }).catch(() => {})
+  }, [activeVenue?.id]) // eslint-disable-line
+
   // Modalities — for wizard step + existing template editor
   const [modalities, setModalities] = useState<any[]>([])
+  const [allModalities, setAllModalities] = useState<any[]>([])
   useEffect(() => {
-    if (modalities.length > 0) return
-    fetch('/api/estructura/modalities').then(r => r.ok ? r.json() : null).then(d => { if (d?.modalities) setModalities(d.modalities) }).catch(() => {})
-  }, [modalities.length])
+    if (!activeVenue) return
+    fetch(`/api/estructura/modalities?venue_id=${activeVenue.id}`).then(r => r.ok ? r.json() : null).then(d => {
+      if (d?.modalities) {
+        setAllModalities(d.modalities)
+        // Filter by selected config
+        if (selectedConfigId) {
+          setModalities(d.modalities.filter((m: any) => m.commercial_config_id === selectedConfigId))
+        } else {
+          setModalities(d.modalities)
+        }
+      }
+    }).catch(() => {})
+  }, [activeVenue?.id]) // eslint-disable-line
+
+  // Re-filter modalities when config changes
+  useEffect(() => {
+    if (selectedConfigId) {
+      const filtered = allModalities.filter((m: any) => m.commercial_config_id === selectedConfigId)
+      setModalities(filtered)
+      // If current default_modality_id doesn't belong to selected config, clear it
+      const curMod = (sections as any).default_modality_id
+      if (curMod && !filtered.find((m: any) => m.id === curMod)) {
+        setSections(s => { const ns = { ...s }; delete (ns as any).default_modality_id; return ns })
+      }
+    } else {
+      setModalities(allModalities)
+    }
+  }, [selectedConfigId, allModalities])
 
   // Open/close section content cards
   const [openSecs, setOpenSecs] = useState<Set<string>>(new Set())
@@ -137,21 +216,64 @@ export default function TemplateEditor({
   // plus the multiple_independent zone picker
   const [commercialConfig, setCommercialConfig] = useState<{ space_type: string; price_model: string } | null>(null)
   const [venueSpaceGroups, setVenueSpaceGroups] = useState<VenueSpaceGroup[]>([])
+
+  // Load space_groups from venue_settings (these are shared across configs)
   useEffect(() => {
     if (!user || !activeVenue) return
     const supabase = createClient()
     ;(async () => {
       const { data: rows } = await supabase
         .from('venue_settings')
-        .select('commercial_config, space_groups')
+        .select('space_groups')
         .eq('user_id', user.id)
         .eq('venue_id', activeVenue.id)
         .limit(1)
       const data = Array.isArray(rows) ? rows[0] : null
-      if (data?.commercial_config) setCommercialConfig(data.commercial_config as any)
       if (Array.isArray(data?.space_groups)) setVenueSpaceGroups(data.space_groups as VenueSpaceGroup[])
     })()
   }, [user, activeVenue])
+
+  // Derive commercial config from selected config
+  useEffect(() => {
+    const cc = commercialConfigs.find(c => c.id === selectedConfigId)
+    if (cc) {
+      const cfg = cc.config
+      setCommercialConfig(cfg)
+      // Auto-set space section defaults based on commercial config
+      const spaceDefaults: Record<string, boolean> = {
+        single_space: cfg.space_type === 'single' || cfg.space_type === 'single_with_supplements',
+        zones:        cfg.space_type === 'single' || cfg.space_type === 'single_with_supplements',
+        space_groups: cfg.space_type === 'multiple_independent' || cfg.space_type === 'single_with_supplements',
+        venue_rental: cfg.price_model === 'rental' && cfg.space_type !== 'multiple_independent',
+      }
+      setSections(s => {
+        const se = s.sections_enabled ?? {}
+        const patch: Record<string, boolean> = {}
+        for (const [k, v] of Object.entries(spaceDefaults)) {
+          if (se[k] === undefined || se[k] !== v) patch[k] = v
+        }
+        if (Object.keys(patch).length === 0) return s
+        return { ...s, sections_enabled: { ...se, ...patch } }
+      })
+    } else if (!selectedConfigId) {
+      // Fallback: load from venue_settings (legacy)
+      if (!user || !activeVenue) return
+      const supabase = createClient()
+      ;(async () => {
+        const { data: rows } = await supabase
+          .from('venue_settings')
+          .select('commercial_config')
+          .eq('user_id', user.id)
+          .eq('venue_id', activeVenue.id)
+          .limit(1)
+        const data = Array.isArray(rows) ? rows[0] : null
+        if (data?.commercial_config) {
+          const cfg = data.commercial_config as { space_type: string; price_model: string }
+          setCommercialConfig(cfg)
+        }
+      })()
+    }
+  }, [selectedConfigId, commercialConfigs]) // eslint-disable-line
 
   // En modo borrador (id === 'new') el preview apunta a la muestra cuyo
   // visual_template_id coincide con el del borrador, para que el iframe inicial
@@ -235,6 +357,10 @@ export default function TemplateEditor({
   }
 
   const hasCatering = sections.has_catering !== false
+  // Auto-redirect from menus tab if catering disabled
+  useEffect(() => {
+    if (!hasCatering && activeTab === 'menus') setActiveTab('sections')
+  }, [hasCatering, activeTab])
 
   const getOverride = (key: string) => (sections as any)[key] as any[] ?? []
   const setOverride = (key: string, val: any) => { setSections((s: any) => ({ ...s, [key]: val })); markDirty() }
@@ -278,6 +404,8 @@ export default function TemplateEditor({
   // PATCH normal sobre la fila existente.
   const handleSave = async () => {
     if (!name.trim()) { setSaveError('El nombre es obligatorio'); return }
+    if (!selectedConfigId) { setSaveError('Debes asignar una configuración comercial a la plantilla'); return }
+    if (!(sections as any).default_modality_id) { setSaveError('Debes asignar una modalidad por defecto a la plantilla'); return }
     setSaving(true); setSaveError(null)
     try {
       const isDraft = template.id === 'new'
@@ -286,7 +414,7 @@ export default function TemplateEditor({
         {
           method: isDraft ? 'POST' : 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), description: description || null, sections_data: sections, is_default: isDefault }),
+          body: JSON.stringify({ name: name.trim(), description: description || null, sections_data: sections, is_default: isDefault, commercial_config_id: selectedConfigId ?? null, lodging_config_id: selectedLodgingId ?? null }),
         }
       )
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error al guardar') }
@@ -1772,12 +1900,13 @@ export default function TemplateEditor({
 
           {/* Tabs + expand toggle */}
           <div style={{ display: 'flex', borderBottom: '2px solid var(--ivory)', flexShrink: 0, alignItems: 'center' }}>
-            {([
+            {(([
+              { id: 'ajustes',  label: 'Ajustes',   icon: <SlidersHorizontal size={12} /> },
               { id: 'sections', label: 'Secciones', icon: <LayoutTemplate size={12} /> },
-              { id: 'visual',   label: 'Visual',     icon: <Palette size={12} /> },
-              { id: 'menus',    label: 'Menús',      icon: <ChefHat size={12} /> },
-            ] as const).map(tab => (
-              <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
+              { id: 'visual',   label: 'Visual',    icon: <Palette size={12} /> },
+              ...(hasCatering ? [{ id: 'menus', label: 'Menús', icon: <ChefHat size={12} /> }] : []),
+            ]) as const).map(tab => (
+              <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id as any)}
                 style={{
                   flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                   padding: '11px 8px', background: 'none', border: 'none', cursor: 'pointer',
@@ -1803,54 +1932,229 @@ export default function TemplateEditor({
           {/* Sidebar content */}
           <div style={{ flex: 1, overflowY: 'auto' }}>
 
+            {/* ── AJUSTES tab — config comercial + modalidad + alojamiento + catering ── */}
+            {activeTab === 'ajustes' && (
+              <div style={{ padding: '16px 16px 32px' }}>
+                <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5, marginBottom: 14, padding: '10px 12px', background: 'var(--cream)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  Estos ajustes definen qué <strong>configuración comercial</strong>, <strong>modalidad</strong> y <strong>alojamiento</strong> usa esta plantilla. Se aplicarán automáticamente al crear un dossier desde ella.
+                </div>
+                {(() => {
+                  const activeCc = commercialConfigs.find(c => c.id === selectedConfigId)
+                  const selectedMod = modalities.find((m: any) => m.id === (sections as any).default_modality_id)
+                  return (
+                    <div style={{ background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                      {/* Config dropdown */}
+                      {commercialConfigs.length > 1 && (
+                        <div>
+                          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 5 }}>Config. comercial</div>
+                          <div style={{ position: 'relative' }}>
+                            <button type="button" onClick={() => { setConfigDdOpen(v => !v); setModalityDdOpen(false) }}
+                              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'border-color .15s' }}
+                              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)' }}
+                              onMouseLeave={e => { if (!configDdOpen) e.currentTarget.style.borderColor = 'var(--border)' }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeCc?.name ?? 'Selecciona…'}</span>
+                                </div>
+                                {activeCc && (
+                                  <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 1 }}>
+                                    {{ single: 'Único', single_with_supplements: 'Base+zonas', multiple_independent: 'Grupos' }[activeCc.config.space_type] ?? ''} · {{ rental: 'Alquiler', per_person: 'Por persona', package: 'Paquetes' }[activeCc.config.price_model] ?? ''}
+                                  </div>
+                                )}
+                              </div>
+                              <ChevronDown size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0, transform: configDdOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+                            </button>
+                            {configDdOpen && (
+                              <>
+                                <div onClick={() => setConfigDdOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 21, maxHeight: 260, overflowY: 'auto', padding: 4 }}>
+                                  {commercialConfigs.map(cc => {
+                                    const sel = cc.id === selectedConfigId
+                                    return (
+                                      <button key={cc.id} type="button" onClick={() => { setSelectedConfigId(cc.id); markDirty(); setConfigDdOpen(false) }}
+                                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', border: 'none', borderRadius: 6, background: sel ? 'rgba(74,107,82,0.08)' : 'transparent', cursor: 'pointer', textAlign: 'left', transition: 'background .1s' }}
+                                        onMouseEnter={e => { if (!sel) e.currentTarget.style.background = 'var(--cream)' }}
+                                        onMouseLeave={e => { if (!sel) e.currentTarget.style.background = 'transparent' }}>
+                                        <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${sel ? 'var(--gold)' : '#ccc'}`, background: sel ? 'var(--gold)' : 'transparent', flexShrink: 0 }} />
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cc.name}</div>
+                                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+                                            {{ single: 'Único', single_with_supplements: 'Base+zonas', multiple_independent: 'Grupos' }[cc.config.space_type] ?? ''} · {{ rental: 'Alquiler', per_person: 'Por persona', package: 'Paquetes' }[cc.config.price_model] ?? ''}
+                                          </div>
+                                        </div>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Modality dropdown */}
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 5 }}>Modalidad por defecto</div>
+                        <div style={{ position: 'relative' }}>
+                          <button type="button" onClick={() => { setModalityDdOpen(v => !v); setConfigDdOpen(false) }}
+                            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'border-color .15s' }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)' }}
+                            onMouseLeave={e => { if (!modalityDdOpen) e.currentTarget.style.borderColor = 'var(--border)' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <span style={{ fontSize: 12, fontWeight: selectedMod ? 600 : 400, color: selectedMod ? 'var(--charcoal)' : 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                                {selectedMod?.name ?? 'Sin modalidad'}
+                              </span>
+                              {selectedMod?.duration_label && <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 1 }}>{selectedMod.duration_label}</div>}
+                            </div>
+                            <ChevronDown size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0, transform: modalityDdOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+                          </button>
+                          {modalityDdOpen && (
+                            <>
+                              <div onClick={() => setModalityDdOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+                              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 21, maxHeight: 260, overflowY: 'auto', padding: 4 }}>
+                                {/* No modality option */}
+                                <button type="button" onClick={() => { setSections(s => ({ ...s, default_modality_id: undefined } as any)); markDirty(); setModalityDdOpen(false) }}
+                                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', border: 'none', borderRadius: 6, background: !(sections as any).default_modality_id ? 'rgba(74,107,82,0.08)' : 'transparent', cursor: 'pointer', textAlign: 'left', transition: 'background .1s' }}
+                                  onMouseEnter={e => { if ((sections as any).default_modality_id) e.currentTarget.style.background = 'var(--cream)' }}
+                                  onMouseLeave={e => { if ((sections as any).default_modality_id) e.currentTarget.style.background = 'transparent' }}>
+                                  <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${!(sections as any).default_modality_id ? 'var(--gold)' : '#ccc'}`, background: !(sections as any).default_modality_id ? 'var(--gold)' : 'transparent', flexShrink: 0 }} />
+                                  <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin modalidad</span>
+                                </button>
+                                {modalities.map((m: any) => {
+                                  const sel = (sections as any).default_modality_id === m.id
+                                  return (
+                                    <button key={m.id} type="button" onClick={() => { setSections(s => ({ ...s, default_modality_id: m.id } as any)); markDirty(); setModalityDdOpen(false) }}
+                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', border: 'none', borderRadius: 6, background: sel ? 'rgba(74,107,82,0.08)' : 'transparent', cursor: 'pointer', textAlign: 'left', transition: 'background .1s' }}
+                                      onMouseEnter={e => { if (!sel) e.currentTarget.style.background = 'var(--cream)' }}
+                                      onMouseLeave={e => { if (!sel) e.currentTarget.style.background = 'transparent' }}>
+                                      <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${sel ? 'var(--gold)' : '#ccc'}`, background: sel ? 'var(--gold)' : 'transparent', flexShrink: 0 }} />
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{m.name}</div>
+                                        {m.duration_label && <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>{m.duration_label}</div>}
+                                      </div>
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Lodging dropdown */}
+                      {lodgingConfigs.length > 0 && (() => {
+                        const activeLodging = lodgingConfigs.find(c => c.id === selectedLodgingId)
+                        return (
+                          <div style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 5 }}>Alojamiento</div>
+                            <div style={{ position: 'relative' }}>
+                              <button type="button" onClick={() => { setLodgingDdOpen(v => !v); setConfigDdOpen(false); setModalityDdOpen(false) }}
+                                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'border-color .15s' }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)' }}
+                                onMouseLeave={e => { if (!lodgingDdOpen) e.currentTarget.style.borderColor = 'var(--border)' }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <span style={{ fontSize: 12, fontWeight: activeLodging ? 600 : 400, color: activeLodging ? 'var(--charcoal)' : 'var(--warm-gray)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                                    {activeLodging?.name ?? 'Sin alojamiento'}
+                                  </span>
+                                </div>
+                                <ChevronDown size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0, transform: lodgingDdOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+                              </button>
+                              {lodgingDdOpen && (
+                                <>
+                                  <div onClick={() => setLodgingDdOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+                                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 21, maxHeight: 260, overflowY: 'auto', padding: 4 }}>
+                                    <button type="button" onClick={() => { setSelectedLodgingId(null); markDirty(); setLodgingDdOpen(false) }}
+                                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', border: 'none', borderRadius: 6, background: !selectedLodgingId ? 'rgba(74,107,82,0.08)' : 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+                                      <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${!selectedLodgingId ? 'var(--gold)' : '#ccc'}`, background: !selectedLodgingId ? 'var(--gold)' : 'transparent', flexShrink: 0 }} />
+                                      <span style={{ fontSize: 12, color: 'var(--warm-gray)', fontStyle: 'italic' }}>Sin alojamiento</span>
+                                    </button>
+                                    {lodgingConfigs.map(lc => {
+                                      const sel = lc.id === selectedLodgingId
+                                      return (
+                                        <button key={lc.id} type="button" onClick={() => { setSelectedLodgingId(lc.id); markDirty(); setLodgingDdOpen(false) }}
+                                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', border: 'none', borderRadius: 6, background: sel ? 'rgba(74,107,82,0.08)' : 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+                                          <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${sel ? 'var(--gold)' : '#ccc'}`, background: sel ? 'var(--gold)' : 'transparent', flexShrink: 0 }} />
+                                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lc.name}</span>
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Lodging preview — habitaciones + tarifas + extras vinculados */}
+                            {selectedLodgingId && lodgingPreview && (
+                              <div style={{ marginTop: 8, background: '#fff', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                                {/* Stats row */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid var(--border)' }}>
+                                  <div style={{ padding: '8px 6px', textAlign: 'center', borderRight: '1px solid var(--border)' }}>
+                                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)' }}>{lodgingPreview.rooms.length}</div>
+                                    <div style={{ fontSize: 9, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 1 }}>tipos</div>
+                                  </div>
+                                  <div style={{ padding: '8px 6px', textAlign: 'center', borderRight: '1px solid var(--border)' }}>
+                                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)' }}>{lodgingPreview.priceCount}</div>
+                                    <div style={{ fontSize: 9, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 1 }}>tarifas</div>
+                                  </div>
+                                  <div style={{ padding: '8px 6px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)' }}>{lodgingPreview.extras.length}</div>
+                                    <div style={{ fontSize: 9, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 1 }}>extras</div>
+                                  </div>
+                                </div>
+                                {/* Room types list (mini) */}
+                                {lodgingPreview.rooms.length > 0 ? (
+                                  <div style={{ padding: '8px 10px', maxHeight: 180, overflowY: 'auto' }}>
+                                    {lodgingPreview.rooms.map((rt: any) => {
+                                      const pricesCount = rt.prices?.length ?? 0
+                                      const minPrice = pricesCount > 0 ? Math.min(...rt.prices.map((p: any) => p.price_per_night)) : null
+                                      return (
+                                        <div key={rt.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px dashed var(--border)' }}>
+                                          <div style={{ width: 22, height: 22, borderRadius: 5, background: 'rgba(74,107,82,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11 }}>🛏️</div>
+                                          <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--charcoal)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rt.name}</div>
+                                            <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+                                              {rt.total_quantity} disponibles · {rt.capacity_persons} pax
+                                              {minPrice != null && <> · desde <strong style={{ color: 'var(--charcoal)' }}>{minPrice}€/noche</strong></>}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div style={{ padding: '12px 10px', fontSize: 11, color: 'var(--warm-gray)', textAlign: 'center' }}>
+                                    Esta config aún no tiene habitaciones creadas
+                                  </div>
+                                )}
+                                {/* Link to edit */}
+                                <a href="/venue-settings" target="_blank" rel="noopener noreferrer"
+                                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '7px 10px', background: 'var(--cream)', borderTop: '1px solid var(--border)', fontSize: 11, color: 'var(--gold)', textDecoration: 'none', fontWeight: 600 }}>
+                                  Editar tarifas y inventario <ExternalLink size={11} />
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+
+                      {/* Catering toggle — compact */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--charcoal)' }}>Menús y catering</div>
+                          <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Habilita pestaña Menús</div>
+                        </div>
+                        <Toggle value={hasCatering} onChange={v => { setSections(s => ({ ...s, has_catering: v })); markDirty() }} />
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
+
             {/* ── SECCIONES tab ─────────────────────────────────────────────── */}
             {activeTab === 'sections' && (
               <div style={{ padding: '16px 16px 32px' }}>
-
-                {/* Catering toggle */}
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Tipo</div>
-                <div style={{ background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 18 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Incluye menús y catering</div>
-                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>Habilita la pestaña Menús</div>
-                    </div>
-                    <Toggle value={hasCatering} onChange={v => { setSections(s => ({ ...s, has_catering: v })); markDirty() }} />
-                  </div>
-                </div>
-
-                {/* Modality selector */}
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Modalidad por defecto</div>
-                <div style={{ background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 18 }}>
-                  {modalities.length === 0 ? (
-                    <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Sin modalidades configuradas</div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {modalities.map((m: any) => {
-                        const selected = (sections as any).default_modality_id === m.id
-                        return (
-                          <button key={m.id} type="button"
-                            onClick={() => { setSections(s => ({ ...s, default_modality_id: selected ? undefined : m.id } as any)); markDirty() }}
-                            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, border: `1.5px solid ${selected ? 'var(--gold)' : 'var(--border)'}`, background: selected ? 'rgba(196,151,90,0.08)' : '#fff', cursor: 'pointer', textAlign: 'left' }}>
-                            <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${selected ? 'var(--gold)' : 'var(--border)'}`, background: selected ? 'var(--gold)' : 'transparent', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {selected && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{m.name}</div>
-                              {m.duration_label && <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>{m.duration_label}</div>}
-                            </div>
-                          </button>
-                        )
-                      })}
-                      {(sections as any).default_modality_id && (
-                        <button type="button" onClick={() => { setSections(s => ({ ...s, default_modality_id: undefined } as any)); markDirty() }}
-                          style={{ fontSize: 11, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', textAlign: 'left' }}>
-                          × Quitar modalidad por defecto
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
 
                 {/* Section list — each row has toggle + label + expand */}
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Secciones de la propuesta</div>

@@ -706,7 +706,7 @@ const sliderCard: React.CSSProperties = isMobile ? { minWidth: 240, maxWidth: 24
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 clamp(20px,5vw,60px)' }}>
 
           {/* Section heading */}
-          <div style={{ textAlign: 'center', marginBottom: pricingBlock ? 40 : 64 }}>
+          <div style={{ textAlign: 'center', marginBottom: pricingBlock ? 24 : 64 }}>
             <span style={{ fontSize: '.63rem', fontWeight: 700, letterSpacing: '.22em', textTransform: 'uppercase', color: primary, display: 'block', marginBottom: 12 }}>
               Vuestros espacios
             </span>
@@ -717,7 +717,7 @@ const sliderCard: React.CSSProperties = isMobile ? { minWidth: 240, maxWidth: 24
 
           {/* Pricing / date block injected by parent */}
           {pricingBlock && (
-            <div style={{ marginBottom: 48 }}>
+            <div style={{ marginBottom: 32 }}>
               {pricingBlock}
             </div>
           )}

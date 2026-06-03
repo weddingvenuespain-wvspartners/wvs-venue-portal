@@ -27,6 +27,7 @@ function NewTemplateContent() {
 
   const cateringParam = searchParams.get('catering')
   const modalityIdParam = searchParams.get('modality_id')
+  const configIdParam   = searchParams.get('config_id')
 
   const draftTemplate = useMemo<ContentTemplate>(() => {
     const base = (() => {
@@ -44,8 +45,9 @@ function NewTemplateContent() {
     return {
       ...base,
       sections_data: { ...base.sections_data, ...extraSd },
+      commercial_config_id: configIdParam ?? null,
     }
-  }, [fromId, cateringParam, modalityIdParam])
+  }, [fromId, cateringParam, modalityIdParam, configIdParam])
 
   return (
     <TemplateEditor

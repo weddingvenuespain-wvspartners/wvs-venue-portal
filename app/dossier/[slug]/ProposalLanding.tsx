@@ -10,6 +10,8 @@ import T2Emocion     from './tpl/T2Emocion'
 import T3TodoClaro   from './tpl/T3TodoClaro'
 import T4SocialProof from './tpl/T4SocialProof'
 import T5Minimalista from './tpl/T5Minimalista'
+import T6Alojamiento from './tpl/T6Alojamiento'
+import LodgingSection from './LodgingSection'
 import { applyCommissionToProposalData } from '@/lib/proposal-commission'
 
 export type PreviewMessage = {
@@ -140,6 +142,7 @@ export default function ProposalLanding({ data, preview }: { data: ProposalData;
       case 3:  return <T3TodoClaro   data={withPlaceholders} />
       case 4:  return <T4SocialProof data={withPlaceholders} />
       case 5:  return <T5Minimalista data={withPlaceholders} />
+      case 6:  return <T6Alojamiento data={withPlaceholders} />
       case 1:
       default: return <T1Impacto     data={withPlaceholders} />
     }
@@ -190,10 +193,15 @@ export default function ProposalLanding({ data, preview }: { data: ProposalData;
   }
   if (secOverride) cssParts.push(`:root{--tpl-secondary:${secOverride}}`)
 
+  const lodging = (effective as any).lodging
+
   return (
     <>
       {cssParts.length > 0 && <style dangerouslySetInnerHTML={{ __html: cssParts.join('\n') }} />}
       {tpl}
+      {templateId !== 6 && lodging && lodging.room_types && lodging.room_types.length > 0 && (
+        <LodgingSection data={lodging} proposalId={effective.id} isPreview={preview} />
+      )}
     </>
   )
 }

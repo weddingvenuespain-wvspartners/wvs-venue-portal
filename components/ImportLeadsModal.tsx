@@ -1,8 +1,9 @@
 'use client'
 import { useState, useRef, useCallback } from 'react'
-import { X, Download, Upload, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet, Loader2 } from 'lucide-react'
+import { X, Download, Upload, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet, Loader2, Users } from 'lucide-react'
 // xlsx imported dynamically to avoid SSR issues
 import { createClient } from '@/lib/supabase'
+import { findOrCreateClient } from '@/lib/clients'
 
 // ── Status mapping ──────────────────────────────────────────────────────────
 const STATUS_MAP: Record<string, string> = {
@@ -48,6 +49,24 @@ const BUDGET_MAP: Record<string, string> = {
   'más de 40.000':       'mas_40k',
 }
 
+const SOURCE_MAP: Record<string, string> = {
+  'web':                'website',
+  'website':            'website',
+  'bodas.net':          'bodas_net',
+  'bodas net':          'bodas_net',
+  'bodasnet':           'bodas_net',
+  'instagram':          'instagram',
+  'facebook':           'facebook',
+  'google':             'google',
+  'recomendación':      'referral',
+  'recomendacion':      'referral',
+  'referral':           'referral',
+  'wedding planner':    'wedding_planner',
+  'feria':              'feria',
+  'otro':               'other',
+  'other':              'other',
+}
+
 // ── Column mapping (Excel header → DB field) ────────────────────────────────
 const COL_MAP: Record<string, string> = {
   'nombre':         'name',
@@ -67,6 +86,9 @@ const COL_MAP: Record<string, string> = {
   'ceremonia':      'ceremony_type',
   'idioma':         'language',
   'presupuesto':    'budget',
+  'fuente':         'source',
+  'source':         'source',
+  'origen':         'source',
   'fecha visita':   'visit_date',
   'hora visita':    'visit_time',
   'notas':          'notes',
@@ -97,6 +119,11 @@ function parseDate(raw: any): string | null {
   return null
 }
 
+// Normalize phone: strip spaces, dashes — keep + and digits
+function normalizePhone(raw: string): string {
+  return raw.replace(/[\s\-().]/g, '')
+}
+
 // ── Types ───────────────────────────────────────────────────────────────────
 type ParsedRow = {
   rowNum: number
@@ -105,6 +132,7 @@ type ParsedRow = {
   message: string
   dbStatus: string
   duplicate?: boolean
+  matchType?: 'email' | 'phone'  // how we detected duplicate
   existingLeadId?: string
 }
 
@@ -114,6 +142,7 @@ type Props = {
   userId: string
   venueId: string
   existingEmails: Set<string>
+  existingPhones?: Set<string>
   onImported: () => void
 }
 
@@ -123,14 +152,14 @@ async function downloadTemplate() {
   const headers = [
     'Nombre pareja', 'Email', 'Teléfono', 'WhatsApp', 'País',
     'Fecha boda', 'Invitados', 'Adultos', 'Niños',
-    'Estado', 'Ceremonia', 'Idioma', 'Presupuesto',
+    'Estado', 'Ceremonia', 'Idioma', 'Presupuesto', 'Fuente',
     'Fecha visita', 'Hora visita', 'Notas',
   ]
 
   const example = [
     'María y Carlos', 'maria@email.com', '+34612345678', '+34612345678', 'España',
     '15/06/2027', '150', '120', '30',
-    'Nuevo', 'Civil', 'Español', '20.000–40.000 €',
+    'Nuevo', 'Civil', 'Español', '20.000–40.000 €', 'Instagram',
     '', '', 'Quieren ceremonia en el jardín',
   ]
 
@@ -138,23 +167,15 @@ async function downloadTemplate() {
 
   // Sheet 1: Plantilla
   const ws = XLSX.utils.aoa_to_sheet([headers, example])
-
-  // Column widths
   ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 4, 18) }))
-
-  // Data validation (dropdowns) for Estado (col J=9), Ceremonia (col K=10), Presupuesto (col M=12)
-  // SheetJS community edition doesn't support data validation natively,
-  // so we add them as comments/notes + instruction sheet explains values
-  ws['!dataValidations'] = ws['!dataValidations'] || []
-
   XLSX.utils.book_append_sheet(wb, ws, 'Plantilla')
 
   // Sheet 2: Instrucciones
   const instrucciones = [
     ['Columna', 'Descripción', 'Valores válidos', 'Obligatorio'],
     ['Nombre pareja', 'Nombre de la pareja', 'Texto libre', 'Sí'],
-    ['Email', 'Correo electrónico de contacto', 'email@ejemplo.com', 'No'],
-    ['Teléfono', 'Número de teléfono', '+34612345678', 'No'],
+    ['Email', 'Correo electrónico de contacto', 'email@ejemplo.com', 'No (recomendado)'],
+    ['Teléfono', 'Número de teléfono', '+34612345678', 'No (recomendado)'],
     ['WhatsApp', 'Número de WhatsApp (si diferente)', '+34612345678', 'No'],
     ['País', 'País de origen de la pareja', 'Texto libre (ej: España, UK, USA)', 'No'],
     ['Fecha boda', 'Fecha de la boda', 'DD/MM/YYYY o YYYY-MM-DD', 'No'],
@@ -179,29 +200,32 @@ async function downloadTemplate() {
     ['', '', '10.000–20.000 €', ''],
     ['', '', '20.000–40.000 €', ''],
     ['', '', '> 40.000 €', ''],
+    ['Fuente', 'De dónde vino el lead', '', 'No'],
+    ['', '', 'Web, Bodas.net, Instagram, Facebook, Google', ''],
+    ['', '', 'Recomendación, Wedding Planner, Feria, Otro', ''],
     ['Fecha visita', 'Fecha de visita al venue (si aplica)', 'DD/MM/YYYY o YYYY-MM-DD', 'No'],
     ['Hora visita', 'Hora de la visita', 'HH:MM (ej: 11:00)', 'No'],
     ['Notas', 'Notas internas sobre el lead', 'Texto libre', 'No'],
   ]
 
   const ws2 = XLSX.utils.aoa_to_sheet(instrucciones)
-  ws2['!cols'] = [{ wch: 18 }, { wch: 40 }, { wch: 50 }, { wch: 14 }]
+  ws2['!cols'] = [{ wch: 18 }, { wch: 40 }, { wch: 50 }, { wch: 20 }]
   XLSX.utils.book_append_sheet(wb, ws2, 'Instrucciones')
 
   XLSX.writeFile(wb, 'plantilla-leads-wvs.xlsx')
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
-export default function ImportLeadsModal({ open, onClose, userId, venueId, existingEmails, onImported }: Props) {
+export default function ImportLeadsModal({ open, onClose, userId, venueId, existingEmails, existingPhones, onImported }: Props) {
   const [step, setStep] = useState<'upload' | 'preview' | 'importing' | 'done'>('upload')
   const [rows, setRows] = useState<ParsedRow[]>([])
   const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<{ created: number; updated: number; skipped: number; calendarCreated: number }>({ created: 0, updated: 0, skipped: 0, calendarCreated: 0 })
+  const [importResult, setImportResult] = useState<{ created: number; updated: number; skipped: number; calendarCreated: number; clientsLinked: number }>({ created: 0, updated: 0, skipped: 0, calendarCreated: 0, clientsLinked: 0 })
   const [duplicateAction, setDuplicateAction] = useState<'skip' | 'update'>('skip')
   const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const reset = () => { setStep('upload'); setRows([]); setImporting(false); setImportResult({ created: 0, updated: 0, skipped: 0, calendarCreated: 0 }) }
+  const reset = () => { setStep('upload'); setRows([]); setImporting(false); setImportResult({ created: 0, updated: 0, skipped: 0, calendarCreated: 0, clientsLinked: 0 }) }
 
   const parseFile = useCallback((file: File) => {
     const reader = new FileReader()
@@ -231,6 +255,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
           const get = (field: string) => colIdx[field] !== undefined ? cells[colIdx[field]] : undefined
           const name = String(get('name') || '').trim()
           const email = String(get('email') || '').trim().toLowerCase()
+          const phone = get('phone') ? normalizePhone(String(get('phone')).trim()) : ''
 
           if (!name) {
             parsed.push({ rowNum: r + 1, data: {}, status: 'error', message: 'Sin nombre — se ignorará', dbStatus: 'new' })
@@ -244,19 +269,25 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
           const rawCeremony = String(get('ceremony_type') || '').trim().toLowerCase()
           const dbCeremony = CEREMONY_MAP[rawCeremony] || (rawCeremony || undefined)
           const rawBudget = String(get('budget') || '').trim().toLowerCase()
-          const dbBudget = BUDGET_MAP[rawBudget] || Object.values(BUDGET_MAP).includes(rawBudget) ? rawBudget : undefined
+          const dbBudget = BUDGET_MAP[rawBudget] || (Object.values(BUDGET_MAP).includes(rawBudget) ? rawBudget : undefined)
+          const rawSource = String(get('source') || '').trim().toLowerCase()
+          const dbSource = SOURCE_MAP[rawSource] || (rawSource || undefined)
 
           const guests = get('guests') ? parseInt(String(get('guests')), 10) : undefined
           const guestsAdults = get('guests_adults') ? parseInt(String(get('guests_adults')), 10) : undefined
           const guestsChildren = get('guests_children') ? parseInt(String(get('guests_children')), 10) : undefined
 
-          const isDuplicate = !!email && existingEmails.has(email)
+          // Duplicate detection: email OR phone
+          const emailDup = !!email && existingEmails.has(email)
+          const phoneDup = !!phone && existingPhones?.has(phone)
+          const isDuplicate = emailDup || !!phoneDup
+          const matchType = emailDup ? 'email' as const : phoneDup ? 'phone' as const : undefined
 
           const rowData: Record<string, any> = {
             name,
             email: email || undefined,
-            phone: get('phone') ? String(get('phone')).trim() : undefined,
-            whatsapp: get('whatsapp') ? String(get('whatsapp')).trim() : undefined,
+            phone: phone || undefined,
+            whatsapp: get('whatsapp') ? normalizePhone(String(get('whatsapp')).trim()) : undefined,
             country: get('country') ? String(get('country')).trim() : undefined,
             wedding_date: weddingDate || undefined,
             guests: isNaN(guests!) ? undefined : guests,
@@ -266,6 +297,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
             ceremony_type: dbCeremony,
             language: get('language') ? String(get('language')).trim() : undefined,
             budget: dbBudget,
+            source: dbSource,
             visit_date: visitDate || undefined,
             visit_time: get('visit_time') ? String(get('visit_time')).trim() : undefined,
             notes: get('notes') ? String(get('notes')).trim() : undefined,
@@ -274,18 +306,23 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
           // Clean undefined
           Object.keys(rowData).forEach(k => { if (rowData[k] === undefined) delete rowData[k] })
 
-          const calendarNote = dbStatus === 'won' && weddingDate ? ' → creará reserva en calendario' :
-            (dbStatus === 'proposal_sent' || dbStatus === 'budget_sent') && weddingDate ? ' → creará negociación en calendario' : ''
+          const calendarNote = dbStatus === 'won' && weddingDate ? ' · reserva en calendario' :
+            (dbStatus === 'proposal_sent' || dbStatus === 'budget_sent') && weddingDate ? ' · negociación en calendario' : ''
+
+          const dupMsg = matchType === 'phone'
+            ? `Teléfono "${phone}" ya existe`
+            : `Email "${email}" ya existe`
 
           parsed.push({
             rowNum: r + 1,
             data: rowData,
             status: isDuplicate ? 'warning' : 'ok',
             message: isDuplicate
-              ? `Email "${email}" ya existe` + calendarNote
+              ? dupMsg + calendarNote
               : (name + calendarNote),
             dbStatus,
             duplicate: isDuplicate,
+            matchType,
           })
         }
 
@@ -297,7 +334,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
       }
     }
     reader.readAsArrayBuffer(file)
-  }, [existingEmails])
+  }, [existingEmails, existingPhones])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragOver(false)
@@ -315,7 +352,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
     setImporting(true)
     setStep('importing')
     const supabase = createClient()
-    let created = 0, updated = 0, skipped = 0, calendarCreated = 0
+    let created = 0, updated = 0, skipped = 0, calendarCreated = 0, clientsLinked = 0
 
     for (const row of rows) {
       if (row.status === 'error') { skipped++; continue }
@@ -327,42 +364,65 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
         venue_id: venueId,
       }
 
-      // Remove status from payload for insert — we set it separately
+      // Remove status + source from payload — set separately
       const status = payload.status || 'new'
+      const source = payload.source || null
       delete payload.status
+
+      // ── Auto-link to client/contact ──
+      let clientId: string | null = null
+      try {
+        clientId = await findOrCreateClient(venueId, {
+          name: row.data.name || '',
+          email: row.data.email || null,
+          phone: row.data.phone || null,
+          whatsapp: row.data.whatsapp || null,
+          language: row.data.language || null,
+          country: row.data.country || null,
+        })
+        if (clientId) clientsLinked++
+      } catch (err) {
+        console.error('Client link error:', err)
+      }
 
       let leadId: string | null = null
 
       if (row.duplicate && duplicateAction === 'update') {
-        // Find and update existing lead
-        const { data: existing } = await supabase
-          .from('leads')
-          .select('id')
-          .eq('venue_id', venueId)
-          .eq('email', row.data.email)
-          .single()
+        // Find existing lead by email or phone
+        let existing: { id: string } | null = null
+        if (row.matchType === 'email' && row.data.email) {
+          const { data } = await supabase
+            .from('leads').select('id').eq('venue_id', venueId).eq('email', row.data.email).limit(1).single()
+          existing = data
+        } else if (row.matchType === 'phone' && row.data.phone) {
+          const { data } = await supabase
+            .from('leads').select('id').eq('venue_id', venueId).eq('phone', row.data.phone).limit(1).single()
+          existing = data
+        }
 
         if (existing) {
-          const { error } = await supabase
-            .from('leads')
-            .update({ ...payload, status })
-            .eq('id', existing.id)
+          const updatePayload: any = { ...payload, status }
+          if (source) updatePayload.source = source
+          if (clientId) updatePayload.client_id = clientId
+          const { error } = await supabase.from('leads').update(updatePayload).eq('id', existing.id)
           if (!error) { updated++; leadId = existing.id }
           else { skipped++; continue }
+        } else {
+          skipped++; continue
         }
       } else {
         // Insert new lead
-        const insertPayload = {
+        const insertPayload: any = {
           ...payload,
           status,
           original_date_flexibility: 'exact',
           original_wedding_date: payload.wedding_date || null,
         }
+        if (source) insertPayload.source = source
+        if (clientId) insertPayload.client_id = clientId
+
         const { data: newLead, error } = await supabase
-          .from('leads')
-          .insert(insertPayload)
-          .select('id')
-          .single()
+          .from('leads').insert(insertPayload).select('id').single()
         if (!error && newLead) { created++; leadId = newLead.id }
         else { skipped++; continue }
       }
@@ -389,7 +449,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
       }
     }
 
-    setImportResult({ created, updated, skipped, calendarCreated })
+    setImportResult({ created, updated, skipped, calendarCreated, clientsLinked })
     setStep('done')
     setImporting(false)
     onImported()
@@ -422,7 +482,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
             <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--warm-gray)' }}>
               {step === 'upload' && 'Sube un archivo Excel con tus leads'}
               {step === 'preview' && `${rows.length} filas encontradas — revisa antes de importar`}
-              {step === 'importing' && 'Importando leads…'}
+              {step === 'importing' && 'Importando leads y vinculando contactos…'}
               {step === 'done' && 'Importación completada'}
             </p>
           </div>
@@ -438,6 +498,16 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
           {/* ── Step: Upload ────────────────────────────────────────────── */}
           {step === 'upload' && (
             <div>
+              {/* Info banner */}
+              <div style={{
+                background: '#f0f4f1', border: '1px solid #d4ddd6', borderRadius: 10,
+                padding: '12px 16px', marginBottom: 16, fontSize: 12, color: '#35513E', lineHeight: 1.55,
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+              }}>
+                <Users size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span>Cada lead importado se vincula automáticamente a un contacto. Si ya existe un contacto con el mismo email o teléfono, se asocia. Si no, se crea uno nuevo.</span>
+              </div>
+
               {/* Download template */}
               <div style={{
                 background: '#faf8f5', border: '1px solid var(--ivory)', borderRadius: 12,
@@ -491,7 +561,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
               {/* Summary badges */}
               <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '4px 10px', borderRadius: 6, background: '#DCE7DE', color: '#35513E' }}>
-                  <CheckCircle2 size={12} /> {okRows.length} listos
+                  <CheckCircle2 size={12} /> {okRows.length} nuevos
                 </span>
                 {warnRows.length > 0 && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '4px 10px', borderRadius: 6, background: '#fef7ec', color: '#8a6d2b' }}>
@@ -525,37 +595,66 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
                 </div>
               )}
 
+              {/* Auto-link info */}
+              <div style={{
+                background: '#f0f4f1', border: '1px solid #d4ddd6', borderRadius: 8,
+                padding: '8px 12px', marginBottom: 12, fontSize: 11, color: '#35513E',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <Users size={12} />
+                Cada lead se vinculará automáticamente a un contacto (existente o nuevo)
+              </div>
+
               {/* Row list */}
               <div style={{ border: '1px solid var(--ivory)', borderRadius: 10, overflow: 'hidden' }}>
                 <div style={{
-                  display: 'grid', gridTemplateColumns: '40px 1fr 140px 100px',
+                  display: 'grid', gridTemplateColumns: '36px 1fr 100px 90px',
                   padding: '8px 12px', background: '#faf8f5', fontSize: 11, fontWeight: 600,
                   color: 'var(--warm-gray)', borderBottom: '1px solid var(--ivory)',
                 }}>
-                  <span>Fila</span><span>Nombre</span><span>Estado</span><span>Resultado</span>
+                  <span>#</span><span>Lead</span><span>Estado</span><span>Acción</span>
                 </div>
                 <div style={{ maxHeight: 320, overflow: 'auto' }}>
                   {rows.map((row, i) => {
                     const willSkip = row.status === 'error' || (row.duplicate && duplicateAction === 'skip')
                     return (
                       <div key={i} style={{
-                        display: 'grid', gridTemplateColumns: '40px 1fr 140px 100px',
+                        display: 'grid', gridTemplateColumns: '36px 1fr 100px 90px',
                         padding: '8px 12px', fontSize: 12, borderBottom: '1px solid #f5f0eb',
-                        opacity: willSkip ? 0.5 : 1,
-                        background: row.status === 'error' ? '#FAF4F3' : row.duplicate ? '#F7F3E8' : '#fff',
+                        opacity: willSkip ? 0.45 : 1,
+                        background: row.status === 'error' ? '#FAF4F3' : row.duplicate ? '#FFFCF5' : '#fff',
                       }}>
-                        <span style={{ color: 'var(--warm-gray)' }}>{row.rowNum}</span>
-                        <span style={{ color: 'var(--charcoal)', fontWeight: 500 }}>
-                          {row.data.name || '—'}
-                          {row.data.email && <span style={{ fontWeight: 400, color: 'var(--warm-gray)', marginLeft: 6 }}>{row.data.email}</span>}
-                        </span>
+                        <span style={{ color: 'var(--warm-gray)', fontSize: 11 }}>{row.rowNum}</span>
+                        <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                          <div style={{ color: 'var(--charcoal)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {row.data.name || '—'}
+                          </div>
+                          {(row.data.email || row.data.phone) && (
+                            <div style={{ fontSize: 10.5, color: 'var(--warm-gray)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {[row.data.email, row.data.phone].filter(Boolean).join(' · ')}
+                            </div>
+                          )}
+                          {row.duplicate && (
+                            <div style={{ fontSize: 10, color: '#8a6d2b', marginTop: 1 }}>
+                              {row.matchType === 'phone' ? 'Teléfono' : 'Email'} coincide con lead existente
+                            </div>
+                          )}
+                        </div>
                         <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
-                          {row.dbStatus === 'won' ? 'Confirmado' : row.dbStatus === 'new' ? 'Nuevo' : row.dbStatus}
+                          {row.dbStatus === 'won' ? 'Confirmado' :
+                           row.dbStatus === 'new' ? 'Nuevo' :
+                           row.dbStatus === 'contacted' ? 'Contactado' :
+                           row.dbStatus === 'proposal_sent' ? 'Propuesta' :
+                           row.dbStatus === 'visit_scheduled' ? 'Visita' :
+                           row.dbStatus === 'post_visit' ? 'Post-visita' :
+                           row.dbStatus === 'budget_sent' ? 'Presupuesto' :
+                           row.dbStatus === 'lost' ? 'Perdido' :
+                           row.dbStatus}
                         </span>
                         <span>
-                          {row.status === 'ok' && <span style={{ color: '#3C5945', display: 'flex', alignItems: 'center', gap: 3 }}><CheckCircle2 size={11} /> Importar</span>}
-                          {row.status === 'warning' && <span style={{ color: '#8a6d2b', display: 'flex', alignItems: 'center', gap: 3 }}><AlertTriangle size={11} /> {duplicateAction === 'skip' ? 'Saltar' : 'Actualizar'}</span>}
-                          {row.status === 'error' && <span style={{ color: '#7E332D', display: 'flex', alignItems: 'center', gap: 3 }}><XCircle size={11} /> Error</span>}
+                          {row.status === 'ok' && <span style={{ color: '#3C5945', display: 'flex', alignItems: 'center', gap: 3, fontSize: 11 }}><CheckCircle2 size={11} /> Crear</span>}
+                          {row.status === 'warning' && <span style={{ color: '#8a6d2b', display: 'flex', alignItems: 'center', gap: 3, fontSize: 11 }}><AlertTriangle size={11} /> {duplicateAction === 'skip' ? 'Saltar' : 'Actualizar'}</span>}
+                          {row.status === 'error' && <span style={{ color: '#7E332D', display: 'flex', alignItems: 'center', gap: 3, fontSize: 11 }}><XCircle size={11} /> Error</span>}
                         </span>
                       </div>
                     )
@@ -569,7 +668,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
           {step === 'importing' && (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
               <Loader2 size={32} style={{ color: 'var(--espresso)', animation: 'spin 1s linear infinite', marginBottom: 16 }} />
-              <div style={{ fontSize: 14, color: 'var(--charcoal)' }}>Importando leads…</div>
+              <div style={{ fontSize: 14, color: 'var(--charcoal)' }}>Importando leads y vinculando contactos…</div>
               <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             </div>
           )}
@@ -588,6 +687,7 @@ export default function ImportLeadsModal({ open, onClose, userId, venueId, exist
                 <span>Leads creados:</span><strong>{importResult.created}</strong>
                 {importResult.updated > 0 && <><span>Leads actualizados:</span><strong>{importResult.updated}</strong></>}
                 {importResult.skipped > 0 && <><span>Filas saltadas:</span><strong>{importResult.skipped}</strong></>}
+                <span>Contactos vinculados:</span><strong style={{ color: '#3C5945' }}>{importResult.clientsLinked}</strong>
                 {importResult.calendarCreated > 0 && <><span>Fechas en calendario:</span><strong>{importResult.calendarCreated}</strong></>}
               </div>
             </div>

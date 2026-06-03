@@ -1,7 +1,7 @@
 'use client'
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, LayoutTemplate, Trash2, Star, Loader2, Pencil, FileText, X, Zap, Sparkles, ClipboardList, MessageCircle, Target, Check, ChevronLeft, ChefHat, type LucideIcon } from 'lucide-react'
+import { Plus, LayoutTemplate, Trash2, Star, Loader2, Pencil, FileText, X, Zap, Sparkles, ClipboardList, MessageCircle, Target, Check, ChevronLeft, ChefHat, BedDouble, type LucideIcon } from 'lucide-react'
 import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
@@ -15,6 +15,7 @@ const SAMPLE_ICON: Record<DefaultTemplateIcon, LucideIcon> = {
   'clipboard-list': ClipboardList,
   'message-circle': MessageCircle,
   'target': Target,
+  'bed-double': BedDouble,
 }
 
 type Template = {
@@ -61,19 +62,29 @@ export default function TemplatesPage() {
   const [renameValue, setRenameValue] = useState('')
 
   // Multi-step picker modal
-  const [pickerStep, setPickerStep] = useState<'style' | 'catering' | 'modality'>('style')
+  const [pickerStep, setPickerStep] = useState<'style' | 'catering' | 'config' | 'modality'>('style')
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerFrom, setPickerFrom] = useState<string | undefined>(undefined)
   const [pickerCatering, setPickerCatering] = useState<boolean | null>(null)
   const [pickerModalities, setPickerModalities] = useState<any[]>([])
+  const [pickerConfigs, setPickerConfigs] = useState<any[]>([])
+  const [pickerConfigId, setPickerConfigId] = useState<string | null>(null)
 
-  const openPicker = () => { setPickerStep('style'); setPickerFrom(undefined); setPickerCatering(null); setPickerOpen(true) }
+  const openPicker = () => {
+    setPickerStep('style'); setPickerFrom(undefined); setPickerCatering(null)
+    setPickerConfigId(null); setPickerOpen(true)
+  }
   const closePicker = () => setPickerOpen(false)
 
   useEffect(() => {
-    if (!pickerOpen || pickerModalities.length > 0) return
-    fetch('/api/estructura/modalities').then(r => r.ok ? r.json() : null).then(d => { if (d?.modalities) setPickerModalities(d.modalities) }).catch(() => {})
-  }, [pickerOpen, pickerModalities.length])
+    if (!pickerOpen) return
+    if (pickerModalities.length === 0) {
+      fetch('/api/estructura/modalities').then(r => r.ok ? r.json() : null).then(d => { if (d?.modalities) setPickerModalities(d.modalities) }).catch(() => {})
+    }
+    if (pickerConfigs.length === 0) {
+      fetch('/api/estructura/commercial-configs').then(r => r.ok ? r.json() : null).then(d => { if (d?.configs) setPickerConfigs(d.configs.filter((c: any) => (c.config_type ?? 'space') === 'space')) }).catch(() => {})
+    }
+  }, [pickerOpen, pickerModalities.length, pickerConfigs.length])
 
   useEffect(() => {
     if (authLoading || !ready) return
@@ -106,6 +117,7 @@ export default function TemplatesPage() {
     const params = new URLSearchParams()
     if (pickerFrom) params.set('from', pickerFrom)
     if (pickerCatering !== null) params.set('catering', pickerCatering ? '1' : '0')
+    if (pickerConfigId) params.set('config_id', pickerConfigId)
     if (modalityId) params.set('modality_id', modalityId)
     router.push(`/dossier/templates/new${params.size > 0 ? '?' + params.toString() : ''}`)
   }
@@ -301,7 +313,7 @@ export default function TemplatesPage() {
           </div>
         ) : templates.length === 0 ? (
           <div style={{ padding: '20px 16px', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--warm-gray)' }}>
-            Todavía no tienes plantillas propias. Pulsa <strong>Nueva plantilla</strong> para empezar (en blanco o partiendo de una muestra).
+            Todavía no tienes plantillas propias. Pulsa <strong>Nueva plantilla</strong> para empezar partiendo de un estilo.
           </div>
         ) : (
           <div style={{
@@ -429,18 +441,22 @@ export default function TemplatesPage() {
             <div className="modal-header" style={{ position: 'relative', paddingRight: 48 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {pickerStep !== 'style' && (
-                  <button type="button" onClick={() => setPickerStep(pickerStep === 'modality' ? 'catering' : 'style')}
+                  <button type="button" onClick={() => setPickerStep(pickerStep === 'modality' ? 'config' : pickerStep === 'config' ? 'catering' : 'style')}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', padding: 0 }}>
                     <ChevronLeft size={16} />
                   </button>
                 )}
                 <div>
                   <div className="modal-title" style={{ marginBottom: 2 }}>
-                    {pickerStep === 'style' ? 'Nueva plantilla' : pickerStep === 'catering' ? '¿Incluye catering?' : '¿Qué modalidad?'}
+                    {pickerStep === 'style' ? 'Nueva plantilla'
+                      : pickerStep === 'catering' ? '¿Incluye catering?'
+                      : pickerStep === 'config' ? '¿Qué configuración comercial?'
+                      : '¿Qué modalidad?'}
                   </div>
                   <div className="modal-sub">
-                    {pickerStep === 'style' ? 'Empieza desde cero o usa uno de los estilos de página como base'
+                    {pickerStep === 'style' ? 'Elige uno de los estilos de página como base'
                       : pickerStep === 'catering' ? 'Activa la pestaña de Menús en el editor'
+                      : pickerStep === 'config' ? 'Define qué config aplicará a esta plantilla'
                       : 'Se precargará al crear un dosier con esta plantilla'}
                   </div>
                 </div>
@@ -450,17 +466,9 @@ export default function TemplatesPage() {
               </button>
             </div>
 
-            {/* Step 1 — Style */}
+            {/* Step 1 — Style (must always pick a visual style; no blank option) */}
             {pickerStep === 'style' && (
               <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <button type="button" onClick={() => { setPickerFrom(undefined); setPickerStep('catering') }}
-                  className="starter-card" style={{ flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
-                  <div className="starter-card-icon"><FileText size={20} strokeWidth={1.6} /></div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>En blanco</div>
-                    <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.5 }}>Plantilla vacía para configurar desde cero.</div>
-                  </div>
-                </button>
                 {DEFAULT_TEMPLATES.map(tpl => {
                   const Icon = SAMPLE_ICON[tpl.icon]
                   return (
@@ -480,7 +488,7 @@ export default function TemplatesPage() {
             {/* Step 2 — Catering */}
             {pickerStep === 'catering' && (
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button type="button" onClick={() => { setPickerCatering(true); setPickerStep('modality') }}
+                <button type="button" onClick={() => { setPickerCatering(true); setPickerStep('config') }}
                   style={{ padding: '20px 24px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', border: '2px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(196,151,90,0.12)', border: '1.5px solid rgba(196,151,90,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <ChefHat size={18} style={{ color: 'var(--gold)' }} />
@@ -490,7 +498,7 @@ export default function TemplatesPage() {
                     <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Configura cóctel, menús principales, noche y madrugada</div>
                   </div>
                 </button>
-                <button type="button" onClick={() => { setPickerCatering(false); setPickerStep('modality') }}
+                <button type="button" onClick={() => { setPickerCatering(false); setPickerStep('config') }}
                   style={{ padding: '20px 24px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', border: '2px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--cream)', border: '1.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <LayoutTemplate size={18} style={{ color: 'var(--warm-gray)' }} />
@@ -503,27 +511,118 @@ export default function TemplatesPage() {
               </div>
             )}
 
-            {/* Step 3 — Modality */}
-            {pickerStep === 'modality' && (
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {pickerModalities.length === 0 ? (
-                  <div style={{ fontSize: 13, color: 'var(--warm-gray)', padding: '12px 0' }}>Cargando modalidades…</div>
-                ) : pickerModalities.map((m: any) => (
-                  <button key={m.id} type="button" onClick={() => startDraft(m.id)}
-                    style={{ padding: '16px 20px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', border: '2px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(196,151,90,0.12)', border: '1.5px solid rgba(196,151,90,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>☀️</div>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 2 }}>{m.name}</div>
-                      {m.duration_label && <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>{m.duration_label}</div>}
+            {/* Step 3 — Config comercial (improved UI) */}
+            {pickerStep === 'config' && (
+              <div className="modal-body">
+                {pickerConfigs.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                      <Plus size={22} style={{ color: 'var(--gold)' }} />
                     </div>
-                  </button>
-                ))}
-                <button type="button" onClick={() => startDraft(null)}
-                  style={{ marginTop: 4, padding: '12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--warm-gray)', textAlign: 'center' }}>
-                  Saltar — lo decidiré en cada dosier
-                </button>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 6 }}>Sin configuraciones</div>
+                    <div style={{ fontSize: 12, color: 'var(--warm-gray)', maxWidth: 320, margin: '0 auto', lineHeight: 1.5 }}>
+                      No hay configuraciones comerciales tipo "Espacio". Crea una en <strong>Configuración → Alquiler y tarifas</strong> antes de continuar.
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+                    {pickerConfigs.map((c: any) => {
+                      const spaceLabel = { single: 'Espacio único', single_with_supplements: 'Base + zonas', multiple_independent: 'Grupos espacios' }[c.config?.space_type as string] ?? '—'
+                      const priceLabel = { rental: 'Alquiler', per_person: 'Por persona', package: 'Paquetes' }[c.config?.price_model as string] ?? '—'
+                      const modCount = pickerModalities.filter((m: any) => m.commercial_config_id === c.id).length
+                      return (
+                        <button key={c.id} type="button" onClick={() => { setPickerConfigId(c.id); setPickerStep('modality') }}
+                          style={{
+                            padding: 16, borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+                            border: '2px solid var(--ivory)', background: '#fff',
+                            display: 'flex', flexDirection: 'column', gap: 10,
+                            transition: 'all .15s', position: 'relative',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.background = 'var(--cream)' }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ivory)'; e.currentTarget.style.background = '#fff' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(74,107,82,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <LayoutTemplate size={18} style={{ color: 'var(--gold)' }} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                              <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>{modCount} {modCount === 1 ? 'modalidad' : 'modalidades'}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', paddingTop: 6, borderTop: '1px solid var(--ivory)' }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: 'var(--cream)', color: 'var(--espresso)', border: '1px solid var(--ivory)' }}>{spaceLabel}</span>
+                            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: 'var(--cream)', color: 'var(--espresso)', border: '1px solid var(--ivory)' }}>{priceLabel}</span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
+
+            {/* Step 4 — Modality (improved UI, filtered by selected config) */}
+            {pickerStep === 'modality' && (() => {
+              const filtered = pickerModalities.filter((m: any) => m.commercial_config_id === pickerConfigId)
+              const cfg = pickerConfigs.find(c => c.id === pickerConfigId)
+              const DUR_LABEL: Record<string, { label: string; emoji: string }> = {
+                '1_day':         { label: 'Día completo',  emoji: '☀️' },
+                '1_day_morning': { label: 'Medio día',     emoji: '🌤️' },
+                '2_days':        { label: '2 días',         emoji: '🌗' },
+                'package':       { label: 'Paquete',        emoji: '📦' },
+                'custom':        { label: 'Personalizada', emoji: '🛠️' },
+              }
+              return (
+                <div className="modal-body">
+                  {cfg && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--warm-gray)', marginBottom: 12, padding: '6px 12px', background: 'var(--cream)', borderRadius: 6, border: '1px solid var(--ivory)' }}>
+                      <LayoutTemplate size={12} style={{ color: 'var(--gold)' }} />
+                      <span>Configuración: <strong style={{ color: 'var(--charcoal)' }}>{cfg.name}</strong></span>
+                    </div>
+                  )}
+                  {filtered.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+                      <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', fontSize: 22 }}>☀️</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 6 }}>Sin modalidades</div>
+                      <div style={{ fontSize: 12, color: 'var(--warm-gray)', maxWidth: 320, margin: '0 auto', lineHeight: 1.5 }}>
+                        Esta configuración aún no tiene modalidades. Ve a <strong>Configuración → Alquiler y tarifas</strong> para crearlas.
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+                      {filtered.map((m: any) => {
+                        const dt = DUR_LABEL[m.duration_type] ?? { label: '', emoji: '☀️' }
+                        const priceCount = (m.prices?.length ?? 0) + (m.packages ?? []).reduce((s: number, p: any) => s + (p.prices?.length ?? 0), 0)
+                        return (
+                          <button key={m.id} type="button" onClick={() => startDraft(m.id)}
+                            style={{
+                              padding: 16, borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+                              border: '2px solid var(--ivory)', background: '#fff',
+                              display: 'flex', flexDirection: 'column', gap: 10,
+                              transition: 'all .15s', opacity: m.is_active === false ? 0.5 : 1,
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.background = 'var(--cream)' }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ivory)'; e.currentTarget.style.background = '#fff' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(196,151,90,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 18 }}>{dt.emoji}</div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--charcoal)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
+                                <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>{m.duration_label ?? dt.label}</div>
+                              </div>
+                            </div>
+                            {priceCount > 0 && (
+                              <div style={{ display: 'flex', gap: 5, paddingTop: 6, borderTop: '1px solid var(--ivory)' }}>
+                                <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: 'var(--cream)', color: 'var(--espresso)', border: '1px solid var(--ivory)' }}>{priceCount} tarifa{priceCount === 1 ? '' : 's'}</span>
+                              </div>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         </div>
       )}

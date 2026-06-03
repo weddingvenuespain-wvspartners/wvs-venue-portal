@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const venueId = req.nextUrl.searchParams.get('venue_id')
+    const configId = req.nextUrl.searchParams.get('commercial_config_id')
 
     const svc = getServiceClient()
     let query = svc
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
       `)
       .eq('user_id', session.user.id)
     if (venueId) query = query.eq('venue_id', venueId)
+    if (configId) query = query.eq('commercial_config_id', configId)
     const { data, error } = await query
       .order('sort_order')
       .order('sort_order', { referencedTable: 'venue_modality_packages' })
@@ -45,9 +47,10 @@ export async function POST(req: Request) {
     if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const body = await req.json()
-    const { name, description, duration_label, duration_type, day_from, day_to, sort_order, venue_id } = body
+    const { name, description, duration_label, duration_type, day_from, day_to, sort_order, venue_id, commercial_config_id } = body
 
     if (!name?.trim()) return NextResponse.json({ error: 'El nombre es obligatorio' }, { status: 400 })
+    if (!commercial_config_id) return NextResponse.json({ error: 'commercial_config_id requerido — toda modalidad pertenece a una configuración' }, { status: 400 })
 
     const svc = getServiceClient()
     const { data, error } = await svc
@@ -55,6 +58,7 @@ export async function POST(req: Request) {
       .insert({
         user_id:        session.user.id,
         venue_id:       venue_id ?? null,
+        commercial_config_id: commercial_config_id ?? null,
         name:           name.trim(),
         description:    description?.trim() || null,
         duration_label: duration_label?.trim() || null,

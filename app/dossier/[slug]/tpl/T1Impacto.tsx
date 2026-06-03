@@ -713,7 +713,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           <div ref={sbarRef} className="t1-sbar">
             <div>
               <div style={{ fontFamily: FONT, fontSize: '1.1rem', fontWeight: 300, fontStyle: 'italic' }}>{couple_name}</div>
-              <div style={{ fontSize: '.62rem', letterSpacing: '.14em', textTransform: 'uppercase', opacity: .6, marginTop: 2 }}>Propuesta exclusiva · {venue?.name}</div>
+              <div style={{ fontSize: '.62rem', letterSpacing: '.14em', textTransform: 'uppercase', opacity: .6, marginTop: 2 }}>{venue?.name || 'Vuestra propuesta'}</div>
             </div>
             <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
               {/* Price display: menu total takes priority over static estimate */}
@@ -804,14 +804,14 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           const subLabel = `rgba(${sr},${sg},${sb},.6)`
           return (
             <div style={{ position: 'relative', zIndex: 10, padding: '0 48px 80px' }}>
-              <div className="ha" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '7px 0', marginBottom: 24, animationDelay: '.15s' }}>
-                <span style={{ fontFamily: 'Inter,sans-serif', fontSize: '.62rem', fontWeight: 600, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,.7)' }}>
-                  Propuesta exclusiva
+              <div className="ha" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', borderRadius: 999, background: 'rgba(0,0,0,.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', marginBottom: 24, animationDelay: '.15s' }}>
+                <span style={{ fontFamily: 'Inter,sans-serif', fontSize: '.68rem', fontWeight: 600, letterSpacing: '.14em', textTransform: 'uppercase', color: '#fff' }}>
+                  Vuestra propuesta
                 </span>
                 {venue?.name && (
                   <>
-                    <span style={{ width: 16, height: 1, background: 'rgba(255,255,255,.25)' }} />
-                    <span style={{ fontFamily: 'Inter,sans-serif', fontSize: '.62rem', fontWeight: 400, letterSpacing: '.06em', color: 'rgba(255,255,255,.55)' }}>{venue.name}</span>
+                    <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,.3)' }} />
+                    <span style={{ fontFamily: 'Inter,sans-serif', fontSize: '.68rem', fontWeight: 500, color: 'rgba(255,255,255,.85)' }}>{venue.name}</span>
                   </>
                 )}
               </div>
@@ -825,23 +825,27 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
 
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
-        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} guestCount={guests} weddingDate={wedding_date ?? undefined} />
+        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} guestCount={guests} weddingDate={dateSlots && dateSlots.flatMap(s => s.dates).length > 1 ? undefined : (wedding_date ?? undefined)} />
       )}
 
       {/* ════════════════════════════════════════════
           SELECTOR DE FECHAS
       ════════════════════════════════════════════ */}
       {on('date_slots') && dateSlots && dateSlots.length > 1 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
-        <DateSelector
-          slots={dateSlots}
-          primary={primary}
-          onPrimary={onPri}
-          dark={!lightMode}
-          font={FONT}
-          proposalId={data.id}
-          onSelect={setSelectedDateSlotIdx}
-          guestCount={guests}
-        />
+        <section style={{ padding: '40px 0', background: lightMode ? '#faf8f5' : '#080808' }}>
+          <div style={{ maxWidth: 880, margin: '0 auto', padding: '0 32px' }}>
+            <DateSelector
+              slots={dateSlots}
+              primary={primary}
+              onPrimary={onPri}
+              dark={!lightMode}
+              font={FONT}
+              proposalId={data.id}
+              onSelect={setSelectedDateSlotIdx}
+              guestCount={guests}
+            />
+          </div>
+        </section>
       )}
 
       {/* ── STATS BAR ── */}

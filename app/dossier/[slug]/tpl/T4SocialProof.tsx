@@ -686,7 +686,7 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', borderRadius: 999, background: 'rgba(0,0,0,.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
                       <span style={{ fontFamily: "'Inter',sans-serif", fontSize: '.68rem', fontWeight: 600, letterSpacing: '.14em', textTransform: 'uppercase', color: '#fff' }}>
-                        Propuesta exclusiva
+                        Vuestra propuesta
                       </span>
                       {data.venue?.name && (
                         <>
@@ -709,12 +709,16 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
 
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
-        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} guestCount={guests} weddingDate={data.wedding_date ?? undefined} />
+        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} guestCount={guests} weddingDate={dateSlots && dateSlots.flatMap(s => s.dates).length > 1 ? undefined : (data.wedding_date ?? undefined)} />
       )}
 
       {/* ── DATE SELECTOR ── */}
       {on('date_slots') && dateSlots && dateSlots.length > 1 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
-        <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />
+        <section style={{ padding: '40px 0', background: '#faf8f5' }}>
+          <div style={{ maxWidth: 880, margin: '0 auto', padding: '0 32px' }}>
+            <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />
+          </div>
+        </section>
       )}
 
       {/* TESTIMONIALS — first content section */}

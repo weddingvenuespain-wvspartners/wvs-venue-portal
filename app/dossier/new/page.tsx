@@ -88,23 +88,25 @@ function NuevaPropuestaContent() {
       let contentSectionsData: Record<string, unknown> | null = null
       let resolvedContentTemplateId: string | null = contentTemplateId
 
+      let templateCommercialConfigId: string | null = null
+      let templateLodgingConfigId: string | null = null
       if (contentTemplateId) {
         const { data: ct } = await supabase
           .from('proposal_content_templates')
-          .select('sections_data')
+          .select('sections_data, commercial_config_id, lodging_config_id')
           .eq('id', contentTemplateId)
           .eq('user_id', user.id)
           .maybeSingle()
-        if (ct) contentSectionsData = ct.sections_data
+        if (ct) { contentSectionsData = ct.sections_data; templateCommercialConfigId = ct.commercial_config_id ?? null; templateLodgingConfigId = ct.lodging_config_id ?? null }
       } else {
         // Fall back to default content template
         const { data: defCt } = await supabase
           .from('proposal_content_templates')
-          .select('id, sections_data')
+          .select('id, sections_data, commercial_config_id, lodging_config_id')
           .eq('user_id', user.id)
           .eq('is_default', true)
           .maybeSingle()
-        if (defCt) { contentSectionsData = defCt.sections_data; resolvedContentTemplateId = defCt.id }
+        if (defCt) { contentSectionsData = defCt.sections_data; resolvedContentTemplateId = defCt.id; templateCommercialConfigId = defCt.commercial_config_id ?? null; templateLodgingConfigId = defCt.lodging_config_id ?? null }
       }
 
       const baseSectionsData = starter?.sections_data ?? { visual_template_id: 1 }
@@ -136,6 +138,8 @@ function NuevaPropuestaContent() {
         template_id: defTpl?.id ?? null,
         content_template_id: resolvedContentTemplateId,
         ...(templateDefaultModalityId ? { modality_id: templateDefaultModalityId } : {}),
+        ...(templateCommercialConfigId ? { commercial_config_id: templateCommercialConfigId } : {}),
+        ...(templateLodgingConfigId ? { lodging_config_id: templateLodgingConfigId } : {}),
         ...(firstProposedDate ? { wedding_date: firstProposedDate } : {}),
         ...(starter?.personal_message ? { personal_message: starter.personal_message } : {}),
         ...(starter?.price_estimate ? { price_estimate: starter.price_estimate } : {}),

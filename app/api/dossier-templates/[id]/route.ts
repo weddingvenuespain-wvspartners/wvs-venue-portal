@@ -52,6 +52,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (body.description !== undefined)  patch.description   = body.description
   if (body.sections_data !== undefined) patch.sections_data = body.sections_data
   if (body.is_default !== undefined)   patch.is_default    = body.is_default
+  if (body.commercial_config_id !== undefined) patch.commercial_config_id = body.commercial_config_id
+  if (body.lodging_config_id !== undefined) patch.lodging_config_id = body.lodging_config_id
 
   // If setting as default, unset others first
   if (body.is_default) {

@@ -538,7 +538,9 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         <FadeIn>
           <div className="t5-hero-left">
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 999, background: `${primary}12`, border: `1px solid ${primary}22`, marginBottom: 22 }}>
-              <span style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: primary }}>Propuesta exclusiva</span>
+              <span style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: primary }}>
+                Vuestra propuesta
+              </span>
               {data.venue?.name && (
                 <>
                   <span style={{ width: 1, height: 12, background: `${primary}33` }} />
@@ -594,12 +596,16 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
 
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
-        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} guestCount={guests} weddingDate={data.wedding_date ?? undefined} />
+        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} guestCount={guests} weddingDate={dateSlots && dateSlots.flatMap(s => s.dates).length > 1 ? undefined : (data.wedding_date ?? undefined)} />
       )}
 
       {/* ── DATE SELECTOR ── */}
       {on('date_slots') && dateSlots && dateSlots.length > 1 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
-        <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />
+        <section style={{ padding: '40px 0', background: '#faf8f5' }}>
+          <div style={{ maxWidth: 880, margin: '0 auto', padding: '0 32px' }}>
+            <DateSelector slots={dateSlots} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />
+          </div>
+        </section>
       )}
 
       {/* URGENCY BAR */}

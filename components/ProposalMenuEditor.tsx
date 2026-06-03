@@ -3,7 +3,7 @@
 // de una propuesta concreta. Se integra en el tab "Menús" de ProposalEditor.
 
 import { useRef, useState } from 'react'
-import { ChevronDown, X, GripVertical, Upload, FileText, Sparkles, Undo2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, X, GripVertical, Upload, FileText, Sparkles, Undo2, Wine, UtensilsCrossed, Moon, PartyPopper, Eye, EyeOff, Plus, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import DatePicker from '@/components/DatePicker'
@@ -75,12 +75,13 @@ const extraCard: React.CSSProperties = {
 }
 const subBlock: React.CSSProperties = {
   border: '1px solid var(--border)',
-  borderRadius: 8,
+  borderRadius: 10,
   overflow: 'hidden',
   marginBottom: 0,
+  background: 'var(--cream)',
 }
 const subBlockHeader: React.CSSProperties = {
-  padding: '8px 12px',
+  padding: '10px 14px',
   background: 'var(--cream)',
   borderBottom: '1px solid var(--border)',
 }
@@ -106,6 +107,9 @@ export default function ProposalMenuEditor({
   intro?: string
 }) {
   const { user } = useAuth()
+  const [activeTab, setActiveTab] = useState<'cocktail' | 'menus' | 'night' | 'extras'>('menus')
+  const [expandedMenus, setExpandedMenus] = useState<Set<number>>(new Set([0]))
+  const toggleMenu = (i: number) => setExpandedMenus(s => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n })
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(['cocktail', 'menus', 'night_extras', 'event_extras']))
   const [uploadingPdf, setUploadingPdf] = useState(false)
   const [parsing, setParsing] = useState(false)
@@ -248,11 +252,11 @@ export default function ProposalMenuEditor({
     showCategory = true,
   ) => (
     <div key={i} style={extraCard}>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         {showCategory && (
-          <div style={{ width: 140, flexShrink: 0 }}>
+          <div style={{ width: 120, flexShrink: 0 }}>
             <Select value={e.category} onValueChange={(v) => updateExtra(i, { category: v as MenuExtra['category'] })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger style={{ fontSize: 12 }}><SelectValue /></SelectTrigger>
               <SelectContent>
                 {categoryOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
               </SelectContent>
@@ -260,17 +264,17 @@ export default function ProposalMenuEditor({
           </div>
         )}
         <input className="form-input" placeholder="Nombre" value={e.name}
-          onChange={ev => updateExtra(i, { name: ev.target.value })} style={{ flex: 1 }} />
+          onChange={ev => updateExtra(i, { name: ev.target.value })} style={{ flex: 1, minWidth: 110, fontSize: 12 }} />
         <button type="button" style={removeBtn} onClick={() => removeExtra(i)}><X size={13} /></button>
       </div>
       <input className="form-input" placeholder="Descripción breve (opcional)" value={e.description ?? ''}
         onChange={ev => updateExtra(i, { description: ev.target.value })}
         style={{ fontSize: 12 }} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px 130px', gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 6 }}>
         <input className="form-input" placeholder="Precio (ej. 25€)" value={e.price}
-          onChange={ev => updateExtra(i, { price: ev.target.value })} />
+          onChange={ev => updateExtra(i, { price: ev.target.value })} style={{ fontSize: 12 }} />
         <Select value={e.price_type} onValueChange={(v) => updateExtra(i, { price_type: v as MenuExtra['price_type'] })}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger style={{ fontSize: 12 }}><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="per_person">Por persona</SelectItem>
             <SelectItem value="flat">Precio total</SelectItem>
@@ -283,7 +287,7 @@ export default function ProposalMenuEditor({
           title="Mínimo de comensales para ofrecer este extra" />
       </div>
       {e.category === 'open_bar' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 6, marginTop: 4 }}>
           <input className="form-input" type="number" min={0} placeholder="Horas incluidas (opc.)"
             value={e.hours_included ?? ''}
             onChange={ev => updateExtra(i, { hours_included: ev.target.value ? parseInt(ev.target.value) : undefined })}
@@ -330,10 +334,62 @@ export default function ProposalMenuEditor({
     </button>
   )
 
+  // Counts for tab badges
+  const cocktailCount = appetizers.length + extras.filter(e => e.category === 'station').length
+  const menusCount    = menus.length
+  const nightCount    = extras.filter(e => e.category === 'resopon' || e.category === 'open_bar').length
+  const eventCount    = extras.filter(e => ['ceremony','music','audiovisual','other'].includes(e.category)).length
+
+  const TABS = [
+    { key: 'cocktail' as const, label: 'Cóctel', icon: Wine,            count: cocktailCount, visKey: 'cocktail'     as const },
+    { key: 'menus'    as const, label: 'Menús',  icon: UtensilsCrossed, count: menusCount,    visKey: 'menus'        as const },
+    { key: 'night'    as const, label: 'Noche',  icon: Moon,            count: nightCount,    visKey: 'night'        as const },
+    { key: 'extras'   as const, label: 'Extras', icon: PartyPopper,     count: eventCount,    visKey: 'event_extras' as const },
+  ]
+
   return (
     <div>
       <div style={{ fontSize: 12, color: 'var(--warm-gray)', background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, lineHeight: 1.55 }}>
         {intro ?? <>Aquí configuráis los <strong>menús, extras y aperitivos</strong> que verán los invitados en el bloque interactivo al final de la propuesta. Lo que elijan se os enviará por email.</>}
+      </div>
+
+      {/* ── Top tab navigation (vertical stacked: icon on top, label + count below) ── */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16,
+        background: '#fff', padding: 6, borderRadius: 12,
+        border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+      }}>
+        {TABS.map(t => {
+          const active = activeTab === t.key
+          const visible = isVisible(t.visKey)
+          const Icon = t.icon
+          return (
+            <button key={t.key} type="button" onClick={() => setActiveTab(t.key)}
+              style={{
+                minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 4px',
+                background: active ? 'var(--gold)' : 'var(--cream)',
+                border: 'none', borderRadius: 8, cursor: 'pointer',
+                color: active ? '#fff' : 'var(--charcoal)',
+                transition: 'all .15s', position: 'relative',
+              }}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#F0EAE0' }}
+              onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'var(--cream)' }}>
+              {/* Count badge top-right corner */}
+              {t.count > 0 && (
+                <span style={{
+                  position: 'absolute', top: 4, right: 4,
+                  fontSize: 9, fontWeight: 700, padding: '0 5px', borderRadius: 10, minWidth: 16, textAlign: 'center',
+                  background: active ? 'rgba(255,255,255,0.28)' : '#fff',
+                  color: active ? '#fff' : 'var(--warm-gray)',
+                  lineHeight: '14px', border: active ? 'none' : '1px solid var(--border)',
+                }}>{t.count}</span>
+              )}
+              <Icon size={16} style={{ flexShrink: 0, color: active ? '#fff' : 'var(--gold)' }} />
+              <span style={{ fontSize: 11, fontWeight: active ? 700 : 500, lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{t.label}</span>
+              {!visible && <EyeOff size={10} style={{ color: active ? 'rgba(255,255,255,0.7)' : 'var(--warm-gray)', flexShrink: 0, position: 'absolute', bottom: 3, right: 4 }} />}
+            </button>
+          )
+        })}
       </div>
 
       {/* "Importar desde PDF" oculto temporalmente — el parser no acierta con todos los menús.
@@ -362,26 +418,22 @@ export default function ProposalMenuEditor({
       )}
 
       {/* ─── CÓCTEL DE BIENVENIDA ───────────────────────────────────────────── */}
-      {(() => {
+      {activeTab === 'cocktail' && (() => {
         const cocktailExtras = extras.filter(e => e.category === 'station')
         return (
-          <div style={{ ...sectionBlock, opacity: isVisible('cocktail') ? 1 : 0.5 }}>
-            <div style={sectionHeader}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggle('cocktail')}>
-                <span style={sectionTitle}>
-                  Cóctel de bienvenida
-                  <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--warm-gray)', marginLeft: 6 }}>
-                    {appetizers.length} grupos · {cocktailExtras.length} estaciones
-                  </span>
-                </span>
-              </div>
+          <div style={{ opacity: isVisible('cocktail') ? 1 : 0.55, background: '#fff', border: '1px solid var(--border)', borderRadius: 12, padding: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            {/* Visibility banner */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: isVisible('cocktail') ? 'var(--cream)' : '#F5F0E8', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <VisToggle skey="cocktail" />
-                <ChevronDown size={14} style={{ transform: openSections.has('cocktail') ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--warm-gray)', cursor: 'pointer' }} onClick={() => toggle('cocktail')} />
+                {isVisible('cocktail') ? <Eye size={14} style={{ color: 'var(--gold)' }} /> : <EyeOff size={14} style={{ color: 'var(--warm-gray)' }} />}
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>
+                  {isVisible('cocktail') ? 'Visible en la propuesta' : 'Oculto en la propuesta'}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>· {appetizers.length} grupos aperitivos · {cocktailExtras.length} estaciones</span>
               </div>
+              <VisToggle skey="cocktail" />
             </div>
-
-            {openSections.has('cocktail') && (
+            {true && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
                 {/* Sub-block: Aperitivos incluidos */}
                 <div style={subBlock}>
@@ -428,18 +480,19 @@ export default function ProposalMenuEditor({
       })()}
 
       {/* ─── MENÚS PRINCIPALES ──────────────────────────────────────────────── */}
-      <div style={{ ...sectionBlock, opacity: isVisible('menus') ? 1 : 0.5 }}>
-        <div style={sectionHeader}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggle('menus')}>
-            <span style={sectionTitle}>Menús principales ({menus.length})</span>
-          </div>
+      {activeTab === 'menus' && (
+      <div style={{ opacity: isVisible('menus') ? 1 : 0.55, background: '#fff', border: '1px solid var(--border)', borderRadius: 12, padding: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        {/* Visibility banner */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: isVisible('menus') ? 'var(--cream)' : '#F5F0E8', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <VisToggle skey="menus" />
-            <ChevronDown size={14} style={{ transform: openSections.has('menus') ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--warm-gray)', cursor: 'pointer' }} onClick={() => toggle('menus')} />
+            {isVisible('menus') ? <Eye size={14} style={{ color: 'var(--gold)' }} /> : <EyeOff size={14} style={{ color: 'var(--warm-gray)' }} />}
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{isVisible('menus') ? 'Visible en la propuesta' : 'Oculto en la propuesta'}</span>
+            <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>· {menus.length} menú{menus.length !== 1 ? 's' : ''}</span>
           </div>
+          <VisToggle skey="menus" />
         </div>
 
-        {openSections.has('menus') && (
+        {true && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
             {/* Config row */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 8 }}>
@@ -495,14 +548,40 @@ export default function ProposalMenuEditor({
                 <div style={subBlockHint}>Crea cada menú con sus platos. Para platos que la pareja debe elegir, usa <strong>"Escoger 1"</strong> o <strong>"Escoger N"</strong>.</div>
               </div>
               <div style={subBlockBody}>
-                {menus.map((m, mi) => (
-                  <div key={mi} style={{ background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+                {menus.map((m, mi) => {
+                  const expanded = expandedMenus.has(mi)
+                  const courseCount = (m.courses ?? []).length
+                  return (
+                  <div key={mi} style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 10, overflow: 'hidden' }}>
+                    {/* Header — clickable to expand */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: expanded ? 'var(--cream)' : '#fff', borderBottom: expanded ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}
+                      onClick={() => toggleMenu(mi)}>
+                      <ChevronRight size={14} style={{ color: 'var(--warm-gray)', transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform .15s', flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {m.name || <span style={{ color: 'var(--warm-gray)', fontStyle: 'italic', fontWeight: 400 }}>Sin nombre — pulsa para editar</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>
+                          {m.price_per_person && <span>{m.price_per_person}</span>}
+                          {m.price_per_person && courseCount > 0 && <span> · </span>}
+                          {courseCount > 0 && <span>{courseCount} curso{courseCount !== 1 ? 's' : ''}</span>}
+                          {!m.price_per_person && courseCount === 0 && <span>Vacío</span>}
+                        </div>
+                      </div>
+                      <button type="button" onClick={e => { e.stopPropagation(); removeMenu(mi) }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 5, borderRadius: 4, display: 'flex' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#FAF3F2'; e.currentTarget.style.color = '#BC5249' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--warm-gray)' }}
+                        title="Eliminar menú"><Trash2 size={13} /></button>
+                    </div>
+
+                    {expanded && (
+                    <div style={{ padding: '12px 14px', background: 'var(--cream)' }}>
                     {/* Nombre del menú */}
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
                       <input className="form-input" placeholder="Nombre del menú (ej. Menú Bosque)"
                         value={m.name} onChange={e => updateMenu(mi, { name: e.target.value })}
                         style={{ flex: 1, fontWeight: 600 }} />
-                      <button type="button" style={removeBtn} onClick={() => removeMenu(mi)} title="Eliminar menú"><X size={13} /></button>
                     </div>
 
                     {/* PRECIOS */}
@@ -612,47 +691,52 @@ export default function ProposalMenuEditor({
                     <div style={fieldLabel}>Cursos / Platos</div>
                     {(m.courses ?? []).map((c, ci) => (
                       <div key={ci} style={{ background: '#fff', borderRadius: 8, border: '1px solid var(--border)', padding: 10, marginBottom: 6 }}>
+                        {/* Row 1: drag + name + remove */}
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
                           <GripVertical size={13} style={{ color: 'var(--warm-gray)', flexShrink: 0 }} />
                           <input className="form-input" placeholder="Ej. Primer plato" value={c.label}
-                            onChange={e => updateCourse(mi, ci, { label: e.target.value })} style={{ flex: 1 }} />
-                          {(c.mode === 'pick_one' || c.mode === 'pick_n') && (
-                            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: '#ffebee', color: '#b71c1c', border: '1px solid #ffcdd2', whiteSpace: 'nowrap' }}>
-                              Obligatorio
-                            </span>
-                          )}
-                          {c.mode === 'fixed' && (
-                            <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#EEF2EC', color: '#35513E', border: '1px solid #D2DFD3', whiteSpace: 'nowrap' }}>
-                              Fijo
-                            </span>
-                          )}
-                          <div style={{ width: 160, flexShrink: 0 }}>
+                            onChange={e => updateCourse(mi, ci, { label: e.target.value })} style={{ flex: 1, minWidth: 0, fontSize: 12 }} />
+                          <button type="button" style={removeBtn} onClick={() => removeCourse(mi, ci)}><X size={13} /></button>
+                        </div>
+                        {/* Row 2: mode + badge + pick_n */}
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+                          <div style={{ flex: 1, minWidth: 140 }}>
                             <Select value={c.mode ?? 'fixed'} onValueChange={(v) => updateCourse(mi, ci, { mode: v as MenuCourse['mode'] })}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectTrigger style={{ fontSize: 12 }}><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 {MODE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                               </SelectContent>
                             </Select>
                           </div>
+                          {(c.mode === 'pick_one' || c.mode === 'pick_n') && (
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: '#ffebee', color: '#b71c1c', border: '1px solid #ffcdd2', whiteSpace: 'nowrap', flexShrink: 0 }}>Obligatorio</span>
+                          )}
+                          {c.mode === 'fixed' && (
+                            <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#EEF2EC', color: '#35513E', border: '1px solid #D2DFD3', whiteSpace: 'nowrap', flexShrink: 0 }}>Fijo</span>
+                          )}
                           {c.mode === 'pick_n' && (
                             <input className="form-input" type="number" min={1} placeholder="N"
                               value={c.pick_count ?? 1} onChange={e => updateCourse(mi, ci, { pick_count: parseInt(e.target.value) || 1 })}
-                              style={{ width: 60, flexShrink: 0 }} />
+                              style={{ width: 56, flexShrink: 0, fontSize: 12 }} />
                           )}
-                          <button type="button" style={removeBtn} onClick={() => removeCourse(mi, ci)}><X size={13} /></button>
                         </div>
+                        {/* Items — each in own card with stacked rows */}
                         {c.items.map((it, ii) => (
-                          <div key={ii} style={{ display: 'flex', gap: 6, marginBottom: 4, paddingLeft: 18 }}>
-                            <input className="form-input" placeholder="Nombre del plato" value={it.name}
-                              onChange={e => updateItem(mi, ci, ii, { name: e.target.value })} style={{ flex: 2 }} />
-                            <input className="form-input" placeholder="Descripción (opc.)" value={it.description ?? ''}
-                              onChange={e => updateItem(mi, ci, ii, { description: e.target.value })} style={{ flex: 3 }} />
-                            <input className="form-input" placeholder="+precio" value={it.extra_price ?? ''}
-                              onChange={e => updateItem(mi, ci, ii, { extra_price: e.target.value })}
-                              style={{ width: 80, flexShrink: 0 }} />
-                            <button type="button" style={{ ...removeBtn, width: 24, height: 24 }} onClick={() => removeItem(mi, ci, ii)}>
-                              <X size={11} />
-                            </button>
+                          <div key={ii} style={{ background: 'var(--cream)', borderRadius: 6, padding: '6px 8px', marginBottom: 4, marginLeft: 18 }}>
+                            <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                              <input className="form-input" placeholder="Nombre del plato" value={it.name}
+                                onChange={e => updateItem(mi, ci, ii, { name: e.target.value })} style={{ flex: 1, minWidth: 0, fontSize: 12 }} />
+                              <button type="button" style={{ ...removeBtn, width: 24, height: 24 }} onClick={() => removeItem(mi, ci, ii)}>
+                                <X size={11} />
+                              </button>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 6 }}>
+                              <input className="form-input" placeholder="Descripción (opc.)" value={it.description ?? ''}
+                                onChange={e => updateItem(mi, ci, ii, { description: e.target.value })} style={{ fontSize: 11 }} />
+                              <input className="form-input" placeholder="+precio" value={it.extra_price ?? ''}
+                                onChange={e => updateItem(mi, ci, ii, { extra_price: e.target.value })}
+                                style={{ fontSize: 11 }} />
+                            </div>
                           </div>
                         ))}
                         <button type="button"
@@ -663,31 +747,39 @@ export default function ProposalMenuEditor({
                       </div>
                     ))}
                     <button type="button" style={addBtn} onClick={() => addCourse(mi)}>+ Añadir curso</button>
+                    </div>
+                    )}
                   </div>
-                ))}
-                <button type="button" style={addBtn} onClick={addMenu}>+ Añadir menú</button>
+                  )
+                })}
+                {menus.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--warm-gray)' }}>
+                    <UtensilsCrossed size={28} style={{ opacity: 0.4, marginBottom: 8 }} />
+                    <div style={{ fontSize: 13, marginBottom: 12 }}>Sin menús todavía</div>
+                  </div>
+                )}
+                <button type="button" style={addBtn} onClick={() => { addMenu(); setTimeout(() => setExpandedMenus(s => new Set([...s, menus.length])), 0) }}><Plus size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />Añadir menú</button>
               </div>
             </div>
           </div>
         )}
       </div>
+      )}
 
       {/* ─── NOCHE Y MADRUGADA ───────────────────────────────────────────────── */}
-      {(() => {
+      {activeTab === 'night' && (() => {
         const nightExtras = extras.filter(e => e.category === 'resopon' || e.category === 'open_bar')
         return (
-          <div style={{ ...sectionBlock, opacity: isVisible('night') ? 1 : 0.5 }}>
-            <div style={sectionHeader}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggle('night_extras')}>
-                <span style={sectionTitle}>Noche y madrugada ({nightExtras.length})</span>
-                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#F7F3E8', color: '#7A5A2E', border: '1px solid #E2D4AE' }}>Opcional</span>
-              </div>
+          <div style={{ opacity: isVisible('night') ? 1 : 0.55, background: '#fff', border: '1px solid var(--border)', borderRadius: 12, padding: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: isVisible('night') ? 'var(--cream)' : '#F5F0E8', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <VisToggle skey="night" />
-                <ChevronDown size={14} style={{ transform: openSections.has('night_extras') ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--warm-gray)', cursor: 'pointer' }} onClick={() => toggle('night_extras')} />
+                {isVisible('night') ? <Eye size={14} style={{ color: 'var(--gold)' }} /> : <EyeOff size={14} style={{ color: 'var(--warm-gray)' }} />}
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{isVisible('night') ? 'Visible en la propuesta' : 'Oculto en la propuesta'}</span>
+                <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>· {nightExtras.length} opciones</span>
               </div>
+              <VisToggle skey="night" />
             </div>
-            {openSections.has('night_extras') && (
+            {true && (
               <div style={{ paddingTop: 4 }}>
                 <div style={subBlock}>
                   <div style={subBlockHeader}>
@@ -706,21 +798,19 @@ export default function ProposalMenuEditor({
       })()}
 
       {/* ─── EXTRAS DEL EVENTO ───────────────────────────────────────────────── */}
-      {(() => {
+      {activeTab === 'extras' && (() => {
         const eventExtras = extras.filter(e => ['ceremony','music','audiovisual','other'].includes(e.category))
         return (
-          <div style={{ ...sectionBlock, opacity: isVisible('event_extras') ? 1 : 0.5 }}>
-            <div style={sectionHeader}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggle('event_extras')}>
-                <span style={sectionTitle}>Extras del evento ({eventExtras.length})</span>
-                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: '#F7F3E8', color: '#7A5A2E', border: '1px solid #E2D4AE' }}>Opcional</span>
-              </div>
+          <div style={{ opacity: isVisible('event_extras') ? 1 : 0.55, background: '#fff', border: '1px solid var(--border)', borderRadius: 12, padding: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: isVisible('event_extras') ? 'var(--cream)' : '#F5F0E8', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <VisToggle skey="event_extras" />
-                <ChevronDown size={14} style={{ transform: openSections.has('event_extras') ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--warm-gray)', cursor: 'pointer' }} onClick={() => toggle('event_extras')} />
+                {isVisible('event_extras') ? <Eye size={14} style={{ color: 'var(--gold)' }} /> : <EyeOff size={14} style={{ color: 'var(--warm-gray)' }} />}
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>{isVisible('event_extras') ? 'Visible en la propuesta' : 'Oculto en la propuesta'}</span>
+                <span style={{ fontSize: 11, color: 'var(--warm-gray)' }}>· {eventExtras.length} extras</span>
               </div>
+              <VisToggle skey="event_extras" />
             </div>
-            {openSections.has('event_extras') && (
+            {true && (
               <div style={{ paddingTop: 4 }}>
                 <div style={subBlock}>
                   <div style={subBlockHeader}>

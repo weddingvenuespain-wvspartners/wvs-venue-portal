@@ -47,6 +47,15 @@ export type ProposalData = {
   _preview?: boolean
   venueContent: VenueContent
   commercialConfig?: { space_type?: string; price_model?: string } | null
+  lodging?: {
+    config_id: string
+    room_types: any[]
+    prices: any[]
+    extras: any[]
+    blocks: any[]
+    inventory_limits: any[]
+    selections: any[]
+  } | null
   commission_planner_id?: string | null
   commission_percent?: number | null
   commission_mode?: 'comisionable' | 'neto' | null
@@ -129,7 +138,8 @@ export default async function ProposalPage({ params, searchParams }: { params: P
       guest_count, wedding_date, price_estimate,
       show_availability, show_price_estimate, status, ctas,
       sections_data, user_id, access_password,
-      commission_planner_id, commission_percent, commission_mode, commission_amount
+      commission_planner_id, commission_percent, commission_mode, commission_amount,
+      lodging_config_id
     `)
     .eq('slug', slug)
     .single()
@@ -147,11 +157,21 @@ export default async function ProposalPage({ params, searchParams }: { params: P
   }
 
   // 2. Obtener datos del venue (solo nombre, ciudad, contacto para el hero y CTA)
-  const { data: venueData } = await supabase
+  let { data: venueData } = await supabase
     .from('venue_onboarding')
     .select('name, city, region, contact_email, contact_phone, website, photo_urls')
     .eq('user_id', proposal.user_id)
+    .eq('venue_id', proposal.venue_id)
     .maybeSingle()
+  // Fallback: if no venue_onboarding matched by venue_id, try user_venues for the name
+  if (!venueData && proposal.venue_id) {
+    const { data: uv } = await supabase
+      .from('user_venues')
+      .select('name')
+      .eq('id', proposal.venue_id)
+      .maybeSingle()
+    if (uv?.name) venueData = { name: uv.name, city: null, region: null, contact_email: null, contact_phone: null, website: null, photo_urls: null } as any
+  }
 
   // 3. Obtener branding
   const { data: brandingData } = await supabase
@@ -166,6 +186,49 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     .select('space_groups, commercial_config')
     .eq('user_id', proposal.user_id)
     .maybeSingle()
+
+  // If proposal has a specific commercial_config_id, use that config instead
+  if ((proposal as any).commercial_config_id) {
+    const { data: ccRow } = await supabase
+      .from('venue_commercial_configs')
+      .select('config')
+      .eq('id', (proposal as any).commercial_config_id)
+      .maybeSingle()
+    if (ccRow?.config && venueSettings) {
+      ;(venueSettings as any).commercial_config = ccRow.config
+    }
+  }
+
+  // Lodging data: load if proposal has lodging_config_id
+  let lodgingData: any = null
+  if ((proposal as any).lodging_config_id) {
+    const lcId = (proposal as any).lodging_config_id
+    const [rtsR, prR, exR, lmR, selR] = await Promise.all([
+      supabase.from('venue_room_types').select('*').eq('commercial_config_id', lcId).eq('is_active', true).order('sort_order'),
+      supabase.from('venue_room_prices').select('*'),
+      supabase.from('venue_room_extras').select('*').eq('commercial_config_id', lcId).eq('is_active', true).order('sort_order'),
+      supabase.from('proposal_room_inventory_limits').select('*').eq('proposal_id', proposal.id),
+      supabase.from('proposal_room_selections').select('*').eq('proposal_id', proposal.id),
+    ])
+    const rts = rtsR.data ?? []
+    const rtIds = rts.map((r: any) => r.id)
+    // Filter prices to only those of relevant room types
+    const prices = (prR.data ?? []).filter((p: any) => rtIds.includes(p.room_type_id))
+    // Load blocks
+    const { data: blocksData } = await supabase
+      .from('venue_room_blocks')
+      .select('*')
+      .in('room_type_id', rtIds.length > 0 ? rtIds : ['00000000-0000-0000-0000-000000000000'])
+    lodgingData = {
+      config_id:      lcId,
+      room_types:     rts,
+      prices,
+      extras:         exR.data ?? [],
+      blocks:         blocksData ?? [],
+      inventory_limits: lmR.data ?? [],
+      selections:     selR.data ?? [],
+    }
+  }
 
   // 5. Obtener venue_content (contenido de propuesta — completamente independiente de la ficha)
   const { data: vcRows } = await supabase
@@ -236,7 +299,8 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     branding: { ...baseBranding, secondary_color: sectionsSecondary ?? null },
     venueContent,
     commercialConfig: (venueSettings as any)?.commercial_config ?? null,
-  }
+    lodging: lodgingData,
+  } as any
 
   return <ProposalLanding data={proposalData} preview={preview} />
 }

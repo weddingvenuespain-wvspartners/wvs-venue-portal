@@ -28,7 +28,7 @@ export function isSectionAllowed(secId: string, spaceType: SpaceType): boolean {
     case 'zones':
       return spaceType !== 'multiple_independent'
     case 'space_groups':
-      return spaceType === 'multiple_independent' || spaceType === 'single_with_supplements'
+      return true  // always visible in sidebar; default on/off controlled by getDefaultSections
     case 'venue_rental':
       return spaceType !== 'multiple_independent'
     default:
@@ -44,7 +44,7 @@ export function getSectionLabel(secId: string, spaceType: SpaceType, fallback: s
       if (spaceType === 'single_with_supplements') return 'Espacios y zonas'
       return 'Los espacios'
     case 'space_groups':
-      return 'Los espacios'
+      return 'Grupos de espacios'
     case 'venue_rental':
       if (spaceType === 'single') return 'Tarifa de alquiler'
       if (spaceType === 'single_with_supplements') return 'Tarifa base de alquiler'

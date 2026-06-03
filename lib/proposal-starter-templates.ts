@@ -7,10 +7,10 @@
 
 import type { SectionsData } from './proposal-types'
 
-export type DefaultTemplateId = 't1' | 't2' | 't3' | 't4' | 't5'
+export type DefaultTemplateId = 't1' | 't2' | 't3' | 't4' | 't5' | 't6'
 
 // Nombre de icono lucide-react que el componente resuelve vía lookup.
-export type DefaultTemplateIcon = 'zap' | 'sparkles' | 'clipboard-list' | 'message-circle' | 'target'
+export type DefaultTemplateIcon = 'zap' | 'sparkles' | 'clipboard-list' | 'message-circle' | 'target' | 'bed-double'
 
 export type DefaultTemplate = {
   id: DefaultTemplateId
@@ -256,6 +256,36 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
     ...BASE_PROPOSAL,
     branding: { primary_color: '#1A1A1A', font_family: "'Cormorant Garamond', serif" },
     sections_data: styled(5, 'light', '#1A1A1A', '#666666', "'Cormorant Garamond', serif"),
+  },
+  {
+    id: 't6',
+    name: 'Alojamiento',
+    description: 'Boutique hotel · solo habitaciones · sin evento',
+    icon: 'bed-double',
+    preview_url: '/dossier/templates/t6/preview',
+    is_default: false,
+    couple_name: 'Huéspedes',
+    guest_count: 2,
+    personal_message: 'Os damos la bienvenida a nuestro alojamiento. Aquí encontraréis nuestras habitaciones, tarifas y servicios para que escojáis lo que mejor se adapte a vosotros.',
+    price_estimate: 0,
+    show_availability: false,
+    show_price_estimate: false,
+    branding: { primary_color: '#2D4A3A', font_family: "'Cormorant Garamond', serif" },
+    sections_data: {
+      visual_template_id: 6,
+      color_mode: 'light',
+      primary_color: '#2D4A3A',
+      secondary_color: '#8FAA94',
+      font_family: "'Cormorant Garamond', serif",
+      has_catering: false,
+      sections_enabled: {
+        hero: true, faq: true, map: true, contact: true,
+        // All event sections disabled
+        availability: false, welcome: false, experience: false, gallery: false,
+        zones: false, venue_rental: false, inclusions: false, testimonials: false,
+        collaborators: false, accommodation: false, extra_services: false,
+      },
+    } as SectionsData,
   },
 ]
 

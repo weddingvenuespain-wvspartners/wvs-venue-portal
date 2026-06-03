@@ -50,6 +50,7 @@ export type EditorProposal = {
   status: string
   lead_id: string | null
   modality_id?: string | null
+  commercial_config_id?: string | null
   sections_data?: SectionsData | null
   template_id?: string | null
   branding?: { logo_url: string | null; primary_color: string; font_family?: string } | null
@@ -127,7 +128,7 @@ function getDefaultSections(cfg: { space_type: string; price_model: string; menu
     experience:       true,
     gallery:          true,
     single_space:     cfg.space_type === 'single' || cfg.space_type === 'single_with_supplements',
-    zones:            cfg.space_type === 'single_with_supplements',
+    zones:            cfg.space_type === 'single' || cfg.space_type === 'single_with_supplements',
     space_groups:     cfg.space_type === 'multiple_independent' || cfg.space_type === 'single_with_supplements',
     venue_rental:     cfg.price_model === 'rental' && cfg.space_type !== 'multiple_independent',
     inclusions:       cfg.price_model === 'package' && cfg.menu_included !== false,
@@ -226,7 +227,20 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       if (tplData) setTemplates(tplData as ProposalTemplate[])
       if (venueRow) setVenue(venueRow)
       const settingsRow0 = Array.isArray(settingsRow) ? settingsRow[0] : settingsRow
-      const cfg = settingsRow0?.commercial_config as { space_type: string; price_model: string } | null
+
+      // If proposal has a specific commercial_config_id, load that config
+      let cfg: { space_type: string; price_model: string } | null = null
+      if (initial.commercial_config_id) {
+        try {
+          const ccRes = await fetch(`/api/estructura/commercial-configs/${initial.commercial_config_id}`)
+          if (ccRes.ok) {
+            const ccJson = await ccRes.json()
+            cfg = ccJson.config?.config ?? null
+          }
+        } catch {}
+      }
+      // Fallback to venue_settings.commercial_config
+      if (!cfg) cfg = settingsRow0?.commercial_config as { space_type: string; price_model: string } | null
       if (cfg) setCommercialConfig(cfg)
       if (settingsRow0?.menu_catalog) setMenuCatalog(settingsRow0.menu_catalog as SectionsData)
 
@@ -234,7 +248,16 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
       if (spaceGroups.length) setVenueSpaceGroups(spaceGroups)
 
       let loadedModalities: any[] = []
-      if (modalRes.ok) { const mj = await modalRes.json(); loadedModalities = mj.modalities ?? []; setModalities(loadedModalities) }
+      if (modalRes.ok) {
+        const mj = await modalRes.json()
+        let mods = mj.modalities ?? []
+        // Filter modalities by proposal's commercial config
+        if (initial.commercial_config_id) {
+          mods = mods.filter((m: any) => m.commercial_config_id === initial.commercial_config_id)
+        }
+        loadedModalities = mods
+        setModalities(loadedModalities)
+      }
       if (ctplRes.ok) { const ct = await ctplRes.json(); setContentTemplates(Array.isArray(ct) ? ct : []) }
 
       // ── Auto-populate sections for NEW proposals ──────────────────────────
@@ -819,10 +842,19 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
     }
 
     setApplyingTemplate(true)
+    // Enforce commercial-config defaults on space sections after template apply
+    const spaceOverrides: Record<string, boolean> = {}
+    if (commercialConfig) {
+      const defs = getDefaultSections(commercialConfig)
+      for (const k of ['single_space', 'zones', 'space_groups', 'venue_rental'] as const) {
+        if (!defs[k]) spaceOverrides[k] = false  // force off if config says no
+      }
+    }
     setSections(s => ({
       ...s,
       ...sd,
       content_template_id: templateId,
+      sections_enabled: { ...(s.sections_enabled ?? {}), ...(sd.sections_enabled ?? {}), ...spaceOverrides },
     }))
     // Also apply visual branding from template if set
     if (sd.primary_color) setForm(f => ({ ...f, primary_color: sd.primary_color! }))

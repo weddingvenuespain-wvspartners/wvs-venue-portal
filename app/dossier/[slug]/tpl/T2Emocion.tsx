@@ -182,7 +182,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', padding: '0 24px' }}>
               <div className="hc1" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', borderRadius: 999, background: 'rgba(0,0,0,.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', marginBottom: 22 }}>
                 <span style={{ fontFamily: "'Inter',sans-serif", fontSize: '.68rem', fontWeight: 600, letterSpacing: '.14em', textTransform: 'uppercase', color: '#fff' }}>
-                  Propuesta exclusiva
+                  Vuestra propuesta
                 </span>
                 {venue?.name && (
                   <>
@@ -203,12 +203,16 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
 
       {/* ── AVAILABILITY BANNER ── */}
       {on('availability') && sec.availability_message && (
-        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} guestCount={guests} weddingDate={wedding_date ?? undefined} />
+        <AvailabilityBanner message={sec.availability_message} primary={primary} onPrimary={onPri} guestCount={guests} weddingDate={dateSlots && dateSlots.flatMap(s => s.dates).length > 1 ? undefined : (wedding_date ?? undefined)} />
       )}
 
       {/* ── DATE SELECTOR ── */}
       {on('date_slots') && dateSlots && dateSlots.length > 1 && !(on('space_groups') && visibleSpaceGroups.length > 0) && (
-        <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />
+        <section style={{ padding: '40px 0', background: '#faf8f5' }}>
+          <div style={{ maxWidth: 880, margin: '0 auto', padding: '0 32px' }}>
+            <DateSelector slots={dateSlots} primary={primary} onPrimary={onPri} dark={false} font={font} proposalId={data.id} onSelect={setSelectedDateSlotIdx} guestCount={guests} />
+          </div>
+        </section>
       )}
 
       {/* ══════════════════════════════════════════

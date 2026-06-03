@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { DateSlot } from '@/lib/proposal-types'
 
 type Props = {
@@ -15,13 +15,23 @@ type Props = {
 
 /* ── helpers ────────────────────────────────────── */
 
-/** Show dates as individual options: "15 may, 16 may o 17 may" */
+function fmtShort(d: string) {
+  const dt = new Date(d + 'T12:00:00')
+  return dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+}
+
+/** "Sáb 9 sept" */
+function fmtWithDay(d: string) {
+  const dt = new Date(d + 'T12:00:00')
+  const weekday = dt.toLocaleDateString('es-ES', { weekday: 'short' })
+  const day = dt.getDate()
+  const month = dt.toLocaleDateString('es-ES', { month: 'short' })
+  return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)} ${day} ${month}`
+}
+
 function fmtDatesAsOptions(dates: string[]): string {
   if (!dates.length) return ''
-  const labels = dates.map(d => {
-    const dt = new Date(d + 'T12:00:00')
-    return dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
-  })
+  const labels = dates.map(fmtWithDay)
   if (labels.length === 1) return labels[0]
   return labels.slice(0, -1).join(', ') + ' o ' + labels[labels.length - 1]
 }
@@ -36,11 +46,35 @@ function hexToRgb(hex: string) {
   return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) }
 }
 
+/** Get all unique months from slots for calendar view */
+function getMonths(slots: DateSlot[]) {
+  const all = slots.flatMap(s => s.dates).sort()
+  const months = new Map<string, Date>()
+  for (const d of all) {
+    const dt = new Date(d + 'T12:00:00')
+    const key = `${dt.getFullYear()}-${dt.getMonth()}`
+    if (!months.has(key)) months.set(key, new Date(dt.getFullYear(), dt.getMonth(), 1))
+  }
+  return Array.from(months.values())
+}
+
+/** Build calendar grid for a month */
+function buildCalendarDays(monthStart: Date) {
+  const year = monthStart.getFullYear()
+  const month = monthStart.getMonth()
+  const firstDay = (new Date(year, month, 1).getDay() + 6) % 7 // Monday = 0
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const cells: (number | null)[] = Array(firstDay).fill(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  return cells
+}
+
+const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+
 /* ── component ──────────────────────────────────── */
 
-export default function DateSelector({ slots, primary, onPrimary, dark = false, font, proposalId: _pid, onSelect, guestCount }: Props) {
+export default function DateSelector({ slots, primary, onPrimary, dark = false, font, proposalId: _pid, onSelect, guestCount: _gc }: Props) {
   const [selected, setSelected] = useState<number | null>(null)
-  const [showAll, setShowAll] = useState(false)
 
   const textColor  = dark ? '#fff' : '#1a1a1a'
   const subColor   = dark ? 'rgba(255,255,255,.5)' : '#888'
@@ -50,8 +84,18 @@ export default function DateSelector({ slots, primary, onPrimary, dark = false, 
 
   const samePrice   = allSamePrice(slots)
   const interactive = slots.length > 1
+  const useCalendar = slots.length > 6
 
   const { r, g, b } = hexToRgb(primary.length === 7 ? primary : '#8b7355')
+
+  // Map date string → slot index for calendar mode
+  const dateToSlot = useMemo(() => {
+    const map = new Map<string, number>()
+    slots.forEach((slot, i) => { slot.dates.forEach(d => map.set(d, i)) })
+    return map
+  }, [slots])
+
+  const months = useMemo(() => getMonths(slots), [slots])
 
   const handleSelect = (i: number) => {
     const next = selected === i ? null : i
@@ -61,164 +105,169 @@ export default function DateSelector({ slots, primary, onPrimary, dark = false, 
 
   /* ── render ── */
   return (
-    <section style={{ padding: '80px 0', background: secBg }}>
-      <div style={{ maxWidth: 880, margin: '0 auto', padding: '0 32px' }}>
-
+    <div>
         {/* ── Header ── */}
-        <div style={{ textAlign: 'center', marginBottom: 48 }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '6px 16px', borderRadius: 999,
-            background: `rgba(${r},${g},${b},.08)`, marginBottom: 16,
-          }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            <span style={{ fontSize: '.68rem', fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', color: primary }}>
-              {interactive ? 'Elegid vuestra fecha' : 'Fechas disponibles'}
-            </span>
-          </div>
-          <h2 style={{
-            fontFamily: font, fontSize: 'clamp(1.4rem,2.2vw,2rem)', fontWeight: 300,
-            color: textColor, lineHeight: 1.25, margin: 0,
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          <h3 style={{
+            fontFamily: "'Inter',sans-serif", fontSize: '.85rem', fontWeight: 600, letterSpacing: '.01em',
+            color: textColor, lineHeight: 1.3, margin: 0,
           }}>
             {interactive
-              ? (samePrice ? 'Seleccionad vuestra fecha preferida' : 'Cada fecha tiene condiciones distintas')
-              : 'Tenemos disponibilidad para vosotros'}
-          </h2>
-          {interactive && (
-            <p style={{ fontSize: '.82rem', color: subColor, marginTop: 10, lineHeight: 1.6, maxWidth: 440, margin: '10px auto 0' }}>
-              {samePrice ? 'Indicadnos cuándo os gustaría celebrar vuestra boda' : 'Seleccionad la opción que mejor se adapte'}
-            </p>
-          )}
-          {guestCount && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 16, padding: '5px 14px', borderRadius: 999, background: `rgba(${r},${g},${b},.06)`, border: `1px solid rgba(${r},${g},${b},.12)` }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              <span style={{ fontSize: '.72rem', fontWeight: 600, color: primary }}>{guestCount} invitados</span>
-            </div>
+              ? (samePrice ? 'Elegid vuestra fecha' : 'Fecha y precio')
+              : 'Vuestra fecha'}
+          </h3>
+          {interactive && !samePrice && (
+            <span style={{ fontFamily: "'Inter',sans-serif", fontSize: '.75rem', color: subColor, fontWeight: 400 }}>
+              Cada opción tiene un precio distinto
+            </span>
           )}
         </div>
 
-        {/* ── Interactive: horizontal cards with radio ── */}
+        {/* ── Interactive: chips or calendar ── */}
         {interactive ? (
-          <div style={{
-            display: 'flex', flexDirection: 'column', gap: 10,
-            maxWidth: 540, margin: '0 auto',
-          }}>
-            {(showAll ? slots : slots.slice(0, 2)).map((slot, i) => {
-              const isSel = selected === i
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => handleSelect(i)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14,
-                    padding: '16px 20px', textAlign: 'left', width: '100%',
-                    background: isSel ? `rgba(${r},${g},${b},.05)` : cardBg,
-                    border: `2px solid ${isSel ? primary : cardBorder}`,
-                    borderRadius: 12, cursor: 'pointer',
-                    transition: 'all .2s ease',
-                    boxShadow: isSel ? `0 0 0 3px rgba(${r},${g},${b},.1)` : 'none',
-                  }}
-                >
-                  {/* Radio circle */}
-                  <div style={{
-                    width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                    border: `2px solid ${isSel ? primary : cardBorder}`,
-                    background: isSel ? primary : 'transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'all .2s',
-                  }}>
-                    {isSel && <div style={{ width: 7, height: 7, borderRadius: '50%', background: onPrimary }} />}
-                  </div>
-
-                  {/* Dates text */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '.88rem', fontWeight: 600, color: textColor }}>
-                      {fmtDatesAsOptions(slot.dates)}
+          useCalendar ? (
+            /* ── Calendar mode (>5 slots) ── */
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+              {months.map((monthStart, mi) => {
+                const cells = buildCalendarDays(monthStart)
+                const year = monthStart.getFullYear()
+                const month = monthStart.getMonth()
+                return (
+                  <div key={mi} style={{ flex: '0 0 auto' }}>
+                    <div style={{ fontSize: '.75rem', fontWeight: 600, color: textColor, marginBottom: 8, textTransform: 'capitalize' }}>
+                      {monthStart.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
                     </div>
-                    {slot.label && (
-                      <div style={{ fontSize: '.72rem', color: subColor, marginTop: 2 }}>{slot.label}</div>
-                    )}
-                    {slot.notes && (
-                      <div style={{ fontSize: '.7rem', color: subColor, fontStyle: 'italic', marginTop: 3 }}>{slot.notes}</div>
-                    )}
-                  </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 36px)', gap: 2 }}>
+                      {WEEKDAYS.map(w => (
+                        <div key={w} style={{ fontSize: '.6rem', fontWeight: 600, color: subColor, textAlign: 'center', padding: '4px 0' }}>{w}</div>
+                      ))}
+                      {cells.map((day, ci) => {
+                        if (day === null) return <div key={`e${ci}`} />
+                        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                        const slotIdx = dateToSlot.get(dateStr)
+                        const available = slotIdx !== undefined
+                        const isSel = available && selected === slotIdx
+                        const slot = available ? slots[slotIdx] : null
+                        const price = slot?.price_rental || slot?.price_per_person || ''
 
-                  {/* Price on right */}
-                  {(slot.price_rental || slot.price_per_person) && (
-                    <div style={{
-                      fontSize: '1.1rem', fontWeight: 700, fontFamily: font,
-                      color: isSel ? primary : textColor, flexShrink: 0,
-                      transition: 'color .2s',
-                    }}>
-                      {slot.price_rental || slot.price_per_person}
+                        return (
+                          <button
+                            key={ci}
+                            type="button"
+                            disabled={!available}
+                            onClick={() => available && handleSelect(slotIdx)}
+                            title={available ? `${fmtShort(dateStr)}${price ? ` — ${price}` : ''}` : ''}
+                            style={{
+                              width: 36, height: 36, borderRadius: 8,
+                              fontSize: '.78rem', fontWeight: available ? 600 : 400,
+                              border: isSel ? `2px solid ${primary}` : available ? `1.5px solid ${cardBorder}` : '1px solid transparent',
+                              background: isSel ? `rgba(${r},${g},${b},.12)` : available ? cardBg : 'transparent',
+                              color: isSel ? primary : available ? textColor : `${dark ? 'rgba(255,255,255,.2)' : 'rgba(0,0,0,.2)'}`,
+                              cursor: available ? 'pointer' : 'default',
+                              transition: 'all .15s',
+                              padding: 0,
+                            }}
+                          >
+                            {day}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Selected slot detail */}
+              {selected !== null && slots[selected] && (
+                <div style={{
+                  flex: '1 1 200px', padding: '16px 20px', borderRadius: 10,
+                  background: `rgba(${r},${g},${b},.05)`, border: `1.5px solid ${primary}`,
+                  alignSelf: 'flex-start',
+                }}>
+                  <div style={{ fontSize: '.85rem', fontWeight: 600, color: textColor, marginBottom: 4 }}>
+                    {fmtDatesAsOptions(slots[selected].dates)}
+                  </div>
+                  {(slots[selected].price_rental || slots[selected].price_per_person) && (
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, fontFamily: font, color: primary, marginBottom: 4 }}>
+                      {slots[selected].price_rental || slots[selected].price_per_person}
                     </div>
                   )}
-                </button>
-              )
-            })}
-            {!showAll && slots.length > 2 && (
-              <button
-                type="button"
-                onClick={() => setShowAll(true)}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: '.78rem', fontWeight: 600, color: primary,
-                  padding: '8px 0', textAlign: 'center',
-                }}
-              >
-                Ver {slots.length - 2} fecha{slots.length - 2 > 1 ? 's' : ''} más
-              </button>
-            )}
-          </div>
+                  {slots[selected].notes && (
+                    <div style={{ fontSize: '.72rem', color: subColor, fontStyle: 'italic' }}>{slots[selected].notes}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── Chip mode (≤6 slots) — horizontal, full width ── */
+            <div style={{ display: 'flex', gap: 8 }}>
+              {slots.map((slot, i) => {
+                const isSel = selected === i
+                const price = slot.price_rental || slot.price_per_person || ''
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSelect(i)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                      padding: '10px 16px', flex: 1, minWidth: 0,
+                      background: isSel ? `rgba(${r},${g},${b},.08)` : cardBg,
+                      border: `1.5px solid ${isSel ? primary : cardBorder}`,
+                      borderRadius: 10, cursor: 'pointer',
+                      transition: 'all .15s ease',
+                      boxShadow: isSel ? `0 0 0 2px rgba(${r},${g},${b},.1)` : 'none',
+                    }}
+                  >
+                    {/* Radio dot */}
+                    <div style={{
+                      width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                      border: `2px solid ${isSel ? primary : cardBorder}`,
+                      background: isSel ? primary : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all .15s',
+                    }}>
+                      {isSel && <div style={{ width: 6, height: 6, borderRadius: '50%', background: onPrimary }} />}
+                    </div>
+                    <span style={{ fontSize: '.82rem', fontWeight: 500, color: isSel ? primary : textColor, whiteSpace: 'nowrap' }}>
+                      {fmtDatesAsOptions(slot.dates)}
+                    </span>
+                    {price && (
+                      <>
+                        <span style={{ width: 1, height: 14, background: cardBorder, flexShrink: 0 }} />
+                        <span style={{ fontSize: '.82rem', fontWeight: 700, color: isSel ? primary : textColor, whiteSpace: 'nowrap' }}>
+                          {price}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )
         ) : (
-          /* ── Non-interactive: single slot display ── */
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20,
-          }}>
+          /* ── Non-interactive: single slot ── */
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             {slots[0]?.price_per_person && (
-              <div style={{
-                display: 'inline-flex', alignItems: 'baseline', gap: 6,
-                padding: '10px 28px', borderRadius: 12,
-                background: `rgba(${r},${g},${b},.06)`,
-              }}>
-                <span style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: font, color: primary }}>
-                  {slots[0].price_per_person}
-                </span>
-                {slots[0].price_rental && (
-                  <span style={{ fontSize: '.75rem', color: subColor }}>· {slots[0].price_rental} total</span>
-                )}
+              <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, padding: '8px 18px', borderRadius: 10, background: `rgba(${r},${g},${b},.06)` }}>
+                <span style={{ fontSize: '1.1rem', fontWeight: 700, fontFamily: font, color: primary }}>{slots[0].price_per_person}</span>
+                {slots[0].price_rental && <span style={{ fontSize: '.72rem', color: subColor }}>· {slots[0].price_rental} total</span>}
               </div>
             )}
             {!slots[0]?.price_per_person && slots[0]?.price_rental && (
-              <div style={{
-                display: 'inline-flex', alignItems: 'baseline', gap: 6,
-                padding: '10px 28px', borderRadius: 12,
-                background: `rgba(${r},${g},${b},.06)`,
-              }}>
-                <span style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: font, color: primary }}>
-                  {slots[0].price_rental}
-                </span>
+              <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, padding: '8px 18px', borderRadius: 10, background: `rgba(${r},${g},${b},.06)` }}>
+                <span style={{ fontSize: '1.1rem', fontWeight: 700, fontFamily: font, color: primary }}>{slots[0].price_rental}</span>
               </div>
             )}
-
             {slots.flatMap(s => s.dates).length > 0 && (
-              <div style={{ fontSize: '.9rem', color: textColor, textAlign: 'center' }}>
-                {fmtDatesAsOptions(slots.flatMap(s => s.dates))}
-              </div>
+              <span style={{ fontSize: '.82rem', color: subColor }}>{fmtDatesAsOptions(slots.flatMap(s => s.dates))}</span>
             )}
-
             {slots[0]?.notes && (
-              <div style={{ fontSize: '.78rem', color: subColor, textAlign: 'center', maxWidth: 400 }}>{slots[0].notes}</div>
+              <span style={{ fontSize: '.75rem', color: subColor, fontStyle: 'italic' }}>{slots[0].notes}</span>
             )}
           </div>
         )}
 
-      </div>
-    </section>
+    </div>
   )
 }

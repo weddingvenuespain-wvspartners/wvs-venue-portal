@@ -1126,9 +1126,8 @@ function LeadsPageInner() {
   const handlePdfDigitalDates = async (_leadUpdates: any, calendarDates: string[], _calStatus: any, _isVisit: boolean) => {
     if (!pdfDigitalLead || !user) return
     const sorted = calendarDates.slice().sort()
-    const dateSlots = sorted.length > 0
-      ? [{ label: 'Fechas propuestas', dates: sorted }]
-      : []
+    // One slot per date so couple can pick their preferred date
+    const dateSlots = sorted.map(d => ({ label: '', dates: [d], price_rental: '', price_per_person: '', notes: '' }))
 
     // Persist chosen dates on the lead so the editor sidebar shows them all
     if (sorted.length > 0) {
@@ -1180,6 +1179,7 @@ function LeadsPageInner() {
   }
 
   const existingEmails = useMemo(() => new Set(leads.map(l => (l.email || '').toLowerCase()).filter(Boolean)), [leads])
+  const existingPhones = useMemo(() => new Set(leads.map(l => (l.phone || '').replace(/[\s\-().]/g, '')).filter(Boolean)), [leads])
 
   const openCreate = () => { setForm(emptyForm); setEditLead(null); setShowForm(true) }
   const openEdit   = (lead: any) => {
@@ -1798,6 +1798,7 @@ function LeadsPageInner() {
         userId={user!.id}
         venueId={activeVenue!.id}
         existingEmails={existingEmails}
+        existingPhones={existingPhones}
         onImported={load}
       />
 

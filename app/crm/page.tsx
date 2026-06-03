@@ -10,11 +10,12 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import {
   Plus, Search, X, Phone, Mail, MessageCircle, Heart,
-  ChevronRight, Calendar, Download, ArrowUpDown, StickyNote,
+  ChevronRight, Calendar, Download, Upload, ArrowUpDown, StickyNote,
   Users, CheckCircle2, Crown, AlertTriangle, Merge,
 } from 'lucide-react'
 import type { Client, ClientType, ClientWithStats } from '@/lib/clients'
 import { CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS } from '@/lib/clients'
+import ImportContactsModal from '@/components/ImportContactsModal'
 
 const STATUS_LABEL: Record<string, string> = {
   new: 'Nuevo', contacted: 'Contactado', proposal_sent: 'Propuesta enviada',
@@ -73,6 +74,11 @@ export default function CrmListPage() {
   const [notesClientId, setNotesClientId] = useState<string | null>(null)
   const [notesValue, setNotesValue] = useState('')
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Import modal
+  const [showImport, setShowImport] = useState(false)
+  const existingEmails = useMemo(() => new Set(clients.map(c => (c.email || '').toLowerCase()).filter(Boolean)), [clients])
+  const existingPhones = useMemo(() => new Set(clients.map(c => (c.phone || '').replace(/[\s\-().]/g, '')).filter(Boolean)), [clients])
 
   // Duplicates
   type DuplicateGroup = { primary: ClientWithStats; duplicates: ClientWithStats[]; reason: string }
@@ -318,9 +324,10 @@ export default function CrmListPage() {
   }
 
   // ── CSV Export ─────────────────────────────────────────────────────────────────
-  const exportCSV = () => {
-    const headers = ['Nombre', 'Tipo', 'Email', 'Teléfono', 'WhatsApp', 'Leads activos', 'Último estado', 'Fecha boda', 'Presupuesto', 'Notas', 'Creado']
-    const rows = filtered.map(c => {
+  const exportExcel = async () => {
+    const XLSX = await import('xlsx')
+    const headers = ['Nombre', 'Tipo', 'Email', 'Teléfono', 'WhatsApp', 'País', 'Idioma', 'Etiquetas', 'Leads activos', 'Último estado', 'Fecha boda', 'Presupuesto', 'Notas', 'Creado']
+    const dataRows = filtered.map(c => {
       const ll = (c as any)._latestLead
       return [
         c.name,
@@ -328,7 +335,10 @@ export default function CrmListPage() {
         c.email ?? '',
         c.phone ?? '',
         c.whatsapp ?? '',
-        String(c.active_leads),
+        c.country ?? '',
+        c.language ?? '',
+        Array.isArray(c.tags) ? c.tags.join(', ') : '',
+        c.active_leads,
         ll ? (STATUS_LABEL[ll.status] ?? ll.status) : '',
         ll?.wedding_date ?? '',
         ll?.budget ? (BUDGET_LABELS[ll.budget] ?? ll.budget) : '',
@@ -336,14 +346,11 @@ export default function CrmListPage() {
         c.created_at?.split('T')[0] ?? '',
       ]
     })
-    const csvContent = [headers, ...rows].map(r => r.map(v => `"${(v || '').replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `contactos_${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 16) }))
+    XLSX.utils.book_append_sheet(wb, ws, 'Contactos')
+    XLSX.writeFile(wb, `contactos_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
   const fmtDate = (d: string | null) => {
@@ -361,27 +368,23 @@ export default function CrmListPage() {
   return (
     <>
       <Sidebar />
-      <div className="main-layout" style={{ padding: '24px 28px' }}>
-
-        {/* ── Header ─────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--charcoal)', margin: 0 }}>Contactos</h1>
-            <p style={{ fontSize: 13, color: 'var(--warm-gray)', margin: '4px 0 0' }}>
-              Directorio de contactos
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={exportCSV}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', background: '#fff', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer' }}>
-              <Download size={14} /> CSV
+      <div className="main-layout">
+        <div className="topbar">
+          <div className="topbar-title">Contactos</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowImport(true)} title="Importar contactos desde Excel">
+              <Upload size={13} /> Importar
             </button>
-            <button onClick={() => setShowNewModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13, fontWeight: 600, color: '#fff', background: 'var(--gold)', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-              <Plus size={14} /> Nuevo contacto
+            <button className="btn btn-ghost btn-sm" onClick={exportExcel} title="Exportar contactos a Excel">
+              <Download size={13} /> Exportar
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowNewModal(true)}>
+              <Plus size={13} /> Nuevo contacto
             </button>
           </div>
         </div>
+
+        <div className="page-content">
 
         {/* ── KPI cards ──────────────────────────────────────────────── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
@@ -752,6 +755,19 @@ export default function CrmListPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        </div>{/* /page-content */}
+
+      {activeVenue && (
+        <ImportContactsModal
+          open={showImport}
+          onClose={() => setShowImport(false)}
+          venueId={activeVenue.id}
+          existingEmails={existingEmails}
+          existingPhones={existingPhones}
+          onImported={loadData}
+        />
+      )}
 
       </div>
     </>

@@ -10,9 +10,11 @@ import { usePlanFeatures } from '@/lib/use-plan-features'
 import {
   Plus, ChevronDown, ChevronUp, Pencil, Trash2, Copy,
   X, Check, Sun, Moon, CalendarDays, Package, SlidersHorizontal,
-  Building2, Users, Layers, CreditCard, LayoutGrid, Settings2, ChevronRight, ChevronLeft,
+  Building2, Users, Layers, CreditCard, LayoutGrid, Settings2, ChevronRight, ChevronLeft, BedDouble, HelpCircle,
 } from 'lucide-react'
 import FeatureGate from '@/components/FeatureGate'
+import LodgingEditor from '@/components/LodgingEditor'
+import ConfigHelperModal from '@/components/ConfigHelperModal'
 import { createClient } from '@/lib/supabase'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import DatePicker, { fmtDate } from '@/components/DatePicker'
@@ -48,8 +50,9 @@ type CommercialConfig = {
   catering_mandatory?: boolean   // si catering_own: ¿es obligatorio contratarlo?
 }
 
-type WizardQuestion = 'space_type' | 'price_model'
-type WizardConfig   = Partial<CommercialConfig>
+type ConfigType = 'space' | 'lodging'
+type WizardQuestion = 'config_type' | 'space_type' | 'price_model'
+type WizardConfig   = Partial<CommercialConfig> & { config_type?: ConfigType }
 
 type ZoneItem       = { id: string; name: string }
 type SupplementItem = { id: string; name: string }
@@ -395,6 +398,7 @@ export default function EstructuraPage() {
 
   const [activeTab, setActiveTab]             = useState<'modalidades' | 'visitas'>('modalidades')
   const [modalities, setModalities]           = useState<Modality[]>([])
+  const [allModalities, setAllModalities]     = useState<Modality[]>([])  // unfiltered
   const [loading, setLoading]                 = useState(true)
   const [expanded, setExpanded]               = useState<Set<string>>(new Set())
   const [pricesCollapsed, setPricesCollapsed] = useState<Set<string>>(new Set())
@@ -407,10 +411,21 @@ export default function EstructuraPage() {
   const [error, setError]                     = useState('')
   const [commercialConfig, setCommercialConfig] = useState<CommercialConfig | null>(null)
   const [configWizardOpen, setConfigWizardOpen]   = useState(false)
-  const [wizardQuestion, setWizardQuestion]       = useState<WizardQuestion>('space_type')
+  const [wizardQuestion, setWizardQuestion]       = useState<WizardQuestion>('config_type')
   const [wizardHistory, setWizardHistory]         = useState<WizardQuestion[]>([])
   const [wizardConfig, setWizardConfig]           = useState<WizardConfig>({})
   const [configSaving, setConfigSaving]           = useState(false)
+
+  // ── Multiple commercial configs ──
+  type CommercialConfigRow = { id: string; name: string; config: CommercialConfig; config_type?: ConfigType; is_default: boolean; sort_order: number; venue_id: string }
+  const [commercialConfigs, setCommercialConfigs] = useState<CommercialConfigRow[]>([])
+  const [activeConfigId, setActiveConfigId]       = useState<string | null>(null)
+  const [editingConfigId, setEditingConfigId]     = useState<string | null>(null)  // which config the wizard is editing (null = new)
+  const [configNameInput, setConfigNameInput]     = useState('')
+  const [renamingConfigId, setRenamingConfigId]   = useState<string | null>(null)
+  const [renameValue, setRenameValue]             = useState('')
+  const [configDropdownOpen, setConfigDropdownOpen] = useState(false)
+  const [configHelperOpen, setConfigHelperOpen] = useState(false)
 
   // Zones, supplements & space groups
   const [zones, setZones]                   = useState<ZoneItem[]>([])
@@ -516,9 +531,10 @@ export default function EstructuraPage() {
   const load = async () => {
     if (!activeVenue) { setLoading(false); return }
     const supabase = createClient()
-    const [res, { data: settingsRow }] = await Promise.all([
+    const [res, { data: settingsRow }, configsRes] = await Promise.all([
       fetch(`/api/estructura/modalities?venue_id=${activeVenue.id}`),
       supabase.from('venue_settings').select('commercial_config, zones, supplements, space_groups, visit_availability, google_calendar').eq('user_id', user!.id).eq('venue_id', activeVenue.id).maybeSingle(),
+      fetch(`/api/estructura/commercial-configs?venue_id=${activeVenue.id}`),
     ])
     const json = await res.json()
     if (!res.ok) { setError(json.error ?? 'Error al cargar'); setLoading(false); return }
@@ -531,8 +547,26 @@ export default function EstructuraPage() {
         prices: (pkg.prices ?? []).sort((a: any, b: any) => a.date_from.localeCompare(b.date_from)),
       })),
     }))
-    setModalities(mods)
-    if (settingsRow?.commercial_config) setCommercialConfig(settingsRow.commercial_config as CommercialConfig)
+    setAllModalities(mods)
+
+    // Load commercial configs
+    const configsJson = await configsRes.json().catch(() => ({ configs: [] }))
+    const configs: CommercialConfigRow[] = configsJson.configs ?? []
+    setCommercialConfigs(configs)
+
+    // Set active config: prefer default, else first, else null
+    const defaultCfg = configs[0]  // no longer use is_default — just pick first config to show
+    if (defaultCfg) {
+      setActiveConfigId(defaultCfg.id)
+      setCommercialConfig(defaultCfg.config)
+      // Filter modalities by this config
+      setModalities(mods.filter((m: Modality & { commercial_config_id?: string }) => m.commercial_config_id === defaultCfg.id))
+    } else {
+      // Fallback: use venue_settings.commercial_config (legacy)
+      setModalities(mods)
+      if (settingsRow?.commercial_config) setCommercialConfig(settingsRow.commercial_config as CommercialConfig)
+    }
+
     if (settingsRow?.zones)        setZones(settingsRow.zones as ZoneItem[])
     if (settingsRow?.supplements)  setSupplements(settingsRow.supplements as SupplementItem[])
     if (Array.isArray(settingsRow?.space_groups)) {
@@ -550,6 +584,24 @@ export default function EstructuraPage() {
     setLoading(false)
   }
 
+  // Helper: update both modalities + allModalities in sync
+  const updateModalities = (updater: (prev: Modality[]) => Modality[]) => {
+    setModalities(updater)
+    setAllModalities(updater)
+  }
+
+  // When active config changes, update filtered modalities and commercialConfig
+  const switchConfig = (configId: string) => {
+    setActiveConfigId(configId)
+    const cfg = commercialConfigs.find(c => c.id === configId)
+    if (cfg) {
+      const isLodging = (cfg.config_type ?? 'space') === 'lodging'
+      // Lodging configs don't drive space sub-tabs — clear so existing conditions evaluate false
+      setCommercialConfig(isLodging ? null : cfg.config)
+      setModalities(allModalities.filter((m: any) => m.commercial_config_id === configId))
+    }
+  }
+
   const saveSettings = async (patch: Record<string, unknown>) => {
     const res = await fetch('/api/estructura/save-settings', {
       method: 'POST',
@@ -564,12 +616,48 @@ export default function EstructuraPage() {
     return true
   }
 
-  const saveCommercialConfig = async (cfg: CommercialConfig) => {
+  const saveCommercialConfig = async (cfg: WizardConfig) => {
     setConfigSaving(true)
-    await saveSettings({ commercial_config: cfg })
-    setCommercialConfig(cfg)
+    const ct: ConfigType = cfg.config_type === 'lodging' ? 'lodging' : 'space'
+    // Only persist space-type config to legacy venue_settings (lodging has its own tables)
+    if (ct === 'space' && cfg.space_type && cfg.price_model) {
+      await saveSettings({ commercial_config: cfg as CommercialConfig })
+    }
+
+    const cfgPayload = ct === 'lodging' ? {} : (cfg as CommercialConfig)
+
+    if (editingConfigId) {
+      // Update existing named config (don't change config_type on edit)
+      const res = await fetch(`/api/estructura/commercial-configs/${editingConfigId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: cfgPayload }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        setCommercialConfigs(prev => prev.map(c => c.id === editingConfigId ? json.config : c))
+      }
+    } else {
+      // Create new named config
+      const name = configNameInput.trim() || (ct === 'lodging' ? 'Alojamiento ' + (commercialConfigs.length + 1) : 'Configuración ' + (commercialConfigs.length + 1))
+      const isFirst = commercialConfigs.filter(c => (c.config_type ?? 'space') === ct).length === 0
+      const res = await fetch('/api/estructura/commercial-configs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ venue_id: activeVenue?.id, name, config: cfgPayload, config_type: ct, is_default: false, sort_order: commercialConfigs.length }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        setCommercialConfigs(prev => [...prev, json.config])
+        setActiveConfigId(json.config.id)
+      }
+    }
+
+    if (ct === 'space' && cfg.space_type && cfg.price_model) setCommercialConfig(cfg as CommercialConfig)
     setConfigSaving(false)
     setConfigWizardOpen(false)
+    setEditingConfigId(null)
+    setConfigNameInput('')
   }
 
   const saveZonesSupplements = async (newZones: ZoneItem[], newSupps: SupplementItem[]) => {
@@ -620,10 +708,22 @@ export default function EstructuraPage() {
     await saveZonesSupplements(zones, next)
   }
 
-  const openWizard = () => {
-    setWizardQuestion('space_type')
+  const openWizard = (cfgId?: string) => {
     setWizardHistory([])
-    setWizardConfig(commercialConfig ?? {})
+    if (cfgId) {
+      const existing = commercialConfigs.find(c => c.id === cfgId)
+      const ct = (existing?.config_type ?? 'space') as ConfigType
+      setWizardConfig({ ...(existing?.config ?? {}), config_type: ct })
+      setEditingConfigId(cfgId)
+      // For lodging, no follow-up questions — open wizard with config_type already set, no question to answer
+      // For space, start at space_type (editing existing)
+      setWizardQuestion(ct === 'lodging' ? 'config_type' : 'space_type')
+    } else {
+      setWizardConfig({})
+      setEditingConfigId(null)
+      setConfigNameInput('')
+      setWizardQuestion('config_type')
+    }
     setConfigWizardOpen(true)
   }
 
@@ -639,7 +739,8 @@ export default function EstructuraPage() {
     setWizardQuestion(prev)
   }
 
-  const isWizardDone = (cfg: WizardConfig): cfg is CommercialConfig => {
+  const isWizardDone = (cfg: WizardConfig): boolean => {
+    if (cfg.config_type === 'lodging') return true  // lodging only needs config_type
     return !!(cfg.space_type && cfg.price_model)
   }
 
@@ -651,7 +752,13 @@ export default function EstructuraPage() {
 
   // ── Modality CRUD ──────────────────────────────────────────────────────────
 
-  const openCreate = () => { setEditing(null); setModalForm(emptyModalForm); setModalError(''); setModalOpen(true) }
+  const openCreate = () => {
+    if (!activeConfigId) {
+      alert('Selecciona o crea primero una configuración comercial. Toda modalidad pertenece a una configuración.')
+      return
+    }
+    setEditing(null); setModalForm(emptyModalForm); setModalError(''); setModalOpen(true)
+  }
 
   const openEdit = (m: Modality) => {
     setEditing(m)
@@ -665,13 +772,14 @@ export default function EstructuraPage() {
     try {
       const url    = editing ? `/api/estructura/modalities/${editing.id}` : '/api/estructura/modalities'
       const method = editing ? 'PATCH' : 'POST'
-      const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...modalForm, sort_order: editing?.sort_order ?? modalities.length, venue_id: activeVenue?.id ?? null }) })
+      const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...modalForm, sort_order: editing?.sort_order ?? modalities.length, venue_id: activeVenue?.id ?? null, commercial_config_id: activeConfigId ?? null }) })
       const json   = await res.json()
       if (!res.ok) { setModalError(json.error ?? 'Error al guardar'); setModalSaving(false); return }
+      const newMod = { ...json.modality, packages: editing?.packages ?? [], prices: editing?.prices ?? [] }
       if (editing) {
-        setModalities(prev => prev.map(m => m.id === editing.id ? { ...m, ...json.modality } : m))
+        updateModalities(prev => prev.map(m => m.id === editing.id ? { ...m, ...json.modality } : m))
       } else {
-        setModalities(prev => [...prev, { ...json.modality, packages: [], prices: [] }])
+        updateModalities(prev => [...prev, newMod])
       }
       setModalOpen(false)
     } catch { setModalError('Error de red') }
@@ -682,13 +790,13 @@ export default function EstructuraPage() {
     if (!confirm('¿Eliminar esta modalidad y todos sus paquetes y precios?')) return
     const res = await fetch(`/api/estructura/modalities/${id}`, { method: 'DELETE' })
     if (!res.ok) { setError('Error al eliminar'); return }
-    setModalities(prev => prev.filter(m => m.id !== id))
+    updateModalities(prev => prev.filter(m => m.id !== id))
   }
 
   const toggleActive = async (m: Modality) => {
     const res  = await fetch(`/api/estructura/modalities/${m.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !m.is_active }) })
     const json = await res.json()
-    if (res.ok) setModalities(prev => prev.map(x => x.id === m.id ? { ...x, is_active: json.modality.is_active } : x))
+    if (res.ok) updateModalities(prev => prev.map(x => x.id === m.id ? { ...x, is_active: json.modality.is_active } : x))
   }
 
   // ── Package CRUD ───────────────────────────────────────────────────────────
@@ -710,7 +818,7 @@ export default function EstructuraPage() {
       const res  = await fetch(`/api/estructura/modalities/${addingPkg}/packages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...pkgForm, sort_order: sortOrder, venue_id: activeVenue?.id ?? null }) })
       const json = await res.json()
       if (!res.ok) { setPkgError(json.error ?? 'Error al guardar'); setPkgSaving(false); return }
-      setModalities(prev => prev.map(m => m.id === addingPkg
+      updateModalities(prev => prev.map(m => m.id === addingPkg
         ? { ...m, packages: [...m.packages, json.package] }
         : m
       ))
@@ -730,7 +838,7 @@ export default function EstructuraPage() {
       const res  = await fetch(`/api/estructura/packages/${pkgId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editPkgForm) })
       const json = await res.json()
       if (!res.ok) { setPkgError(json.error ?? 'Error'); setPkgSaving(false); return }
-      setModalities(prev => prev.map(m => m.id === modalityId
+      updateModalities(prev => prev.map(m => m.id === modalityId
         ? { ...m, packages: m.packages.map(p => p.id === pkgId ? { ...p, ...json.package } : p) }
         : m
       ))
@@ -742,7 +850,7 @@ export default function EstructuraPage() {
   const deletePkg = async (modalityId: string, pkgId: string) => {
     if (!confirm('¿Eliminar este paquete y todos sus períodos de precio?')) return
     const res = await fetch(`/api/estructura/packages/${pkgId}`, { method: 'DELETE' })
-    if (res.ok) setModalities(prev => prev.map(m =>
+    if (res.ok) updateModalities(prev => prev.map(m =>
       m.id === modalityId ? { ...m, packages: m.packages.filter(p => p.id !== pkgId) } : m
     ))
   }
@@ -818,7 +926,7 @@ export default function EstructuraPage() {
       const json = await res.json()
       if (!res.ok) { setPriceError(json.error ?? 'Error al guardar'); setPriceSaving(false); return }
 
-      setModalities(prev => prev.map(m => {
+      updateModalities(prev => prev.map(m => {
         if (m.id !== modalityId) return m
         if (packageId) {
           return {
@@ -861,7 +969,7 @@ export default function EstructuraPage() {
       const json = await res.json()
       if (!res.ok) { setPriceError(json.error ?? 'Error'); setPriceSaving(false); return }
 
-      setModalities(prev => prev.map(m => {
+      updateModalities(prev => prev.map(m => {
         if (m.id !== modalityId) return m
         if (packageId) {
           return {
@@ -884,7 +992,7 @@ export default function EstructuraPage() {
   const deletePrice = async (modalityId: string, packageId: string | null, priceId: string) => {
     if (!confirm('¿Eliminar este período de precio?')) return
     const res = await fetch(`/api/estructura/prices/${priceId}`, { method: 'DELETE' })
-    if (res.ok) setModalities(prev => prev.map(m => {
+    if (res.ok) updateModalities(prev => prev.map(m => {
       if (m.id !== modalityId) return m
       if (packageId) {
         return { ...m, packages: m.packages.map(pkg => pkg.id === packageId ? { ...pkg, prices: pkg.prices.filter(p => p.id !== priceId) } : pkg) }
@@ -940,11 +1048,6 @@ export default function EstructuraPage() {
       <div className="main-layout">
         <div className="topbar">
           <div className="topbar-title">Configuración</div>
-          {activeTab === 'modalidades' && (
-            <button className="btn btn-primary btn-sm" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Plus size={14} /> Nueva modalidad
-            </button>
-          )}
         </div>
 
         <Tabs
@@ -963,38 +1066,198 @@ export default function EstructuraPage() {
           {/* ── TAB: MODALIDADES ─────────────────────────────────────────────── */}
           {activeTab === 'modalidades' && <>
 
-          {/* Commercial config banner */}
-          {commercialConfig ? (
-            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Settings2 size={18} style={{ color: 'var(--gold)' }} />
+          {/* ── Commercial configs ── */}
+          {commercialConfigs.length > 0 ? (() => {
+            const activeCc = commercialConfigs.find(c => c.id === activeConfigId)
+            const activeCfg = activeCc?.config
+            const spaceLabel = activeCfg ? ({ single: 'Único', single_with_supplements: 'Base + zonas', multiple_independent: 'Grupos' }[activeCfg.space_type] ?? '') : ''
+            const priceLabel = activeCfg ? ({ rental: 'Alquiler', per_person: 'Por persona', package: 'Paquetes' }[activeCfg.price_model] ?? '') : ''
+            const actions = activeCc ? [
+              { label: 'Editar tipo', icon: <Pencil size={11} />, onClick: () => openWizard(activeCc.id) },
+              { label: 'Duplicar', icon: <Copy size={11} />, onClick: async () => {
+                const res = await fetch(`/api/estructura/commercial-configs/${activeCc.id}/duplicate`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+                })
+                if (res.ok) { load() }
+              } },
+              { label: 'Renombrar', onClick: () => { setRenamingConfigId(activeCc.id); setRenameValue(activeCc.name) } },
+              { label: 'Eliminar', danger: true, onClick: async () => {
+                if (!confirm(`¿Eliminar "${activeCc.name}"? Las modalidades asociadas se eliminarán.`)) return
+                await fetch(`/api/estructura/commercial-configs/${activeCc.id}`, { method: 'DELETE' })
+                setCommercialConfigs(prev => prev.filter(c => c.id !== activeCc.id))
+                const remaining = commercialConfigs.filter(c => c.id !== activeCc.id)
+                if (remaining.length > 0) switchConfig(remaining[0].id)
+                else { setActiveConfigId(null); setCommercialConfig(null); setModalities(allModalities) }
+              } },
+            ] as { label: string; icon?: React.ReactNode; danger?: boolean; onClick: () => void }[] : []
+            return (
+            <div style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, marginBottom: 20 }}>
+              {/* HEADER ROW: title + create + help */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid var(--ivory)', background: 'var(--cream)', borderTopLeftRadius: 11, borderTopRightRadius: 11 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <Settings2 size={14} style={{ color: 'var(--gold)' }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Configuración comercial</span>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 4 }}>Configuración comercial</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {[
-                      { single: 'Precio único', single_with_supplements: 'Base + zonas a elegir', multiple_independent: 'Grupos de espacios' }[commercialConfig.space_type],
-                      { rental: 'Alquiler del espacio', per_person: 'Por persona', package: 'Paquetes' }[commercialConfig.price_model],
-                      commercialConfig.menu_included === true ? 'Menú incluido' : commercialConfig.menu_included === false ? 'Menú aparte' : null,
-                      commercialConfig.has_menu_types === true ? 'Varios menús' : null,
-                      commercialConfig.catering_own === true ? (commercialConfig.catering_mandatory ? 'Catering propio obligatorio' : 'Catering propio opcional') : commercialConfig.catering_own === false ? 'Sin catering propio' : null,
-                    ].filter(Boolean).map((tag, i) => (
-                      <span key={i} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--charcoal)', fontWeight: 500 }}>{tag}</span>
-                    ))}
-                  </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <button onClick={() => setConfigHelperOpen(true)} title="¿Qué configuración escoger?"
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: '#fff', color: 'var(--gold)', border: '1px solid var(--gold)', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                    <HelpCircle size={12} /> Ayuda
+                  </button>
+                  <button onClick={() => openWizard()} title="Crear nueva configuración"
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 11px', background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                    <Plus size={12} /> Nueva
+                  </button>
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={openWizard} style={{ flexShrink: 0 }}>Editar</button>
               </div>
-              {modalities.length > 0 && (
-                <div style={{ display: 'flex', gap: 20, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--ivory)' }}>
-                  <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{modalities.filter(m => m.is_active).length}</strong> activas</span>
-                  <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{modalities.length}</strong> total</span>
-                  <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}><strong style={{ color: 'var(--charcoal)' }}>{totalPrices}</strong> tarifas</span>
+
+              {/* BODY: selector + active config preview + actions */}
+              <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                {/* Dropdown selector */}
+                <div style={{ position: 'relative', flex: '1 1 280px', minWidth: 220 }}>
+                  {renamingConfigId === activeCc?.id ? (
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={e => setRenameValue(e.target.value)}
+                      onBlur={async () => {
+                        if (activeCc && renameValue.trim() && renameValue.trim() !== activeCc.name) {
+                          await fetch(`/api/estructura/commercial-configs/${activeCc.id}`, {
+                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: renameValue.trim() }),
+                          })
+                          setCommercialConfigs(prev => prev.map(c => c.id === activeCc.id ? { ...c, name: renameValue.trim() } : c))
+                        }
+                        setRenamingConfigId(null)
+                      }}
+                      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setRenamingConfigId(null) }}
+                      style={{ width: '100%', fontSize: 13, fontWeight: 600, border: '1.5px solid var(--gold)', borderRadius: 8, padding: '8px 12px', outline: 'none' }}
+                    />
+                  ) : (() => {
+                    const isLodging = (activeCc?.config_type ?? 'space') === 'lodging'
+                    const typeColor = isLodging ? '#47648A' : '#4A6B52'
+                    const typeBg    = isLodging ? '#EEF2F7' : '#EDF2ED'
+                    const TypeIcon  = isLodging ? BedDouble : Building2
+                    return (
+                      <button onClick={() => setConfigDropdownOpen(v => !v)}
+                        style={{
+                          width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                          border: '1.5px solid var(--ivory)', borderRadius: 8, background: '#fff',
+                          cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ivory)' }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 7, background: typeBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <TypeIcon size={15} style={{ color: typeColor }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeCc?.name ?? 'Selecciona…'}</span>
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: typeBg, color: typeColor, letterSpacing: '.04em', textTransform: 'uppercase', flexShrink: 0 }}>{isLodging ? 'Alojamiento' : 'Espacio'}</span>
+                          </div>
+                          {activeCfg && !isLodging && (
+                            <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 2 }}>{spaceLabel} · {priceLabel}</div>
+                          )}
+                        </div>
+                        <ChevronDown size={14} style={{ color: 'var(--warm-gray)', flexShrink: 0, transform: configDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+                      </button>
+                    )
+                  })()}
+
+                  {configDropdownOpen && (() => {
+                    const spaceCfgs   = commercialConfigs.filter(c => (c.config_type ?? 'space') === 'space')
+                    const lodgingCfgs = commercialConfigs.filter(c => c.config_type === 'lodging')
+
+                    const renderCard = (cc: any) => {
+                      const isActive = cc.id === activeConfigId
+                      const isLg = cc.config_type === 'lodging'
+                      const cfg = cc.config
+                      const cfgMods = allModalities.filter((m: any) => m.commercial_config_id === cc.id)
+                      const sL = cfg.space_type ? (({ single: 'Único', single_with_supplements: 'Base + zonas', multiple_independent: 'Grupos' } as Record<string, string>)[cfg.space_type] ?? '') : ''
+                      const pL = cfg.price_model ? (({ rental: 'Alquiler', per_person: 'Por persona', package: 'Paquetes' } as Record<string, string>)[cfg.price_model] ?? '') : ''
+                      const TypeIcon = isLg ? BedDouble : Building2
+                      const typeColor = isLg ? '#47648A' : '#4A6B52'
+                      const typeBg    = isLg ? '#EEF2F7' : '#EDF2ED'
+                      return (
+                        <button key={cc.id} onClick={() => { switchConfig(cc.id); setConfigDropdownOpen(false) }}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: 'none', borderRadius: 6, background: isActive ? 'rgba(74,107,82,0.08)' : 'transparent', cursor: 'pointer', textAlign: 'left', transition: 'background .1s' }}
+                          onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--cream)' }}
+                          onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}>
+                          <div style={{ width: 26, height: 26, borderRadius: 6, background: typeBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <TypeIcon size={13} style={{ color: typeColor }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cc.name}</div>
+                            <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 1 }}>
+                              {isLg ? 'Alojamiento' : `${sL} · ${pL} · ${cfgMods.length} mod.`}
+                            </div>
+                          </div>
+                          {isActive && <Check size={13} style={{ color: 'var(--gold)', flexShrink: 0 }} />}
+                        </button>
+                      )
+                    }
+
+                    return (
+                      <>
+                        <div onClick={() => setConfigDropdownOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 10 }} />
+                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', border: '1px solid var(--ivory)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.10)', zIndex: 11, maxHeight: 380, overflowY: 'auto', padding: 6 }}>
+                          {/* Espacios group */}
+                          {spaceCfgs.length > 0 && (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px 6px', fontSize: 9, fontWeight: 700, color: '#4A6B52', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                                <Building2 size={11} /> Espacios · {spaceCfgs.length}
+                              </div>
+                              {spaceCfgs.map(renderCard)}
+                            </>
+                          )}
+                          {/* Alojamiento group */}
+                          {lodgingCfgs.length > 0 && (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px 6px', fontSize: 9, fontWeight: 700, color: '#47648A', textTransform: 'uppercase', letterSpacing: '.06em', marginTop: spaceCfgs.length > 0 ? 4 : 0, borderTop: spaceCfgs.length > 0 ? '1px solid var(--ivory)' : 'none' }}>
+                                <BedDouble size={11} /> Alojamiento · {lodgingCfgs.length}
+                              </div>
+                              {lodgingCfgs.map(renderCard)}
+                            </>
+                          )}
+                          <div style={{ borderTop: '1px solid var(--ivory)', marginTop: 6, paddingTop: 6 }}>
+                            <button onClick={() => { setConfigDropdownOpen(false); openWizard() }}
+                              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer', color: 'var(--gold)', fontSize: 12, fontWeight: 700 }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'var(--cream)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                              <Plus size={13} /> Nueva configuración
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )
+                  })()}
+                </div>
+
+                {/* Stats — solo si config es de espacio */}
+                {activeCc && (activeCc.config_type ?? 'space') === 'space' && (
+                  <div style={{ display: 'flex', gap: 14, fontSize: 11, color: 'var(--warm-gray)', flexShrink: 0, alignItems: 'center' }}>
+                    <span><strong style={{ color: 'var(--charcoal)' }}>{modalities.filter(m => m.is_active).length}</strong> activas</span>
+                    <span><strong style={{ color: 'var(--charcoal)' }}>{modalities.length}</strong> total</span>
+                    <span><strong style={{ color: 'var(--charcoal)' }}>{totalPrices}</strong> tarifas</span>
+                  </div>
+                )}
+              </div>
+
+              {/* FOOTER: actions */}
+              {actions.length > 0 && (
+                <div style={{ display: 'flex', gap: 0, flexWrap: 'wrap', padding: '6px 8px', borderTop: '1px solid var(--ivory)', background: 'var(--cream)', borderBottomLeftRadius: 11, borderBottomRightRadius: 11 }}>
+                  {actions.map((btn, i) => (
+                    <button key={i} onClick={btn.onClick} title={btn.label}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 500, padding: '5px 10px', borderRadius: 5, color: btn.danger ? '#BC5249' : 'var(--warm-gray)', transition: 'all .1s', display: 'flex', alignItems: 'center', gap: 4 }}
+                      onMouseEnter={e => { e.currentTarget.style.background = btn.danger ? '#FAF3F2' : '#fff'; e.currentTarget.style.color = btn.danger ? '#BC5249' : 'var(--charcoal)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = btn.danger ? '#BC5249' : 'var(--warm-gray)' }}>
+                      {btn.icon}{btn.label}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
-          ) : (
+            )
+          })() : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FDF8F0', border: '1px dashed #4A6B5266', borderRadius: 10, padding: '14px 16px', marginBottom: 24 }}>
               <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #4A6B5244' }}>
                 <Settings2 size={18} style={{ color: '#4A6B52' }} />
@@ -1003,10 +1266,24 @@ export default function EstructuraPage() {
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>Configura tu modelo comercial</div>
                 <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>Indica cómo trabajas para que las propuestas se adapten automáticamente</div>
               </div>
-              <button className="btn btn-primary btn-sm" onClick={openWizard} style={{ flexShrink: 0 }}>Configurar</button>
+              <button className="btn btn-primary btn-sm" onClick={() => openWizard()} style={{ flexShrink: 0 }}>Configurar</button>
             </div>
           )}
 
+          {/* ── Lodging editor (when active config is lodging) ── */}
+          {(() => {
+            const activeCc = commercialConfigs.find(c => c.id === activeConfigId)
+            const isLodging = (activeCc?.config_type ?? 'space') === 'lodging'
+            if (!isLodging) return null
+            return <LodgingEditor configId={activeCc!.id} venueId={activeVenue?.id ?? ''} />
+          })()}
+
+          {/* ── Space editor (existing — only if active config is space type) ── */}
+          {(() => {
+            const activeCc = commercialConfigs.find(c => c.id === activeConfigId)
+            const isLodging = (activeCc?.config_type ?? 'space') === 'lodging'
+            return !isLodging
+          })() && <>
           {/* ── Sub-tabs: Zonas y grupos | Modalidades y tarifas ── */}
           {(['multiple_independent', 'single_with_supplements'] as const).includes(commercialConfig?.space_type as any) && (
             <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--ivory)', marginBottom: 16 }}>
@@ -1425,6 +1702,19 @@ export default function EstructuraPage() {
 
           {/* ── Tab: Modalidades y tarifas ── */}
           {(configSubTab === 'modalities' || !(['multiple_independent', 'single_with_supplements'] as const).includes(commercialConfig?.space_type as any)) && <>
+          {/* Section header — only when there are modalities (empty state has its own CTA) */}
+          {modalities.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <CalendarDays size={15} style={{ color: 'var(--gold)' }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--charcoal)' }}>Modalidades y tarifas</span>
+                <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--warm-gray)' }}>{modalities.length}</span>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Plus size={14} /> Nueva modalidad
+              </button>
+            </div>
+          )}
           {/* Empty state */}
           {modalities.length === 0 && (
             <div style={{ textAlign: 'center', padding: '80px 24px' }}>
@@ -1778,6 +2068,7 @@ export default function EstructuraPage() {
 
           </>}
 
+          </>}
           </>}
 
           {/* ── TAB: VISITAS ─────────────────────────────────────────────────── */}
@@ -2555,13 +2846,41 @@ export default function EstructuraPage() {
       </div>
 
       {/* ── Commercial config wizard ───────────────────────────────────────── */}
+      {/* ── Config helper modal ── */}
+      {configHelperOpen && (
+        <ConfigHelperModal
+          onClose={() => setConfigHelperOpen(false)}
+          onApply={(r) => {
+            setConfigHelperOpen(false)
+            // Pre-fill wizard with suggested values + name
+            setWizardHistory([])
+            setEditingConfigId(null)
+            setConfigNameInput(r.suggested_name)
+            if (r.config_type === 'lodging') {
+              // Lodging: save directly with suggested name
+              setWizardConfig({ config_type: 'lodging' })
+              saveCommercialConfig({ config_type: 'lodging' } as any)
+            } else {
+              setWizardConfig({ config_type: 'space', space_type: r.space_type as any, price_model: r.price_model as any })
+              // Save directly (skip wizard since helper already collected all answers)
+              saveCommercialConfig({ config_type: 'space', space_type: r.space_type, price_model: r.price_model } as any)
+            }
+          }}
+        />
+      )}
+
       {configWizardOpen && (() => {
         const QUESTION_LABELS: Record<WizardQuestion, string> = {
+          config_type: '¿Qué tipo de configuración?',
           space_type:  '¿Cómo está organizado tu espacio?',
           price_model: '¿Cómo cobras el espacio?',
         }
 
         const cardOpts = (q: WizardQuestion) => {
+          if (q === 'config_type') return [
+            { key: 'space',   icon: Building2,    label: 'Espacio (alquiler / modalidades)', sub: 'Alquiler de venue, modalidades y tarifas por temporada. Lo habitual para bodas y eventos.', color: '#4A6B52', bg: '#FDF8F0' },
+            { key: 'lodging', icon: LayoutGrid,   label: 'Alojamiento (habitaciones)',       sub: 'Catálogo de tipos de habitación, precios por noche, calendario de inventario.',            color: '#47648A', bg: '#EEF2F7' },
+          ] as { key: string; icon: any; label: string; sub: string; color: string; bg: string }[]
           if (q === 'space_type') return [
             { key: 'single',               icon: Building2, label: 'Precio único por todo',                   sub: 'El presupuesto incluye todas las zonas del venue. El cliente no elige ni paga zonas por separado.',                          color: '#4A6B52', bg: '#FDF8F0' },
             { key: 'single_with_supplements', icon: Layers, label: 'Espacio base + zonas a elegir', sub: 'Hay zonas fijas incluidas y otras donde el cliente elige. Pueden ser gratuitas o tener suplemento.', color: '#6A5B95', bg: '#F2F1F8' },
@@ -2577,14 +2896,26 @@ export default function EstructuraPage() {
 
 
         const currentVal = (() => {
+          if (wizardQuestion === 'config_type') return wizardConfig.config_type
           if (wizardQuestion === 'space_type')  return wizardConfig.space_type
           if (wizardQuestion === 'price_model') return wizardConfig.price_model
         })()
 
         const handleAnswer = (val: any) => {
           let next: WizardConfig = { ...wizardConfig }
+          if (wizardQuestion === 'config_type') {
+            next = { config_type: val }
+            setWizardConfig(next)
+            if (val === 'lodging') {
+              // Lodging needs no further questions — save immediately
+              saveCommercialConfig(next)
+            } else {
+              wizardNext('space_type')
+            }
+            return
+          }
           if (wizardQuestion === 'space_type') {
-            next = { space_type: val }
+            next = { ...next, space_type: val }
           } else if (wizardQuestion === 'price_model') {
             next = { ...next, price_model: val }
           }
@@ -2606,13 +2937,25 @@ export default function EstructuraPage() {
               {/* Header */}
               <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)' }}>Configuración comercial</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)' }}>{editingConfigId ? 'Editar configuración' : 'Nueva configuración comercial'}</div>
                   <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2 }}>Pregunta {stepNum}</div>
                 </div>
                 <button onClick={() => setConfigWizardOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4, display: 'flex' }}><X size={18} /></button>
               </div>
 
               <div style={{ padding: '20px 24px 24px' }}>
+                {/* Name input for new config (shown on first step only) */}
+                {!editingConfigId && wizardQuestion === 'config_type' && (
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)', display: 'block', marginBottom: 4 }}>Nombre de la configuración</label>
+                    <input
+                      value={configNameInput}
+                      onChange={e => setConfigNameInput(e.target.value)}
+                      placeholder="Ej: Boda clásica, Evento corporativo, Alojamiento finca…"
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--ivory)', fontSize: 13, outline: 'none' }}
+                    />
+                  </div>
+                )}
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 16 }}>
                   {QUESTION_LABELS[wizardQuestion]}
                 </div>
