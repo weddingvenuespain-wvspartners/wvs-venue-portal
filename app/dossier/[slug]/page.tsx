@@ -137,7 +137,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
       id, slug, couple_name, personal_message,
       guest_count, wedding_date, price_estimate,
       show_availability, show_price_estimate, status, ctas,
-      sections_data, user_id, access_password,
+      sections_data, user_id, access_password, venue_id,
       commission_planner_id, commission_percent, commission_mode, commission_amount,
       lodging_config_id
     `)
