@@ -215,9 +215,9 @@ export default function Sidebar() {
   return (
     <div className="sidebar">
       <div className="sidebar-logo">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <img src="/foreventos-assets/favicon.png" alt="" style={{ height: 22, width: 'auto', borderRadius: 5, opacity: 0.9 }} />
-          <span className="brand">FOREVENTOS</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 6 }}>
+          <img src="/foreventos-assets/foreventos-icon-cream.svg" alt="ForEventos" style={{ height: 22, width: 'auto', display: 'block' }} />
+          <span className="brand" style={{ color: '#F5F4EE' }}>FOREVENTOS</span>
         </div>
         <span className="venue-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4A6B52', display: 'inline-block', flexShrink: 0 }} />

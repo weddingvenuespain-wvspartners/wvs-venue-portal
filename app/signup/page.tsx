@@ -261,8 +261,8 @@ function SignupPageInner() {
         }}>
           {/* Brand */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24, justifyContent: 'center' }}>
-            <img src="/foreventos-assets/favicon.png" alt="ForEventos" style={{ height: 26, width: 'auto', borderRadius: 6 }} />
-            <span style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, letterSpacing: 0.5, fontSize: 18, color: '#E8E6DC' }}>
+            <img src="/foreventos-assets/foreventos-icon-cream.svg" alt="ForEventos" style={{ height: 24, width: 'auto', display: 'block' }} />
+            <span style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, letterSpacing: 0.5, fontSize: 18, color: '#F5F4EE' }}>
               FOREVENTOS
             </span>
           </div>
