@@ -97,12 +97,130 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
   const [includesText, setIncludesText] = useState('')
   const [dossierResponses, setDossierResponses] = useState<DossierResponse[]>([])
   const [paymentPlan, setPaymentPlan] = useState<PaymentInstallment[]>([])
+  // Imported from proposal / editable in sidebar
+  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
+  const [selectedModalityId, setSelectedModalityId] = useState<string | null>(null)
+  const [selectedLodgingId, setSelectedLodgingId] = useState<string | null>(null)
+  const [allConfigs, setAllConfigs] = useState<any[]>([])
+  // New extra fields
+  const [budgetName, setBudgetName] = useState('')
+  const [budgetDescription, setBudgetDescription] = useState('')
+  const [documentNumber, setDocumentNumber] = useState('')
+  const [issueDate, setIssueDate] = useState('')
+  const [message, setMessage] = useState('')
+  // Sidebar tab nav
+  const [sidebarTab, setSidebarTab] = useState<'general' | 'config' | 'conceptos' | 'pagos' | 'detalles'>('general')
+  // Source proposal selection (when lead has multiple proposals)
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null)
+  const [leadProposals, setLeadProposals] = useState<any[]>([])
+  // Concept picker modal (from proposal)
+  const [showConceptPicker, setShowConceptPicker] = useState<string | null>(null)  // group_id or null
+  const [proposalConcepts, setProposalConcepts] = useState<any[]>([])
 
   useEffect(() => {
     if (authLoading) return
     if (!user) { router.push('/login'); return }
     loadBudget()
   }, [user, authLoading, activeVenue?.id])
+
+  // Load proposals for currently linked lead (so user can pick which one feeds this budget)
+  useEffect(() => {
+    if (!leadId || !activeVenue) { setLeadProposals([]); return }
+    const supabase = createClient()
+    supabase.from('proposals')
+      .select('id, couple_name, created_at, commercial_config_id, modality_id, lodging_config_id, sections_data')
+      .eq('lead_id', leadId)
+      .eq('venue_id', activeVenue.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        const list = data ?? []
+        setLeadProposals(list)
+        // Auto-select if only one and none picked yet
+        if (list.length === 1 && !selectedProposalId) setSelectedProposalId(list[0].id)
+      })
+  }, [leadId, activeVenue?.id])  // eslint-disable-line
+
+  // Fetch concepts from selected proposal (modality price, menu selection, extras, rooms)
+  useEffect(() => {
+    if (!selectedProposalId) { setProposalConcepts([]); return }
+    const supabase = createClient()
+    ;(async () => {
+      const concepts: any[] = []
+      const p = leadProposals.find(x => x.id === selectedProposalId)
+
+      // Modality price
+      const modId = p?.modality_id ?? p?.sections_data?.default_modality_id ?? null
+      if (modId) {
+        const { data: mod } = await supabase
+          .from('venue_modalities')
+          .select('id, name, duration_label, prices:venue_modality_prices(*), packages:venue_modality_packages(*, prices:venue_modality_prices(*))')
+          .eq('id', modId)
+          .maybeSingle()
+        if (mod) {
+          const basePrice = ((mod.prices ?? [])[0]?.price as number) ?? 0
+          if (basePrice > 0) {
+            concepts.push({ kind: 'modality', label: 'Alquiler · ' + mod.name + (mod.duration_label ? ` (${mod.duration_label})` : ''), qty: 1, unit_price: basePrice })
+          }
+          for (const pkg of (mod.packages ?? [])) {
+            for (const pr of (pkg.prices ?? [])) {
+              const v = parseFloat((pr as any).price) || 0
+              if (v > 0) concepts.push({ kind: 'package', label: `${mod.name} — ${pkg.label || 'Paquete'}`, qty: 1, unit_price: v })
+            }
+          }
+        }
+      }
+
+      // Menu selection
+      const { data: menuSel } = await supabase
+        .from('proposal_menu_selections')
+        .select('*')
+        .eq('proposal_id', selectedProposalId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (menuSel) {
+        if (menuSel.selected_menu_name) {
+          const perPerson = menuSel.estimated_total && menuSel.guest_count ? menuSel.estimated_total / menuSel.guest_count : 0
+          concepts.push({ kind: 'menu', label: 'Menú · ' + menuSel.selected_menu_name, qty: menuSel.guest_count || 1, unit_price: Math.round(perPerson * 100) / 100 })
+        }
+        if (Array.isArray(menuSel.selected_extras)) {
+          for (const ex of menuSel.selected_extras) {
+            concepts.push({ kind: 'extra', label: 'Extra · ' + (ex.name || 'Sin nombre'), qty: ex.quantity || 1, unit_price: ex.price || 0 })
+          }
+        }
+      }
+
+      // Room selections (lodging)
+      const { data: rooms } = await supabase
+        .from('proposal_room_selections')
+        .select('*, room:venue_room_types(name)')
+        .eq('proposal_id', selectedProposalId)
+      for (const r of (rooms ?? [])) {
+        const nights = r.check_in && r.check_out
+          ? Math.max(1, Math.round((new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / 86400000))
+          : 1
+        const perUnit = r.computed_total && r.quantity ? r.computed_total / r.quantity / nights : 0
+        concepts.push({
+          kind: 'room',
+          label: `Hab. · ${(r as any).room?.name || 'habitación'} × ${nights} noche(s)`,
+          qty: r.quantity, unit_price: Math.round(perUnit * 100) / 100,
+        })
+      }
+
+      setProposalConcepts(concepts)
+    })()
+  }, [selectedProposalId, leadProposals])
+
+  // When selected proposal changes, sync config_id + modality_id + lodging_config_id from it
+  useEffect(() => {
+    if (!selectedProposalId) return
+    const p = leadProposals.find(x => x.id === selectedProposalId)
+    if (!p) return
+    const modId = (p.modality_id ?? p.sections_data?.default_modality_id) ?? null
+    if (p.commercial_config_id) setSelectedConfigId(p.commercial_config_id)
+    if (modId) setSelectedModalityId(modId)
+    if (p.lodging_config_id) setSelectedLodgingId(p.lodging_config_id)
+  }, [selectedProposalId, leadProposals])
 
   const loadBudget = async () => {
     if (!activeVenue) return
@@ -131,6 +249,15 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
     setTaxRate(bud.tax_rate ?? 21)
     setTaxIncluded(bud.tax_included ?? true)
     setPaymentPlan(bud.payment_plan || [])
+    setSelectedConfigId((bud as any).commercial_config_id ?? null)
+    setSelectedModalityId((bud as any).modality_id ?? null)
+    setSelectedLodgingId((bud as any).lodging_config_id ?? null)
+    setSelectedProposalId((bud as any).proposal_id ?? null)
+    setBudgetName((bud as any).name ?? '')
+    setBudgetDescription((bud as any).description ?? '')
+    setDocumentNumber((bud as any).document_number ?? '')
+    setIssueDate((bud as any).issue_date ?? '')
+    setMessage((bud as any).message ?? '')
     setPassword(bud.password ?? '')
     setIncludesText(bud.includes_text ?? '')
     setLeadId(bud.lead_id)
@@ -142,6 +269,14 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
     if (v) setVenue(v as any)
     if (br) setBranding(br as any)
     if (ld) setLeads(ld)
+
+    // Load commercial configs (for sidebar picker)
+    const { data: ccs } = await supabase
+      .from('venue_commercial_configs')
+      .select('*')
+      .eq('venue_id', activeVenue.id)
+      .order('sort_order')
+    if (ccs) setAllConfigs(ccs)
 
     // Load contracts: those for this budget + all unlinked ones (for picker)
     const { data: linkedCtr } = await supabase.from('venue_contracts').select('id, contract_number, title, status').eq('budget_id', id).order('created_at', { ascending: false })
@@ -210,7 +345,7 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
           ? Math.round(total * (commissionPercent / 100) * 100) / 100
           : Math.round((total - total * (100 / (100 + commissionPercent))) * 100) / 100)
       : null
-    await supabase.from('budgets').update({
+    const updatePayload: any = {
       couple_name: coupleName,
       couple_email: coupleEmail || null,
       wedding_date: weddingDate || null,
@@ -232,11 +367,26 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
       commission_percent: commissionPercent,
       commission_mode: commissionMode,
       commission_amount: commAmount,
+      commercial_config_id: selectedConfigId,
+      modality_id: selectedModalityId,
+      lodging_config_id: selectedLodgingId,
+      proposal_id: selectedProposalId,
+      name: budgetName || null,
+      description: budgetDescription || null,
+      document_number: documentNumber || null,
+      issue_date: issueDate || null,
+      message: message || null,
       updated_at: new Date().toISOString(),
-    }).eq('id', budget.id)
+    }
+    let { error: upErr } = await supabase.from('budgets').update(updatePayload).eq('id', budget.id)
+    if (upErr && upErr.code === '42703') {
+      // Strip unknown columns and retry (in case migration not applied)
+      const { commercial_config_id: _c, modality_id: _m, lodging_config_id: _l, name: _n, description: _d, document_number: _dn, issue_date: _id, message: _msg, proposal_id: _p, ...rest } = updatePayload
+      await supabase.from('budgets').update(rest).eq('id', budget.id)
+    }
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 2000)
-  }, [budget, coupleName, coupleEmail, weddingDate, guestCount, notes, validUntil, groups, paymentPlan, total, taxRate, taxIncluded, discountType, discountAmount, discountLabel, password, includesText, leadId, commissionPlannerId, commissionPercent, commissionMode])
+  }, [budget, coupleName, coupleEmail, weddingDate, guestCount, notes, validUntil, groups, paymentPlan, total, taxRate, taxIncluded, discountType, discountAmount, discountLabel, password, includesText, leadId, commissionPlannerId, commissionPercent, commissionMode, selectedConfigId, selectedModalityId, selectedLodgingId, budgetName, budgetDescription, documentNumber, issueDate, message, selectedProposalId])
 
   // Auto-save on changes (debounced)
   useEffect(() => {
@@ -499,9 +649,39 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
 
+        {/* Sidebar tabs */}
+        <div style={{ flexShrink: 0, display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+          {([
+            { key: 'general',   label: 'General' },
+            { key: 'config',    label: 'Config' },
+            { key: 'conceptos', label: 'Conceptos' },
+            { key: 'pagos',     label: 'Pagos' },
+            { key: 'detalles',  label: 'Detalles' },
+          ] as const).map(t => {
+            const active = sidebarTab === t.key
+            return (
+              <button key={t.key} type="button" onClick={() => setSidebarTab(t.key)}
+                style={{
+                  flex: 1, padding: '9px 6px', background: 'none', border: 'none',
+                  borderBottom: active ? '2px solid var(--gold)' : '2px solid transparent',
+                  marginBottom: -1, cursor: 'pointer',
+                  fontSize: 11.5, fontWeight: active ? 700 : 500,
+                  color: active ? 'var(--espresso)' : 'var(--warm-gray)',
+                  textTransform: 'capitalize', letterSpacing: '0.02em',
+                  transition: 'color .15s, border-color .15s',
+                  fontFamily: 'Inter, sans-serif',
+                }}>
+                {t.label}
+              </button>
+            )
+          })}
+        </div>
+
         {/* Scrollable form body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px' }}>
 
+          {/* ── GENERAL tab ────────────────────────────────────── */}
+          {sidebarTab === 'general' && <>
           {/* ── Lead vinculado ─────────────────────────────────── */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -569,6 +749,93 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
             )}
           </div>
 
+          {/* ── Propuesta vinculada (cuando lead tiene varias) ── */}
+          {leadId && leadProposals.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                Propuesta vinculada {leadProposals.length > 1 && <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0, color: 'var(--gold)' }}>· {leadProposals.length} propuestas</span>}
+              </div>
+              <Select value={selectedProposalId ?? '__none'} onValueChange={(v) => setSelectedProposalId(v === '__none' ? null : v)}>
+                <SelectTrigger style={{ fontSize: 12 }}><SelectValue placeholder="Sin propuesta vinculada" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">Sin propuesta vinculada</SelectItem>
+                  {leadProposals.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.couple_name || 'Propuesta'} · {new Date(p.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedProposalId && (
+                <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 4, lineHeight: 1.4 }}>
+                  Esta propuesta se usa para importar conceptos y heredar configuración comercial.
+                </div>
+              )}
+            </div>
+          )}
+
+          </>}
+          {/* ── CONFIG tab ─────────────────────────────────────── */}
+          {sidebarTab === 'config' && <>
+          {/* ── Configuración comercial heredada de la propuesta ── */}
+          {(() => {
+            const spaceConfigs   = allConfigs.filter(c => (c.config_type ?? 'space') === 'space')
+            const lodgingConfigs = allConfigs.filter(c => c.config_type === 'lodging')
+            const configMods = modalities.filter((m: any) => m.commercial_config_id === selectedConfigId)
+            return (
+              <div style={{ marginBottom: 18, padding: '12px 14px', background: '#fff', border: '1.5px solid rgba(74,107,82,0.20)', borderRadius: 10, boxShadow: '0 1px 3px rgba(20,30,22,0.04)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                  <FileText size={13} style={{ color: 'var(--gold)' }} />
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--espresso)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Config. del presupuesto</div>
+                </div>
+                {allConfigs.length === 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', padding: '8px 0', lineHeight: 1.5 }}>
+                    Sin configuraciones comerciales todavía. Crea una en <a href="/venue-settings" style={{ color: 'var(--gold)', textDecoration: 'underline' }}>Configuración</a> para vincularla a este presupuesto.
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, opacity: allConfigs.length === 0 ? 0.5 : 1, pointerEvents: allConfigs.length === 0 ? 'none' : 'auto' }}>
+                  <div>
+                    <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600, display: 'block', marginBottom: 3 }}>Configuración comercial</label>
+                    <Select value={selectedConfigId ?? '__none'} onValueChange={(v) => { setSelectedConfigId(v === '__none' ? null : v); setSelectedModalityId(null) }}>
+                      <SelectTrigger style={{ fontSize: 12 }}><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none">Sin asignar</SelectItem>
+                        {spaceConfigs.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {selectedConfigId && (
+                    <div>
+                      <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600, display: 'block', marginBottom: 3 }}>Modalidad</label>
+                      <Select value={selectedModalityId ?? '__none'} onValueChange={(v) => setSelectedModalityId(v === '__none' ? null : v)}>
+                        <SelectTrigger style={{ fontSize: 12 }}><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none">Sin asignar</SelectItem>
+                          {configMods.map((m: any) => <SelectItem key={m.id} value={m.id}>{m.name}{m.duration_label ? ` · ${m.duration_label}` : ''}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {lodgingConfigs.length > 0 && (
+                    <div>
+                      <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600, display: 'block', marginBottom: 3 }}>Alojamiento</label>
+                      <Select value={selectedLodgingId ?? '__none'} onValueChange={(v) => setSelectedLodgingId(v === '__none' ? null : v)}>
+                        <SelectTrigger style={{ fontSize: 12 }}><SelectValue placeholder="Sin alojamiento" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none">Sin alojamiento</SelectItem>
+                          {lodgingConfigs.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+
+          </>}
+          {/* ── GENERAL tab (cont. — comisión + datos pareja) ─── */}
+          {sidebarTab === 'general' && <>
           {/* ── Comisión wedding planner / organizador ────────── */}
           {(commissionPlannerId || (leadId && (() => {
             const l = leads.find(x => x.id === leadId)
@@ -652,6 +919,9 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
 
+          </>}
+          {/* ── CONCEPTOS tab ──────────────────────────────────── */}
+          {sidebarTab === 'conceptos' && <>
           {/* ── Conceptos ───────────────────────────────────────── */}
           <div style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -684,22 +954,38 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
                   <button onClick={() => removeGroup(g.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rose)', padding: 2, flexShrink: 0 }}><Trash2 size={12} /></button>
                 </div>
                 {/* Column headers */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 80px 80px 24px', gap: 0, padding: '4px 10px', fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--ivory)' }}>
-                  <span>Concepto</span><span style={{ textAlign: 'center' }}>Uds</span><span style={{ textAlign: 'right' }}>€/ud</span><span style={{ textAlign: 'right' }}>Total</span><span />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 44px 72px 50px 80px 24px', gap: 4, padding: '4px 10px', fontSize: 9, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--ivory)' }}>
+                  <span>Concepto</span><span style={{ textAlign: 'center' }}>Uds</span><span style={{ textAlign: 'right' }}>€/ud</span><span style={{ textAlign: 'center' }}>IVA</span><span style={{ textAlign: 'right' }}>Total</span><span />
                 </div>
                 {/* Items */}
                 {g.items.map(item => (
-                  <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 80px 80px 24px', gap: 0, padding: '4px 10px', alignItems: 'center', borderBottom: '1px solid var(--ivory)' }}>
+                  <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 44px 72px 50px 80px 24px', gap: 4, padding: '4px 10px', alignItems: 'center', borderBottom: '1px solid var(--ivory)' }}>
                     <input value={item.concept} onChange={e => updateItem(g.id, item.id, 'concept', e.target.value)} className="form-input" style={{ border: 'none', padding: '3px 0', fontSize: 12 }} placeholder="Concepto" />
                     <input type="number" min={0} value={item.qty} onChange={e => updateItem(g.id, item.id, 'qty', Number(e.target.value))} className="form-input" style={{ border: 'none', padding: '3px', fontSize: 12, textAlign: 'center' }} />
                     <input type="number" min={0} step={0.01} value={item.unit_price} onChange={e => updateItem(g.id, item.id, 'unit_price', Number(e.target.value))} className="form-input" style={{ border: 'none', padding: '3px', fontSize: 12, textAlign: 'right' }} />
+                    <input
+                      type="number" min={0} max={100} step={1}
+                      value={item.tax_rate ?? ''}
+                      onChange={e => updateItem(g.id, item.id, 'tax_rate' as any, e.target.value === '' ? null : Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                      placeholder={taxRate?.toString() ?? '21'}
+                      title={`Si vacío → usa IVA global (${taxRate}%)`}
+                      className="form-input"
+                      style={{ border: 'none', padding: '3px', fontSize: 11, textAlign: 'center', color: item.tax_rate != null ? 'var(--gold)' : 'var(--warm-gray)' }}
+                    />
                     <div style={{ fontSize: 12, fontWeight: 500, textAlign: 'right', color: 'var(--charcoal)' }}>{item.subtotal.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
                     <button onClick={() => removeItem(g.id, item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rose)', padding: 1 }}><X size={11} /></button>
                   </div>
                 ))}
-                <button onClick={() => addItem(g.id)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--gold)' }}>
-                  <Plus size={11} /> Concepto
-                </button>
+                <div style={{ display: 'flex', gap: 8, padding: '6px 10px' }}>
+                  <button onClick={() => addItem(g.id)} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--gold)' }}>
+                    <Plus size={11} /> Concepto manual
+                  </button>
+                  {selectedProposalId && (
+                    <button onClick={() => setShowConceptPicker(g.id)} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--gold)' }}>
+                      <FileText size={11} /> Desde propuesta
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -762,6 +1048,9 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
 
+          </>}
+          {/* ── PAGOS tab ──────────────────────────────────────── */}
+          {sidebarTab === 'pagos' && <>
           {/* ── Plan de pagos ──────────────────────────────────── */}
           <div style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -816,14 +1105,34 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
                         Reembolsable
                       </label>
                       {p.refundable && (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--warm-gray)' }}>
-                          hasta
-                          <DatePicker
-                            value={p.refund_deadline || ''}
-                            onChange={(v) => updatePayment(i, 'refund_deadline', v)}
-                            placeholder="dd/mm/aaaa"
-                          />
-                        </label>
+                        <>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--warm-gray)' }}>
+                            hasta
+                            <DatePicker
+                              value={p.refund_deadline || ''}
+                              onChange={(v) => updatePayment(i, 'refund_deadline', v)}
+                              placeholder="dd/mm/aaaa"
+                            />
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--warm-gray)' }}>
+                            hasta
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={1}
+                              value={p.refund_percent ?? ''}
+                              onChange={(e) => updatePayment(i, 'refund_percent', e.target.value === '' ? undefined : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                              placeholder="100"
+                              style={{
+                                width: 48, padding: '3px 5px', fontSize: 10, border: '1px solid var(--ivory)',
+                                borderRadius: 4, textAlign: 'right', outline: 'none',
+                              }}
+                              title="Porcentaje máximo reembolsable (0-100)"
+                            />
+                            %
+                          </label>
+                        </>
                       )}
                     </div>
                   </div>
@@ -835,6 +1144,9 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
             )}
           </div>
 
+          </>}
+          {/* ── CONCEPTOS tab (cont. — respuestas dosier) ─────── */}
+          {sidebarTab === 'conceptos' && <>
           {/* ── Respuestas del dosier ──────────────────────────── */}
           {dossierResponses.length > 0 && (
             <div style={{ marginBottom: 20 }}>
@@ -987,6 +1299,41 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
             </div>
           )}
 
+          </>}
+          {/* ── DETALLES tab ───────────────────────────────────── */}
+          {sidebarTab === 'detalles' && <>
+          {/* ── Nombre + nº documento + fecha emisión ─────────── */}
+          <div style={{ marginBottom: 18, padding: '12px 14px', background: '#fff', border: '1px solid var(--ivory)', borderRadius: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <FileText size={12} style={{ color: 'var(--gold)' }} />
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Datos del presupuesto</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600, display: 'block', marginBottom: 3 }}>Nombre del presupuesto</label>
+                <input value={budgetName} onChange={e => setBudgetName(e.target.value)} placeholder="Ej: Boda finca 12 jun 2026" className="form-input" style={{ fontSize: 12, padding: '6px 10px' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600, display: 'block', marginBottom: 3 }}>Nº documento</label>
+                  <input value={documentNumber} onChange={e => setDocumentNumber(e.target.value)} placeholder="PRE-2025-001" className="form-input" style={{ fontSize: 12, padding: '6px 10px' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600, display: 'block', marginBottom: 3 }}>Fecha emisión</label>
+                  <DatePicker value={issueDate} onChange={setIssueDate} placeholder="dd/mm/aaaa" />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600, display: 'block', marginBottom: 3 }}>Descripción interna</label>
+                <textarea value={budgetDescription} onChange={e => setBudgetDescription(e.target.value)} rows={2} placeholder="Notas internas no visibles al cliente" className="form-input" style={{ fontSize: 12, padding: '6px 10px', resize: 'vertical' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600, display: 'block', marginBottom: 3 }}>Mensaje al cliente</label>
+                <textarea value={message} onChange={e => setMessage(e.target.value)} rows={3} placeholder="Mensaje personalizado que verá el cliente en el presupuesto" className="form-input" style={{ fontSize: 12, padding: '6px 10px', resize: 'vertical' }} />
+              </div>
+            </div>
+          </div>
+
           {/* ── Mensaje + validez + contraseña ─────────────────── */}
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Opciones</div>
@@ -1106,8 +1453,57 @@ export default function BudgetEditorPage({ params }: { params: Promise<{ id: str
               )}
             </div>
           </div>
+          </>}
 
         </div>
+
+        {/* Concept picker modal — import items from selected proposal */}
+        {showConceptPicker && (
+          <div onClick={() => setShowConceptPicker(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(20,30,22,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 520, maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(20,30,22,0.25)' }}>
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--espresso)' }}>Importar concepto de propuesta</div>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>Selecciona uno o varios items de la propuesta</div>
+                </div>
+                <button onClick={() => setShowConceptPicker(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 4 }}><X size={16} /></button>
+              </div>
+              <div style={{ overflowY: 'auto', padding: 12, flex: 1 }}>
+                {proposalConcepts.length === 0 ? (
+                  <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 12 }}>
+                    La propuesta no tiene conceptos importables. Añade manualmente o configura la propuesta.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {proposalConcepts.map((c, i) => (
+                      <button key={i}
+                        onClick={() => {
+                          setGroups(prev => prev.map(gr => gr.id === showConceptPicker
+                            ? { ...gr, items: [...gr.items, { id: nanoid(), concept: c.label, qty: c.qty, unit_price: c.unit_price, subtotal: c.qty * c.unit_price }] }
+                            : gr))
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '1px solid var(--ivory)', borderRadius: 8, background: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all .12s' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.background = 'var(--cream)' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ivory)'; e.currentTarget.style.background = '#fff' }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'var(--cream)', color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '.05em', flexShrink: 0 }}>{c.kind}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--espresso)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</div>
+                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 1 }}>{c.qty} × {c.unit_price.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--espresso)', flexShrink: 0 }}>
+                          {(c.qty * c.unit_price).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{ padding: '10px 18px', borderTop: '1px solid var(--ivory)', display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={() => setShowConceptPicker(null)} className="btn btn-ghost btn-sm">Cerrar</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Footer — save button */}
         <div style={{ flexShrink: 0, padding: '12px 18px', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>

@@ -268,8 +268,8 @@ export default function NuevoContratoPage() {
         {/* Main: form + preview */}
         <div style={{ display: 'flex', gap: 0, minHeight: 'calc(100vh - 56px)' }}>
 
-          {/* ═══ LEFT: Form (dark sidebar) ═══ */}
-          <div style={{ width: 420, flexShrink: 0, background: '#1e293b', color: 'white', padding: 24, overflowY: 'auto', maxHeight: 'calc(100vh - 56px)' }}>
+          {/* ═══ LEFT: Form (platform deep green sidebar) ═══ */}
+          <div style={{ width: 420, flexShrink: 0, background: 'var(--fe-deep)', color: 'var(--fe-text-light)', padding: 24, overflowY: 'auto', maxHeight: 'calc(100vh - 56px)', fontFamily: "'Inter', sans-serif" }}>
 
             {/* Template */}
             <div style={{ marginBottom: 20 }}>
@@ -286,7 +286,7 @@ export default function NuevoContratoPage() {
                     style={{
                       flex: 1, padding: '8px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                       border: 'none', cursor: 'pointer',
-                      background: template === t.key ? '#4F6D8C' : 'rgba(255,255,255,0.1)',
+                      background: template === t.key ? 'var(--fe-primary)' : 'rgba(255,255,255,0.08)',
                       color: template === t.key ? 'white' : 'rgba(255,255,255,0.7)',
                     }}
                   >
@@ -316,7 +316,7 @@ export default function NuevoContratoPage() {
                 {showLeadDropdown && filteredLeads.length > 0 && (
                   <div style={{
                     position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-                    background: '#1e293b', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8,
+                    background: 'var(--fe-deep)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8,
                     maxHeight: 200, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                   }}>
                     {filteredLeads.map(l => (
@@ -360,7 +360,7 @@ export default function NuevoContratoPage() {
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Detalles del evento</div>
               <div style={{ marginBottom: 10 }}>
-                <DatePicker value={weddingDate} onChange={setWeddingDate} label="Fecha de la boda" accent="#4F6D8C" dark allowPast placeholder="Seleccionar fecha" />
+                <DatePicker value={weddingDate} onChange={setWeddingDate} label="Fecha de la boda" accent="#8FAA94" dark allowPast placeholder="Seleccionar fecha" />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <div>
@@ -424,23 +424,23 @@ export default function NuevoContratoPage() {
           </div>
 
           {/* ═══ RIGHT: Live Preview ═══ */}
-          <div style={{ flex: 1, background: '#f1f5f9', padding: 24, overflowY: 'auto', maxHeight: 'calc(100vh - 56px)' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Vista previa</div>
+          <div style={{ flex: 1, background: 'var(--cream)', padding: 24, overflowY: 'auto', maxHeight: 'calc(100vh - 56px)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Vista previa</div>
 
             <div style={{
               background: 'white', maxWidth: 700, margin: '0 auto', padding: '48px 56px',
               boxShadow: '0 1px 8px rgba(0,0,0,0.06)', borderRadius: 4, minHeight: 800,
-              fontFamily: "'Helvetica Neue', Arial, sans-serif",
+              fontFamily: "'Inter', sans-serif",
             }}>
               {/* Title */}
               <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <div style={{ fontSize: 20, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 2, color: '#1e293b' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 2, color: 'var(--espresso)' }}>
                   Contrato de servicios
                 </div>
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
+                <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 6 }}>
                   Referencia: {contractNumber} | Fecha: {fmtDateLong(new Date().toISOString().slice(0, 10))}
                 </div>
-                <div style={{ width: 80, height: 2, background: '#1e293b', margin: '12px auto 0' }} />
+                <div style={{ width: 80, height: 2, background: 'var(--espresso)', margin: '12px auto 0' }} />
               </div>
 
               {/* Sections */}
@@ -452,13 +452,13 @@ export default function NuevoContratoPage() {
                   return (
                     <div key={idx} style={{ marginBottom: 24 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', marginBottom: 10 }}>{idx + 1}. {s.title}</div>
-                      <div style={{ display: 'flex', gap: 0, border: '1px solid #e2e8f0', borderRadius: 4 }}>
-                        <div style={{ flex: 1, padding: '14px 16px', borderRight: '1px solid #e2e8f0' }}>
-                          <div style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>El prestador</div>
+                      <div style={{ display: 'flex', gap: 0, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 4 }}>
+                        <div style={{ flex: 1, padding: '14px 16px', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                          <div style={{ fontSize: 9, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>El prestador</div>
                           <div style={{ fontSize: 13, fontWeight: 600 }}>{venueName || '[Nombre del venue]'}</div>
                         </div>
                         <div style={{ flex: 1, padding: '14px 16px' }}>
-                          <div style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>El cliente</div>
+                          <div style={{ fontSize: 9, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>El cliente</div>
                           <div style={{ fontSize: 13, fontWeight: 600 }}>{clientName || '[Nombre del cliente]'}</div>
                         </div>
                       </div>
@@ -471,17 +471,17 @@ export default function NuevoContratoPage() {
                   return (
                     <div key={idx} style={{ marginBottom: 24 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', marginBottom: 10 }}>{idx + 1}. {s.title}</div>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 8, border: '1px solid #e2e8f0' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 8, border: '1px solid rgba(0,0,0,0.08)' }}>
                         <tbody>
-                          <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
                             <td style={{ padding: '10px 14px', fontWeight: 600 }}>Importe total</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>{totalAmount ? fmtEur(totalAmount) : '—'}</td>
                           </tr>
-                          <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
                             <td style={{ padding: '10px 14px', fontWeight: 600 }}>IVA 21%</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>{totalAmount ? fmtEur(totalAmount * 0.21) : '—'}</td>
                           </tr>
-                          <tr style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                          <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.08)', background: 'var(--cream)' }}>
                             <td style={{ padding: '10px 14px', fontWeight: 700 }}>Precio total (IVA incl.)</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700 }}>{totalAmount ? fmtEur(totalAmount * 1.21) : '—'}</td>
                           </tr>
@@ -491,7 +491,7 @@ export default function NuevoContratoPage() {
                           </tr>
                         </tbody>
                       </table>
-                      <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{content}</div>
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{content}</div>
                     </div>
                   )
                 }
@@ -500,26 +500,26 @@ export default function NuevoContratoPage() {
                 return (
                   <div key={idx} style={{ marginBottom: 24 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', marginBottom: 8 }}>{idx + 1}. {s.title}</div>
-                    <div style={{ fontSize: 12, color: '#334155', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{content}</div>
+                    <div style={{ fontSize: 12, color: 'var(--espresso)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{content}</div>
                   </div>
                 )
               })}
 
               {/* Signatures */}
-              <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid #e2e8f0' }}>
+              <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', marginBottom: 20 }}>{sections.length + 1}. Firmas</div>
                 <div style={{ display: 'flex', gap: 32 }}>
                   <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>El prestador</div>
-                    <div style={{ height: 50, borderBottom: '1px solid #cbd5e1', margin: '12px 0 4px' }} />
-                    <div style={{ height: 20, borderBottom: '1px solid #cbd5e1', marginBottom: 4 }} />
-                    <div style={{ fontSize: 10, color: '#94a3b8' }}>Fecha: _______________</div>
+                    <div style={{ fontSize: 9, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: 1 }}>El prestador</div>
+                    <div style={{ height: 50, borderBottom: '1px solid rgba(0,0,0,0.20)', margin: '12px 0 4px' }} />
+                    <div style={{ height: 20, borderBottom: '1px solid rgba(0,0,0,0.20)', marginBottom: 4 }} />
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Fecha: _______________</div>
                   </div>
                   <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>El cliente</div>
-                    <div style={{ height: 50, borderBottom: '1px solid #cbd5e1', margin: '12px 0 4px' }} />
-                    <div style={{ height: 20, borderBottom: '1px solid #cbd5e1', marginBottom: 4 }} />
-                    <div style={{ fontSize: 10, color: '#94a3b8' }}>Fecha: _______________</div>
+                    <div style={{ fontSize: 9, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: 1 }}>El cliente</div>
+                    <div style={{ height: 50, borderBottom: '1px solid rgba(0,0,0,0.20)', margin: '12px 0 4px' }} />
+                    <div style={{ height: 20, borderBottom: '1px solid rgba(0,0,0,0.20)', marginBottom: 4 }} />
+                    <div style={{ fontSize: 10, color: 'var(--warm-gray)' }}>Fecha: _______________</div>
                   </div>
                 </div>
               </div>

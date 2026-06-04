@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
-import { Plus, FileText, Search, Eye, Printer, Mail, X, Calendar } from 'lucide-react'
+import { Plus, FileText, Search, Eye, Printer, Mail, X, Calendar, CheckCircle2, Clock, TrendingUp, FileSignature } from 'lucide-react'
 import DatePicker from '@/components/DatePicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -117,28 +117,85 @@ export default function ContratosPage() {
 
         <div className="page-content">
 
-          {/* Stats */}
-          <div className="stats-grid">
-            <div className="stat-card accent">
-              <div className="stat-label">Contratos activos</div>
-              <div className="stat-value">{active}</div>
-              <div className="stat-sub">firmados o en vigor</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Pendientes de firma</div>
-              <div className="stat-value">{pending}</div>
-              <div className="stat-sub">enviados</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Valor contratado</div>
-              <div className="stat-value">{fmtEur(totalValue)}</div>
-              <div className="stat-sub">contratos firmados</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Total</div>
-              <div className="stat-value" style={{ fontSize: 22 }}>{contracts.length}</div>
-              <div className="stat-sub">contratos creados</div>
-            </div>
+          {/* Stats — redesigned */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+            {([
+              {
+                label: 'Activos',
+                value: String(active),
+                sub: 'Firmados o en vigor',
+                Icon: CheckCircle2,
+                tint: '#4A6B52',
+                tintBg: 'rgba(74,107,82,0.10)',
+              },
+              {
+                label: 'Pendientes',
+                value: String(pending),
+                sub: 'Esperando firma',
+                Icon: Clock,
+                tint: '#9A7A40',
+                tintBg: 'rgba(154,122,64,0.12)',
+              },
+              {
+                label: 'Facturado',
+                value: fmtEur(totalValue),
+                sub: 'Contratos firmados',
+                Icon: TrendingUp,
+                tint: '#141E16',
+                tintBg: 'rgba(20,30,22,0.06)',
+                emphasis: true,
+              },
+              {
+                label: 'Total',
+                value: String(contracts.length),
+                sub: 'Contratos creados',
+                Icon: FileSignature,
+                tint: '#555',
+                tintBg: 'rgba(85,85,85,0.08)',
+              },
+            ] as const).map((s, i) => {
+              const Icon = s.Icon
+              return (
+                <div key={i} style={{
+                  background: '#fff',
+                  border: '1px solid rgba(0,0,0,0.07)',
+                  borderRadius: 12,
+                  padding: '14px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  boxShadow: '0 1px 3px rgba(20,30,22,0.04)',
+                  transition: 'transform .15s, box-shadow .15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(20,30,22,0.06)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(20,30,22,0.04)' }}
+                >
+                  <div style={{
+                    width: 38, height: 38, borderRadius: 10,
+                    background: s.tintBg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                  }}>
+                    <Icon size={18} strokeWidth={1.8} color={s.tint} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase',
+                      color: 'var(--warm-gray)', fontWeight: 600, marginBottom: 3,
+                    }}>{s.label}</div>
+                    <div style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: (s as any).emphasis ? 20 : 22,
+                      fontWeight: 700, lineHeight: 1,
+                      color: 'var(--espresso)',
+                      letterSpacing: '-0.3px',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>{s.value}</div>
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 3 }}>{s.sub}</div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
           {/* Filters bar */}

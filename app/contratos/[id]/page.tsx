@@ -437,67 +437,97 @@ export default function ContractDetailPage() {
                 </div>
               )}
 
-              {/* Signatures area */}
-              <div style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid var(--border)', display: 'flex', gap: 40 }}>
-                <div style={{ flex: 1, textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Firma del venue</div>
-                  {contract.venue_signature_url ? (
-                    <div style={{ position: 'relative' }}>
-                      <img src={contract.venue_signature_url} alt="Firma venue" style={{ maxHeight: 80, margin: '0 auto', display: 'block' }} />
-                      <div style={{ fontSize: 10, color: 'green', marginTop: 4 }}>✓ Firmado {contract.venue_signed_at ? fmtDateShort(contract.venue_signed_at) : ''}</div>
-                    </div>
-                  ) : contract.venue_signed_at ? (
-                    <div>
-                      <div style={{ height: 60, borderBottom: '1px solid #ccc', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 4 }}>
-                        <span style={{ fontSize: 11, color: 'green' }}>✓ Firmado {fmtDateShort(contract.venue_signed_at)}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowSignModal('venue')}
-                      style={{
-                        width: '100%', height: 70, border: '2px dashed var(--border)', borderRadius: 8,
-                        background: 'var(--surface)', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', gap: 6, color: 'var(--warm-gray)', fontSize: 12,
-                        transition: 'border-color 0.15s',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--gold)'}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-                    >
-                      <PenTool size={14} /> Firmar
-                    </button>
-                  )}
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{contract.venue_name}</div>
+              {/* Signatures area — refined platform-styled */}
+              <div style={{ marginTop: 48, paddingTop: 28, borderTop: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 18, textAlign: 'center' }}>
+                  Firmas de las partes
                 </div>
-                <div style={{ flex: 1, textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Firma del cliente</div>
-                  {contract.client_signature_url ? (
-                    <div style={{ position: 'relative' }}>
-                      <img src={contract.client_signature_url} alt="Firma cliente" style={{ maxHeight: 80, margin: '0 auto', display: 'block' }} />
-                      <div style={{ fontSize: 10, color: 'green', marginTop: 4 }}>✓ Firmado {contract.client_signed_at ? fmtDateShort(contract.client_signed_at) : ''}</div>
-                    </div>
-                  ) : contract.client_signed_at ? (
-                    <div>
-                      <div style={{ height: 60, borderBottom: '1px solid #ccc', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 4 }}>
-                        <span style={{ fontSize: 11, color: 'green' }}>✓ Firmado {fmtDateShort(contract.client_signed_at)}</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
+                  {/* Venue signature card */}
+                  <div>
+                    <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.10)', borderRadius: 10, padding: 18, boxShadow: '0 1px 3px rgba(20,30,22,0.04)' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--fe-primary)', letterSpacing: '.10em', textTransform: 'uppercase', marginBottom: 12 }}>
+                        El prestador
                       </div>
+                      {contract.venue_signature_url ? (
+                        <div>
+                          <img src={contract.venue_signature_url} alt="Firma venue" style={{ width: '100%', maxHeight: 90, objectFit: 'contain', display: 'block', borderBottom: '1px solid rgba(0,0,0,0.08)', paddingBottom: 8 }} />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 11, color: 'var(--fe-primary)', fontWeight: 600 }}>
+                            <CheckCircle size={12} /> Firmado · {contract.venue_signed_at ? fmtDateShort(contract.venue_signed_at) : ''}
+                          </div>
+                        </div>
+                      ) : contract.venue_signed_at ? (
+                        <div style={{ paddingBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.10)', minHeight: 90, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                          <span style={{ fontSize: 12, color: 'var(--fe-primary)', fontWeight: 600 }}>
+                            ✓ Firmado {fmtDateShort(contract.venue_signed_at)}
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowSignModal('venue')}
+                          style={{
+                            width: '100%', minHeight: 90, padding: 14,
+                            border: '1.5px dashed rgba(74,107,82,0.30)', borderRadius: 8,
+                            background: 'linear-gradient(180deg, rgba(245,244,238,0.40) 0%, rgba(143,170,148,0.06) 100%)',
+                            cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                            justifyContent: 'center', gap: 6, color: 'var(--fe-primary)', fontSize: 13, fontWeight: 600,
+                            transition: 'all 0.15s', fontFamily: "'Inter', sans-serif",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--fe-primary)'; e.currentTarget.style.background = 'rgba(143,170,148,0.10)' }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(74,107,82,0.30)'; e.currentTarget.style.background = 'linear-gradient(180deg, rgba(245,244,238,0.40) 0%, rgba(143,170,148,0.06) 100%)' }}
+                        >
+                          <PenTool size={16} />
+                          <span>Firmar aquí</span>
+                          <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--warm-gray)' }}>Click para firmar</span>
+                        </button>
+                      )}
+                      <div style={{ fontSize: 12, color: 'var(--espresso)', marginTop: 12, fontWeight: 500 }}>{contract.venue_name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 2, letterSpacing: '.04em' }}>VENUE</div>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowSignModal('client')}
-                      style={{
-                        width: '100%', height: 70, border: '2px dashed var(--border)', borderRadius: 8,
-                        background: 'var(--surface)', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', gap: 6, color: 'var(--warm-gray)', fontSize: 12,
-                        transition: 'border-color 0.15s',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--gold)'}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-                    >
-                      <PenTool size={14} /> Firmar
-                    </button>
-                  )}
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{contract.client_name}</div>
+                  </div>
+
+                  {/* Client signature card */}
+                  <div>
+                    <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.10)', borderRadius: 10, padding: 18, boxShadow: '0 1px 3px rgba(20,30,22,0.04)' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--fe-primary)', letterSpacing: '.10em', textTransform: 'uppercase', marginBottom: 12 }}>
+                        El cliente
+                      </div>
+                      {contract.client_signature_url ? (
+                        <div>
+                          <img src={contract.client_signature_url} alt="Firma cliente" style={{ width: '100%', maxHeight: 90, objectFit: 'contain', display: 'block', borderBottom: '1px solid rgba(0,0,0,0.08)', paddingBottom: 8 }} />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 11, color: 'var(--fe-primary)', fontWeight: 600 }}>
+                            <CheckCircle size={12} /> Firmado · {contract.client_signed_at ? fmtDateShort(contract.client_signed_at) : ''}
+                          </div>
+                        </div>
+                      ) : contract.client_signed_at ? (
+                        <div style={{ paddingBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.10)', minHeight: 90, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                          <span style={{ fontSize: 12, color: 'var(--fe-primary)', fontWeight: 600 }}>
+                            ✓ Firmado {fmtDateShort(contract.client_signed_at)}
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowSignModal('client')}
+                          style={{
+                            width: '100%', minHeight: 90, padding: 14,
+                            border: '1.5px dashed rgba(74,107,82,0.30)', borderRadius: 8,
+                            background: 'linear-gradient(180deg, rgba(245,244,238,0.40) 0%, rgba(143,170,148,0.06) 100%)',
+                            cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                            justifyContent: 'center', gap: 6, color: 'var(--fe-primary)', fontSize: 13, fontWeight: 600,
+                            transition: 'all 0.15s', fontFamily: "'Inter', sans-serif",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--fe-primary)'; e.currentTarget.style.background = 'rgba(143,170,148,0.10)' }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(74,107,82,0.30)'; e.currentTarget.style.background = 'linear-gradient(180deg, rgba(245,244,238,0.40) 0%, rgba(143,170,148,0.06) 100%)' }}
+                        >
+                          <PenTool size={16} />
+                          <span>Firmar aquí</span>
+                          <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--warm-gray)' }}>Click para firmar</span>
+                        </button>
+                      )}
+                      <div style={{ fontSize: 12, color: 'var(--espresso)', marginTop: 12, fontWeight: 500 }}>{contract.client_name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 2, letterSpacing: '.04em' }}>CLIENTE</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -670,8 +700,9 @@ export default function ContractDetailPage() {
               width={400}
               height={150}
               style={{
-                width: '100%', height: 150, border: '2px solid var(--border)', borderRadius: 8,
-                cursor: 'crosshair', background: '#fafaf8', touchAction: 'none',
+                width: '100%', height: 150, border: '1.5px solid rgba(74,107,82,0.25)', borderRadius: 10,
+                cursor: 'crosshair', background: 'var(--cream)', touchAction: 'none',
+                boxShadow: 'inset 0 1px 2px rgba(20,30,22,0.05)',
               }}
               onMouseDown={startDraw}
               onMouseMove={draw}

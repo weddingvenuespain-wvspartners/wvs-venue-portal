@@ -3,9 +3,17 @@ export type BudgetStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'expired'
 export type LineItem = {
   id: string
   concept: string
+  /** Optional descripción/detalle */
+  description?: string | null
   qty: number
   unit_price: number
   subtotal: number
+  /** Per-line IVA % (overrides global if set) */
+  tax_rate?: number | null
+  /** Per-line discount type */
+  discount_type?: 'fixed' | 'percent' | null
+  /** Per-line discount amount */
+  discount_amount?: number | null
 }
 
 export type LineItemGroup = {
@@ -27,6 +35,8 @@ export type PaymentInstallment = {
   refundable?: boolean
   /** Refund deadline (ISO date). After this date, the installment is non-refundable */
   refund_deadline?: string
+  /** Refund percentage cap (0-100). E.g. 50 = refund up to 50% of this installment */
+  refund_percent?: number
 }
 
 export type PaymentTemplateRule = {
@@ -75,6 +85,24 @@ export type Budget = {
   password: string | null
   includes_text: string | null
   open_count: number
+  /** Source proposal — when lead has multiple proposals, pick which one feeds the budget */
+  proposal_id?: string | null
+  /** Commercial config (space) imported from proposal — can be changed in editor */
+  commercial_config_id?: string | null
+  /** Default modality from proposal */
+  modality_id?: string | null
+  /** Lodging commercial config from proposal */
+  lodging_config_id?: string | null
+  /** Custom name for the budget (separate from couple_name) */
+  name?: string | null
+  /** Long description of the budget */
+  description?: string | null
+  /** Document number (e.g. PRE-2025-001) */
+  document_number?: string | null
+  /** Issue date — when the budget was issued */
+  issue_date?: string | null
+  /** Public message shown to the client */
+  message?: string | null
   created_at: string
   updated_at: string
 }
@@ -103,17 +131,36 @@ export function generateBudgetSlug(): string {
   return slug
 }
 
+/** Subtotal of a single line item after per-line discount (if any). */
+export function calcLineSubtotal(item: LineItem): number {
+  const base = item.qty * item.unit_price
+  let after = base
+  if (item.discount_type === 'fixed' && item.discount_amount) after -= item.discount_amount
+  if (item.discount_type === 'percent' && item.discount_amount) after -= base * (item.discount_amount / 100)
+  return Math.max(0, Math.round(after * 100) / 100)
+}
+
 export function calcBudgetTotal(
   groups: LineItemGroup[],
   discount: { type: 'fixed' | 'percent' | null; amount: number | null },
   taxRate: number | null,
   taxIncluded: boolean
 ): number {
+  // Subtotal uses already-stored subtotal (set by callers) which may incorporate per-line discount
   const subtotal = groups.reduce((sum, g) => sum + g.items.reduce((s, i) => s + i.subtotal, 0), 0)
   let afterDiscount = subtotal
   if (discount.type === 'fixed' && discount.amount) afterDiscount -= discount.amount
   if (discount.type === 'percent' && discount.amount) afterDiscount -= subtotal * (discount.amount / 100)
-  if (taxRate && !taxIncluded) afterDiscount *= (1 + taxRate / 100)
+  if (taxRate && !taxIncluded) {
+    // Apply per-line tax overrides when present, fall back to global rate
+    const taxAdded = groups.reduce((sum, g) => sum + g.items.reduce((s, i) => {
+      const rate = (i.tax_rate ?? taxRate) || 0
+      return s + i.subtotal * (rate / 100)
+    }, 0), 0)
+    // Replace global rate with computed sum: subtotal + taxAdded (post-global-discount adjustment)
+    const discountRatio = subtotal > 0 ? afterDiscount / subtotal : 1
+    afterDiscount = afterDiscount + taxAdded * discountRatio
+  }
   return Math.round(afterDiscount * 100) / 100
 }
 

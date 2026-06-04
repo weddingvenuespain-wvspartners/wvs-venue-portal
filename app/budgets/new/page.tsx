@@ -87,16 +87,24 @@ function NewBudgetContent() {
 
     // Fetch proposal selections if lead has a linked proposal
     let proposalMenuData: any = null
+    let proposalConfigId: string | null = null
+    let proposalModalityId: string | null = null
+    let proposalLodgingConfigId: string | null = null
+    let proposalRoomSelections: any[] = []
     if (leadId) {
       const { data: proposal } = await supabase
         .from('proposals')
-        .select('id')
+        .select('id, commercial_config_id, modality_id, lodging_config_id, sections_data')
         .eq('lead_id', leadId)
         .eq('venue_id', activeVenue!.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
       if (proposal) {
+        proposalConfigId = (proposal as any).commercial_config_id ?? null
+        proposalModalityId = (proposal as any).modality_id ?? (proposal as any).sections_data?.default_modality_id ?? null
+        proposalLodgingConfigId = (proposal as any).lodging_config_id ?? null
+
         const { data: menuSel } = await supabase
           .from('proposal_menu_selections')
           .select('*')
@@ -106,10 +114,17 @@ function NewBudgetContent() {
           .maybeSingle()
         if (menuSel) {
           proposalMenuData = menuSel
-          // Override guest count from selection if couple changed it
           if (menuSel.guest_count) guestCount = menuSel.guest_count
-          // Override wedding date if selection has it
           if (menuSel.wedding_date) weddingDate = menuSel.wedding_date
+        }
+
+        // Lodging room selections
+        if (proposalLodgingConfigId) {
+          const { data: roomSels } = await supabase
+            .from('proposal_room_selections')
+            .select('*')
+            .eq('proposal_id', proposal.id)
+          proposalRoomSelections = roomSels ?? []
         }
       }
     }
@@ -123,6 +138,53 @@ function NewBudgetContent() {
       // No template specified — use default template if one exists
       const defTplStruct = customTemplates.find(t => t.is_default)
       if (defTplStruct?.line_items?.groups) lineItemsGroups = cloneTemplateGroups(defTplStruct.line_items.groups)
+    }
+
+    // Import from proposal — pull modality price + lodging selections as initial line items
+    if (proposalConfigId && proposalModalityId) {
+      const { data: modality } = await supabase
+        .from('venue_modalities')
+        .select('*, prices:venue_modality_prices(*), packages:venue_modality_packages(*, prices:venue_modality_prices(*))')
+        .eq('id', proposalModalityId)
+        .maybeSingle()
+      if (modality) {
+        const modPrice = (modality.prices ?? [])[0]?.price ?? 0
+        const importedGroup = {
+          id: `imp-${Date.now()}`,
+          name: 'Alquiler espacio (importado del dosier)',
+          items: [{
+            id: `mod-${Date.now()}`,
+            concept: modality.name + (modality.duration_label ? ` · ${modality.duration_label}` : ''),
+            qty: 1,
+            unit_price: modPrice,
+            subtotal: modPrice,
+          }],
+        }
+        if (modPrice > 0) lineItemsGroups = [importedGroup, ...lineItemsGroups]
+      }
+    }
+
+    // Import lodging selections
+    if (proposalRoomSelections.length > 0) {
+      const lodgingItems = proposalRoomSelections.map((s: any, idx: number) => {
+        const nights = s.check_in && s.check_out
+          ? Math.max(1, Math.round((new Date(s.check_out).getTime() - new Date(s.check_in).getTime()) / 86400000))
+          : 1
+        const total = s.computed_total ?? 0
+        return {
+          id: `lodg-${Date.now()}-${idx}`,
+          concept: `Habitación · ${s.quantity} hab. × ${nights} noche(s)`,
+          qty: s.quantity,
+          unit_price: nights > 0 ? Math.round((total / s.quantity / nights) * 100) / 100 : 0,
+          subtotal: total,
+        }
+      })
+      if (lodgingItems.length > 0) {
+        lineItemsGroups = [
+          ...lineItemsGroups,
+          { id: `imp-lodg-${Date.now()}`, name: 'Alojamiento (importado del dosier)', items: lodgingItems },
+        ]
+      }
     }
 
     // Dynamic guest count: update qty on items that match guest count patterns
@@ -157,7 +219,7 @@ function NewBudgetContent() {
       : []
 
     const slug = generateBudgetSlug()
-    const { data, error: insErr } = await supabase.from('budgets').insert({
+    const basePayload: any = {
       user_id: user!.id,
       venue_id: activeVenue!.id,
       lead_id: leadId || null,
@@ -171,7 +233,17 @@ function NewBudgetContent() {
       line_items: { groups: lineItemsGroups },
       payment_plan: paymentPlan,
       total_amount: total,
-    }).select().single()
+      commercial_config_id: proposalConfigId,
+      modality_id: proposalModalityId,
+      lodging_config_id: proposalLodgingConfigId,
+    }
+    let { data, error: insErr } = await supabase.from('budgets').insert(basePayload).select().single()
+    // Retry without unknown columns (in case migration not applied yet)
+    if (insErr && insErr.code === '42703') {
+      const { commercial_config_id: _c, modality_id: _m, lodging_config_id: _l, ...rest } = basePayload
+      const r = await supabase.from('budgets').insert(rest).select().single()
+      data = r.data; insErr = r.error
+    }
 
     if (insErr || !data) {
       setError(`No se pudo crear el presupuesto: ${insErr?.message ?? 'desconocido'}`)
