@@ -5,7 +5,13 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { usePlanFeatures, type PlanFeatures } from '@/lib/use-plan-features'
-import { Hourglass, ChevronDown, Check, User, LogOut, ArrowRight } from 'lucide-react'
+import {
+  Hourglass, ChevronDown, Check, User, LogOut, ArrowRight,
+  LayoutDashboard, Inbox, Users, Calendar, BookOpen, Calculator,
+  Store, MessageSquare, BarChart3, Receipt, FileSignature, Settings,
+  LifeBuoy, Heart, UtensilsCrossed, Palette, Building2, Layers, UserPlus,
+  FileText, type LucideIcon,
+} from 'lucide-react'
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -133,63 +139,62 @@ export default function Sidebar() {
     window.location.replace('/login')
   }
 
-  const Icon = ({ d }: { d: string }) => (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d={d} />
-    </svg>
+  // Renders a lucide nav icon at the sidebar's standard size/weight
+  const Icon = ({ glyph: Glyph }: { glyph: LucideIcon }) => (
+    <Glyph size={15} strokeWidth={1.6} style={{ flexShrink: 0 }} />
   )
 
   // ── Nav item definitions ──────────────────────────────────────────────────────
 
   // ── Venue owner nav groups ──────────────────────────────────────────────────
-  const comercialItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/leads',        label: 'Leads',                                          icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', feature: 'leads'        },
-    { href: '/crm',          label: 'Contactos',                                     icon: 'M1 12s2-4 7-4 7 4 7 4M8 8a3 3 0 100-6 3 3 0 000 6zM15 12s-1-2.5-3.5-3.5M12.5 5.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z', feature: 'leads' },
-    { href: '/calendar',   label: isMultiVenue ? 'Calendarios'    : 'Calendario',  icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14',           feature: 'calendario'   },
+  const comercialItems: { href: string; label: string; icon: LucideIcon; feature: keyof PlanFeatures }[] = [
+    { href: '/leads',        label: 'Leads',                                          icon: Inbox,    feature: 'leads'        },
+    { href: '/crm',          label: 'Contactos',                                     icon: Users,    feature: 'leads'        },
+    { href: '/calendar',   label: isMultiVenue ? 'Calendarios'    : 'Calendario',  icon: Calendar, feature: 'calendario'   },
   ]
-  const propuestasItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/dossier',      label: 'Dosieres',                                      icon: 'M2 2h12v10H2zM14 8l2 4M5 6h6M5 9h4',                feature: 'propuestas'   },
-    { href: '/budgets',      label: 'Presupuestos',                                     icon: 'M2 3h12v11H2zM5 1v3M11 1v3M5 7h6M5 10h3',             feature: 'presupuestos' },
+  const propuestasItems: { href: string; label: string; icon: LucideIcon; feature: keyof PlanFeatures }[] = [
+    { href: '/dossier',      label: 'Dosieres',                                      icon: BookOpen,   feature: 'propuestas'   },
+    { href: '/budgets',      label: 'Presupuestos',                                     icon: Calculator, feature: 'presupuestos' },
   ]
-  const canalesItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/channels',      label: 'Canales de venta',                               icon: 'M2 2h12v12H2zM5 6h6M5 9h4',                         feature: 'ficha'        },
-    { href: '/communication', label: 'Comunicación',                                   icon: 'M14 2H2v9h5l1 3 1-3h5V2zM5 6h6M5 9h3',              feature: 'comunicacion' },
+  const canalesItems: { href: string; label: string; icon: LucideIcon; feature: keyof PlanFeatures }[] = [
+    { href: '/channels',      label: 'Canales de venta',                               icon: Store,         feature: 'ficha'        },
+    { href: '/communication', label: 'Comunicación',                                   icon: MessageSquare, feature: 'comunicacion' },
   ]
-  const datosItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/stats', label: 'Estadísticas', icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z', feature: 'estadisticas' },
+  const datosItems: { href: string; label: string; icon: LucideIcon; feature: keyof PlanFeatures }[] = [
+    { href: '/stats', label: 'Estadísticas', icon: BarChart3, feature: 'estadisticas' },
   ]
-  const facturasItem = { href: '/invoices', label: 'Facturas', icon: 'M3 1h10v14l-2-1-2 1-2-1-2 1-2-1V1zM5 5h6M5 8h6M5 11h4' }
-  const contratosItem = { href: '/contratos', label: 'Contratos', icon: 'M4 1h8l3 3v11H1V1zM8 1v3h4M4 7h8M4 10h8M4 13h5' }
-  const configItems: { href: string; label: string; icon: string; feature: keyof PlanFeatures }[] = [
-    { href: '/venue-settings', label: 'Configuración',                                 icon: 'M1 3h14M1 7h9M1 11h5M11 9l2 2 4-4',                  feature: 'estructura'   },
-  ]
-
-  const plannerItems = [
-    { href: '/wp',           label: 'Dashboard',        icon: 'M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z' },
-    { href: '/wp/clients',   label: 'Mis parejas',      icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4' },
-    { href: '/wp/venues',    label: 'Buscar venues',    icon: 'M2 2h12v12H2zM5 6h6M5 9h4' },
-    { href: '/wp/catering',  label: 'Buscar catering',  icon: 'M5 2h6l1 4H4zM4 6c0 5 4 8 4 8s4-3 4-8' },
-    { href: '/wp/branding',  label: 'Branding',         icon: 'M12 2l2 4-7 7-4-1-1-4 7-7zM2 14l2-2M9 3l2 2' },
+  const facturasItem = { href: '/invoices', label: 'Facturas', icon: Receipt }
+  const contratosItem = { href: '/contratos', label: 'Contratos', icon: FileSignature }
+  const configItems: { href: string; label: string; icon: LucideIcon; feature: keyof PlanFeatures }[] = [
+    { href: '/venue-settings', label: 'Configuración', icon: Settings, feature: 'estructura' },
   ]
 
-  const cateringItems = [
-    { href: '/catering',              label: 'Dashboard',     icon: 'M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z' },
-    { href: '/catering/venue-profile',        label: 'Mi ficha',      icon: 'M2 2h12v12H2zM5 6h6M5 9h4' },
-    { href: '/catering/leads',        label: 'Solicitudes',   icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4' },
-    { href: '/catering/calendar',   label: 'Calendario',    icon: 'M1 4h14v10H1zM1 4V2M4 1v3M12 1v3M1 8h14' },
-    { href: '/catering/proposals',   label: 'Propuestas',    icon: 'M2 2h12v10H2zM5 6h6M5 9h4' },
-    { href: '/catering/stats', label: 'Estadísticas',  icon: 'M1 13h2V7H1zM5 13h2V3H5zM9 13h2V9H9zM13 13h2V5h-2z' },
+  const plannerItems: { href: string; label: string; icon: LucideIcon }[] = [
+    { href: '/wp',           label: 'Dashboard',        icon: LayoutDashboard },
+    { href: '/wp/clients',   label: 'Mis parejas',      icon: Heart },
+    { href: '/wp/venues',    label: 'Buscar venues',    icon: Building2 },
+    { href: '/wp/catering',  label: 'Buscar catering',  icon: UtensilsCrossed },
+    { href: '/wp/branding',  label: 'Branding',         icon: Palette },
   ]
 
-  const adminItems: { href: string; label: string; icon: string; badge?: number }[] = [
-    { href: '/admin',                    label: 'CRM',             icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4', badge: pendingUsersCount },
-    { href: '/admin/plans',             label: 'Planes',          icon: 'M1 4h14v8H1zM4 4V2M12 4V2M1 8h14' },
-    { href: '/admin/onboarding',         label: 'Solicitudes',     icon: 'M8 8a3 3 0 100-6 3 3 0 000 6zM2 14s1-4 6-4 6 4 6 4M12 5v4M10 7h4', badge: pendingOnboardingCount },
-    { href: '/admin/wedding-planners',   label: 'Peticiones WP', icon: 'M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z', badge: wpNewCount },
+  const cateringItems: { href: string; label: string; icon: LucideIcon }[] = [
+    { href: '/catering',                label: 'Dashboard',     icon: LayoutDashboard },
+    { href: '/catering/venue-profile',  label: 'Mi ficha',      icon: Store },
+    { href: '/catering/leads',          label: 'Solicitudes',   icon: Inbox },
+    { href: '/catering/calendar',       label: 'Calendario',    icon: Calendar },
+    { href: '/catering/proposals',      label: 'Propuestas',    icon: FileText },
+    { href: '/catering/stats',          label: 'Estadísticas',  icon: BarChart3 },
   ]
 
-  const helpItems = [
-    { href: '/guides', label: 'Centro de ayuda', icon: 'M8 1a7 7 0 100 14A7 7 0 008 1zM8 6v.5M8 9.5V11' },
+  const adminItems: { href: string; label: string; icon: LucideIcon; badge?: number }[] = [
+    { href: '/admin',                    label: 'CRM',             icon: Users,    badge: pendingUsersCount },
+    { href: '/admin/plans',             label: 'Planes',          icon: Layers },
+    { href: '/admin/onboarding',         label: 'Solicitudes',     icon: UserPlus, badge: pendingOnboardingCount },
+    { href: '/admin/wedding-planners',   label: 'Peticiones WP', icon: Heart,    badge: wpNewCount },
+  ]
+
+  const helpItems: { href: string; label: string; icon: LucideIcon }[] = [
+    { href: '/guides', label: 'Centro de ayuda', icon: LifeBuoy },
   ]
 
   const isActive = (href: string) =>
@@ -312,7 +317,7 @@ export default function Sidebar() {
         {/* Dashboard — visible for non-planners (planners have it in their section) */}
         {!isPlanner && (
           <Link href={dashboardHref} className={`nav-item ${isActive(dashboardHref) || pathname === dashboardHref ? 'active' : ''}`}>
-            <Icon d="M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z" /> Dashboard
+            <Icon glyph={LayoutDashboard} /> Dashboard
           </Link>
         )}
 
@@ -324,7 +329,7 @@ export default function Sidebar() {
               <Link key={item.href} href={item.href}
                 className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
               >
-                <Icon d={item.icon} /> {item.label}
+                <Icon glyph={item.icon} /> {item.label}
                 {item.badge != null && item.badge > 0 && (
                   <span style={{
                     marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
@@ -349,7 +354,7 @@ export default function Sidebar() {
                 className={`nav-item ${pathname === item.href || (item.href !== '/wp' && pathname.startsWith(item.href)) ? 'active' : ''}`}
                 style={{ paddingLeft: 20 }}
               >
-                <Icon d={item.icon} /> {item.label}
+                <Icon glyph={item.icon} /> {item.label}
                 {item.href === '/wp' && newClientsCount > 0 && (
                   <span style={{
                     marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
@@ -365,7 +370,7 @@ export default function Sidebar() {
             <div className="nav-section" style={{ marginTop: 8 }}>Ayuda</div>
             {helpItems.map(item => (
               <Link key={item.href} href={item.href} className={`nav-item ${isActive(item.href) ? 'active' : ''}`}>
-                <Icon d={item.icon} /> {item.label}
+                <Icon glyph={item.icon} /> {item.label}
               </Link>
             ))}
           </>
@@ -380,7 +385,7 @@ export default function Sidebar() {
                 className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
                 style={{ paddingLeft: 20 }}
               >
-                <Icon d={item.icon} /> {item.label}
+                <Icon glyph={item.icon} /> {item.label}
                 {item.href === '/catering/leads' && newLeadsCount > 0 && (
                   <span style={{
                     marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
@@ -396,7 +401,7 @@ export default function Sidebar() {
             <div className="nav-section" style={{ marginTop: 8 }}>Ayuda</div>
             {helpItems.map(item => (
               <Link key={item.href} href={item.href} className={`nav-item ${isActive(item.href) ? 'active' : ''}`}>
-                <Icon d={item.icon} /> {item.label}
+                <Icon glyph={item.icon} /> {item.label}
               </Link>
             ))}
           </>
@@ -419,7 +424,7 @@ export default function Sidebar() {
                       title="Funcionalidad no disponible en tu plan actual"
                       style={{ paddingLeft: 20, opacity: 0.38, cursor: 'not-allowed', userSelect: 'none' }}
                     >
-                      <Icon d={item.icon} /> {item.label}
+                      <Icon glyph={item.icon} /> {item.label}
                       <span style={{ marginLeft: 'auto', fontSize: 9 }}>PRO</span>
                     </div>
                   )
@@ -428,7 +433,7 @@ export default function Sidebar() {
                       className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
                       style={{ paddingLeft: 20 }}
                     >
-                      <Icon d={item.icon} /> {item.label}
+                      <Icon glyph={item.icon} /> {item.label}
                       {item.href === '/leads' && newLeadsCount > 0 && (
                         <span style={{
                           marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9,
@@ -453,7 +458,7 @@ export default function Sidebar() {
                   title="Funcionalidad no disponible en tu plan actual"
                   style={{ paddingLeft: 20, opacity: 0.38, cursor: 'not-allowed', userSelect: 'none' }}
                 >
-                  <Icon d={item.icon} /> {item.label}
+                  <Icon glyph={item.icon} /> {item.label}
                   <span style={{ marginLeft: 'auto', fontSize: 9 }}>PRO</span>
                 </div>
               )
@@ -462,7 +467,7 @@ export default function Sidebar() {
                   className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
                   style={{ paddingLeft: 20 }}
                 >
-                  <Icon d={item.icon} /> {item.label}
+                  <Icon glyph={item.icon} /> {item.label}
                 </Link>
               )
             })}
@@ -470,13 +475,13 @@ export default function Sidebar() {
               className={`nav-item ${isActive(facturasItem.href) ? 'active' : ''}`}
               style={{ paddingLeft: 20 }}
             >
-              <Icon d={facturasItem.icon} /> {facturasItem.label}
+              <Icon glyph={facturasItem.icon} /> {facturasItem.label}
             </Link>
             <Link href={contratosItem.href}
               className={`nav-item ${isActive(contratosItem.href) ? 'active' : ''}`}
               style={{ paddingLeft: 20 }}
             >
-              <Icon d={contratosItem.icon} /> {contratosItem.label}
+              <Icon glyph={contratosItem.icon} /> {contratosItem.label}
             </Link>
 
             <div className="nav-section" style={{ marginTop: 8 }}>Configuración</div>
@@ -487,7 +492,7 @@ export default function Sidebar() {
                   title="Funcionalidad no disponible en tu plan actual"
                   style={{ paddingLeft: 20, opacity: 0.38, cursor: 'not-allowed', userSelect: 'none' }}
                 >
-                  <Icon d={item.icon} /> {item.label}
+                  <Icon glyph={item.icon} /> {item.label}
                   <span style={{ marginLeft: 'auto', fontSize: 9 }}>PRO</span>
                 </div>
               )
@@ -496,7 +501,7 @@ export default function Sidebar() {
                   className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
                   style={{ paddingLeft: 20 }}
                 >
-                  <Icon d={item.icon} /> {item.label}
+                  <Icon glyph={item.icon} /> {item.label}
                 </Link>
               )
             })}
@@ -505,7 +510,7 @@ export default function Sidebar() {
                 className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
                 style={{ paddingLeft: 20 }}
               >
-                <Icon d={item.icon} /> {item.label}
+                <Icon glyph={item.icon} /> {item.label}
               </Link>
             ))}
           </>

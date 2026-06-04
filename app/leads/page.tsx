@@ -1483,46 +1483,6 @@ function LeadsPageInner() {
             </div>
           )}
 
-          {/* Stale leads warning */}
-          {staleLeads.length > 0 && activeTab === 'new' && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
-              background: '#FAF3F2', border: '1px solid #E0C2BD', borderRadius: 8, marginBottom: 10, fontSize: 12,
-            }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F2E2E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Clock size={16} style={{ color: '#B0473E' }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, color: '#B0473E' }}>
-                  {staleLeads.length} lead{staleLeads.length !== 1 ? 's' : ''} sin responder hace más de 48h
-                </div>
-                <div style={{ color: '#933B34', fontSize: 11, marginTop: 1 }}>
-                  Responder rápido aumenta la conversión. Considera contactar o marcar como perdido.
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* WP priority leads */}
-          {wpPriorityLeads.length > 0 && activeTab === 'new' && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
-              background: '#F2F1F8', border: '1px solid #d8b4fe', borderRadius: 8, marginBottom: 10, fontSize: 12,
-            }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#E9E6F3', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Crown size={16} style={{ color: '#7E72A0' }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, color: '#5A4878' }}>
-                  {wpPriorityLeads.length} lead{wpPriorityLeads.length !== 1 ? 's' : ''} de Wedding Planners
-                </div>
-                <div style={{ color: '#6A5B95', fontSize: 11, marginTop: 1 }}>
-                  Prioridad alta — provienen de planners con los que colaboras
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Bulk action bar */}
           {selectedIds.size > 0 && (
             <div style={{
@@ -1625,6 +1585,46 @@ function LeadsPageInner() {
           </div>
 
           {viewMode === 'list' && (<>
+
+          {/* Stale leads warning — dentro del contenido del tab Nuevos para no desplazar la barra de tabs */}
+          {staleLeads.length > 0 && activeTab === 'new' && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
+              background: '#FAF3F2', border: '1px solid #E0C2BD', borderRadius: 8, marginTop: 14, marginBottom: 10, fontSize: 12,
+            }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F2E2E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Clock size={16} style={{ color: '#B0473E' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, color: '#B0473E' }}>
+                  {staleLeads.length} lead{staleLeads.length !== 1 ? 's' : ''} sin responder hace más de 48h
+                </div>
+                <div style={{ color: '#933B34', fontSize: 11, marginTop: 1 }}>
+                  Responder rápido aumenta la conversión. Considera contactar o marcar como perdido.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* WP priority leads */}
+          {wpPriorityLeads.length > 0 && activeTab === 'new' && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
+              background: '#F2F1F8', border: '1px solid #d8b4fe', borderRadius: 8, marginTop: staleLeads.length > 0 ? 0 : 14, marginBottom: 10, fontSize: 12,
+            }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#E9E6F3', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Crown size={16} style={{ color: '#7E72A0' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, color: '#5A4878' }}>
+                  {wpPriorityLeads.length} lead{wpPriorityLeads.length !== 1 ? 's' : ''} de Wedding Planners
+                </div>
+                <div style={{ color: '#6A5B95', fontSize: 11, marginTop: 1 }}>
+                  Prioridad alta — provienen de planners con los que colaboras
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Lost banner — aparece cuando un lead se mueve a Perdidos */}
           {lostBanner && (

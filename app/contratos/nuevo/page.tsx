@@ -266,14 +266,14 @@ export default function NuevoContratoPage() {
         </div>
 
         {/* Main: form + preview */}
-        <div style={{ display: 'flex', gap: 0, minHeight: 'calc(100vh - 56px)' }}>
+        <div style={{ display: 'flex', gap: 24, padding: 24, minHeight: 'calc(100vh - 56px)', alignItems: 'flex-start' }}>
 
-          {/* ═══ LEFT: Form (platform deep green sidebar) ═══ */}
-          <div style={{ width: 420, flexShrink: 0, background: 'var(--fe-deep)', color: 'var(--fe-text-light)', padding: 24, overflowY: 'auto', maxHeight: 'calc(100vh - 56px)', fontFamily: "'Inter', sans-serif" }}>
+          {/* ═══ LEFT: Form ═══ */}
+          <div style={{ flex: '0 0 420px', maxWidth: 420 }}>
 
             {/* Template */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Plantilla</div>
+            <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--warm-gray)', marginBottom: 10 }}>Plantilla</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 {([
                   { key: 'standard' as Template, label: 'Estándar' },
@@ -284,10 +284,10 @@ export default function NuevoContratoPage() {
                     key={t.key}
                     onClick={() => switchTemplate(t.key)}
                     style={{
-                      flex: 1, padding: '8px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                      border: 'none', cursor: 'pointer',
-                      background: template === t.key ? 'var(--fe-primary)' : 'rgba(255,255,255,0.08)',
-                      color: template === t.key ? 'white' : 'rgba(255,255,255,0.7)',
+                      flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      border: template === t.key ? '2px solid var(--gold)' : '2px solid var(--border)',
+                      background: template === t.key ? 'var(--cream)' : 'white',
+                      color: template === t.key ? 'var(--espresso)' : 'var(--warm-gray)',
                     }}
                   >
                     {t.label}
@@ -297,32 +297,33 @@ export default function NuevoContratoPage() {
             </div>
 
             {/* Client search */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Datos del cliente</div>
+            <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--warm-gray)', marginBottom: 10 }}>Datos del cliente</div>
 
-              <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 4, display: 'block' }}>Buscar pareja *</label>
-              <div style={{ position: 'relative', marginBottom: 10 }}>
-                <input
-                  value={leadSearch}
-                  onChange={e => { setLeadSearch(e.target.value); setShowLeadDropdown(true) }}
-                  onFocus={() => setShowLeadDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowLeadDropdown(false), 200)}
-                  placeholder="Buscar por nombre..."
-                  style={{
-                    width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)',
-                    background: 'rgba(255,255,255,0.05)', color: 'white', fontSize: 13, outline: 'none',
-                  }}
-                />
+              <div style={{ position: 'relative', marginBottom: 12 }}>
+                <label className="form-label">Buscar pareja *</label>
+                <div style={{ position: 'relative' }}>
+                  <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--warm-gray)' }} />
+                  <input
+                    className="form-input"
+                    value={leadSearch}
+                    onChange={e => { setLeadSearch(e.target.value); setShowLeadDropdown(true) }}
+                    onFocus={() => setShowLeadDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowLeadDropdown(false), 200)}
+                    placeholder="Buscar por nombre..."
+                    style={{ paddingLeft: 32 }}
+                  />
+                </div>
                 {showLeadDropdown && filteredLeads.length > 0 && (
                   <div style={{
                     position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-                    background: 'var(--fe-deep)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8,
-                    maxHeight: 200, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    background: 'white', border: '1px solid var(--border)', borderRadius: 8,
+                    maxHeight: 200, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                   }}>
                     {filteredLeads.map(l => (
-                      <div key={l.id} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid rgba(255,255,255,0.08)' }} onMouseDown={() => selectLead(l)}>
+                      <div key={l.id} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--border)' }} onMouseDown={() => selectLead(l)}>
                         <div style={{ fontWeight: 500 }}>{l.couple_name}</div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+                        <div style={{ fontSize: 11, color: 'var(--warm-gray)' }}>
                           {l.email || 'Sin email'}{l.budget_id && ' · Presupuesto'}{l.wedding_date && ` · ${fmtDateLong(l.wedding_date)}`}
                         </div>
                       </div>
@@ -332,7 +333,7 @@ export default function NuevoContratoPage() {
               </div>
 
               {/* Client fields */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 {[
                   { label: 'Dirección', value: clientAddress, set: setClientAddress, span: 2, ph: 'Calle Mayor 1' },
                   { label: 'Código postal', value: clientZip, set: setClientZip, ph: '28001' },
@@ -341,15 +342,12 @@ export default function NuevoContratoPage() {
                   { label: 'Email', value: clientEmail, set: setClientEmail, ph: 'email@ejemplo.com' },
                 ].map((f, i) => (
                   <div key={i} style={{ gridColumn: 'span' in f && f.span === 2 ? 'span 2' : undefined }}>
-                    <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 3, textTransform: 'uppercase' }}>{f.label}</label>
+                    <label className="form-label">{f.label}</label>
                     <input
+                      className="form-input"
                       value={f.value}
                       onChange={e => f.set(e.target.value)}
                       placeholder={f.ph}
-                      style={{
-                        width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)',
-                        background: 'rgba(255,255,255,0.05)', color: 'white', fontSize: 12, outline: 'none',
-                      }}
                     />
                   </div>
                 ))}
@@ -357,64 +355,62 @@ export default function NuevoContratoPage() {
             </div>
 
             {/* Event details */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Detalles del evento</div>
-              <div style={{ marginBottom: 10 }}>
-                <DatePicker value={weddingDate} onChange={setWeddingDate} label="Fecha de la boda" accent="#8FAA94" dark allowPast placeholder="Seleccionar fecha" />
+            <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--warm-gray)', marginBottom: 10 }}>Detalles del evento</div>
+              <div style={{ marginBottom: 12 }}>
+                <DatePicker value={weddingDate} onChange={setWeddingDate} label="Fecha de la boda" accent="var(--gold)" allowPast placeholder="Seleccionar fecha" />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 3, textTransform: 'uppercase' }}>Importe total (€)</label>
+                  <label className="form-label">Importe total (€)</label>
                   <input
+                    className="form-input"
                     type="number" min={0} step={0.01} value={totalAmount || ''} onChange={e => setTotalAmount(Number(e.target.value))}
                     placeholder="0.00"
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: 'white', fontSize: 12, outline: 'none' }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 3, textTransform: 'uppercase' }}>Señal / Depósito (€)</label>
+                  <label className="form-label">Señal / Depósito (€)</label>
                   <input
+                    className="form-input"
                     type="number" min={0} step={0.01} value={depositAmount || ''} onChange={e => setDepositAmount(Number(e.target.value))}
                     placeholder="0.00"
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: 'white', fontSize: 12, outline: 'none' }}
                   />
                 </div>
               </div>
             </div>
 
             {/* Edit sections */}
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Cláusulas del contrato</div>
+            <div className="card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--warm-gray)', marginBottom: 10 }}>Cláusulas del contrato</div>
               {sections.map((s, idx) => (
-                <div key={idx} style={{ marginBottom: 10, padding: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div key={idx} style={{ marginBottom: 10, padding: 10, background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{idx + 1}.</span>
+                    <span style={{ fontSize: 11, color: 'var(--warm-gray)', fontWeight: 600 }}>{idx + 1}.</span>
                     <input
+                      className="form-input"
                       value={s.title}
                       onChange={e => updateSection(idx, 'title', e.target.value)}
-                      style={{ flex: 1, padding: '4px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'white', fontSize: 12, fontWeight: 600, outline: 'none' }}
+                      style={{ flex: 1, minHeight: 32, padding: '6px 10px', fontSize: 12, fontWeight: 600 }}
                     />
-                    <button onClick={() => removeSection(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: 2 }}>
-                      <Trash2 size={12} />
+                    <button onClick={() => removeSection(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 2, display: 'flex' }}>
+                      <Trash2 size={13} />
                     </button>
                   </div>
                   <textarea
+                    className="form-textarea"
                     value={s.content}
                     onChange={e => updateSection(idx, 'content', e.target.value)}
                     rows={3}
-                    style={{
-                      width: '100%', padding: '6px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.08)',
-                      background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.85)', fontSize: 11,
-                      lineHeight: 1.5, resize: 'vertical', outline: 'none',
-                    }}
+                    style={{ minHeight: 0, fontSize: 12, lineHeight: 1.5 }}
                   />
                 </div>
               ))}
               <button
                 onClick={addSection}
                 style={{
-                  width: '100%', padding: '8px', borderRadius: 6, border: '1px dashed rgba(255,255,255,0.15)',
-                  background: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 12, cursor: 'pointer',
+                  width: '100%', padding: '9px', borderRadius: 8, border: '1px dashed rgba(74,107,82,0.30)',
+                  background: 'none', color: 'var(--fe-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 }}
               >
@@ -424,7 +420,7 @@ export default function NuevoContratoPage() {
           </div>
 
           {/* ═══ RIGHT: Live Preview ═══ */}
-          <div style={{ flex: 1, background: 'var(--cream)', padding: 24, overflowY: 'auto', maxHeight: 'calc(100vh - 56px)' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Vista previa</div>
 
             <div style={{

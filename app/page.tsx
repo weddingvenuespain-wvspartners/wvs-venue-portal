@@ -139,7 +139,7 @@ function Hero() {
       <div style={{ position: 'relative', zIndex: 2, maxWidth: 340 }}>
         {/* Brand */}
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 28, justifyContent: 'center' }}>
-          <img src="/foreventos-assets/favicon.png" alt="FE" style={{ height: 28, width: 'auto', borderRadius: 6 }} />
+          <img src="/foreventos-assets/favicon.png" alt="ForEventos" style={{ height: 28, width: 'auto', borderRadius: 6 }} />
           <span style={{ fontFamily: "'Satoshi', 'Inter', sans-serif", fontWeight: 700, letterSpacing: 0.5, fontSize: 18, color: '#E8E6DC' }}>
             FOREVENTOS
           </span>
@@ -473,7 +473,7 @@ function LoginPageInner() {
               {/* Card head */}
               <div style={{ marginBottom: 16 }}>
                 <div className="fe-form-brand" style={{ alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                  <img src="/foreventos-assets/favicon.png" alt="FE" style={{ height: 28, width: 'auto', borderRadius: 6 }} />
+                  <img src="/foreventos-assets/favicon.png" alt="ForEventos" style={{ height: 28, width: 'auto', borderRadius: 6 }} />
                   <span style={{ fontFamily: "'Satoshi','Inter',sans-serif", fontWeight: 700, letterSpacing: 0.5, fontSize: 20, color: '#E8E6DC' }}>
                     FOREVENTOS
                   </span>

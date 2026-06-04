@@ -582,7 +582,7 @@ export default function NuevaFacturaPage() {
             <div style={{
               background: 'white', borderRadius: 8, boxShadow: '0 1px 8px rgba(0,0,0,0.06)',
               border: '1px solid var(--border)', minHeight: 600, overflow: 'hidden',
-              fontFamily: "'Helvetica Neue', Arial, sans-serif",
+              fontFamily: "'Inter', sans-serif",
             }}>
 
               {/* ─── CLASSIC TEMPLATE ─── */}
