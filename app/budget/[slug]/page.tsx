@@ -26,6 +26,14 @@ export default async function BudgetPublicPage({ params, searchParams }: {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { get: (name: string) => cookieStore.get(name)?.value } }
   )
+  // Public landing reads the budget (financial + PII) by slug server-side with
+  // the service role, so we can keep RLS locked down (no public anon read of
+  // the budgets table).
+  const svc = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  )
 
   // If returning from Stripe Checkout, verify and update DB before rendering
   if (paid === '1' && session_id) {
@@ -40,7 +48,7 @@ export default async function BudgetPublicPage({ params, searchParams }: {
     }
   }
 
-  const { data: budget } = await supabase
+  const { data: budget } = await svc
     .from('budgets')
     .select('*')
     .eq('slug', slug)
@@ -76,11 +84,6 @@ export default async function BudgetPublicPage({ params, searchParams }: {
   const stripeConnected = !!stripeAccount?.charges_enabled
 
   // Fetch payment records for split payment tracking + history
-  const svc = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  )
   const { data: paymentRecords } = await svc
     .from('budget_payments')
     .select('installment_index, amount, status, paid_at, payer_name, payer_email')

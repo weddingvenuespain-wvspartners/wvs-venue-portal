@@ -4,6 +4,7 @@
 // Sections: Hero minimal, Gallery (full-bleed), Mensaje personal, Experiencia, Testimonios, Incluye, CTA romántico
 
 import { useEffect, useState, useRef } from 'react'
+import { safeCssColor, safeFontFamily } from '@/lib/utils'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, formatZonePrice, VenueRentalGrid, TplStickyNav, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, replacePlaceholders, ZoneSlider, type ProposalData } from './shared'
 import { WeddingProposal } from './WeddingProposal'
@@ -41,11 +42,11 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
   const welcomeVariant = pickWelcomeVariant(sec)
   const _preview = !!(data as any)._preview
 
-  const primary = branding?.primary_color ?? '#6B4F3A'
+  const primary = safeCssColor(branding?.primary_color, '#6B4F3A')!
   const rgb     = toRgb(primary)
   const onPri   = isDark(primary) ? '#ffffff' : '#111111'
   const logo    = branding?.logo_url ?? null
-  const font    = (branding as any)?.font_family || 'Satoshi,Georgia,serif'
+  const font    = safeFontFamily((branding as any)?.font_family, 'Satoshi,Georgia,serif')!
   const contact = resolveContact(data)
   const contactOn = on('contact') && (contact.phone || contact.email)
   const photoList = venue?.photo_urls ?? []

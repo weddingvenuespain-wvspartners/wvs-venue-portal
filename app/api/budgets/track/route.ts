@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { getServiceClient } from '@/lib/auth-server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -11,12 +10,9 @@ export async function POST(req: NextRequest) {
     const slug: string | undefined = body.slug
     if (!slug) return NextResponse.json({ ok: false }, { status: 400 })
 
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { get: (name: string) => cookieStore.get(name)?.value } }
-    )
+    // Public view-tracking endpoint: use the service role (budgets is not
+    // anon-readable) and scope strictly by slug.
+    const supabase = getServiceClient()
 
     const now = new Date().toISOString()
 

@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
     const responseCode = params.Ds_Response
     const order = params.Ds_Order
     const authCode = params.Ds_AuthorisationCode
+    const amount = params.Ds_Amount
 
     let merchantData: {
       type?: string
@@ -68,6 +69,31 @@ export async function POST(req: NextRequest) {
     if (!budgetId || installmentIndex == null) {
       console.error('[budget-payment/notification] Missing budgetId or installmentIndex')
       return new NextResponse('OK')
+    }
+
+    // Idempotency + amount validation against the pending payment row that
+    // create-payment persisted for this order.
+    const { data: paymentRow } = await svc
+      .from('budget_payments')
+      .select('status, amount')
+      .eq('redsys_order', order)
+      .maybeSingle()
+
+    if (paymentRow?.status === 'paid') {
+      console.log(`[budget-payment/notification] Order ${order} already paid — skipping`)
+      return new NextResponse('OK')
+    }
+
+    if (paymentRow?.amount != null && amount) {
+      const expectedCents = Math.round(Number(paymentRow.amount) * 100)
+      const paidCents = parseInt(amount, 10)
+      if (paidCents < expectedCents) {
+        console.error(`[budget-payment/notification] Amount mismatch order=${order} paid=${paidCents} expected=${expectedCents} — not marking paid`)
+        await svc.from('budget_payments')
+          .update({ status: 'failed' })
+          .eq('redsys_order', order)
+        return new NextResponse('OK')
+      }
     }
 
     // Update payment record

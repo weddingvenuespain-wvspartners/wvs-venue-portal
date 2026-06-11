@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ProposalData } from '../page'
+import { safeCssColor, safeFontFamily } from '@/lib/utils'
 import {
   extractData, formatDate, formatPrice, isDark, toRgb,
   FadeUp, FadeIn,
@@ -445,10 +446,10 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
 
   const _preview = !!(data as any)._preview
   const branding  = data.branding
-  const primary   = branding?.primary_color || '#1A1A1A'
+  const primary   = safeCssColor(branding?.primary_color, '#1A1A1A')!
   const priRgb    = toRgb(primary)
   const darkPri   = isDark(primary)
-  const font      = (branding as any)?.font_family || "'DM Sans', sans-serif"
+  const font      = safeFontFamily((branding as any)?.font_family, "'DM Sans', sans-serif")!
   const venueName = data.venue?.name || ''
   const contact   = resolveContact(data)
   const contactOn = on('contact') && (contact.phone || contact.email)

@@ -4,6 +4,7 @@
 // Sections: Hero + sidebar nav, Experience, Inclusions, Packages, Extras, FAQ, CTA
 
 import { useEffect, useRef, useState } from 'react'
+import { safeCssColor, safeFontFamily } from '@/lib/utils'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { formatDate, formatPrice, isDark, toRgb, FadeUp, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoPin, IcoCalendar, IcoUsers, IcoChat, IcoBuilding, ivaLabel, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, formatZonePrice, VenueRentalGrid, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, replacePlaceholders, ZoneSlider, type ProposalData } from './shared'
 import { WeddingProposal } from './WeddingProposal'
@@ -56,11 +57,11 @@ export default function T3TodoClaro({ data }: { data: ProposalData }) {
   const displayMsg = replacePlaceholders(personal_message || (sec as any).welcome_default || null, data)
   const welcomeVariant = pickWelcomeVariant(sec)
 
-  const primary = branding?.primary_color ?? '#1A3A5C'
+  const primary = safeCssColor(branding?.primary_color, '#1A3A5C')!
   const rgb     = toRgb(primary)
   const onPri   = isDark(primary) ? '#ffffff' : '#111111'
   const logo    = branding?.logo_url ?? null
-  const font    = (branding as any)?.font_family || 'Satoshi,Georgia,serif'
+  const font    = safeFontFamily((branding as any)?.font_family, 'Satoshi,Georgia,serif')!
   const contact = resolveContact(data)
   const contactOn = on('contact') && (contact.phone || contact.email)
 

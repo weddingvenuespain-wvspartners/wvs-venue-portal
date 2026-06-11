@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import type { GCalConfig } from '@/lib/google-calendar'
 import { getValidAccessToken, fetchCalendarEvents, eventsToBlockedDates } from '@/lib/google-calendar'
 
@@ -24,13 +26,32 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${APP_URL}/venue-settings?gcal=error`)
   }
 
-  let userId: string, venueId: string
+  let userId: string, venueId: string, stateNonce: string
   try {
     const decoded = JSON.parse(Buffer.from(state, 'base64url').toString())
     userId  = decoded.user_id
     venueId = decoded.venue_id
-    if (!userId || !venueId) throw new Error()
+    stateNonce = decoded.nonce
+    if (!userId || !venueId || !stateNonce) throw new Error()
   } catch {
+    return NextResponse.redirect(`${APP_URL}/venue-settings?gcal=error`)
+  }
+
+  // CSRF check: the state nonce must match the cookie set in /start.
+  const cookieStore = await cookies()
+  const cookieNonce = cookieStore.get('gcal_oauth_nonce')?.value
+  if (!cookieNonce || cookieNonce !== stateNonce) {
+    return NextResponse.redirect(`${APP_URL}/venue-settings?gcal=error`)
+  }
+
+  // The user completing the flow must be the same one who started it.
+  const authClient = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (n: string) => cookieStore.get(n)?.value } }
+  )
+  const { data: { user: sessionUser } } = await authClient.auth.getUser()
+  if (!sessionUser || sessionUser.id !== userId) {
     return NextResponse.redirect(`${APP_URL}/venue-settings?gcal=error`)
   }
 

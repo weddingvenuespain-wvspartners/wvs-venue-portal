@@ -9,6 +9,7 @@ import { Metadata } from 'next'
 import ProposalLanding from './ProposalLanding'
 import ProposalGate from '@/components/ProposalGate'
 import type { SectionsData } from '@/lib/proposal-types'
+import { dossierUnlockToken } from '@/lib/dossier-unlock'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -151,7 +152,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
   if (proposal.access_password && !preview) {
     const cookieStore = await cookies()
     const unlockCookie = cookieStore.get(`proposal_unlock_${proposal.id}`)?.value
-    if (unlockCookie !== proposal.access_password) {
+    if (unlockCookie !== dossierUnlockToken(proposal.id)) {
       return <ProposalGate slug={proposal.slug} coupleName={proposal.couple_name} />
     }
   }

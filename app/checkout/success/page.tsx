@@ -27,19 +27,22 @@ export default function CheckoutSuccessPage() {
     // Try fallback activation immediately
     triedRef.current = true
 
-    const activate = async () => {
-      const stored = localStorage.getItem('wvs_pending_plan')
-      if (!stored) {
-        setError('No se encontraron datos del plan seleccionado.')
+    // The Redsys order number is echoed back in the success URL. It's the key
+    // the server uses to look up the verified payment intent — the server never
+    // trusts a client-provided plan, so we only need to pass the order.
+    const order = new URLSearchParams(window.location.search).get('order')
+
+    const activate = async (attempt = 0) => {
+      if (!order) {
+        setError('No se encontró la referencia del pago.')
         return
       }
 
       try {
-        const { planId, cycleId, venueId } = JSON.parse(stored)
         const res = await fetch('/api/redsys/activate-from-success', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ planId, cycleId, venueId: venueId || null }),
+          body: JSON.stringify({ order }),
         })
         const data = await res.json()
 
@@ -47,6 +50,13 @@ export default function CheckoutSuccessPage() {
           localStorage.removeItem('wvs_pending_plan')
           await refreshProfile()
           setActivated(true)
+        } else if (data.status === 'pending') {
+          // Webhook hasn't confirmed the payment yet — retry briefly.
+          if (attempt < 5) {
+            setTimeout(() => activate(attempt + 1), 2000)
+          } else {
+            setError('Tu pago se está procesando. Refresca en unos segundos.')
+          }
         } else {
           setError(data.error || 'No se pudo activar la suscripción.')
         }

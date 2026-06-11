@@ -2,9 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession, getServiceClient } from '@/lib/auth-server'
 
 // POST /api/redsys/activate-from-success
-// Fallback activation: creates subscription if the webhook hasn't fired yet.
-// Only works if user has NO active subscription (prevents double-activation).
-// Body: { planId, cycleId }
+// Fallback activation for the checkout success page, used when the Redsys
+// webhook (the real activation path) hasn't reached us yet.
+//
+// Body: { order }  — the Redsys order number echoed back in the success URL.
+//
+// Security: this endpoint never trusts client-provided plan data. It looks up
+// the server-side payment intent persisted at create-payment time (keyed by
+// `order`, scoped to the authenticated user) and derives the plan/cycle from
+// it. In production it additionally requires the signature-verified webhook to
+// have recorded a matching `payment_received`, so a plan can never be activated
+// without a real payment. In non-production (local dev, sandbox) the webhook
+// can't reach localhost, so the verified intent alone is accepted.
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,19 +23,39 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = session.user.id
-    const { planId, cycleId, venueId } = await req.json()
+    const { order } = await req.json()
 
-    if (!planId || !cycleId) {
-      return NextResponse.json({ error: 'planId y cycleId requeridos' }, { status: 400 })
+    if (!order) {
+      return NextResponse.json({ error: 'order requerido' }, { status: 400 })
     }
 
     const svc = getServiceClient()
 
-    // Check if this venue already has a PAID subscription (webhook already fired).
-    // Only 'active' blocks: a trial — expired or not — must never prevent
-    // activating the payment the user just made (it gets cancelled below,
-    // mirroring the webhook). For multi-venue accounts, scope to the specific
-    // venue so buying a plan for venue 2 doesn't get blocked by venue 1's.
+    // Look up the server-side payment intent for this order, bound to this user.
+    const { data: intent } = await svc
+      .from('venue_payment_history')
+      .select('plan_id, billing_cycle, amount, notes')
+      .eq('reference', order)
+      .eq('user_id', userId)
+      .eq('event_type', 'payment_initiated')
+      .maybeSingle()
+
+    if (!intent || !intent.plan_id || !intent.billing_cycle) {
+      return NextResponse.json({ error: 'Pago no encontrado' }, { status: 404 })
+    }
+
+    const planId = intent.plan_id
+    const cycleId = intent.billing_cycle
+    let venueId: string | null = null
+    let intervalMonths = 1
+    try {
+      const meta = intent.notes ? JSON.parse(intent.notes) : {}
+      venueId = meta.venueId ?? null
+      intervalMonths = meta.intervalMonths || 1
+    } catch { /* notes not JSON — ignore */ }
+
+    // Already activated by the webhook? Scope to the specific venue for
+    // multi-venue accounts so venue 2's purchase isn't blocked by venue 1's.
     let existingQuery = svc
       .from('venue_subscriptions')
       .select('id')
@@ -40,20 +69,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'already_active' })
     }
 
-    // Fetch plan to get billing cycle details
-    const { data: plan } = await svc
-      .from('venue_plans')
-      .select('id, billing_cycles')
-      .eq('id', planId)
-      .single()
+    // In production, require proof that the payment actually completed. The
+    // Redsys webhook records a signature-verified `payment_received` for the
+    // same order; without it we must not activate (just tell the client to
+    // wait for the webhook).
+    if (process.env.REDSYS_ENV === 'production') {
+      const { data: paid } = await svc
+        .from('venue_payment_history')
+        .select('id, amount')
+        .eq('reference', order)
+        .eq('user_id', userId)
+        .eq('event_type', 'payment_received')
+        .maybeSingle()
 
-    if (!plan) {
-      return NextResponse.json({ error: 'Plan no encontrado' }, { status: 404 })
+      if (!paid) {
+        return NextResponse.json({ status: 'pending' })
+      }
+      // Defense in depth: the recorded paid amount must cover the plan price.
+      if (paid.amount != null && intent.amount != null && Number(paid.amount) + 0.01 < Number(intent.amount)) {
+        console.error('[activate-from-success] amount mismatch', { order, paid: paid.amount, expected: intent.amount })
+        return NextResponse.json({ error: 'Importe no coincide' }, { status: 409 })
+      }
     }
-
-    const cycles = (plan.billing_cycles || []) as any[]
-    const cycle = cycles.find((c: any) => c.id === cycleId)
-    const intervalMonths = cycle?.interval_months || 1
 
     const periodEnd = new Date()
     periodEnd.setMonth(periodEnd.getMonth() + intervalMonths)
@@ -88,6 +125,8 @@ export async function POST(req: NextRequest) {
     await svc.from('venue_payment_history').insert({
       user_id: userId,
       event_type: 'activated',
+      amount: intent.amount ?? null,
+      reference: order,
       plan_id: planId,
       billing_cycle: cycleId,
       notes: 'Suscripción activada desde página de éxito (fallback)',
