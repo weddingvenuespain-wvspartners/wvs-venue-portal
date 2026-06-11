@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import crypto from 'crypto'
 
 // GET /api/auth/google/start?venue_id=xxx
 // Redirects to Google OAuth consent screen.
@@ -17,7 +18,11 @@ export async function GET(req: NextRequest) {
   const venueId = req.nextUrl.searchParams.get('venue_id')
   if (!venueId) return NextResponse.json({ error: 'Missing venue_id' }, { status: 400 })
 
-  const state = Buffer.from(JSON.stringify({ user_id: user.id, venue_id: venueId })).toString('base64url')
+  // CSRF protection: bind the OAuth flow to a random nonce stored in an
+  // HttpOnly cookie. The callback rejects any response whose state nonce
+  // doesn't match the cookie.
+  const nonce = crypto.randomBytes(16).toString('hex')
+  const state = Buffer.from(JSON.stringify({ user_id: user.id, venue_id: venueId, nonce })).toString('base64url')
 
   const params = new URLSearchParams({
     client_id:     process.env.GOOGLE_CLIENT_ID!,
@@ -29,5 +34,13 @@ export async function GET(req: NextRequest) {
     state,
   })
 
-  return NextResponse.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`)
+  const res = NextResponse.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`)
+  res.cookies.set('gcal_oauth_nonce', nonce, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 600, // 10 minutes
+  })
+  return res
 }

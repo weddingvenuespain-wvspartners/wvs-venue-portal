@@ -55,6 +55,19 @@ export async function POST(req: NextRequest) {
       venueId: venueId || null,
     })
 
+    // Persist a server-side payment intent keyed by the Redsys order number.
+    // This is the authoritative binding order -> user/plan/cycle/amount, so the
+    // success-page fallback never has to trust client-provided plan data.
+    await supabase.from('venue_payment_history').insert({
+      user_id: session.user.id,
+      event_type: 'payment_initiated',
+      amount: cycle.price,
+      reference: order,
+      plan_id: plan.id,
+      billing_cycle: cycle.id,
+      notes: JSON.stringify({ venueId: venueId || null, intervalMonths: cycle.interval_months }),
+    })
+
     const formData = buildRedirectFormData({
       amountCents,
       order,
