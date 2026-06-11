@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
 
     // If budget status is draft/sent, update to accepted
     await svc.from('budgets')
-      .update({ status: 'accepted' })
+      .update({ status: 'accepted', accepted_at: new Date().toISOString() })
       .eq('id', budgetId)
       .in('status', ['draft', 'sent', 'viewed'])
 
