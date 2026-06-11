@@ -22,14 +22,16 @@ export async function POST(req: NextRequest) {
 
     const svc = getServiceClient()
 
-    // Check if this venue already has an active subscription (webhook already fired).
-    // For multi-venue accounts, scope to the specific venue so buying a plan for
-    // venue 2 doesn't get blocked by venue 1's existing subscription.
+    // Check if this venue already has a PAID subscription (webhook already fired).
+    // Only 'active' blocks: a trial — expired or not — must never prevent
+    // activating the payment the user just made (it gets cancelled below,
+    // mirroring the webhook). For multi-venue accounts, scope to the specific
+    // venue so buying a plan for venue 2 doesn't get blocked by venue 1's.
     let existingQuery = svc
       .from('venue_subscriptions')
       .select('id')
       .eq('user_id', userId)
-      .in('status', ['active', 'trial'])
+      .eq('status', 'active')
       .limit(1)
     if (venueId) existingQuery = (existingQuery as any).eq('venue_id', venueId)
     const { data: existing } = await existingQuery.maybeSingle()
@@ -55,6 +57,16 @@ export async function POST(req: NextRequest) {
 
     const periodEnd = new Date()
     periodEnd.setMonth(periodEnd.getMonth() + intervalMonths)
+
+    // Cancel any existing trial/expired-trial subscriptions for this user+venue
+    // (same as the webhook) so they can't shadow the new paid subscription.
+    let cancelQuery = svc
+      .from('venue_subscriptions')
+      .update({ status: 'cancelled' })
+      .eq('user_id', userId)
+      .in('status', ['trial', 'trial_expired'])
+    if (venueId) cancelQuery = (cancelQuery as any).eq('venue_id', venueId)
+    await cancelQuery
 
     // Create subscription
     const { error: subError } = await svc.from('venue_subscriptions').insert({
