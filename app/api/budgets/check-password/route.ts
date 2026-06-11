@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { getServiceClient } from '@/lib/auth-server'
 import crypto from 'crypto'
 import { checkRateLimit, clientIp } from '@/lib/rate-limit'
 
@@ -25,14 +24,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'too_many_attempts' }, { status: 429 })
     }
 
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { get: (name: string) => cookieStore.get(name)?.value } }
-    )
-
-    const { data: budget } = await supabase
+    const { data: budget } = await getServiceClient()
       .from('budgets')
       .select('password')
       .eq('slug', slug)

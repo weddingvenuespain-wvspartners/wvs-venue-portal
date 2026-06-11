@@ -46,6 +46,20 @@ Estado de cada hallazgo: ✅ corregido en código · ⏳ pendiente · 🔎 requi
 
 `upload` valida MIME por magic bytes y nombra el fichero server-side; firmas Redsys/Stripe verificadas; importes Stripe recalculados en servidor; IDOR en refund/dashboard-link bloqueado; `estructura/*` filtra por `user_id`; `.env.local` no commiteado; sin secretos en `NEXT_PUBLIC_`; endpoints `/api/admin/*` reverifican rol admin.
 
+## Hallazgos RLS confirmados con el volcado de `pg_policies` (2026-06-11)
+
+Corregidos en `supabase_migrations_security_rls_fix2.sql` (+ conversiones de código):
+
+| # | Tabla / política | Problema | Fix |
+|---|------------------|----------|-----|
+| 1 | `venue_profiles` "Users can update own profile" (UPDATE, sin WITH CHECK efectivo sobre `role`) | **CRÍTICO** — un usuario podía `UPDATE venue_profiles SET role='admin'` con la anon key (auto-promoción a admin). | Trigger `prevent_profile_privilege_escalation` que bloquea cambios de `role`/`subscription_status`/`trial_end_date`/`features_override` a no-admins (service role y admins pasan). |
+| 2 | `budgets` `budgets_public_read` (SELECT `true`) | **CRÍTICO** — anon podía leer todos los presupuestos (PII + importes). | Páginas/endpoints públicos pasados a service-role (`budget/[slug]`, `budgets/check-password`, `budgets/track`); política eliminada. |
+| 3 | `proposals` `public_read_proposals` (SELECT `true` para anon) | **ALTO** — anon leía todas las propuestas, incl. borradores. | Eliminada; queda `proposals_public_by_slug` (status≠draft). |
+| 4 | `proposal_room_selections` `*_public_write/update/delete` (`true`) | **CRÍTICO** — anon podía borrar/reescribir selecciones de cualquier propuesta directamente. | Eliminadas; las escrituras van por la API con service-role. Se conserva el read público. |
+| 5 | `wp_invoices` (4 políticas) | **ALTO** — subconsulta correlacionada rota ⇒ acceso efectivo a facturas de todos los tenants. | Recreadas apuntando a `user_venues.id`. |
+
+Nota: las políticas `FOR ALL ... USING (x)` sin `WITH CHECK` (p.ej. `planner_owns_clients`, `budgets_owner`) **no** son vulnerables: Postgres reutiliza el `USING` como check de escritura.
+
 ## Verificación pendiente en Supabase
 
 ```sql
