@@ -61,12 +61,7 @@ DROP POLICY IF EXISTS "Users can insert wp_invoices for their venues" ON wp_invo
 DROP POLICY IF EXISTS "Users can update wp_invoices for their venues" ON wp_invoices;
 DROP POLICY IF EXISTS "Users can delete wp_invoices for their venues" ON wp_invoices;
 
-CREATE POLICY "Users can view wp_invoices for their venues" ON wp_invoices
-  FOR SELECT USING (venue_id IN (SELECT id FROM user_venues WHERE user_id = auth.uid()));
-CREATE POLICY "Users can insert wp_invoices for their venues" ON wp_invoices
-  FOR INSERT WITH CHECK (venue_id IN (SELECT id FROM user_venues WHERE user_id = auth.uid()));
-CREATE POLICY "Users can update wp_invoices for their venues" ON wp_invoices
-  FOR UPDATE USING (venue_id IN (SELECT id FROM user_venues WHERE user_id = auth.uid()))
-         WITH CHECK (venue_id IN (SELECT id FROM user_venues WHERE user_id = auth.uid()));
-CREATE POLICY "Users can delete wp_invoices for their venues" ON wp_invoices
-  FOR DELETE USING (venue_id IN (SELECT id FROM user_venues WHERE user_id = auth.uid()));
+CREATE POLICY "Users can view wp_invoices for their venues" ON wp_invoices FOR SELECT USING (venue_id IN (SELECT id FROM user_venues WHERE user_id = auth.uid()));
+CREATE POLICY "Users can insert wp_invoices for their venues" ON wp_invoices FOR INSERT WITH CHECK (venue_id IN (SELECT id FROM user_venues WHERE user_id = auth.uid()));
+CREATE POLICY "Users can update wp_invoices for their venues" ON wp_invoices FOR UPDATE USING (venue_id IN (SELECT id FROM user_venues WHERE user_id = auth.uid())) WITH CHECK (venue_id IN (SELECT id FROM user_venues WHERE user_id = auth.uid()));
+CREATE POLICY "Users can delete wp_invoices for their venues" ON wp_invoices FOR DELETE USING (venue_id IN (SELECT id FROM user_venues WHERE user_id = auth.uid()));
