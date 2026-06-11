@@ -88,6 +88,46 @@ export async function POST(req: NextRequest) {
 
     const svc = getServiceClient()
 
+    // Idempotency: Redsys may retry notifications. If we already recorded a
+    // payment for this order, don't create a duplicate subscription.
+    const { data: alreadyProcessed } = await svc
+      .from('venue_payment_history')
+      .select('id')
+      .eq('reference', order)
+      .eq('event_type', 'payment_received')
+      .maybeSingle()
+    if (alreadyProcessed) {
+      console.log(`[redsys/notification] Order ${order} already processed — skipping`)
+      return new NextResponse('OK')
+    }
+
+    // Validate the charged amount against the real plan price (defense in depth:
+    // the activated plan must match what was actually paid).
+    const { data: planRow } = await svc
+      .from('venue_plans')
+      .select('billing_cycles')
+      .eq('id', planId)
+      .single()
+    const planCycles = (planRow?.billing_cycles || []) as any[]
+    const matchedCycle = planCycles.find((c: any) => c.id === cycleId)
+    if (matchedCycle?.price != null && amount) {
+      const expectedCents = Math.round(Number(matchedCycle.price) * 100)
+      const paidCents = parseInt(amount, 10)
+      if (paidCents !== expectedCents) {
+        console.error(`[redsys/notification] Amount mismatch order=${order} paid=${paidCents} expected=${expectedCents} — not activating`)
+        await svc.from('venue_payment_history').insert({
+          user_id: userId,
+          event_type: 'payment_anomaly',
+          amount: paidCents / 100,
+          reference: order,
+          plan_id: planId,
+          billing_cycle: cycleId || null,
+          notes: `Importe pagado (${paidCents}) no coincide con el plan (${expectedCents}) — pedido ${order}`,
+        })
+        return new NextResponse('OK')
+      }
+    }
+
     // Cancel any existing active/trial subscriptions for this user+venue.
     // For multi-venue accounts, scope to the specific venue so we don't
     // cancel subscriptions belonging to the user's other venues.

@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ProposalData } from '../page'
+import { safeCssColor, safeFontFamily } from '@/lib/utils'
 import {
   extractData, formatDate, formatPrice, isDark, toRgb,
   FadeUp, FadeIn, useReveal,
@@ -597,12 +598,12 @@ export default function T4SocialProof({ data }: { data: ProposalData }) {
 
   const _preview = !!(data as any)._preview
   const branding  = data.branding
-  const primary   = branding?.primary_color || TERRA
+  const primary   = safeCssColor(branding?.primary_color, TERRA)!
   const priRgb    = toRgb(primary)
   const darkPri   = isDark(primary)
-  const secondary = branding?.secondary_color || TERRA
+  const secondary = safeCssColor(branding?.secondary_color, TERRA)!
   const secRgb    = toRgb(secondary)
-  const font      = (branding as any)?.font_family || "'Playfair Display', Georgia, serif"
+  const font      = safeFontFamily((branding as any)?.font_family, "'Playfair Display', Georgia, serif")!
   const venueName = data.venue?.name || ''
   const contact   = resolveContact(data)
   const contactOn = on('contact') && (contact.phone || contact.email)

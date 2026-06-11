@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 // GET  /api/estructura/modalities/[id]/prices — list prices for a modality
 // POST /api/estructura/modalities/[id]/prices — add a price range
@@ -7,15 +8,15 @@ import { getSession, getServiceClient } from '@/lib/auth-server'
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const svc = getServiceClient()
     const { data, error } = await svc
       .from('venue_modality_prices')
       .select('*')
       .eq('modality_id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
       .order('date_from')
 
     if (error) {
@@ -32,8 +33,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const body = await req.json()
     const { date_from, date_to, price, notes, day_from, day_to, price_per_person, zone_prices, supplement_prices, group_prices, venue_id } = body
@@ -48,7 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .from('venue_modalities')
       .select('id')
       .eq('id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
       .maybeSingle()
 
     if (!modal) return NextResponse.json({ error: 'Modalidad no encontrada' }, { status: 404 })
@@ -57,7 +58,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .from('venue_modality_prices')
       .insert({
         modality_id:       id,
-        user_id:           session.user.id,
+        user_id:           gate.userId,
         venue_id:          venue_id ?? null,
         date_from,
         date_to,

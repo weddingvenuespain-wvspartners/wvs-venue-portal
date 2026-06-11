@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 // POST /api/estructura/commercial-configs/:id/duplicate
 // Duplicates the config + all its modalities, packages, and prices
@@ -8,8 +9,8 @@ type Ctx = { params: Promise<{ id: string }> }
 
 export async function POST(req: NextRequest, ctx: Ctx) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const { id } = await ctx.params
     const body = await req.json().catch(() => ({}))
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       .from('venue_commercial_configs')
       .select('*')
       .eq('id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
       .single()
 
     if (origErr || !original) return NextResponse.json({ error: 'Config no encontrada' }, { status: 404 })
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     const { data: newConfig, error: cfgErr } = await svc
       .from('venue_commercial_configs')
       .insert({
-        user_id: session.user.id,
+        user_id: gate.userId,
         venue_id: original.venue_id,
         name: newName,
         config: original.config,
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         ),
         prices:venue_modality_prices(*)
       `)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
       .eq('commercial_config_id', id)
       .order('sort_order')
 
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       const { data: newMod, error: modErr } = await svc
         .from('venue_modalities')
         .insert({
-          user_id: session.user.id,
+          user_id: gate.userId,
           venue_id: mod.venue_id,
           commercial_config_id: newConfig.id,
           name: mod.name,
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       for (const price of directPrices) {
         await svc.from('venue_modality_prices').insert({
           modality_id: newMod.id,
-          user_id: session.user.id,
+          user_id: gate.userId,
           date_from: price.date_from,
           date_to: price.date_to,
           price: price.price,
@@ -132,7 +133,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
           await svc.from('venue_modality_prices').insert({
             modality_id: newMod.id,
             package_id: newPkg.id,
-            user_id: session.user.id,
+            user_id: gate.userId,
             date_from: price.date_from,
             date_to: price.date_to,
             price: price.price,

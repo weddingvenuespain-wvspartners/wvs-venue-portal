@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 // GET  /api/estructura/modalities — list all modalities for the user
 // POST /api/estructura/modalities — create a new modality
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const venueId = req.nextUrl.searchParams.get('venue_id')
     const configId = req.nextUrl.searchParams.get('commercial_config_id')
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
         ),
         prices:venue_modality_prices(*)
       `)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
     if (venueId) query = query.eq('venue_id', venueId)
     if (configId) query = query.eq('commercial_config_id', configId)
     const { data, error } = await query
@@ -43,8 +44,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const body = await req.json()
     const { name, description, duration_label, duration_type, day_from, day_to, sort_order, venue_id, commercial_config_id } = body
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
     const { data, error } = await svc
       .from('venue_modalities')
       .insert({
-        user_id:        session.user.id,
+        user_id:        gate.userId,
         venue_id:       venue_id ?? null,
         commercial_config_id: commercial_config_id ?? null,
         name:           name.trim(),

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 // GET  /api/estructura/room-types?commercial_config_id=xxx  — list room types for a lodging config
 // POST /api/estructura/room-types — create a room type
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const configId = req.nextUrl.searchParams.get('commercial_config_id')
     const venueId  = req.nextUrl.searchParams.get('venue_id')
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
         *,
         prices:venue_room_prices(*)
       `)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
 
     if (configId) query = query.eq('commercial_config_id', configId)
     if (venueId)  query = query.eq('venue_id', venueId)
@@ -38,8 +39,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const body = await req.json()
     const { venue_id, commercial_config_id, name, description, total_quantity, capacity_persons, bed_config, features, photo_urls, sort_order } = body
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
     const { data, error } = await svc
       .from('venue_room_types')
       .insert({
-        user_id:              session.user.id,
+        user_id:              gate.userId,
         venue_id,
         commercial_config_id,
         name:                 name.trim(),

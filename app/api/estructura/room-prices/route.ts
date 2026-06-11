@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 // GET  /api/estructura/room-prices?room_type_id=xxx — list prices for room type
 // POST /api/estructura/room-prices — create price
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const roomTypeId = req.nextUrl.searchParams.get('room_type_id')
 
     const svc = getServiceClient()
-    let query = svc.from('venue_room_prices').select('*').eq('user_id', session.user.id)
+    let query = svc.from('venue_room_prices').select('*').eq('user_id', gate.userId)
     if (roomTypeId) query = query.eq('room_type_id', roomTypeId)
 
     const { data, error } = await query.order('date_from')
@@ -29,8 +30,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const body = await req.json()
     const { room_type_id, date_from, date_to, price_per_night, min_nights, price_tiers, notes } = body
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
     const { data, error } = await svc
       .from('venue_room_prices')
       .insert({
-        user_id:         session.user.id,
+        user_id:         gate.userId,
         room_type_id,
         date_from,
         date_to,

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { requireFeature } from '@/lib/plan-server'
 
 function getServiceClient() {
   return createClient(
@@ -16,14 +15,8 @@ function getServiceClient() {
 // Reads the current row, merges, and writes back — safe against column overwrites.
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { get: (name: string) => cookieStore.get(name)?.value } }
-    )
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const { venue_id, ...patch } = await req.json()
     if (!venue_id) return NextResponse.json({ error: 'Missing venue_id' }, { status: 400 })
@@ -33,11 +26,11 @@ export async function POST(req: NextRequest) {
     const { data: current } = await svc
       .from('venue_settings')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', gate.userId)
       .eq('venue_id', venue_id)
       .maybeSingle()
 
-    const upsertPayload: Record<string, any> = { ...(current || {}), ...patch, user_id: user.id, venue_id }
+    const upsertPayload: Record<string, any> = { ...(current || {}), ...patch, user_id: gate.userId, venue_id }
 
     const { error } = await svc
       .from('venue_settings')

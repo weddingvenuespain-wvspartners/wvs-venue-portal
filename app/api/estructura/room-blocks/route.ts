@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 // GET /api/estructura/room-blocks?room_type_id=&from=&to=  — list blocks (optional date range)
 // POST /api/estructura/room-blocks — create manual block
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const roomTypeId = req.nextUrl.searchParams.get('room_type_id')
     const configId = req.nextUrl.searchParams.get('commercial_config_id')
@@ -15,12 +16,12 @@ export async function GET(req: NextRequest) {
     const to   = req.nextUrl.searchParams.get('to')
 
     const svc = getServiceClient()
-    let query = svc.from('venue_room_blocks').select('*').eq('user_id', session.user.id)
+    let query = svc.from('venue_room_blocks').select('*').eq('user_id', gate.userId)
 
     if (roomTypeId) query = query.eq('room_type_id', roomTypeId)
     else if (configId) {
       // Filter via room types belonging to the config
-      const { data: rts } = await svc.from('venue_room_types').select('id').eq('commercial_config_id', configId).eq('user_id', session.user.id)
+      const { data: rts } = await svc.from('venue_room_types').select('id').eq('commercial_config_id', configId).eq('user_id', gate.userId)
       const ids = (rts ?? []).map((r: any) => r.id)
       if (ids.length === 0) return NextResponse.json({ blocks: [] })
       query = query.in('room_type_id', ids)
@@ -45,8 +46,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const body = await req.json()
     const { room_type_id, date_from, date_to, quantity_blocked, reason, proposal_id, notes } = body
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
     const { data, error } = await svc
       .from('venue_room_blocks')
       .insert({
-        user_id: session.user.id,
+        user_id: gate.userId,
         room_type_id,
         date_from,
         date_to,

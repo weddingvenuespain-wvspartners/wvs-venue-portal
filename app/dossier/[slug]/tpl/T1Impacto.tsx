@@ -5,6 +5,7 @@
 //            → Qué incluye → Testimoniales → Colaboradores → Extras → FAQ → CTA
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { safeCssColor, safeFontFamily } from '@/lib/utils'
 import { formatDate, formatPrice, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoPin, IcoCalendar, IcoUsers, IcoBuilding, formatZoneCapacities, formatZoneFeatures, formatZonePrice, ivaLabel, VenueRentalGrid, InclusionIcon, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, TestimonialsFeatured, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, StarRating, resolveContact, replacePlaceholders, ZoneSlider, type ProposalData } from './shared'
 import InquiryForm from '@/components/InquiryForm'
 import VisitBookingModal from '@/components/VisitBookingModal'
@@ -203,11 +204,11 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       ? (welcomeStyleToLegacy[getActiveStyle(sec, 'welcome')] ?? 'welcome')
       : null
 
-  const primary = branding?.primary_color ?? '#8B6914'
+  const primary = safeCssColor(branding?.primary_color, '#8B6914')!
   const rgb     = toRgb(primary)
   const onPri   = isDark(primary) ? '#ffffff' : '#111111'
   const logo    = branding?.logo_url ?? null
-  const FONT    = (branding as any)?.font_family || "'Satoshi', Georgia, serif"
+  const FONT    = safeFontFamily((branding as any)?.font_family, "'Satoshi', Georgia, serif")!
   const contact = resolveContact(data)
   const contactOn = !!(contact.phone || contact.email)
   const waHref = contact.phone ? `https://wa.me/${contact.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, he visto la propuesta para ${couple_name} y me gustaría hablar con vosotros.`)}` : ''
