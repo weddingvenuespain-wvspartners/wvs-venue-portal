@@ -23,11 +23,11 @@ Estado de cada hallazgo: ✅ corregido en código · ⏳ pendiente · 🔎 requi
 
 | Hallazgo | Estado |
 |----------|--------|
-| **Gating de planes solo en cliente** — rutas premium no comprueban el plan en servidor. | ✅ `estructura/*` (37 handlers) gateado con `requireFeature('estructura')`. ⏳ Falta `proposals/*`, `budgets/*`, `export-data` (`leads_export`). |
+| **Gating de planes solo en cliente** — rutas premium no comprueban el plan en servidor. | ✅ `estructura/*` (37 handlers) con `requireFeature('estructura')`; mutaciones de `proposals/*` (confirm-lodging, room-inventory-limits POST) con `requireFeature('propuestas')`. `export-data` se deja sin gatear a propósito (es exportación de datos personales RGPD, no la feature premium); bajo `budgets/*` las rutas API son solo públicas. |
 | **OAuth Google sin protección CSRF** en el `state`. | ✅ Nonce aleatorio en cookie HttpOnly + verificación de sesión (`session.user.id === state.user_id`) en el callback. |
 | **Redsys: webhook no valida importe ni es idempotente** — `redsys/notification` y `budget-payment/notification`. | ✅ Ambos comparan `Ds_Amount` con el precio del plan/cuota y deduplican por `order`. |
 | **Inyección de leads en cualquier venue** — `wp/request-venue` confía en `venue_user_id` del body. | ✅ Valida que el `client_id` pertenece al planner y que el venue es un `venue_owner` real. |
-| **Contraseñas de dossier/presupuesto en texto plano, sin rate-limit** — `dossier/unlock`, `budgets/check-password`. | ⏳ Pendiente: hashear (bcrypt/argon2), rate-limit, no guardar la contraseña en la cookie. |
+| **Contraseñas de dossier/presupuesto en texto plano, sin rate-limit** — `dossier/unlock`, `budgets/check-password`. | ✅ Rate-limit por slug+IP (tabla `rate_limit_attempts`), comparación en tiempo constante, y la cookie de unlock ya no guarda la contraseña (token HMAC derivado). ⏳ Hash en reposo pendiente: requiere trigger pgcrypto + dejar de precargar la contraseña en los editores (ProposalEditor / budgets edit). SQL preparado abajo. |
 | **Inyección de CSS almacenada en dossiers públicos** — `app/dossier/[slug]/tpl/*` interpola colores/fuentes sin validar. | ✅ Saneado con `safeCssColor`/`safeFontFamily` (lib/utils.ts) en los 6 templates y en ProposalLanding. |
 | **`venue_profiles` RLS sin verificar** — riesgo de auto-promoción a admin. | 🔎 Verificar en Supabase que UPDATE no permita cambiar `role`. |
 | **Dependencias con CVEs** — `xlsx@0.18.5` (sin fix), `next@15.5.14`. | ⏳ `npm audit fix` para next/dompurify/postcss/ws; migrar `xlsx` a `exceljs` o CDN oficial. |
