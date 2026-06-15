@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 // GET    /api/estructura/commercial-configs/:id
 // PATCH  /api/estructura/commercial-configs/:id
@@ -9,8 +10,8 @@ type Ctx = { params: Promise<{ id: string }> }
 
 export async function GET(_req: NextRequest, ctx: Ctx) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const { id } = await ctx.params
     const svc = getServiceClient()
@@ -19,7 +20,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
       .from('venue_commercial_configs')
       .select('*')
       .eq('id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
       .single()
 
     if (error || !data) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
@@ -32,8 +33,8 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const { id } = await ctx.params
     const body = await req.json()
@@ -46,14 +47,14 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
         .from('venue_commercial_configs')
         .select('venue_id')
         .eq('id', id)
-        .eq('user_id', session.user.id)
+        .eq('user_id', gate.userId)
         .single()
 
       if (existing) {
         await svc
           .from('venue_commercial_configs')
           .update({ is_default: false })
-          .eq('user_id', session.user.id)
+          .eq('user_id', gate.userId)
           .eq('venue_id', existing.venue_id)
           .neq('id', id)
       }
@@ -63,7 +64,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       .from('venue_commercial_configs')
       .update(body)
       .eq('id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
       .select()
       .single()
 
@@ -80,8 +81,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 
 export async function DELETE(_req: NextRequest, ctx: Ctx) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const { id } = await ctx.params
     const svc = getServiceClient()
@@ -91,13 +92,13 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
       .from('venue_modalities')
       .delete()
       .eq('commercial_config_id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
 
     const { error } = await svc
       .from('venue_commercial_configs')
       .delete()
       .eq('id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
 
     if (error) {
       console.error('[commercial-configs/:id DELETE]', error.message)

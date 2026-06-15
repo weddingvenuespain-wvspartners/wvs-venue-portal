@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -22,8 +23,8 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 // POST — replace all limits for proposal (venue editor)
 export async function POST(req: NextRequest, ctx: Ctx) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('propuestas')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const { id } = await ctx.params
     const body = await req.json()
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
     // Verify ownership
     const { data: prop } = await svc.from('proposals').select('user_id').eq('id', id).single()
-    if (!prop || prop.user_id !== session.user.id) {
+    if (!prop || prop.user_id !== gate.userId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 

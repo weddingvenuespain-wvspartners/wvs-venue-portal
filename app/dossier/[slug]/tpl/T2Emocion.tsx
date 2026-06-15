@@ -4,6 +4,7 @@
 // Sections: Hero minimal, Gallery (full-bleed), Mensaje personal, Experiencia, Testimonios, Incluye, CTA romántico
 
 import { useEffect, useState, useRef } from 'react'
+import { safeCssColor, safeFontFamily } from '@/lib/utils'
 import { buildSingleFontUrl } from '@/lib/fonts'
 import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, formatZonePrice, VenueRentalGrid, TplStickyNav, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, replacePlaceholders, ZoneSlider, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, TestimonialsFeatured, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, type ProposalData } from './shared'
 import { getActiveStyle } from '@/lib/section-styles'
@@ -41,11 +42,11 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
   const welcomeVariant = pickWelcomeVariant(sec)
   const _preview = !!(data as any)._preview
 
-  const primary = branding?.primary_color ?? '#4A6B52'
+  const primary = safeCssColor(branding?.primary_color, '#4A6B52')!
   const rgb     = toRgb(primary)
   const onPri   = isDark(primary) ? '#ffffff' : '#111111'
   const logo    = branding?.logo_url ?? null
-  const font    = (branding as any)?.font_family || "'Inter', system-ui, sans-serif"
+  const font    = safeFontFamily((branding as any)?.font_family, "'Inter', system-ui, sans-serif")!
   const contact = resolveContact(data)
   const contactOn = on('contact') && (contact.phone || contact.email)
   const photoList = venue?.photo_urls ?? []

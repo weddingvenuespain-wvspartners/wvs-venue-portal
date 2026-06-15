@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -9,15 +10,15 @@ type Ctx = { params: Promise<{ id: string }> }
 
 export async function POST(_req: NextRequest, ctx: Ctx) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('propuestas')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const { id } = await ctx.params
     const svc = getServiceClient()
 
     // Verify ownership
     const { data: prop } = await svc.from('proposals').select('user_id').eq('id', id).single()
-    if (!prop || prop.user_id !== session.user.id) {
+    if (!prop || prop.user_id !== gate.userId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
@@ -33,7 +34,7 @@ export async function POST(_req: NextRequest, ctx: Ctx) {
     }
 
     const blocks = selections.map((s: any) => ({
-      user_id:          session.user.id,
+      user_id:          gate.userId,
       room_type_id:     s.room_type_id,
       date_from:        s.check_in,
       date_to:          s.check_out,
@@ -55,14 +56,14 @@ export async function POST(_req: NextRequest, ctx: Ctx) {
 // DELETE — release blocks (cancel reservation)
 export async function DELETE(_req: NextRequest, ctx: Ctx) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('propuestas')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const { id } = await ctx.params
     const svc = getServiceClient()
 
     const { data: prop } = await svc.from('proposals').select('user_id').eq('id', id).single()
-    if (!prop || prop.user_id !== session.user.id) {
+    if (!prop || prop.user_id !== gate.userId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 

@@ -11,6 +11,7 @@ import T5Minimalista from './tpl/T5Minimalista'
 import T6Alojamiento from './tpl/T6Alojamiento'
 import LodgingSection from './LodgingSection'
 import { applyCommissionToProposalData } from '@/lib/proposal-commission'
+import { safeCssColor } from '@/lib/utils'
 
 export type PreviewMessage = {
   type: 'proposal-preview-update'
@@ -131,8 +132,9 @@ export default function ProposalLanding({ data, preview }: { data: ProposalData;
     ?? 1
 
   const sd = (effective as any).sections_data ?? {}
-  const bgOverride  = sd.background_color as string | undefined
-  const secOverride = sd.secondary_color  as string | undefined
+  // Sanitize user-controlled colors before interpolating into <style> (CSS injection guard).
+  const bgOverride  = safeCssColor(sd.background_color) ?? undefined
+  const secOverride = safeCssColor(sd.secondary_color)  ?? undefined
   const colorMode   = (sd.color_mode as 'light' | 'dark' | undefined)
   const tpl = (() => {
     switch (templateId) {

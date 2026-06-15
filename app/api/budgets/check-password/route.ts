@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { getServiceClient } from '@/lib/auth-server'
+import crypto from 'crypto'
+import { checkRateLimit, clientIp } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a)
+  const bb = Buffer.from(b)
+  if (ab.length !== bb.length) return false
+  return crypto.timingSafeEqual(ab, bb)
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,14 +19,12 @@ export async function POST(req: NextRequest) {
     const { slug, password } = body as { slug?: string; password?: string }
     if (!slug || !password) return NextResponse.json({ ok: false }, { status: 400 })
 
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { get: (name: string) => cookieStore.get(name)?.value } }
-    )
+    const allowed = await checkRateLimit(`budget-pw:${slug}:${clientIp(req)}`, 10, 600)
+    if (!allowed) {
+      return NextResponse.json({ ok: false, error: 'too_many_attempts' }, { status: 429 })
+    }
 
-    const { data: budget } = await supabase
+    const { data: budget } = await getServiceClient()
       .from('budgets')
       .select('password')
       .eq('slug', slug)
@@ -26,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     if (!budget) return NextResponse.json({ ok: false }, { status: 404 })
 
-    if (budget.password === password) {
+    if (budget.password && safeEqual(password, budget.password)) {
       return NextResponse.json({ ok: true })
     }
 

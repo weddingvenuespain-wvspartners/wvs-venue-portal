@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 // PATCH  /api/estructura/packages/[id] — update a package slot
 // DELETE /api/estructura/packages/[id] — delete a package slot (and its prices via CASCADE)
@@ -7,8 +8,8 @@ import { getSession, getServiceClient } from '@/lib/auth-server'
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const body = await req.json()
     const { day_from, day_to, label, sort_order, name, description, includes, min_guests, max_guests, linked_menu_ids } = body
@@ -34,7 +35,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       .from('venue_modality_packages')
       .update(update)
       .eq('id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
       .select()
       .single()
 
@@ -53,15 +54,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const svc = getServiceClient()
     const { error } = await svc
       .from('venue_modality_packages')
       .delete()
       .eq('id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
 
     if (error) {
       console.error('[/api/estructura/packages DELETE]', error.message)

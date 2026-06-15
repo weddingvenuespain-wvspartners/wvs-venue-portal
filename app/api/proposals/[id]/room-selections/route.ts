@@ -1,15 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/auth-server'
 
-// PUBLIC endpoints — used by dossier landing page (client selects rooms)
-// Proposal slug already authorizes; we use ID via the URL param.
+// PUBLIC endpoints — used by dossier landing page (client selects rooms).
+// There is no session here (the couple is anonymous), so the capability is the
+// proposal id itself. To prevent tampering with arbitrary/draft proposals, we
+// only operate on proposals that have been published to the couple
+// (status sent/viewed/preview), mirroring /api/dossier/[id]/select-date.
 
 type Ctx = { params: Promise<{ id: string }> }
+
+// Returns the proposal id if it exists and is in a publicly-shared state, else null.
+async function assertPublicProposal(svc: ReturnType<typeof getServiceClient>, id: string) {
+  const { data } = await svc
+    .from('proposals')
+    .select('id, status')
+    .eq('id', id)
+    .in('status', ['sent', 'viewed', 'preview'])
+    .maybeSingle()
+  return data?.id ?? null
+}
 
 export async function GET(_req: NextRequest, ctx: Ctx) {
   try {
     const { id } = await ctx.params
     const svc = getServiceClient()
+    if (!(await assertPublicProposal(svc, id))) {
+      return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+    }
     const { data, error } = await svc
       .from('proposal_room_selections')
       .select('*')
@@ -30,6 +47,9 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     const selections = Array.isArray(body.selections) ? body.selections : []
 
     const svc = getServiceClient()
+    if (!(await assertPublicProposal(svc, id))) {
+      return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+    }
     // Delete existing
     await svc.from('proposal_room_selections').delete().eq('proposal_id', id)
     // Insert new

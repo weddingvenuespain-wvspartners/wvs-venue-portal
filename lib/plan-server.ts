@@ -45,7 +45,9 @@ export async function getUserPlan(): Promise<ResolvedPlan | null> {
     }
   }
 
-  const SELECT = 'id, status, trial_end_date, plan:venue_plans(id, name, permissions)'
+  // Disambiguate: venue_subscriptions has two FKs to venue_plans (plan_id,
+  // previous_plan_id) — name the relationship or PostgREST errors with PGRST201.
+  const SELECT = 'id, status, trial_end_date, plan:venue_plans!venue_subscriptions_plan_id_fkey(id, name, permissions)'
   const { data: activeSub } = await svc
     .from('venue_subscriptions')
     .select(SELECT)

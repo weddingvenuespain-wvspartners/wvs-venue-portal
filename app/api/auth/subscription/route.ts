@@ -17,7 +17,10 @@ export async function GET(req: Request) {
     }
 
     const svc = getServiceClient()
-    const SELECT = 'id, status, trial_end_date, plan_id, plan:venue_plans(id, name, display_name, permissions)'
+    // Disambiguate the embed: venue_subscriptions has two FKs to venue_plans
+    // (plan_id and previous_plan_id), so the relationship name is required —
+    // otherwise PostgREST returns PGRST201 and the whole query fails.
+    const SELECT = 'id, status, trial_end_date, plan_id, plan:venue_plans!venue_subscriptions_plan_id_fkey(id, name, display_name, permissions)'
 
     // Priority 1: active subscription (paid) — venue-specific first, then fallback to null venue_id
     let activeSub: any = null

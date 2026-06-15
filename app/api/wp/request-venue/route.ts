@@ -43,6 +43,29 @@ export async function POST(req: NextRequest) {
   const plannerId = session.id
   const service = getServiceClient()
 
+  // Authorization: the client must belong to this planner, and the target
+  // venue must be a real venue owner. Without these checks any authenticated
+  // user could inject leads into arbitrary venues or link foreign clients.
+  const { data: ownedClient } = await service
+    .from('wp_clients')
+    .select('id')
+    .eq('id', client_id)
+    .eq('planner_id', plannerId)
+    .maybeSingle()
+  if (!ownedClient) {
+    return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 403 })
+  }
+
+  const { data: targetVenue } = await service
+    .from('venue_profiles')
+    .select('user_id')
+    .eq('user_id', venue_user_id)
+    .eq('role', 'venue_owner')
+    .maybeSingle()
+  if (!targetVenue) {
+    return NextResponse.json({ error: 'Venue no válido' }, { status: 400 })
+  }
+
   // 1. Create lead in the venue's system
   const { data: lead, error: leadErr } = await service.from('leads').insert({
     user_id:      venue_user_id,

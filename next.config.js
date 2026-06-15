@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Pin file tracing to this project so Next never scans parent/sibling dirs
+  // for lockfiles (avoids the "multiple lockfiles" warning in isolated builds).
+  outputFileTracingRoot: __dirname,
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'weddingvenuesspain.com' },

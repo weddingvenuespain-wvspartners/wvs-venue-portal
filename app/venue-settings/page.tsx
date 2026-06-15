@@ -580,7 +580,7 @@ export default function EstructuraPage() {
     const supabase = createClient()
     const [res, { data: settingsRow }, configsRes] = await Promise.all([
       fetch(`/api/estructura/modalities?venue_id=${activeVenue.id}`),
-      supabase.from('venue_settings').select('commercial_config, zones, supplements, space_groups, visit_availability, google_calendar').eq('user_id', user!.id).eq('venue_id', activeVenue.id).maybeSingle(),
+      supabase.from('venue_settings').select('commercial_config, zones, supplements, space_groups, visit_availability').eq('user_id', user!.id).eq('venue_id', activeVenue.id).maybeSingle(),
       fetch(`/api/estructura/commercial-configs?venue_id=${activeVenue.id}`),
     ])
     const json = await res.json()
@@ -627,7 +627,12 @@ export default function EstructuraPage() {
         setSpaceGroups(settingsRow.space_groups as VenueSpaceGroup[])
       }
     }
-    if (settingsRow?.google_calendar) setGcalConfig(settingsRow.google_calendar as any)
+    // Google Calendar status is fetched via a server endpoint that strips the
+    // OAuth tokens — never select google_calendar directly from the client.
+    fetch(`/api/calendar/status?venue_id=${activeVenue.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(s => { if (s?.connected) setGcalConfig({ calendar_name: s.calendar_name, last_sync: s.last_sync }) })
+      .catch(() => {})
     if (settingsRow?.visit_availability) {
       const va = settingsRow.visit_availability as VisitAvailability & { blocked_dates?: Array<BlockedDate | string> }
       // Migrate legacy string[] blocked_dates → BlockedDate[]

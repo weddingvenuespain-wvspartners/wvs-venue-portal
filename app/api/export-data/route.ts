@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
       supabase.from('venue_profiles').select('*').eq('user_id', userId).maybeSingle(),
       supabase.from('leads').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
       supabase.from('proposals').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-      supabase.from('venue_subscriptions').select('*, plan:venue_plans(*)').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('venue_subscriptions').select('*, plan:venue_plans!venue_subscriptions_plan_id_fkey(*)').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ])
 
     const exportData = {

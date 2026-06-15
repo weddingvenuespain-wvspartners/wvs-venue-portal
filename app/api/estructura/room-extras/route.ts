@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const configId = req.nextUrl.searchParams.get('commercial_config_id')
 
     const svc = getServiceClient()
-    let query = svc.from('venue_room_extras').select('*').eq('user_id', session.user.id)
+    let query = svc.from('venue_room_extras').select('*').eq('user_id', gate.userId)
     if (configId) query = query.eq('commercial_config_id', configId)
 
     const { data, error } = await query.order('sort_order')
@@ -26,8 +27,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const body = await req.json()
     const { venue_id, commercial_config_id, name, description, pricing_unit, price, applies_to_room_types, is_default_included, sort_order } = body
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
     const { data, error } = await svc
       .from('venue_room_extras')
       .insert({
-        user_id:               session.user.id,
+        user_id:               gate.userId,
         venue_id,
         commercial_config_id,
         name:                  name.trim(),

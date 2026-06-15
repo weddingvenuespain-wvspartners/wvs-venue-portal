@@ -6,7 +6,8 @@
 import { useEffect, useState } from 'react'
 import type { ProposalData } from '../page'
 import LodgingSection from '../LodgingSection'
-import { MapPin, Calendar as CalendarIcon, Star } from 'lucide-react'
+import { safeCssColor, safeFontFamily } from '@/lib/utils'
+import { MapPin, Phone, Mail, Calendar as CalendarIcon, Star, Globe } from 'lucide-react'
 
 const T6_FONT = "'Cormorant Garamond', 'EB Garamond', serif"
 const T6_SANS = "'DM Sans', 'Inter', sans-serif"
@@ -15,8 +16,9 @@ export default function T6Alojamiento({ data }: { data: ProposalData }) {
   const sd = (data as any).sections_data ?? {}
   const lodging = (data as any).lodging
   const branding = data.branding ?? { primary_color: '#2D4A3A', font_family: T6_FONT }
-  const primary = (branding as any).primary_color ?? '#2D4A3A'
-  const secondary = (branding as any).secondary_color ?? '#8FAA94'
+  const primary = safeCssColor((branding as any).primary_color, '#2D4A3A')!
+  const secondary = safeCssColor((branding as any).secondary_color, '#8FAA94')!
+  const safeFont = safeFontFamily((branding as any).font_family, T6_FONT)!
   const venue = data.venue
   const heroPhoto = venue?.photo_urls?.[0] ?? sd.hero_image_url ?? null
 
@@ -30,7 +32,7 @@ export default function T6Alojamiento({ data }: { data: ProposalData }) {
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
     .t6 { font-family: ${T6_SANS}; background: #FBFAF7; color: #1A1A1A; min-height: 100vh; overflow-x: hidden }
-    .t6 h1, .t6 h2, .t6 h3 { font-family: ${branding.font_family ?? T6_FONT}; font-weight: 500; line-height: 1.1; letter-spacing: -.01em }
+    .t6 h1, .t6 h2, .t6 h3 { font-family: ${safeFont}; font-weight: 500; line-height: 1.1; letter-spacing: -.01em }
 
     /* Hero */
     .t6-hero { position: relative; min-height: 88vh; display: flex; align-items: flex-end; padding: 60px 40px; overflow: hidden }
@@ -70,7 +72,7 @@ export default function T6Alojamiento({ data }: { data: ProposalData }) {
 
     /* Override lodging colors via vars */
     .t6 #lodging { background: #fff; padding: 70px 20px }
-    .t6 #lodging h2 { color: ${primary}; font-family: ${branding.font_family ?? T6_FONT} }
+    .t6 #lodging h2 { color: ${primary}; font-family: ${safeFont} }
 
     /* FAQ */
     .t6-faq-item { padding: 18px 0; border-bottom: 1px solid #ECE7DD }

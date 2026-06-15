@@ -27,6 +27,8 @@ function CheckoutSuccessInner() {
     triedRef.current = true
 
     // Poll for subscription activation (webhook may take a moment)
+    // The server verifies the payment intent server-side — we never trust
+    // a client-provided plan.
     let attempts = 0
     const maxAttempts = 10
 
@@ -41,6 +43,10 @@ function CheckoutSuccessInner() {
         if (data.hasActiveSubscription) {
           setActivated(true)
           return
+        } else if (data.status === 'pending') {
+          // Webhook hasn't confirmed the payment yet — will retry via polling below.
+        } else if (data.error) {
+          setError(data.error || 'No se pudo activar la suscripción.')
         }
       } catch {}
 

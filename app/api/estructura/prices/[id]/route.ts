@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 // PATCH  /api/estructura/prices/[id] — update a price range
 // DELETE /api/estructura/prices/[id] — delete a price range
@@ -7,8 +8,8 @@ import { getSession, getServiceClient } from '@/lib/auth-server'
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const body = await req.json()
     const { date_from, date_to, price, notes, day_from, day_to, price_per_person, zone_prices, supplement_prices, group_prices } = body
@@ -36,7 +37,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       .from('venue_modality_prices')
       .update(update)
       .eq('id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
       .select()
       .single()
 
@@ -55,15 +56,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const svc = getServiceClient()
     const { error } = await svc
       .from('venue_modality_prices')
       .delete()
       .eq('id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
 
     if (error) {
       console.error('[/api/estructura/prices DELETE]', error.message)

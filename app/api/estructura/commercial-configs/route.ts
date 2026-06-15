@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession, getServiceClient } from '@/lib/auth-server'
+import { getServiceClient } from '@/lib/auth-server'
+import { requireFeature } from '@/lib/plan-server'
 
 // GET  /api/estructura/commercial-configs?venue_id=xxx — list all configs for venue
 // POST /api/estructura/commercial-configs — create a new config
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const venueId = req.nextUrl.searchParams.get('venue_id')
     const svc = getServiceClient()
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
     let query = svc
       .from('venue_commercial_configs')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', gate.userId)
 
     if (venueId) query = query.eq('venue_id', venueId)
 
@@ -34,8 +35,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const gate = await requireFeature('estructura')
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
     const body = await req.json()
     const { venue_id, name, config, is_default, sort_order, config_type } = body
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
       await svc
         .from('venue_commercial_configs')
         .update({ is_default: false })
-        .eq('user_id', session.user.id)
+        .eq('user_id', gate.userId)
         .eq('venue_id', venue_id)
         .eq('config_type', ct)
     }
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
     const { data, error } = await svc
       .from('venue_commercial_configs')
       .insert({
-        user_id: session.user.id,
+        user_id: gate.userId,
         venue_id,
         name: name.trim(),
         config: config ?? {},

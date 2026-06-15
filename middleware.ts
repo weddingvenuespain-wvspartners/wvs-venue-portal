@@ -48,8 +48,12 @@ export async function middleware(req: NextRequest) {
     }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  // Use getUser() (validates the JWT against Supabase Auth) instead of
+  // getSession() (which only decodes the cookie locally and trusts it).
+  // The middleware is the only server-side gate for most API routes, so the
+  // check must be authoritative.
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 

@@ -117,7 +117,7 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
 
   // Transition budget status to accepted if needed
   await svc.from('budgets')
-    .update({ status: 'accepted' })
+    .update({ status: 'accepted', accepted_at: new Date().toISOString() })
     .eq('id', budgetId)
     .in('status', ['draft', 'sent', 'viewed'])
 }
