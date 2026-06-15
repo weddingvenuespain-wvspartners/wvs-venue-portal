@@ -134,12 +134,14 @@ function packagesConflict(f1: number, t1: number, f2: number, t2: number): boole
 
 function pkgLabel(p: ModalityPackage): string {
   if (p.label) return p.label
+  if (p.day_from == null || p.day_to == null) return ''
   if (p.day_from === p.day_to) return DAY_FULL[p.day_from]
   const wrap = p.day_to < p.day_from
   return `${DAY_FULL[p.day_from]} → ${DAY_FULL[p.day_to]}${wrap ? ' (cruza semana)' : ''}`
 }
 
-function pkgShortLabel(from: number, to: number): string {
+function pkgShortLabel(from: number | null, to: number | null): string {
+  if (from == null || to == null) return ''
   if (from === to) return DAY_SHORT[from]
   const wrap = to < from
   return `${DAY_SHORT[from]}→${DAY_SHORT[to]}${wrap ? '*' : ''}`
@@ -1917,9 +1919,12 @@ export default function EstructuraPage() {
               const isAddingPkgHere = addingPkg === m.id
 
               // Existing package day ranges for conflict detection
-              const existingRanges: DayRange[] = m.packages.map(pkg => ({
-                day_from: pkg.day_from, day_to: pkg.day_to,
-              }))
+              const existingRanges: DayRange[] = m.packages
+                .filter(pkg => pkg.day_from != null && pkg.day_to != null)
+                .map(pkg => ({
+                  day_from: pkg.day_from as number,
+                  day_to: pkg.day_to as number,
+                }))
 
               return (
                 <div key={m.id} style={{ background: '#fff', border: '1px solid var(--ivory)', borderRadius: 12, overflow: 'hidden', opacity: m.is_active ? 1 : 0.6, boxShadow: isExpanded ? '0 4px 18px rgba(0,0,0,0.07)' : '0 1px 4px rgba(0,0,0,0.03)', transition: 'box-shadow 0.2s, opacity 0.2s' }}>
