@@ -50,6 +50,7 @@ export type MenuItem = {
   name: string
   description?: string
   extra_price?: string            // opcional, normalmente vacío si incluido
+  image_url?: string              // foto del plato (opcional)
 }
 
 export type MenuCourse = {
@@ -98,6 +99,8 @@ export type MenuExtra = {
 export type AppetizerGroup = {
   label: string                   // "Aperitivos fríos", "Buffet mediterráneo"
   items: string[]
+  image_url?: string              // foto principal del grupo (opcional, legacy)
+  image_urls?: string[]           // múltiples fotos del grupo
 }
 
 export type DateSlot = {
@@ -201,6 +204,8 @@ export type SectionsData = {
   sections_enabled?: Record<string, boolean>
   iva_included?: boolean
   show_menu_prices?: boolean        // default true; false = menus shown without price (price comes from proposal estimate)
+  show_menu_supplements?: boolean   // default true; false = hide extra_price on menu items (package mode)
+  menu_display_mode?: 'list' | 'gallery'  // default 'list'; 'gallery' = card grid with images
   menu_pick_limit?: number | null   // how many menus couple can pick: 1 = single choice, 2+ = pick N, null/undefined = unlimited
   menu_sections_visible?: { cocktail?: boolean; menus?: boolean; night?: boolean; event_extras?: boolean }
   // Visual branding (used by templates; copied to proposal branding on apply)

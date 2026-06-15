@@ -8,7 +8,11 @@ import type { ProposalData } from '../page'
 import {
   extractData, formatDate, formatPrice, isDark, toRgb,
   FadeUp, FadeIn,
-  FloatingWhatsApp, AvailabilityBanner, Gallery,
+  FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid,
+  InclusionsGrid, InclusionsList, InclusionsCards,
+  TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, TestimonialsFeatured,
+  FaqAccordion, FaqCards, FaqNumbered,
+  PricingCards, PricingTable,
   IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating,
   resolveContact, VenueRentalGrid,
   formatZoneCapacities, formatZoneFeatures, formatZonePrice,
@@ -327,29 +331,6 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) =
   }
   .t5-pkg.recommended .t5-pkg-cta:hover { opacity: .9 }
 
-  /* ── CTA mega section ── */
-  .t5-cta-section {
-    background: ${WHITE};
-    padding: 120px 0 0;
-  }
-  .t5-cta-inner {
-    max-width: 1100px; margin: 0 auto; padding: 0 56px;
-  }
-  .t5-cta-top {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 80px; align-items: start;
-    padding-bottom: 80px; border-bottom: 1px solid ${LINE};
-  }
-  .t5-cta-heading {
-    font-family: ${font}; font-style: italic;
-    font-size: clamp(2.4rem, 5vw, 4rem); line-height: 1.1; color: ${INK};
-  }
-  .t5-cta-heading span { color: ${pri}; font-style: normal }
-  .t5-cta-desc { font-size: .95rem; color: ${MUTED}; line-height: 1.8; margin-top: 20px }
-  .t5-cta-bullets { margin-top: 28px; display: flex; flex-direction: column; gap: 10px }
-  .t5-cta-bullet { display: flex; gap: 12px; align-items: baseline }
-  .t5-cta-bullet::before { content: '→'; color: ${pri}; font-size: .8rem; flex-shrink: 0 }
-  .t5-cta-bullet-text { font-size: .88rem; color: ${INK}; font-weight: 500 }
   .t5-form {
     display: flex; flex-direction: column; gap: 0;
     border: 1px solid ${LINE};
@@ -401,8 +382,7 @@ const buildCss = (pri: string, priRgb: string, darkPri: boolean, font: string) =
     .t5-hero { grid-template-columns: 1fr; min-height: auto }
     .t5-hero-left { padding: 60px 32px }
     .t5-hero-right { min-height: 55vw }
-    .t5-cta-top { grid-template-columns: 1fr; gap: 40px }
-    .t5-pkg-inner, .t5-cta-inner, .t5-inc-inner { padding: 0 24px }
+    .t5-pkg-inner, .t5-inc-inner { padding: 0 24px }
     .t5-pricing-inner { padding: 0 24px }
     .t5-footer-wrap { padding: 32px 24px }
     .t5-nav { padding: 0 24px }
@@ -470,6 +450,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
   const [selectedExtraSvcs, setSelectedExtraSvcs] = useState<Record<string, boolean>>({})
   const [selectedZoneSupplements, setSelectedZoneSupplements] = useState<Record<number, boolean>>({})
   const [selectedMenus, setSelectedMenus] = useState<string[]>([])
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null)
   const [scrolled, setScrolled]     = useState(false)
   const [progress, setProgress]     = useState(0)
 
@@ -683,10 +664,12 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         </section>
       )}
 
-      {/* GALLERY */}
-      {on('gallery') && (galleryPhotos.length > 0 ? (
-        <Gallery photos={galleryPhotos} primary={primary} dark={false} />
-      ) : _preview ? <EmptySec label="Galería" /> : null)}
+      {/* GALLERY — variantes: carrusel / mosaico / cuadrícula */}
+      {on('gallery') && (galleryPhotos.length > 0 ? (() => {
+        const galleryStyle = getActiveStyle(secData, 'gallery')
+        const GalleryComp  = galleryStyle === 'mosaic' ? GalleryMosaic : galleryStyle === 'grid' ? GalleryGrid : Gallery
+        return <GalleryComp photos={galleryPhotos} primary={primary} dark={false} />
+      })() : _preview ? <EmptySec label="Galería" /> : null)}
 
       {/* VENUE SPECS */}
       {on('venue_specs') && (
@@ -802,37 +785,29 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         </section>
       )}
 
-      {/* INCLUSIONS — bloque de color primario */}
-      {on('inclusions') && (inclusionsShow.length > 0 ? (
-        <section className="t5-inc-block" id="t5-inc">
-          <div className="t5-inc-inner">
-            <FadeUp>
-              <div className="t5-inc-header">
-                <div>
-                  <p className="t5-inc-tag">Qué incluye</p>
-                  <h2 className="t5-inc-title">Todo lo que necesitáis,<br/>sin sorpresas</h2>
-                </div>
-                <p className="t5-inc-sub">
-                  Cada detalle ha sido pensado para que vosotros solo tengáis que disfrutar del día.
-                </p>
-              </div>
-            </FadeUp>
-            <div className="t5-inc-grid">
-              {inclusionsShow.map((inc: any, i: number) => (
-                <FadeUp key={i} delay={i * .03}>
-                  <div className="t5-inc-item">
-                    <span className="t5-inc-emoji" style={{ display: 'inline-flex', color: primary }}>
-                      <InclusionIcon name={inc.icon || inc.emoji || 'check'} size={26} color={primary} strokeWidth={1.5} />
-                    </span>
-                    <div className="t5-inc-name">{inc.title}</div>
-                    {inc.description && <div className="t5-inc-desc">{inc.description}</div>}
+      {/* INCLUSIONS — 3 variantes (grid/list/cards) */}
+      {on('inclusions') && (inclusionsShow.length > 0 ? (() => {
+        const variant = getActiveStyle(secData, 'inclusions')
+        const Comp = variant === 'list' ? InclusionsList : variant === 'cards' ? InclusionsCards : InclusionsGrid
+        return (
+          <section className="t5-inc-block" id="t5-inc">
+            <div className="t5-inc-inner">
+              <FadeUp>
+                <div className="t5-inc-header">
+                  <div>
+                    <p className="t5-inc-tag">Qué incluye</p>
+                    <h2 className="t5-inc-title">Todo lo que necesitáis,<br/>sin sorpresas</h2>
                   </div>
-                </FadeUp>
-              ))}
+                  <p className="t5-inc-sub">
+                    Cada detalle ha sido pensado para que vosotros solo tengáis que disfrutar del día.
+                  </p>
+                </div>
+              </FadeUp>
+              <Comp items={inclusionsShow as any} primary={primary} dark={false} columns={3} />
             </div>
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="Qué incluye" /> : null)}
+          </section>
+        )
+      })() : _preview ? <EmptySec label="Qué incluye" /> : null)}
 
       {/* RECEIPT / PRICING */}
       {data.show_price_estimate && data.price_estimate && (
@@ -893,62 +868,31 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
       )}
 
       {/* PACKAGES */}
-      {on('packages') && (activePkgs.length > 0 ? (
-        <section className="t5-pkg-section" id="t5-pkg">
-          <div className="t5-pkg-inner">
-            <FadeUp>
-              <p className="t5-pkg-tag">Paquetes</p>
-              <h2 className="t5-pkg-title">Elige tu experiencia</h2>
-            </FadeUp>
-            <div className="t5-pkgs">
-              {activePkgs.map((pkg: any, i: number) => (
-                <FadeUp key={i} delay={i * .1}>
-                  <div className={`t5-pkg ${pkg.is_recommended ? 'recommended' : ''}`}>
-                    {pkg.is_recommended && <span className="t5-pkg-badge">Más elegido</span>}
-                    <div className="t5-pkg-name">{pkg.name}</div>
-                    {pkg.subtitle && <div className="t5-pkg-sub">{pkg.subtitle}</div>}
-                    {pkg.price && (
-                      <>
-                        <div className="t5-pkg-price">{pkg.price}</div>
-                        <div className="t5-pkg-price-note">por persona · IVA incluido</div>
-                      </>
-                    )}
-                    <div className="t5-pkg-sep" />
-                    {pkg.includes?.length > 0 && (
-                      <ul className="t5-pkg-includes">
-                        {pkg.includes.map((inc: string, j: number) => (
-                          <li key={j}>{inc}</li>
-                        ))}
-                      </ul>
-                    )}
-                    <button
-                      className="t5-pkg-cta"
-                      onClick={() => (document.getElementById(hasCatering ? 'menu' : 't5-cta') ?? document.getElementById('t5-cta'))?.scrollIntoView({ behavior: 'smooth' })}
-                    >
-                      {hasCatering ? 'Ver menús' : 'Solicitar info'}
-                    </button>
-                  </div>
-                </FadeUp>
-              ))}
+      {/* PAQUETES — 3 variantes (cards/table/rental_grid) */}
+      {on('pricing') && (() => {
+        const variant = getActiveStyle(secData, 'pricing')
+        const hasRentalRows = ((secData as any).venue_rental?.rows?.length ?? 0) > 0 && ((secData as any).venue_rental?.day_tiers?.length ?? 0) > 0
+        const hasContent = activePkgs.length > 0 || (variant === 'rental_grid' && hasRentalRows)
+        if (!hasContent) return _preview ? <EmptySec label="Paquetes" /> : null
+        return (
+          <section className="t5-pkg-section" id="t5-pkg">
+            <div className="t5-pkg-inner">
+              <FadeUp>
+                <p className="t5-pkg-tag">Paquetes</p>
+                <h2 className="t5-pkg-title">Elige tu experiencia</h2>
+              </FadeUp>
+              {variant === 'table' ? (
+                <PricingTable packages={activePkgs as any} primary={primary} dark={false} font={font} />
+              ) : variant === 'rental_grid' && hasRentalRows ? (
+                <VenueRentalGrid data={(secData as any).venue_rental} primary={primary} />
+              ) : (
+                <PricingCards packages={activePkgs as any} primary={primary} dark={false} font={font}
+                  selectedId={selectedPackageId} onSelect={(id) => setSelectedPackageId(id)} />
+              )}
             </div>
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="Paquetes" /> : null)}
-
-      {/* VENUE RENTAL — grid temporada × día — standalone only when space_groups not active */}
-      {on('venue_rental') && !(on('space_groups') && visibleSpaceGroups.length > 0) && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
-        <section style={{ padding: '80px 0', background: OFF }}>
-          <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 56px' }}>
-            <FadeUp>
-              <p className="t5-eyebrow">{sec.venue_rental.title || 'Tarifas de alquiler'}</p>
-              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Elegid vuestra fecha</h2>
-            </FadeUp>
-            <FadeUp delay={.1}>
-              <VenueRentalGrid data={sec.venue_rental} primary={primary} />
-            </FadeUp>
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="Tarifas de alquiler" /> : null)}
+          </section>
+        )
+      })()}
 
       {/* SEASON PRICES */}
       {on('season_prices') && (seasonsShow.length > 0 ? (
@@ -976,61 +920,67 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         </section>
       ) : _preview ? <EmptySec label="Temporadas" /> : null)}
 
-      {/* FAQ minimal */}
-      {on('faq') && (faqShow.length > 0 ? (
-        <section style={{ padding: '80px 0', background: OFF }}>
-          <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 40px' }}>
-            <FadeUp>
-              <p className="t5-eyebrow">{(sec as any).faq_eyebrow || 'Preguntas frecuentes'}</p>
-              <h2 style={{ fontFamily: font, fontSize: '2rem', color: INK, marginBottom: 40 }}>Preguntas frecuentes</h2>
-            </FadeUp>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {faqShow.map((f: any, i: number) => (
-                <FadeUp key={i} delay={i * .04}>
-                  <div style={{ borderBottom: `1px solid ${LINE}` }}>
-                    <button
-                      onClick={() => setFaqOpen(faqOpen === i ? null : i)}
-                      style={{
-                        width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-                        padding: '20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        textAlign: 'left', gap: 16,
-                      }}
-                    >
-                      <span style={{ fontSize: '.93rem', fontWeight: 600, color: faqOpen === i ? primary : INK }}>{f.question}</span>
-                      <span style={{ fontSize: '1.2rem', color: primary, flexShrink: 0, fontWeight: 300, transform: faqOpen === i ? 'rotate(45deg)' : 'none', transition: 'transform .25s' }}>+</span>
-                    </button>
-                    <div style={{ overflow: 'hidden', maxHeight: faqOpen === i ? '300px' : '0', transition: 'max-height .35s cubic-bezier(.4,0,.2,1)' }}>
-                      <p style={{ fontSize: '.88rem', color: MUTED, lineHeight: 1.75, paddingBottom: 20 }}>{f.answer}</p>
-                    </div>
-                  </div>
-                </FadeUp>
-              ))}
+      {/* FAQ — 3 variantes (accordion/cards/numbered) */}
+      {on('faq') && (faqShow.length > 0 ? (() => {
+        const variant = getActiveStyle(secData, 'faq')
+        const Comp = variant === 'cards' ? FaqCards : variant === 'numbered' ? FaqNumbered : FaqAccordion
+        return (
+          <section style={{ padding: '80px 0', background: OFF }}>
+            <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 40px' }}>
+              <FadeUp>
+                <p className="t5-eyebrow">{(sec as any).faq_eyebrow || 'Preguntas frecuentes'}</p>
+                <h2 style={{ fontFamily: font, fontSize: '2rem', color: INK, marginBottom: 40 }}>Preguntas frecuentes</h2>
+              </FadeUp>
+              <Comp items={faqShow as any} primary={primary} dark={false} />
             </div>
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="FAQ" /> : null)}
+          </section>
+        )
+      })() : _preview ? <EmptySec label="FAQ" /> : null)}
 
-      {/* WeddingProposal — configuración interactiva */}
-      {hasCatering && on('menu') && (menusStructured?.length || menuExtras?.length || appetizersBase?.length || menuShow.length > 0) && (
-        <WeddingProposal
-          data={data}
-          menus={menusStructured}
-          extras={menuExtras}
-          appetizers={appetizersBase}
-          legacyMenus={menuShow}
-          primary={primary}
-          onPrimary={darkPri ? '#fff' : '#111'}
-          onMenusChange={setSelectedMenus}
-        />
-      )}
+      {/* WeddingProposal — configuración interactiva (menús filtrados por paquete) */}
+      {hasCatering && on('menu') && (() => {
+        const pkg = activePkgs.find((p: any) => p.id === selectedPackageId) as any
+        const linked: string[] | null = pkg?.linked_menu_ids ?? null
+        const hasPackages = activePkgs.length > 0 && (data as any).commercialConfig?.price_model === 'package'
+        if (hasPackages && !selectedPackageId) {
+          return (
+            <section id="menu" style={{ padding: '60px 24px', textAlign: 'center', background: OFF }}>
+              <p className="t5-eyebrow">Menús</p>
+              <h2 style={{ fontFamily: font, fontSize: '1.6rem', color: INK, marginTop: 8 }}>Elige primero un paquete arriba para ver los menús disponibles</h2>
+            </section>
+          )
+        }
+        const filterMenus = <T extends { id?: string }>(arr: T[] | undefined): T[] => {
+          if (!arr) return [] as T[]
+          if (!linked || linked.length === 0) return arr
+          return arr.filter(m => m.id && linked.includes(m.id))
+        }
+        const fMenusStructured = filterMenus(menusStructured as any[])
+        const fMenuShow        = filterMenus(menuShow as any[])
+        if (!(fMenusStructured.length || menuExtras?.length || appetizersBase?.length || fMenuShow.length)) return null
+        return (
+          <WeddingProposal
+            data={data}
+            menus={fMenusStructured as any}
+            extras={menuExtras}
+            appetizers={appetizersBase}
+            legacyMenus={fMenuShow as any}
+            primary={primary}
+            onPrimary={darkPri ? '#fff' : '#111'}
+            onMenusChange={setSelectedMenus}
+          />
+        )
+      })()}
 
-      {/* ACCOMMODATION */}
-      {on('accommodation') && accom && (
-        <section style={{ padding: '80px 0', background: OFF }}>
+      {/* ACCOMMODATION — 2 variantes (informational/interactive) */}
+      {on('accommodation') && accom && (() => {
+        const accomVariant = getActiveStyle(secData, 'accommodation')
+        return (
+        <section data-variant={accomVariant} style={{ padding: '80px 0', background: OFF }}>
           <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 56px' }}>
             <FadeUp>
               <p className="t5-eyebrow">{(sec as any).accommodation_eyebrow || 'Alojamiento'}</p>
-              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Quedaos a dormir</h2>
+              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>{accomVariant === 'interactive' ? 'Reservad vuestras habitaciones' : 'Quedaos a dormir'}</h2>
             </FadeUp>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 32, alignItems: 'start' }}>
               <FadeUp>
@@ -1086,7 +1036,8 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+        )
+      })()}
 
       {/* EXTRA SERVICES */}
       {on('extra_services') && (extrasShow.length > 0 ? (
@@ -1121,36 +1072,25 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         </section>
       ) : _preview ? <EmptySec label="Servicios adicionales" /> : null)}
 
-      {/* TESTIMONIALS */}
-      {on('testimonials') && (testsShow.length > 0 ? (
-        <section style={{ padding: '80px 0', background: OFF }}>
-          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
-            <FadeUp>
-              <p className="t5-eyebrow">{(sec as any).testimonials_eyebrow || 'Testimonios'}</p>
-              <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Experiencias reales</h2>
-            </FadeUp>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
-              {testsShow.map((t: any, i: number) => {
-                const name = t.couple_name || t.names || ''
-                const rawDate = t.wedding_date || t.date
-                const dateStr = rawDate && /^\d{4}-\d{2}-\d{2}/.test(rawDate) ? formatDate(rawDate) : rawDate
-                return (
-                  <FadeUp key={i} delay={i * .06}>
-                    <div style={{ background: WHITE, border: `1px solid ${LINE}`, padding: '28px 28px 22px', display: 'flex', flexDirection: 'column', gap: 14, height: '100%' }}>
-                      <div style={{ color: '#F5A623', fontSize: 13 }}><StarRating rating={t.rating ?? 5} size={13} color="#F5A623" /></div>
-                      <p style={{ fontFamily: font, fontStyle: 'italic', fontSize: 15.5, lineHeight: 1.7, color: INK, flex: 1 }}>"{t.text}"</p>
-                      <div style={{ paddingTop: 12, borderTop: `1px solid ${LINE}` }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 600, color: INK }}>{name}</div>
-                        {dateStr && <div style={{ fontSize: 11, color: primary, marginTop: 2, letterSpacing: '.08em', textTransform: 'uppercase' }}>{dateStr}</div>}
-                      </div>
-                    </div>
-                  </FadeUp>
-                )
-              })}
+      {/* TESTIMONIALS — 4 variantes (cards/quotes/compact/featured) */}
+      {on('testimonials') && (testsShow.length > 0 ? (() => {
+        const variant = getActiveStyle(secData, 'testimonials')
+        const Comp = variant === 'quotes'   ? TestimonialsQuotes
+                   : variant === 'compact'  ? TestimonialsCompact
+                   : variant === 'featured' ? TestimonialsFeatured
+                   : TestimonialsCards
+        return (
+          <section style={{ padding: '80px 0', background: OFF }}>
+            <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 56px' }}>
+              <FadeUp>
+                <p className="t5-eyebrow">{(sec as any).testimonials_eyebrow || 'Testimonios'}</p>
+                <h2 style={{ fontFamily: font, fontSize: 'clamp(2rem,3.5vw,3rem)', color: INK, lineHeight: 1.15, marginBottom: 40 }}>Experiencias reales</h2>
+              </FadeUp>
+              <Comp items={testsShow as any} primary={primary} dark={false} font={font} />
             </div>
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="Testimoniales" /> : null)}
+          </section>
+        )
+      })() : _preview ? <EmptySec label="Testimoniales" /> : null)}
 
       {/* COLLABORATORS */}
       {on('collaborators') && (collabsShow.length > 0 ? (
@@ -1296,46 +1236,10 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
         )
       })()}
 
-      {/* CTA — contacto directo */}
-      <section className="t5-cta-section" id="t5-cta">
-        <div className="t5-cta-inner">
-          <div className="t5-cta-top">
-            <FadeUp>
-              <h2 className="t5-cta-heading">
-                ¿Tenéis<br />alguna <span>duda?</span>
-              </h2>
-              <p className="t5-cta-desc">
-                Escribidnos por WhatsApp o email para cualquier consulta sobre la propuesta o el menú. Respondemos en menos de 24 horas.
-              </p>
-              <div className="t5-cta-bullets">
-                <div className="t5-cta-bullet"><span className="t5-cta-bullet-text">Respuesta en menos de 24 horas</span></div>
-                <div className="t5-cta-bullet"><span className="t5-cta-bullet-text">Asesoramiento personalizado</span></div>
-              </div>
-            </FadeUp>
-            {contactOn && (
-              <FadeUp delay={0.15}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'flex-start' }}>
-                  {contact.phone && (
-                    <a href={`https://wa.me/${contact.phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola, me ha llegado la propuesta para ${data.couple_name}.`)}`}
-                      target="_blank" rel="noopener noreferrer"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '18px 44px', background: '#25D366', color: '#fff', border: 'none', fontSize: '.88rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', textDecoration: 'none' }}>
-                      <IcoChat width={16} height={16} /> WhatsApp
-                    </a>
-                  )}
-                  {contact.email && (
-                    <a href={`mailto:${contact.email}?subject=${encodeURIComponent(`Propuesta ${data.couple_name}`)}`}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '18px 44px', background: primary, color: darkPri ? '#fff' : INK, border: 'none', fontSize: '.88rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', textDecoration: 'none' }}>
-                      Enviar email
-                    </a>
-                  )}
-                </div>
-              </FadeUp>
-            )}
-          </div>
-        </div>
       {/* ── FLOATING WHATSAPP ── */}
-      {contactOn && <FloatingWhatsApp phone={contact.phone} coupleName={data.couple_name} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />}
+      {on('floating_contact') && contactOn && <FloatingWhatsApp phone={contact.phone} coupleName={data.couple_name} primary={primary} onPrimary={darkPri ? '#fff' : '#111'} />}
 
+      <footer>
         <div className="t5-footer-wrap">
           {branding?.logo_url
             ? <img src={branding.logo_url} className="t5-footer-logo" alt={venueName} />
@@ -1348,7 +1252,7 @@ export default function T5Minimalista({ data }: { data: ProposalData }) {
             {data.venue?.contact_phone && <a href={`tel:${data.venue.contact_phone}`}>Teléfono</a>}
           </div>
         </div>
-      </section>
+      </footer>
     </div>
   )
 }

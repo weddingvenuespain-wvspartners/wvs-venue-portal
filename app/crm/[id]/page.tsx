@@ -14,7 +14,7 @@ import {
   Plus, Circle, ClipboardList,
 } from 'lucide-react'
 import type { Client, ClientType } from '@/lib/clients'
-import { CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS } from '@/lib/clients'
+import { CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS, isProfessional } from '@/lib/clients'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import DatePicker from '@/components/DatePicker'
 
@@ -322,8 +322,8 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
       client_type: c.client_type ?? 'pareja', language: c.language ?? '', country: c.country ?? '',
     })
 
-    // WP agreement
-    if (c.client_type === 'wedding_planner') {
+    // WP/professional agreement
+    if (isProfessional(c.client_type)) {
       setAgreementForm({
         commission_percent: c.wp_commission_percent?.toString() ?? '',
         commission_type: c.wp_commission_type ?? 'percentage',
@@ -347,9 +347,9 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
         const { data } = await supabase.from('leads').select('*').eq('venue_id', activeVenue.id).eq('phone', c.phone).order('created_at', { ascending: false })
         leads = (data ?? []) as Lead[]
       }
-      // For WP: also try by contact_type + name match
-      if (leads.length === 0 && c.client_type === 'wedding_planner' && c.name) {
-        const { data } = await supabase.from('leads').select('*').eq('venue_id', activeVenue.id).eq('contact_type', 'wedding_planner').ilike('name', c.name).order('created_at', { ascending: false })
+      // For professionals: also try by contact_type + name match
+      if (leads.length === 0 && isProfessional(c.client_type) && c.name) {
+        const { data } = await supabase.from('leads').select('*').eq('venue_id', activeVenue.id).eq('contact_type', c.client_type).ilike('name', c.name).order('created_at', { ascending: false })
         leads = (data ?? []) as Lead[]
       }
     }
@@ -368,8 +368,8 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
       setCrmTasks([])
     }
 
-    // WP: load couples
-    if (c.client_type === 'wedding_planner') {
+    // Professional: load couples
+    if (isProfessional(c.client_type)) {
       const { data: coupleData } = await supabase.from('clients').select('*').eq('parent_client_id', id).order('created_at', { ascending: false })
       if (coupleData && coupleData.length > 0) {
         const coupleIds = coupleData.map((cp: any) => cp.id)
@@ -545,7 +545,7 @@ export default function CrmClientDetailPage({ params }: { params: Promise<{ id: 
 
   // ── Derived data ─────────────────────────────────────────────────────────────
   const tc = CLIENT_TYPE_COLORS[client.client_type] ?? CLIENT_TYPE_COLORS.otro
-  const isWP = client.client_type === 'wedding_planner'
+  const isWP = isProfessional(client.client_type)
   const latestLead = clientLeads[0] ?? null
   const activeLead = clientLeads.find(l => l.status !== 'lost' && l.status !== 'won') ?? latestLead
   const sc  = latestLead ? (STATUS_CFG[latestLead.status] || { label: latestLead.status, bg: '#f3f4f6', color: '#6b7280' }) : null

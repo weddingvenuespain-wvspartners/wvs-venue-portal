@@ -36,10 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const body = await req.json()
-    const { day_from, day_to, label, sort_order, venue_id } = body
-
-    if (day_from === undefined || day_from === null) return NextResponse.json({ error: 'day_from es obligatorio' }, { status: 400 })
-    if (day_to   === undefined || day_to   === null) return NextResponse.json({ error: 'day_to es obligatorio' },   { status: 400 })
+    const { day_from, day_to, label, sort_order, venue_id, name, description, includes, min_guests, max_guests, linked_menu_ids } = body
 
     const svc = getServiceClient()
 
@@ -59,9 +56,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         modality_id: id,
         user_id:     session.user.id,
         venue_id:    venue_id ?? null,
-        day_from,
-        day_to,
+        day_from:    day_from ?? null,
+        day_to:      day_to ?? null,
         label:       label?.trim() || null,
+        name:        name?.trim() || null,
+        description: description?.trim() || null,
+        includes:    includes ?? null,
+        min_guests:  min_guests ?? null,
+        max_guests:  max_guests ?? null,
+        linked_menu_ids: linked_menu_ids ?? null,
         sort_order:  sort_order ?? 0,
       })
       .select()

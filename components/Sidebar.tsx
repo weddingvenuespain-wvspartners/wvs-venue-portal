@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Inbox, Users, Calendar, BookOpen, Calculator,
   Store, MessageSquare, BarChart3, Receipt, FileSignature, Settings,
   LifeBuoy, Heart, UtensilsCrossed, Palette, Building2, Layers, UserPlus,
-  FileText, type LucideIcon,
+  FileText, TrendingUp, Ticket, type LucideIcon,
 } from 'lucide-react'
 
 export default function Sidebar() {
@@ -166,7 +166,7 @@ export default function Sidebar() {
   const facturasItem = { href: '/invoices', label: 'Facturas', icon: Receipt }
   const contratosItem = { href: '/contratos', label: 'Contratos', icon: FileSignature }
   const configItems: { href: string; label: string; icon: LucideIcon; feature: keyof PlanFeatures }[] = [
-    { href: '/venue-settings', label: 'Configuración', icon: Settings, feature: 'estructura' },
+    { href: '/venue-settings', label: 'Mi espacio', icon: Settings, feature: 'estructura' },
   ]
 
   const plannerItems: { href: string; label: string; icon: LucideIcon }[] = [
@@ -191,6 +191,8 @@ export default function Sidebar() {
     { href: '/admin/plans',             label: 'Planes',          icon: Layers },
     { href: '/admin/onboarding',         label: 'Solicitudes',     icon: UserPlus, badge: pendingOnboardingCount },
     { href: '/admin/wedding-planners',   label: 'Peticiones WP', icon: Heart,    badge: wpNewCount },
+    { href: '/admin/coupons',           label: 'Cupones',          icon: Ticket },
+    { href: '/admin/stats',             label: 'Estadísticas',    icon: TrendingUp },
   ]
 
   const helpItems: { href: string; label: string; icon: LucideIcon }[] = [

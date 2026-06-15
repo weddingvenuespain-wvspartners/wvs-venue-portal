@@ -92,9 +92,8 @@ export const SECTION_STYLES: Record<string, SectionStyleConfig> = {
     sectionId: 'pricing',
     defaultVariant: 'cards',
     variants: [
-      { id: 'cards',       label: 'Tarjetas', description: 'Paquetes apilados con precio destacado' },
-      { id: 'table',       label: 'Tabla',    description: 'Listado tabular compacto, fácil de comparar' },
-      { id: 'rental_grid', label: 'Grid de alquiler', description: 'Tarifas por horario × temporada (requiere venue_rental)' },
+      { id: 'cards', label: 'Tarjetas', description: 'Paquetes apilados con precio destacado' },
+      { id: 'table', label: 'Tabla',    description: 'Listado tabular compacto, fácil de comparar' },
     ],
   },
   accommodation: {

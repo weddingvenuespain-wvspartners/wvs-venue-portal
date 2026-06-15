@@ -11,13 +11,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const body = await req.json()
-    const { day_from, day_to, label, sort_order } = body
+    const { day_from, day_to, label, sort_order, name, description, includes, min_guests, max_guests, linked_menu_ids } = body
 
     const update: Record<string, any> = {}
     if (day_from    !== undefined) update.day_from   = day_from
     if (day_to      !== undefined) update.day_to     = day_to
     if (label       !== undefined) update.label      = label?.trim() || null
     if (sort_order  !== undefined) update.sort_order = sort_order
+    if (name        !== undefined) update.name       = name?.trim() || null
+    if (description !== undefined) update.description = description?.trim() || null
+    if (includes    !== undefined) update.includes   = includes
+    if (min_guests  !== undefined) update.min_guests = min_guests
+    if (max_guests  !== undefined) update.max_guests = max_guests
+    if (linked_menu_ids !== undefined) update.linked_menu_ids = linked_menu_ids
 
     if (Object.keys(update).length === 0)
       return NextResponse.json({ error: 'Nada que actualizar' }, { status: 400 })

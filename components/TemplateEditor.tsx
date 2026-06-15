@@ -34,10 +34,9 @@ export const ALL_SECTION_IDS = [
   'hero', 'availability', 'venue_specs', 'sticky_nav',
   'welcome', 'welcome_light', 'welcome_split', 'welcome_editorial',
   'experience', 'gallery',
-  'single_space', 'zones', 'space_groups', 'venue_rental', 'inclusions',
+  'single_space', 'zones', 'space_groups', 'pricing', 'inclusions',
   'collaborators',
   'testimonials', 'accommodation', 'extra_services',
-  'pricing',
   'faq', 'schedule_visit', 'map', 'floating_contact',
 ] as const
 
@@ -57,13 +56,12 @@ const SECTION_LABELS: Record<SectionId, string> = {
   single_space:      'Tu espacio',
   zones:             'Zonas del venue',
   space_groups:      'Grupos de espacios',
-  venue_rental:      'Tarifas de alquiler (grid temporada × día)',
   inclusions:        'Qué incluye',
   testimonials:      'Testimonios',
   collaborators:     'Colaboradores',
   accommodation:     'Alojamiento',
   extra_services:    'Servicios adicionales',
-  pricing:           'Paquetes y precios',
+  pricing:           'Paquetes',
   faq:               'Preguntas frecuentes',
   schedule_visit:    'Agendar visita / Hablemos',
   map:               'Mapa y ubicación',
@@ -244,13 +242,13 @@ export default function TemplateEditor({
         single_space: cfg.space_type === 'single' || cfg.space_type === 'single_with_supplements',
         zones:        cfg.space_type === 'single' || cfg.space_type === 'single_with_supplements',
         space_groups: cfg.space_type === 'multiple_independent' || cfg.space_type === 'single_with_supplements',
-        venue_rental: cfg.price_model === 'rental' && cfg.space_type !== 'multiple_independent',
       }
       setSections(s => {
         const se = s.sections_enabled ?? {}
         const patch: Record<string, boolean> = {}
+        // Only seed defaults if not yet set by user (preserves manual toggles)
         for (const [k, v] of Object.entries(spaceDefaults)) {
-          if (se[k] === undefined || se[k] !== v) patch[k] = v
+          if (se[k] === undefined) patch[k] = v
         }
         if (Object.keys(patch).length === 0) return s
         return { ...s, sections_enabled: { ...se, ...patch } }
@@ -292,13 +290,15 @@ export default function TemplateEditor({
     show_availability:   false,
     show_price_estimate: true,
     sections_data:       sections,
+    commercialConfig:    commercialConfig ?? null,
+    modalities:          modalities ?? [],
     branding: {
       logo_url:        sections.logo_url ?? null,
       primary_color:   sections.primary_color ?? '#2d4a7a',
       secondary_color: sections.secondary_color ?? null,
       font_family:     sections.font_family ?? 'Georgia, serif',
     },
-  }), [sections])
+  }), [sections, commercialConfig, modalities])
 
   useEffect(() => {
     const onMessage = (e: MessageEvent<any>) => {
@@ -441,7 +441,6 @@ export default function TemplateEditor({
     extra_services: 'Servicios adicionales',
     pricing: 'Paquetes',
     faq: 'Preguntas frecuentes',
-    venue_rental: 'Tarifas de alquiler',
     season_prices: 'Temporadas',
   }
 
@@ -987,13 +986,6 @@ export default function TemplateEditor({
       )
     }
 
-    if (secId === 'venue_rental') return (
-      <div style={{ padding: '10px 12px', background: 'var(--cream)', borderRadius: 7, fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5, display: 'flex', gap: 8 }}>
-        <Info size={13} style={{ flexShrink: 0, marginTop: 1, color: 'var(--gold)' }} />
-        Las tarifas se configuran en <strong>Configuración → Opciones y tarifas</strong> y se asignan por propuesta según la fecha.
-      </div>
-    )
-
     if (secId === 'inclusions') {
       const inclusionsStyleConfig = SECTION_STYLES.inclusions
       const activeInclusionsVariantId = getActiveStyle(sections, 'inclusions')
@@ -1435,9 +1427,45 @@ export default function TemplateEditor({
               })}
             </div>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5, padding: '10px 12px', background: 'var(--cream)', borderRadius: 7 }}>
-            Los paquetes se editan en <strong>Comunicación → Plantillas de propuesta</strong> o por propuesta concreta.
-          </div>
+          {/* Show packages from modalities */}
+          {(() => {
+            const pkgs = modalities.flatMap((m: any) => {
+              const subs = m.packages ?? []
+              if (subs.length > 0) return subs.map((p: any) => ({ ...p, modality_name: m.name }))
+              return [{ id: m.id, name: m.name, modality_name: m.name, min_guests: m.min_guests, max_guests: m.max_guests, prices: m.prices ?? [] }]
+            })
+            if (pkgs.length === 0) return (
+              <div style={{ fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.5, padding: '10px 12px', background: 'var(--cream)', borderRadius: 7 }}>
+                No hay paquetes configurados. Créalos en <strong>Configuración comercial → Modalidades</strong>.
+              </div>
+            )
+            return (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Paquetes configurados</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {pkgs.map((p: any) => {
+                    const pp = (p.prices ?? []).find((pr: any) => pr.price_per_person != null && pr.price_per_person > 0)
+                    const fp = (p.prices ?? []).find((pr: any) => pr.price > 0)
+                    const priceLabel = pp ? `${pp.price_per_person}€/pers.` : fp ? `${fp.price}€` : 'Sin precio'
+                    return (
+                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--cream)', borderRadius: 7, fontSize: 12 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--espresso)', flex: 1 }}>{p.name}</span>
+                        {(p.min_guests || p.max_guests) && (
+                          <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+                            {p.min_guests && `${p.min_guests}`}{p.min_guests && p.max_guests ? '–' : ''}{p.max_guests && `${p.max_guests}`} inv.
+                          </span>
+                        )}
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)' }}>{priceLabel}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--warm-gray)', marginTop: 6 }}>
+                  Edita paquetes en <strong>Configuración comercial → Modalidades</strong>
+                </div>
+              </div>
+            )
+          })()}
         </div>
       )
     }
@@ -1945,7 +1973,15 @@ export default function TemplateEditor({
                     <div style={{ background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
                       {/* Config dropdown */}
-                      {commercialConfigs.length > 1 && (
+                      {commercialConfigs.length === 0 && (
+                        <div>
+                          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 5 }}>Config. comercial</div>
+                          <div style={{ fontSize: 11, color: 'var(--warm-gray)', padding: '8px 10px', background: '#fff', border: '1px dashed var(--border)', borderRadius: 8, lineHeight: 1.5 }}>
+                            Sin configuraciones tipo espacio. <a href="/venue-settings" target="_blank" rel="noopener" style={{ color: 'var(--gold)', textDecoration: 'underline' }}>Crear configuración</a>
+                          </div>
+                        </div>
+                      )}
+                      {commercialConfigs.length > 0 && (
                         <div>
                           <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 5 }}>Config. comercial</div>
                           <div style={{ position: 'relative' }}>
@@ -2160,8 +2196,14 @@ export default function TemplateEditor({
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--warm-gray)', marginBottom: 8 }}>Secciones de la propuesta</div>
                 <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
                   {(() => {
-                    const SPACE_GROUP_IDS = ['single_space', 'zones', 'space_groups', 'venue_rental']
-                    const visibleSpaceSubs = SPACE_GROUP_IDS.filter(id => isSectionAllowed(id, commercialConfig?.space_type as any))
+                    const SPACE_GROUP_IDS = ['single_space', 'zones', 'space_groups', 'pricing']
+                    const pm = commercialConfig?.price_model
+                    const visibleSpaceSubs = SPACE_GROUP_IDS.filter(id => {
+                      if (!isSectionAllowed(id, commercialConfig?.space_type as any)) return false
+                      // Paquetes solo visible cuando price_model = 'package'
+                      if (id === 'pricing' && pm && pm !== 'package') return false
+                      return true
+                    })
                     const isSpaceGroupOpen = openSecs.has('__space_group')
                     const activeSpaceIds = visibleSpaceSubs.filter(id => isSectionOn(id))
                     const activeSpaceLabel = activeSpaceIds.length === 0
@@ -2189,6 +2231,8 @@ export default function TemplateEditor({
                     return ALL_SECTION_IDS.map((secId, i) => {
                     if (['welcome_light', 'welcome_split', 'welcome_editorial'].includes(secId)) return null
                     if (!isSectionAllowed(secId, commercialConfig?.space_type as any)) return null
+                    // Paquetes solo visible cuando price_model = 'package'
+                    if (secId === 'pricing' && pm && pm !== 'package') return null
 
                     const isInSpaceGroup = SPACE_GROUP_IDS.includes(secId)
                     const isFirstSpaceVisible = isInSpaceGroup && visibleSpaceSubs[0] === secId

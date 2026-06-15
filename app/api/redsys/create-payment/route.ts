@@ -1,3 +1,16 @@
+import { NextResponse } from 'next/server'
+
+// ── DEACTIVATED: Redsys replaced by Stripe Billing ──────────────────────────
+// Original code preserved below for potential revert.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function POST() {
+  return NextResponse.json(
+    { error: 'Redsys ha sido desactivado. Los pagos se procesan ahora con Stripe.' },
+    { status: 410 }
+  )
+}
+
+/* ── Original Redsys code (preserved) ────────────────────────────────────────
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession, getServiceClient } from '@/lib/auth-server'
 import { buildRedirectFormData, generateOrderNumber } from '@/lib/redsys'
@@ -80,3 +93,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
+*/

@@ -1,7 +1,7 @@
 'use client'
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, LayoutTemplate, Trash2, Star, Loader2, Pencil, FileText, X, Zap, Sparkles, ClipboardList, MessageCircle, Target, Check, ChevronLeft, ChefHat, BedDouble, type LucideIcon } from 'lucide-react'
+import { Plus, LayoutTemplate, Trash2, Star, Loader2, Pencil, FileText, X, Zap, Sparkles, Target, Check, ChevronLeft, ChefHat, BedDouble, type LucideIcon } from 'lucide-react'
 import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
 import { useAuth } from '@/lib/auth-context'
@@ -12,8 +12,6 @@ import { DEFAULT_TEMPLATES, type DefaultTemplateIcon } from '@/lib/proposal-star
 const SAMPLE_ICON: Record<DefaultTemplateIcon, LucideIcon> = {
   'zap': Zap,
   'sparkles': Sparkles,
-  'clipboard-list': ClipboardList,
-  'message-circle': MessageCircle,
   'target': Target,
   'bed-double': BedDouble,
 }
@@ -57,7 +55,7 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>(cachedTemplates ?? [])
   const [loading, setLoading] = useState(cachedTemplates === null)
   const [deleting, setDeleting] = useState<string | null>(null)
-  const [activeSection, setActiveSection] = useState<'samples' | 'mine'>('samples')
+  const [activeSection, setActiveSection] = useState<'samples' | 'mine'>('mine')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
 
@@ -177,8 +175,8 @@ export default function TemplatesPage() {
           {/* Sub-tab segmented control */}
           <div style={{ display: 'inline-flex', gap: 0, background: '#fff', borderRadius: '8px 8px 0 0', border: '1px solid var(--border)', borderBottom: '2px solid var(--border)', marginBottom: 18 }}>
             {([
-              { key: 'samples', label: 'Estilos de página', count: DEFAULT_TEMPLATES.length },
               { key: 'mine',    label: 'Mis plantillas', count: templates.length },
+              { key: 'samples', label: 'Estilos de página', count: DEFAULT_TEMPLATES.length },
             ] as const).map((t, i) => {
               const active = activeSection === t.key
               return (

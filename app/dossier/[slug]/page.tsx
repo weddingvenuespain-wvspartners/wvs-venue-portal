@@ -188,6 +188,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     .maybeSingle()
 
   // If proposal has a specific commercial_config_id, use that config instead
+  // Also pull zones/space_groups from the config (per-config storage)
   if ((proposal as any).commercial_config_id) {
     const { data: ccRow } = await supabase
       .from('venue_commercial_configs')
@@ -195,8 +196,33 @@ export default async function ProposalPage({ params, searchParams }: { params: P
       .eq('id', (proposal as any).commercial_config_id)
       .maybeSingle()
     if (ccRow?.config && venueSettings) {
-      ;(venueSettings as any).commercial_config = ccRow.config
+      const cfg = ccRow.config as any
+      ;(venueSettings as any).commercial_config = cfg
+      // Override venue-level zones/space_groups with config-scoped ones if present
+      if (Array.isArray(cfg.space_groups)) {
+        ;(venueSettings as any).space_groups = cfg.space_groups
+      }
+      if (Array.isArray(cfg.zones)) {
+        ;(venueSettings as any).zones = cfg.zones
+      }
     }
+  }
+
+  // Modalities: load modalidades of proposal's commercial_config_id
+  // These drive the "Paquetes" section when price_model='package'
+  let modalitiesData: any[] = []
+  if ((proposal as any).commercial_config_id) {
+    const { data: mods } = await supabase
+      .from('venue_modalities')
+      .select(`
+        *,
+        packages:venue_modality_packages(*, prices:venue_modality_prices(*), option_groups:package_option_groups(*, items:package_option_items(*))),
+        prices:venue_modality_prices(*)
+      `)
+      .eq('commercial_config_id', (proposal as any).commercial_config_id)
+      .eq('is_active', true)
+      .order('sort_order')
+    modalitiesData = mods ?? []
   }
 
   // Lodging data: load if proposal has lodging_config_id
@@ -300,6 +326,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     venueContent,
     commercialConfig: (venueSettings as any)?.commercial_config ?? null,
     lodging: lodgingData,
+    modalities: modalitiesData,
   } as any
 
   return <ProposalLanding data={proposalData} preview={preview} />

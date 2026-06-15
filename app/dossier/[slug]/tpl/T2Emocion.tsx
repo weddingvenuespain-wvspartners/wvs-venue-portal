@@ -5,12 +5,12 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { buildSingleFontUrl } from '@/lib/fonts'
-import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, formatZonePrice, VenueRentalGrid, TplStickyNav, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, replacePlaceholders, ZoneSlider, type ProposalData } from './shared'
+import { formatDate, isDark, toRgb, FadeUp, FadeIn, extractData, FloatingWhatsApp, AvailabilityBanner, Gallery, GalleryMosaic, GalleryGrid, IcoChat, IcoBuilding, IcoUsers, InclusionIcon, StarRating, resolveContact, formatZoneCapacities, formatZoneFeatures, formatZonePrice, VenueRentalGrid, TplStickyNav, TplVenueSpecs, TplSingleSpace, TplWelcomeLight, TplWelcomeSplit, TplWelcomeEditorial, pickWelcomeVariant, replacePlaceholders, ZoneSlider, InclusionsGrid, InclusionsList, InclusionsCards, TestimonialsCards, TestimonialsQuotes, TestimonialsCompact, TestimonialsFeatured, FaqAccordion, FaqCards, FaqNumbered, PricingCards, PricingTable, type ProposalData } from './shared'
+import { getActiveStyle } from '@/lib/section-styles'
 import { WeddingProposal } from './WeddingProposal'
 import VisitBookingModal from '@/components/VisitBookingModal'
 import SpaceGroupSelector, { type SpaceSelection } from './SpaceGroupSelector'
 import InquiryForm from '@/components/InquiryForm'
-import { getActiveStyle } from '@/lib/section-styles'
 import DateSelector from './DateSelector'
 
 function EmptySec({ label }: { label: string }) {
@@ -41,11 +41,11 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
   const welcomeVariant = pickWelcomeVariant(sec)
   const _preview = !!(data as any)._preview
 
-  const primary = branding?.primary_color ?? '#6B4F3A'
+  const primary = branding?.primary_color ?? '#4A6B52'
   const rgb     = toRgb(primary)
   const onPri   = isDark(primary) ? '#ffffff' : '#111111'
   const logo    = branding?.logo_url ?? null
-  const font    = (branding as any)?.font_family || 'Satoshi,Georgia,serif'
+  const font    = (branding as any)?.font_family || "'Inter', system-ui, sans-serif"
   const contact = resolveContact(data)
   const contactOn = on('contact') && (contact.phone || contact.email)
   const photoList = venue?.photo_urls ?? []
@@ -57,6 +57,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
   const [selectedExtraSvcs, setSelectedExtraSvcs] = useState<Record<string, boolean>>({})
   const [selectedZoneSupplements, setSelectedZoneSupplements] = useState<Record<number, boolean>>({})
   const [selectedMenus, setSelectedMenus] = useState<string[]>([])
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null)
   const [heroLoaded, setHeroLoaded] = useState(false)
   const heroImgRef = useRef<HTMLImageElement>(null)
   useEffect(() => { if (heroImgRef.current?.complete) setHeroLoaded(true) }, [])
@@ -87,7 +88,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
     .w{max-width:860px;margin:0 auto;padding:0 48px}
     .w-full{max-width:1200px;margin:0 auto;padding:0 32px}
     /* Typography */
-    .serif{font-family:Satoshi,Georgia,serif}
+    .serif{font-family:Inter,system-ui,sans-serif}
     .sans{font-family:Inter,system-ui,sans-serif}
     .t2-eyebrow{display:flex;align-items:center;justify-content:center;gap:12px;font-family:Inter,sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${primary};margin-bottom:18px}
     .t2-eyebrow::before,.t2-eyebrow::after{content:'';width:20px;height:1px;background:rgba(${rgb},.25)}
@@ -99,7 +100,7 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
     .gcell:hover .gimg{transform:scale(1.06)}
     /* Inputs */
     .inp{width:100%;padding:14px 0;border:none;border-bottom:1px solid rgba(${rgb},.3);
-      background:transparent;font-family:Satoshi,serif;font-size:17px;
+      background:transparent;font-family:Inter,system-ui,sans-serif;font-size:15px;
       color:#3a2f28;outline:none;transition:border-color .2s}
     .inp:focus{border-color:${primary}}
     .inp::placeholder{color:rgba(58,47,40,.35);font-style:italic}
@@ -218,13 +219,17 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       {/* ══════════════════════════════════════════
           GALLERY — full-bleed, immediately
       ══════════════════════════════════════════ */}
-      {on('gallery') && (gallery.length > 0 ? (
-        <section id="sec-gallery">
-          <FadeIn>
-            <Gallery photos={gallery} primary={primary} dark={false} />
-          </FadeIn>
-        </section>
-      ) : _preview ? <EmptySec label="Galería" /> : null)}
+      {on('gallery') && (gallery.length > 0 ? (() => {
+        const galleryStyle = getActiveStyle(sec, 'gallery')
+        const GalleryComp  = galleryStyle === 'mosaic' ? GalleryMosaic : galleryStyle === 'grid' ? GalleryGrid : Gallery
+        return (
+          <section id="sec-gallery">
+            <FadeIn>
+              <GalleryComp photos={gallery} primary={primary} dark={false} />
+            </FadeIn>
+          </section>
+        )
+      })() : _preview ? <EmptySec label="Galería" /> : null)}
 
 
       {/* ══════════════════════════════════════════
@@ -426,25 +431,6 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       ) : null}
 
       {/* ══════════════════════════════════════════
-          VENUE RENTAL — grid temporada × día
-      ══════════════════════════════════════════ */}
-      {on('venue_rental') && !(on('space_groups') && visibleSpaceGroups.length > 0) && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
-        <section style={{ background: '#fff', padding: '100px 0' }}>
-          <div className="w">
-            <FadeUp>
-              <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                <div className="t2-eyebrow">{sec.venue_rental.title || 'Tarifas de alquiler'}</div>
-                <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Elegid vuestra fecha</h2>
-              </div>
-            </FadeUp>
-            <FadeUp delay={.1}>
-              <VenueRentalGrid data={sec.venue_rental} primary={primary} />
-            </FadeUp>
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="Tarifas de alquiler" /> : null)}
-
-      {/* ══════════════════════════════════════════
           SEASON PRICES
       ══════════════════════════════════════════ */}
       {on('season_prices') && (seasonsShow.length > 0 ? (
@@ -475,145 +461,140 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
       ) : _preview ? <EmptySec label="Temporadas" /> : null)}
 
       {/* ══════════════════════════════════════════
-          TESTIMONIALS — large editorial quotes
+          TESTIMONIALS — 4 variantes (cards/quotes/compact/featured)
       ══════════════════════════════════════════ */}
-      {on('testimonials') && (testsShow.length > 0 ? (
-        <section style={{ background: '#fff', padding: '100px 0' }}>
-          <div className="w">
-            <FadeUp>
-              <div style={{ textAlign: 'center', marginBottom: 64 }}>
-                <div className="t2-eyebrow">{(sec as any).testimonials_eyebrow || 'Testimonios'}</div>
-                <h2 className="serif" style={{ fontSize: 'clamp(30px,4.5vw,48px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>
-                  Bodas en {venue?.name ?? 'nuestro espacio'}
-                </h2>
-              </div>
-            </FadeUp>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 72 }}>
-              {testsShow.map((t:any, i:number) => (
-                <FadeUp key={i} delay={i*.08}>
-                  <div style={{ maxWidth: 700, margin: i%2===0?'0 0 0 auto':'0 auto 0 0', textAlign: i%2===0?'right':'left' }}>
-                    <div style={{ marginBottom: 20 }}><StarRating rating={t.rating ?? 5} size={16} color="#C9A96E" /></div>
-                    <p className="serif" style={{ fontSize: 'clamp(20px,3vw,26px)', fontWeight: 300, fontStyle: 'italic', color: '#2c2418', lineHeight: 1.75, marginBottom: 28 }}>
-                      &ldquo;{t.text}&rdquo;
-                    </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: i%2===0?'flex-end':'flex-start' }}>
-                      {t.photo_url && <img src={t.photo_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />}
-                      <div>
-                        <div className="sans" style={{ fontSize: 13, fontWeight: 500, color: '#3a2f28' }}>{t.couple_name||t.names}</div>
-                        {(t.wedding_date||t.date) && <div className="sans" style={{ fontSize: 11, color: `rgba(${rgb},.5)`, marginTop: 1 }}>{t.wedding_date||t.date}</div>}
-                      </div>
-                    </div>
-                  </div>
-                </FadeUp>
-              ))}
+      {on('testimonials') && (testsShow.length > 0 ? (() => {
+        const variant = getActiveStyle(sec, 'testimonials')
+        const Comp = variant === 'cards'    ? TestimonialsCards
+                   : variant === 'compact'  ? TestimonialsCompact
+                   : variant === 'featured' ? TestimonialsFeatured
+                   : TestimonialsQuotes  // default for T2 = quotes editorial
+        return (
+          <section style={{ background: '#fff', padding: '100px 0' }}>
+            <div className="w">
+              <FadeUp>
+                <div style={{ textAlign: 'center', marginBottom: 64 }}>
+                  <div className="t2-eyebrow">{(sec as any).testimonials_eyebrow || 'Testimonios'}</div>
+                  <h2 className="serif" style={{ fontSize: 'clamp(30px,4.5vw,48px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>
+                    Bodas en {venue?.name ?? 'nuestro espacio'}
+                  </h2>
+                </div>
+              </FadeUp>
+              <Comp items={testsShow} primary={primary} dark={false} font={font} />
             </div>
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="Testimoniales" /> : null)}
+          </section>
+        )
+      })() : _preview ? <EmptySec label="Testimoniales" /> : null)}
 
 
       {/* ══════════════════════════════════════════
-          INCLUSIONS — clean centered grid
+          INCLUSIONS — 3 variantes (grid/list/cards)
       ══════════════════════════════════════════ */}
-      {on('inclusions') && (inclusionsShow.length > 0 ? (
-        <section style={{ background: WARM, padding: '100px 0' }}>
-          <div className="w">
-            <FadeUp>
-              <div style={{ textAlign: 'center', marginBottom: 56 }}>
-                <div className="t2-eyebrow">{(sec as any).inclusions_eyebrow || 'Qué incluye'}</div>
-                <h2 className="serif" style={{ fontSize: 'clamp(30px,4vw,46px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Todo para vuestra boda perfecta</h2>
-              </div>
-            </FadeUp>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 28 }}>
-              {inclusionsShow.map((inc:any, i:number) => (
-                <FadeUp key={i} delay={(i%4)*.06}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ display: 'inline-flex', marginBottom: 14, color: primary }}>
-                      <InclusionIcon name={inc.icon || inc.emoji || 'check'} size={32} color={primary} strokeWidth={1.4} />
-                    </div>
-                    <div className="serif" style={{ fontSize: 17, fontWeight: 500, color: '#2c2418', marginBottom: 6 }}>{inc.title}</div>
-                    {inc.description && <div className="sans" style={{ fontSize: 12, color: `rgba(${rgb},.65)`, lineHeight: 1.6 }}>{inc.description}</div>}
-                  </div>
-                </FadeUp>
-              ))}
+      {on('inclusions') && (inclusionsShow.length > 0 ? (() => {
+        const variant = getActiveStyle(sec, 'inclusions')
+        const Comp = variant === 'list' ? InclusionsList : variant === 'cards' ? InclusionsCards : InclusionsGrid
+        return (
+          <section style={{ background: WARM, padding: '100px 0' }}>
+            <div className="w">
+              <FadeUp>
+                <div style={{ textAlign: 'center', marginBottom: 56 }}>
+                  <div className="t2-eyebrow">{(sec as any).inclusions_eyebrow || 'Qué incluye'}</div>
+                  <h2 className="serif" style={{ fontSize: 'clamp(30px,4vw,46px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Todo para vuestra boda perfecta</h2>
+                </div>
+              </FadeUp>
+              <Comp items={inclusionsShow as any} primary={primary} dark={false} columns={3} />
             </div>
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="Qué incluye" /> : null)}
+          </section>
+        )
+      })() : _preview ? <EmptySec label="Qué incluye" /> : null)}
 
 
       {/* ══════════════════════════════════════════
           PACKAGES — elegant cards
       ══════════════════════════════════════════ */}
-      {on('packages') && (pkgs.length > 0 ? (
-        <section style={{ background: '#fff', padding: '100px 0' }}>
-          <div className="w">
-            <FadeUp>
-              <div style={{ textAlign: 'center', marginBottom: 56 }}>
-                <div className="t2-eyebrow">{(sec as any).pricing_eyebrow || 'Paquetes'}</div>
-                <h2 className="serif" style={{ fontSize: 'clamp(30px,4vw,48px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Nuestra propuesta para vosotros</h2>
-              </div>
-            </FadeUp>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {pkgs.map((pkg:any, i:number) => (
-                <FadeUp key={i} delay={i*.08}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 40, alignItems: 'center', padding: '36px 0', borderBottom: '1px solid rgba(58,47,40,.12)' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                        <h3 className="serif" style={{ fontSize: 28, fontWeight: 400, color: '#2c2418' }}>{pkg.name}</h3>
-                        {pkg.is_recommended && <span className="sans" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, background: `rgba(${rgb},.08)`, padding: '4px 12px', borderRadius: 100 }}>Recomendado</span>}
-                      </div>
-                      {pkg.description && <p className="sans" style={{ fontSize: 14, color: '#8a7060', lineHeight: 1.7, marginBottom: pkg.includes?.filter(Boolean).length>0?16:0 }}>{pkg.description}</p>}
-                      {pkg.includes?.filter(Boolean).length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 24px' }}>
-                          {pkg.includes.filter(Boolean).map((item:string, j:number) => (
-                            <span key={j} className="sans" style={{ fontSize: 13, color: '#5a4a3a', display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ color: primary, fontSize: 10 }}>✦</span>{item}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    {pkg.price && (
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div className="serif" style={{ fontSize: 'clamp(28px,3.5vw,44px)', fontWeight: 300, color: primary }}>{pkg.price}</div>
-                      </div>
-                    )}
-                  </div>
-                </FadeUp>
-              ))}
+      {/* PAQUETES — 3 variantes (cards/table/rental_grid) */}
+      {on('pricing') && (() => {
+        const variant = getActiveStyle(sec, 'pricing')
+        const hasRentalRows = ((sec as any).venue_rental?.rows?.length ?? 0) > 0 && ((sec as any).venue_rental?.day_tiers?.length ?? 0) > 0
+        const hasContent = pkgs.length > 0 || (variant === 'rental_grid' && hasRentalRows)
+        if (!hasContent) return _preview ? <EmptySec label="Paquetes" /> : null
+        return (
+          <section style={{ background: '#fff', padding: '100px 0' }}>
+            <div className="w">
+              <FadeUp>
+                <div style={{ textAlign: 'center', marginBottom: 56 }}>
+                  <div className="t2-eyebrow">{(sec as any).pricing_eyebrow || 'Paquetes'}</div>
+                  <h2 className="serif" style={{ fontSize: 'clamp(30px,4vw,48px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Nuestra propuesta para vosotros</h2>
+                </div>
+              </FadeUp>
+              {variant === 'table' ? (
+                <PricingTable packages={pkgs as any} primary={primary} dark={false} font={font} />
+              ) : variant === 'rental_grid' && hasRentalRows ? (
+                <VenueRentalGrid data={(sec as any).venue_rental} primary={primary} />
+              ) : (
+                <PricingCards packages={pkgs as any} primary={primary} dark={false} font={font}
+                  selectedId={selectedPackageId} onSelect={(id) => setSelectedPackageId(id)} />
+              )}
             </div>
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="Paquetes" /> : null)}
+          </section>
+        )
+      })()}
 
 
       {/* ══════════════════════════════════════════
           CONFIGURA VUESTRA BODA (WeddingProposal)
       ══════════════════════════════════════════ */}
-      {hasCatering && on('menu') && (menusStructured?.length || menuExtras?.length || appetizersBase?.length || menuShow.length > 0) && (
-        <WeddingProposal
-          data={data}
-          menus={menusStructured}
-          extras={menuExtras}
-          appetizers={appetizersBase}
-          legacyMenus={menuShow}
-          primary={primary}
-          onPrimary={onPri}
-          onMenusChange={setSelectedMenus}
-        />
-      )}
+      {hasCatering && on('menu') && (() => {
+        // Filter menus by selected package's linked_menu_ids (if commercial config uses packages)
+        const pkg = pkgs.find((p: any) => p.id === selectedPackageId) as any
+        const linked: string[] | null = pkg?.linked_menu_ids ?? null
+        const hasPackages = pkgs.length > 0 && (data as any).commercialConfig?.price_model === 'package'
+        // If config is package-based and no package picked yet → don't show menus
+        if (hasPackages && !selectedPackageId) {
+          return (
+            <section id="menu" style={{ padding: '60px 24px', textAlign: 'center', background: 'var(--cream)' }}>
+              <div className="t2-eyebrow">Menús</div>
+              <h2 className="serif" style={{ fontSize: 'clamp(24px,3vw,32px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic', marginTop: 8 }}>
+                Elige primero un paquete arriba para ver los menús disponibles
+              </h2>
+            </section>
+          )
+        }
+        // Filter menus if package has linked_menu_ids restriction
+        const filterMenus = <T extends { id?: string }>(arr: T[] | undefined): T[] => {
+          if (!arr) return [] as T[]
+          if (!linked || linked.length === 0) return arr
+          return arr.filter(m => m.id && linked.includes(m.id))
+        }
+        const fMenusStructured = filterMenus(menusStructured as any[])
+        const fMenuShow        = filterMenus(menuShow as any[])
+        if (!(fMenusStructured.length || menuExtras?.length || appetizersBase?.length || fMenuShow.length)) return null
+        return (
+          <WeddingProposal
+            data={data}
+            menus={fMenusStructured as any}
+            extras={menuExtras}
+            appetizers={appetizersBase}
+            legacyMenus={fMenuShow as any}
+            primary={primary}
+            onPrimary={onPri}
+            onMenusChange={setSelectedMenus}
+          />
+        )
+      })()}
 
       {/* ══════════════════════════════════════════
           ACCOMMODATION
       ══════════════════════════════════════════ */}
-      {on('accommodation') && accom && (
-        <section style={{ background: WARM, padding: '100px 0' }}>
+      {on('accommodation') && accom && (() => {
+        const accomVariant = getActiveStyle(sec, 'accommodation')
+        return (
+        <section data-variant={accomVariant} style={{ background: WARM, padding: '100px 0' }}>
           <div className="w">
             <FadeUp>
               <div style={{ textAlign: 'center', marginBottom: 40 }}>
                 <div className="t2-eyebrow">{(sec as any).accommodation_eyebrow || 'Alojamiento'}</div>
-                <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Quedaos a dormir</h2>
+                <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>{accomVariant === 'interactive' ? 'Reservad vuestras habitaciones' : 'Quedaos a dormir'}</h2>
               </div>
             </FadeUp>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px,1fr))', gap: 32, alignItems: 'start' }}>
@@ -668,7 +649,8 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
             </div>
           </div>
         </section>
-      )}
+        )
+      })()}
 
       {/* ══════════════════════════════════════════
           EXTRA SERVICES
@@ -742,36 +724,24 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
         </section>
       ) : _preview ? <EmptySec label="Colaboradores" /> : null)}
 
-      {/* ══════════════════════════════════════════
-          FAQ
-      ══════════════════════════════════════════ */}
-      {on('faq') && (faqShow.length > 0 ? (
-        <section style={{ background: '#fff', padding: '100px 0' }}>
-          <div className="w">
-            <FadeUp>
-              <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                <div className="t2-eyebrow">{(sec as any).faq_eyebrow || 'Preguntas frecuentes'}</div>
-                <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Preguntas y respuestas</h2>
-              </div>
-            </FadeUp>
-            <div>
-              {faqShow.map((item: any, i: number) => (
-                <FadeUp key={i} delay={i * .04}>
-                  <div style={{ borderBottom: `1px solid rgba(${rgb},.12)` }}>
-                    <button onClick={() => setOpenFaq(openFaq === i ? null : i)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', gap: 16 }}>
-                      <span className="serif" style={{ fontSize: 17, fontWeight: 400, color: openFaq === i ? primary : '#2c2418', fontStyle: 'italic' }}>{item.question}</span>
-                      <span style={{ fontSize: 22, color: primary, flexShrink: 0, fontWeight: 200, transform: openFaq === i ? 'rotate(45deg)' : 'none', transition: 'transform .25s' }}>+</span>
-                    </button>
-                    <div style={{ overflow: 'hidden', maxHeight: openFaq === i ? 400 : 0, transition: 'max-height .35s cubic-bezier(.4,0,.2,1)' }}>
-                      <p className="sans" style={{ fontSize: 14, color: '#6a5a4a', lineHeight: 1.8, paddingBottom: 22 }}>{item.answer}</p>
-                    </div>
-                  </div>
-                </FadeUp>
-              ))}
+      {/* FAQ — 3 variantes (accordion/cards/numbered) */}
+      {on('faq') && (faqShow.length > 0 ? (() => {
+        const variant = getActiveStyle(sec, 'faq')
+        const Comp = variant === 'cards' ? FaqCards : variant === 'numbered' ? FaqNumbered : FaqAccordion
+        return (
+          <section style={{ background: '#fff', padding: '100px 0' }}>
+            <div className="w">
+              <FadeUp>
+                <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                  <div className="t2-eyebrow">{(sec as any).faq_eyebrow || 'Preguntas frecuentes'}</div>
+                  <h2 className="serif" style={{ fontSize: 'clamp(28px,4vw,42px)', fontWeight: 300, color: '#2c2418', fontStyle: 'italic' }}>Preguntas y respuestas</h2>
+                </div>
+              </FadeUp>
+              <Comp items={faqShow as any} primary={primary} dark={false} />
             </div>
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="FAQ" /> : null)}
+          </section>
+        )
+      })() : _preview ? <EmptySec label="FAQ" /> : null)}
 
       {/* ══════════════════════════════════════════
           AGENDAR VISITA
@@ -886,52 +856,8 @@ export default function T2Emocion({ data }: { data: ProposalData }) {
         )
       })()}
 
-      {/* ══════════════════════════════════════════
-          CTA — romantic, soft (contacto directo)
-      ══════════════════════════════════════════ */}
-      {contactOn && (
-        <section id="cta" style={{ position: 'relative', padding: '120px 0', overflow: 'hidden' }}>
-          {hero && (
-            <>
-              <img src={hero} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0, filter: 'brightness(.3) saturate(.5)' }} />
-              <div style={{ position: 'absolute', inset: 0, background: `rgba(${toRgb('#2c1a0e')},.7)`, zIndex: 1 }} />
-            </>
-          )}
-          {!hero && <div style={{ position: 'absolute', inset: 0, background: `rgba(${rgb},.85)` }} />}
-
-          <div className="w" style={{ position: 'relative', zIndex: 10 }}>
-            <FadeUp>
-              <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                <div className="sans" style={{ fontSize: 10, letterSpacing: '.24em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 14 }}>Datos de contacto</div>
-                <p className="serif" style={{ fontSize: 'clamp(30px,5vw,58px)', fontWeight: 300, fontStyle: 'italic', color: '#fff', lineHeight: 1.15, marginBottom: 20 }}>
-                  Estamos aquí para ayudaros
-                </p>
-                <p className="sans" style={{ fontSize: 14, color: 'rgba(255,255,255,.55)' }}>Estamos a vuestra disposición para resolver lo que necesitéis.</p>
-              </div>
-            </FadeUp>
-            <FadeUp delay={.12}>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-                {contact.phone && (
-                  <a href={`https://wa.me/${contact.phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola, he visto la propuesta para ${couple_name}.`)}`}
-                    target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '16px 36px', border: '1.5px solid rgba(37,211,102,.5)', color: '#25D366', background: 'none', fontSize: 12, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', textDecoration: 'none', fontFamily: 'Inter,sans-serif' }}>
-                    <IcoChat width={14} height={14} /> WhatsApp
-                  </a>
-                )}
-                {contact.email && (
-                  <a href={`mailto:${contact.email}?subject=${encodeURIComponent(`Propuesta ${couple_name}`)}`}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '16px 36px', border: '1.5px solid rgba(255,255,255,.5)', color: '#fff', background: 'none', fontSize: 12, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', textDecoration: 'none', fontFamily: 'Inter,sans-serif' }}>
-                    Enviar email
-                  </a>
-                )}
-              </div>
-            </FadeUp>
-          </div>
-        </section>
-      )}
-
       {/* ── FLOATING WHATSAPP ── */}
-      {contactOn && <FloatingWhatsApp phone={contact.phone} coupleName={couple_name} primary={primary} onPrimary={onPri} />}
+      {on('floating_contact') && contactOn && <FloatingWhatsApp phone={contact.phone} coupleName={couple_name} primary={primary} onPrimary={onPri} />}
 
       {/* Footer */}
       <footer style={{ background: '#1a0e08', padding: '48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20 }}>

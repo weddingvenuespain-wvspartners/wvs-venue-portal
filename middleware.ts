@@ -7,7 +7,9 @@ import { createServerClient } from '@supabase/ssr'
 const PUBLIC_ROUTES: Array<string | RegExp> = [
   '/api/leads/create',          // uses its own WVS_REST_TOKEN auth
   '/api/admin/backup',          // uses Bearer API key for GitHub Actions cron
-  '/api/redsys/notification',   // Redsys webhook (server-to-server, no session)
+  '/api/stripe/webhook',         // Stripe webhook (server-to-server, signature auth)
+  '/api/cron/',                  // Vercel cron (uses Bearer CRON_SECRET)
+  '/api/redsys/notification',   // Redsys webhook (deactivated, kept for 410 response)
   '/api/plans',                 // public plan listing for pricing page
   '/api/dossier/track-view',  // anonymous couple opens a dossier — RPC handles dedupe + self-view
   '/api/dossier/unlock',      // password gate for private dossiers — anonymous by design

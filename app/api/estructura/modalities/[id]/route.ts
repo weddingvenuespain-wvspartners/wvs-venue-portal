@@ -11,7 +11,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const body = await req.json()
-    const { name, description, duration_label, duration_type, day_from, day_to, sort_order, is_active, commercial_config_id } = body
+    const { name, description, duration_label, duration_type, day_from, day_to, sort_order, is_active, commercial_config_id, linked_menu_ids, days_of_week, includes, min_guests, max_guests } = body
 
     const update: Record<string, any> = {}
     if (name !== undefined)           update.name           = name.trim()
@@ -23,6 +23,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (sort_order !== undefined)     update.sort_order     = sort_order
     if (is_active !== undefined)      update.is_active      = is_active
     if (commercial_config_id !== undefined) update.commercial_config_id = commercial_config_id
+    if (linked_menu_ids !== undefined) update.linked_menu_ids = linked_menu_ids
+    if (days_of_week !== undefined) update.days_of_week = days_of_week
+    if (includes !== undefined) update.includes = includes
+    if (min_guests !== undefined) update.min_guests = min_guests
+    if (max_guests !== undefined) update.max_guests = max_guests
 
     if (Object.keys(update).length === 0)
       return NextResponse.json({ error: 'Nada que actualizar' }, { status: 400 })

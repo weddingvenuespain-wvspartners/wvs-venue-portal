@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { ProposalData } from '../page'
 import type { Menu, MenuCourse, MenuExtra, AppetizerGroup } from './shared'
-import { toRgb, FadeUp, ivaLabel } from './shared'
+import { toRgb, FadeUp, ivaLabel, GuestDistribution } from './shared'
 import DatePicker from '@/components/DatePicker'
 import styles from './WeddingProposal.module.css'
 
@@ -100,7 +100,10 @@ export function WeddingProposal({
 }) {
   const rgb = toRgb(primary)
   const sd = data.sections_data ?? null
-  const showMenuPrices = sd?.show_menu_prices !== false
+  const isPackageModel = (data as any).commercialConfig?.price_model === 'package'
+  const showMenuPrices = isPackageModel ? false : sd?.show_menu_prices !== false
+  const showMenuSupplements = sd?.show_menu_supplements !== false
+  const menuDisplayMode = sd?.menu_display_mode ?? 'list'
   const menuPickLimit = sd?.menu_pick_limit ?? null  // null = unlimited
 
   const menus: Menu[] = useMemo(() => {
@@ -139,6 +142,7 @@ export function WeddingProposal({
   const [selectedMenuIdx, setSelectedMenuIdx] = useState(0)
 
   const [courseChoices, setCourseChoices] = useState<Record<string, string[]>>({})
+  const [courseDistribution, setCourseDistribution] = useState<Record<string, Record<string, number>>>({})
   const [selectedExtras, setSelectedExtras] = useState<Record<string, boolean>>({})
   const [comments, setComments] = useState('')
   const [sending, setSending] = useState(false)
@@ -177,7 +181,7 @@ export function WeddingProposal({
       m.courses?.forEach((c, ci) => {
         ;(courseChoices[`${id}-c${ci}`] || []).forEach(name => {
           const item = c.items.find(it => it.name === name)
-          if (item?.extra_price) menuTotal += parsePrice(item.extra_price) * count
+          if (showMenuSupplements && item?.extra_price) menuTotal += parsePrice(item.extra_price) * count
         })
       })
     })
@@ -191,7 +195,7 @@ export function WeddingProposal({
       // Barra libre extra hours (per-option)
       if (e.category === 'open_bar' && e.extra_hour_price) {
         const eh = barraExtraHours[key] || 0
-        const ep = barraExtraPeople[key] || 0
+        const ep = barraExtraPeople[key] || guests
         if (eh > 0 && ep > 0) itemTotal += eh * parsePrice(e.extra_hour_price) * ep
       }
       // min_spend enforcement
@@ -202,7 +206,7 @@ export function WeddingProposal({
       extrasTotal += itemTotal
     })
     return menuTotal + extrasTotal
-  }, [menus, effectiveAllocations, weddingDate, extras, selectedExtras, courseChoices, guests, extraGuestCounts, barraExtraHours, barraExtraPeople])
+  }, [menus, effectiveAllocations, weddingDate, extras, selectedExtras, courseChoices, guests, extraGuestCounts, barraExtraHours, barraExtraPeople, showMenuSupplements])
 
   // Notify parent of total changes
   useEffect(() => { onTotalChange?.(total) }, [total, onTotalChange])
@@ -211,16 +215,24 @@ export function WeddingProposal({
     const missing: string[] = []
     menus.forEach((m, i) => {
       const id = menuId(m, i)
-      if (!(effectiveAllocations[id] > 0)) return
+      const menuGuests = effectiveAllocations[id] || 0
+      if (!menuGuests) return
       m.courses?.forEach((c, ci) => {
         if (!c.mode || c.mode === 'fixed') return
-        const picks = courseChoices[`${id}-c${ci}`] || []
+        const courseKey = `${id}-c${ci}`
+        const picks = courseChoices[courseKey] || []
         const expected = c.mode === 'pick_one' ? 1 : (c.pick_count || 1)
-        if (picks.length < expected) missing.push(`${m.name}: ${c.label}`)
+        if (picks.length < expected) { missing.push(`${m.name}: ${c.label}`); return }
+        // Validate distribution sums for pick_n with multiple selections
+        if (c.mode === 'pick_n' && picks.length > 1 && menuGuests > 0) {
+          const dist = courseDistribution[courseKey] ?? {}
+          const sum = picks.reduce((s, name) => s + (dist[name] || 0), 0)
+          if (sum !== menuGuests) missing.push(`${m.name}: ${c.label} (reparto incompleto)`)
+        }
       })
     })
     return missing
-  }, [menus, effectiveAllocations, courseChoices])
+  }, [menus, effectiveAllocations, courseChoices, courseDistribution])
 
   // Notify parent of validation state
   useEffect(() => {
@@ -342,6 +354,7 @@ export function WeddingProposal({
         selected_menu_name: allocatedMenus.map(m => m.name).join(' + ') || null,
         guest_count: guests, original_guest_count: originalGuests, guest_count_changed: guests !== originalGuests,
         course_choices: courseChoices,
+        course_distribution: courseDistribution,
         selected_extras: selectedExtraIds,
         selected_extras_detail: selectedExtrasDetail,
         extra_guest_counts: extraGuestCounts,
@@ -421,15 +434,30 @@ export function WeddingProposal({
         )}
 
         {/* Courses */}
-        {(m.courses ?? []).map((c, ci) => (
+        {(m.courses ?? []).map((c, ci) => {
+          const courseKey = `${id}-c${ci}`
+          return (
           <CourseBlock
             key={ci}
             course={c}
-            courseKey={`${id}-c${ci}`}
-            selected={courseChoices[`${id}-c${ci}`] || []}
+            courseKey={courseKey}
+            selected={courseChoices[courseKey] || []}
             onToggle={togglePick}
+            showSupplements={showMenuSupplements}
+            menuGuests={effectiveAllocations[id] || 0}
+            distribution={courseDistribution[courseKey]}
+            onDistributionChange={(itemName, count) => {
+              setCourseDistribution(prev => ({
+                ...prev,
+                [courseKey]: { ...(prev[courseKey] ?? {}), [itemName]: count }
+              }))
+            }}
+            primary={primary}
+            dark={dark}
+            displayMode={menuDisplayMode}
           />
-        ))}
+          )
+        })}
 
         {/* PDF link */}
         {m.pdf_url && (
@@ -781,21 +809,18 @@ export function WeddingProposal({
                                   </div>
                                   <span style={{ fontSize: '.75rem', color: 'var(--wp-text-dim)' }}>× {extra.extra_hour_price}/pers.</span>
                                 </div>
-                                {(barraExtraHours[key] || 0) > 0 && (
-                                  <div className={styles.wpBarraRow}>
-                                    <span className={styles.wpBarraLabel}>Personas extra</span>
-                                    <div className={styles.wpStepper} style={{ marginTop: 0 }}>
-                                      <button type="button" className={styles.wpStepperBtn} style={{ width: 28, height: 28, fontSize: '.95rem' }} onClick={() => setBarraExtraPeople(p => ({ ...p, [key]: Math.max(0, (p[key] || 0) - 1) }))}>−</button>
-                                      <input type="number" className={styles.wpStepperInput} style={{ width: 50, fontSize: '.82rem', lineHeight: '28px' }} min={0} value={barraExtraPeople[key] || 0} onChange={e => setBarraExtraPeople(p => ({ ...p, [key]: Math.max(0, parseInt(e.target.value) || 0) }))} />
-                                      <button type="button" className={styles.wpStepperBtn} style={{ width: 28, height: 28, fontSize: '.95rem' }} onClick={() => setBarraExtraPeople(p => ({ ...p, [key]: (p[key] || 0) + 1 }))}>+</button>
-                                    </div>
-                                    <span style={{ fontSize: '.75rem', color: 'var(--wp-text-dim)' }}>personas</span>
+                                <div className={styles.wpBarraRow}>
+                                  <span className={styles.wpBarraLabel}>Personas</span>
+                                  <div className={styles.wpStepper} style={{ marginTop: 0 }}>
+                                    <button type="button" className={styles.wpStepperBtn} style={{ width: 28, height: 28, fontSize: '.95rem' }} onClick={() => setBarraExtraPeople(p => ({ ...p, [key]: Math.max(1, (p[key] || guests) - 1) }))}>−</button>
+                                    <input type="number" className={styles.wpStepperInput} style={{ width: 50, fontSize: '.82rem', lineHeight: '28px' }} min={1} value={barraExtraPeople[key] || guests} onChange={e => setBarraExtraPeople(p => ({ ...p, [key]: Math.max(1, parseInt(e.target.value) || 1) }))} />
+                                    <button type="button" className={styles.wpStepperBtn} style={{ width: 28, height: 28, fontSize: '.95rem' }} onClick={() => setBarraExtraPeople(p => ({ ...p, [key]: (p[key] || guests) + 1 }))}>+</button>
                                   </div>
-                                )}
-                                {(barraExtraHours[key] || 0) > 0 && (barraExtraPeople[key] || 0) > 0 && (
+                                </div>
+                                {(barraExtraHours[key] || 0) > 0 && (
                                   <div className={styles.wpBarraTotal}>
                                     <span>Suplemento horas extra</span>
-                                    <span>{formatEuro((barraExtraHours[key] || 0) * parsePrice(extra.extra_hour_price) * (barraExtraPeople[key] || 0))}</span>
+                                    <span>{formatEuro((barraExtraHours[key] || 0) * parsePrice(extra.extra_hour_price) * (barraExtraPeople[key] || guests))}</span>
                                   </div>
                                 )}
                               </div>
@@ -902,7 +927,7 @@ export function WeddingProposal({
                   </div>
                 )
               })}
-              {menus.flatMap(m => {
+              {showMenuSupplements && menus.flatMap(m => {
                 const i = menus.indexOf(m); const id = menuId(m, i)
                 const count = effectiveAllocations[id] || 0
                 if (!count) return []
@@ -929,7 +954,7 @@ export function WeddingProposal({
                 let baseAmount = e.price_type === 'per_person' ? p * perPersonCount : p
                 // Barra libre extra hours (per-option)
                 const eh = (e.category === 'open_bar' ? barraExtraHours[key] : 0) || 0
-                const ep = (e.category === 'open_bar' ? barraExtraPeople[key] : 0) || 0
+                const ep = e.category === 'open_bar' ? (barraExtraPeople[key] || guests) : 0
                 const barraExtra = (eh > 0 && ep > 0 && e.extra_hour_price) ? eh * parsePrice(e.extra_hour_price) * ep : 0
                 let amount = baseAmount + barraExtra
                 // min_spend
@@ -965,9 +990,16 @@ export function WeddingProposal({
 
 // ─── Course sub-component ─────────────────────────────────────────────────────
 
-function CourseBlock({ course, courseKey, selected, onToggle }: {
+function CourseBlock({ course, courseKey, selected, onToggle, showSupplements = true, menuGuests = 0, distribution, onDistributionChange, primary = 'var(--gold, #C4975A)', dark = false, displayMode = 'list' as 'list' | 'gallery' }: {
   course: MenuCourse; courseKey: string; selected: string[]
   onToggle: (key: string, name: string, mode: 'pick_one' | 'pick_n', count: number) => void
+  showSupplements?: boolean
+  menuGuests?: number
+  distribution?: Record<string, number>
+  onDistributionChange?: (itemName: string, count: number) => void
+  primary?: string
+  dark?: boolean
+  displayMode?: 'list' | 'gallery'
 }) {
   const mode = course.mode || 'fixed'
   const pickCount = course.pick_count || 1
@@ -975,43 +1007,138 @@ function CourseBlock({ course, courseKey, selected, onToggle }: {
   const hint = mode === 'pick_one' ? 'Escoge 1'
     : mode === 'pick_n' ? (picked >= pickCount ? `✓ ${picked} de ${pickCount} seleccionados` : `Escoge ${pickCount} (${picked}/${pickCount})`) : null
 
+  // Gallery mode: explicit setting; list mode shows thumbnails if images exist
+  const useGallery = displayMode === 'gallery'
+
+  const textColor = dark ? 'rgba(255,255,255,.88)' : '#181410'
+  const subColor = dark ? 'rgba(255,255,255,.50)' : '#6a6560'
+  const borderColor = dark ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.08)'
+
   return (
     <div className={styles.wpCourse}>
       <div className={styles.wpCourseLbl}>
         {course.label}
         {hint && <span className={styles.wpCourseHint}>· {hint}</span>}
       </div>
-      <div className={styles.wpCourseItems}>
-        {course.items.map((item, i) => {
-          if (mode === 'fixed') {
+
+      {/* ── Gallery mode — card grid ── */}
+      {useGallery ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))', gap: 12, marginTop: 8 }}>
+          {course.items.map((item, i) => {
+            const isSelectable = mode !== 'fixed'
+            const isSel = selected.includes(item.name)
+            const isRadio = mode === 'pick_one'
+            const disabled = !isSel && mode === 'pick_n' && picked >= pickCount
+            const clickable = isSelectable && !disabled
             return (
-              <div key={i} className={styles.wpItem}>
-                <span className={styles.wpItemBullet}>•</span>
+              <div key={i}
+                onClick={clickable ? () => onToggle(courseKey, item.name, mode as 'pick_one' | 'pick_n', pickCount) : undefined}
+                style={{
+                  borderRadius: 10, overflow: 'hidden',
+                  cursor: clickable ? 'pointer' : disabled ? 'not-allowed' : 'default',
+                  border: `2px solid ${isSel ? primary : borderColor}`,
+                  opacity: disabled ? 0.45 : 1, transition: 'all .2s',
+                  boxShadow: isSel ? `0 0 0 1px ${primary}` : 'none',
+                  position: 'relative',
+                  background: dark ? 'rgba(255,255,255,.04)' : '#fff',
+                }}>
+                {/* Image */}
+                <div style={{ aspectRatio: '4/3', background: dark ? 'rgba(255,255,255,.06)' : '#f0ece8', overflow: 'hidden' }}>
+                  {item.image_url ? (
+                    <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .3s' }} />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: dark ? 'rgba(255,255,255,.15)' : 'rgba(0,0,0,.12)', fontSize: 36 }}>🍽</div>
+                  )}
+                </div>
+                {/* Selection badge */}
+                {isSelectable && isSel && (
+                  <div style={{
+                    position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 13,
+                    background: primary, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 2px 8px rgba(0,0,0,.3)',
+                  }}>
+                    <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, lineHeight: 1 }}>✓</span>
+                  </div>
+                )}
+                {isSelectable && isRadio && !isSel && (
+                  <div style={{
+                    position: 'absolute', top: 8, right: 8, width: 24, height: 24, borderRadius: 12,
+                    border: '2px solid rgba(255,255,255,.7)', background: 'rgba(0,0,0,.2)',
+                  }} />
+                )}
+                {isSelectable && !isRadio && !isSel && !disabled && (
+                  <div style={{
+                    position: 'absolute', top: 8, right: 8, width: 24, height: 24, borderRadius: 6,
+                    border: '2px solid rgba(255,255,255,.6)', background: 'rgba(0,0,0,.15)',
+                  }} />
+                )}
+                {/* Text content */}
+                <div style={{ padding: '10px 12px' }}>
+                  <div style={{ fontSize: '.82rem', fontWeight: 600, color: textColor, lineHeight: 1.3 }}>{item.name}</div>
+                  {item.description && <div style={{ fontSize: '.7rem', color: subColor, marginTop: 3, lineHeight: 1.4 }}>{item.description}</div>}
+                  {showSupplements && item.extra_price && (
+                    <div style={{ fontSize: '.72rem', fontWeight: 600, color: primary, marginTop: 4 }}>+{item.extra_price}/pers.</div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        /* ── List mode (with optional 60×60 thumbnail) ── */
+        <div className={styles.wpCourseItems}>
+          {course.items.map((item, i) => {
+            const hasImg = !!item.image_url
+            if (mode === 'fixed') {
+              return (
+                <div key={i} className={styles.wpItem} style={{ display: 'flex', alignItems: 'center', gap: hasImg ? 12 : undefined }}>
+                  {hasImg ? (
+                    <img src={item.image_url} alt="" style={{ width: 60, height: 60, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                  ) : (
+                    <span className={styles.wpItemBullet}>•</span>
+                  )}
+                  <div className={styles.wpItemBody}>
+                    <div className={styles.wpItemName}>{item.name}</div>
+                    {item.description && <div className={styles.wpItemDesc}>{item.description}</div>}
+                  </div>
+                  {showSupplements && item.extra_price && <span className={styles.wpItemExtra}>+{item.extra_price}/pers.</span>}
+                </div>
+              )
+            }
+            const isSel = selected.includes(item.name)
+            const isRadio = mode === 'pick_one'
+            return (
+              <div key={i} className={cx(styles.wpItem, styles.wpItemPick, isSel && styles.wpItemPickSel)}
+                onClick={() => onToggle(courseKey, item.name, mode as 'pick_one' | 'pick_n', pickCount)}
+                style={{ display: 'flex', alignItems: 'center', gap: hasImg ? 12 : undefined }}>
+                <div className={cx(styles.wpItemCheck, isRadio && styles.wpItemCheckRound)} aria-hidden="true">
+                  {isRadio ? <span className={styles.wpItemCheckDot} /> : <span className={styles.wpItemCheckTick}>✓</span>}
+                </div>
+                {hasImg && (
+                  <img src={item.image_url} alt="" style={{ width: 60, height: 60, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                )}
                 <div className={styles.wpItemBody}>
                   <div className={styles.wpItemName}>{item.name}</div>
                   {item.description && <div className={styles.wpItemDesc}>{item.description}</div>}
                 </div>
-                {item.extra_price && <span className={styles.wpItemExtra}>+{item.extra_price}/pers.</span>}
+                {showSupplements && item.extra_price && <span className={styles.wpItemExtra}>+{item.extra_price}/pers.</span>}
               </div>
             )
-          }
-          const isSel = selected.includes(item.name)
-          const isRadio = mode === 'pick_one'
-          return (
-            <div key={i} className={cx(styles.wpItem, styles.wpItemPick, isSel && styles.wpItemPickSel)}
-              onClick={() => onToggle(courseKey, item.name, mode as 'pick_one' | 'pick_n', pickCount)}>
-              <div className={cx(styles.wpItemCheck, isRadio && styles.wpItemCheckRound)} aria-hidden="true">
-                {isRadio ? <span className={styles.wpItemCheckDot} /> : <span className={styles.wpItemCheckTick}>✓</span>}
-              </div>
-              <div className={styles.wpItemBody}>
-                <div className={styles.wpItemName}>{item.name}</div>
-                {item.description && <div className={styles.wpItemDesc}>{item.description}</div>}
-              </div>
-              {item.extra_price && <span className={styles.wpItemExtra}>+{item.extra_price}/pers.</span>}
-            </div>
-          )
-        })}
-      </div>
+          })}
+        </div>
+      )}
+
+      {/* Guest distribution for pick_n with multiple selections */}
+      {mode === 'pick_n' && selected.length > 1 && menuGuests > 0 && onDistributionChange && (
+        <GuestDistribution
+          items={selected.map(name => ({ id: name, label: name }))}
+          totalGuests={menuGuests}
+          distribution={distribution ?? {}}
+          onChange={(itemName, count) => onDistributionChange(itemName, count)}
+          primary={primary}
+          dark={dark}
+        />
+      )}
     </div>
   )
 }

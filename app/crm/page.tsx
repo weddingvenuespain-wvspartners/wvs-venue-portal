@@ -14,7 +14,7 @@ import {
   Users, CheckCircle2, Crown, AlertTriangle, Merge,
 } from 'lucide-react'
 import type { Client, ClientType, ClientWithStats } from '@/lib/clients'
-import { CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS } from '@/lib/clients'
+import { CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS, isProfessional } from '@/lib/clients'
 import ImportContactsModal from '@/components/ImportContactsModal'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -108,7 +108,7 @@ export default function CrmListPage() {
       const clientLeads = rawLeads.filter((l: any) => l.client_id === c.id)
       const activeLeads = clientLeads.filter((l: any) => l.status !== 'won' && l.status !== 'lost')
       const lastLead = [...clientLeads].sort((a: any, b: any) => b.created_at.localeCompare(a.created_at))[0]
-      const coupleCount = c.client_type === 'wedding_planner'
+      const coupleCount = isProfessional(c.client_type)
         ? rawClients.filter(rc => rc.parent_client_id === c.id).length
         : undefined
       return {
@@ -132,7 +132,7 @@ export default function CrmListPage() {
     const total = clients.length
     const withActive = clients.filter(c => c.active_leads > 0).length
     const confirmed = clients.filter(c => (c as any)._latestLead?.status === 'won').length
-    const wps = clients.filter(c => c.client_type === 'wedding_planner').length
+    const wps = clients.filter(c => isProfessional(c.client_type)).length
     return { total, withActive, confirmed, wps }
   }, [clients])
 
@@ -228,7 +228,7 @@ export default function CrmListPage() {
 
     // View tab filter
     if (viewTab === 'planners') {
-      list = list.filter(c => c.client_type === 'wedding_planner')
+      list = list.filter(c => isProfessional(c.client_type))
     }
 
     if (typeFilter !== 'all' && viewTab !== 'planners') {
@@ -392,7 +392,7 @@ export default function CrmListPage() {
             { label: 'Total contactos', value: kpis.total, icon: <Users size={16} />, color: '#5F6196', bg: '#eef2ff' },
             { label: 'Con leads activos', value: kpis.withActive, icon: <Heart size={16} />, color: '#AC8B4C', bg: '#F7F3E8' },
             { label: 'Confirmados', value: kpis.confirmed, icon: <CheckCircle2 size={16} />, color: '#5C8570', bg: '#EDF2ED' },
-            { label: 'Wedding Planners', value: kpis.wps, icon: <Crown size={16} />, color: '#7E72A0', bg: '#F2F1F8' },
+            { label: 'Colaboradores', value: kpis.wps, icon: <Crown size={16} />, color: '#7E72A0', bg: '#F2F1F8' },
           ].map(kpi => (
             <div key={kpi.label} style={{ background: '#fff', borderRadius: 10, border: '1px solid var(--border)', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ width: 38, height: 38, borderRadius: 10, background: kpi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: kpi.color, flexShrink: 0 }}>
@@ -432,7 +432,7 @@ export default function CrmListPage() {
         <div style={{ display: 'inline-flex', gap: 0, background: '#fff', borderRadius: '8px 8px 0 0', border: '1px solid var(--border)', borderBottom: '2px solid var(--border)', marginBottom: 16 }}>
           {([
             { key: 'todos' as ViewTab, label: 'Todos', icon: null as React.ReactNode, count: clients.length },
-            { key: 'planners' as ViewTab, label: 'Wedding Planners', icon: <Crown size={14} /> as React.ReactNode, count: kpis.wps },
+            { key: 'planners' as ViewTab, label: 'Colaboradores', icon: <Crown size={14} /> as React.ReactNode, count: kpis.wps },
           ]).map(t => (
             <button key={t.key} onClick={() => setViewTab(t.key)}
               style={{
@@ -517,7 +517,7 @@ export default function CrmListPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {filtered.map(c => {
               const tc = CLIENT_TYPE_COLORS[c.client_type] ?? CLIENT_TYPE_COLORS.otro
-              const isWP = c.client_type === 'wedding_planner'
+              const isWP = isProfessional(c.client_type)
               const ll = (c as any)._latestLead
               const parentName = (c as any)._parentName
               const hasNotes = !!(c.notes && c.notes.trim())
@@ -731,27 +731,77 @@ export default function CrmListPage() {
 
         {/* ── New Client Modal ────────────────────────────────────────── */}
         <Dialog open={showNewModal} onOpenChange={setShowNewModal}>
-          <DialogContent style={{ maxWidth: 440 }}>
-            <DialogTitle>Nuevo contacto</DialogTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
-              <input className="form-input" placeholder="Nombre *" value={newForm.name} onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))} />
-              <input className="form-input" placeholder="Email" value={newForm.email} onChange={e => setNewForm(f => ({ ...f, email: e.target.value }))} />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input className="form-input" placeholder="Teléfono" style={{ flex: 1 }} value={newForm.phone} onChange={e => setNewForm(f => ({ ...f, phone: e.target.value }))} />
-                <input className="form-input" placeholder="WhatsApp" style={{ flex: 1 }} value={newForm.whatsapp} onChange={e => setNewForm(f => ({ ...f, whatsapp: e.target.value }))} />
+          <DialogContent style={{ maxWidth: 460, padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '20px 24px 16px' }}>
+              <DialogTitle style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)', margin: 0 }}>Nuevo contacto</DialogTitle>
+              <p style={{ fontSize: 12, color: 'var(--warm-gray)', margin: '4px 0 0' }}>Añade un contacto a tu CRM</p>
+            </div>
+
+            {/* Type selector — visual pills */}
+            <div style={{ padding: '0 24px 16px' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Tipo de contacto</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                {([
+                  { type: 'pareja' as ClientType, label: 'Pareja', icon: '💍', desc: 'Pareja directa' },
+                  { type: 'wedding_planner' as ClientType, label: 'Wedding Planner', icon: '👑', desc: 'Planificador de bodas' },
+                  { type: 'organizador' as ClientType, label: 'Organizador', icon: '📋', desc: 'Organizador de eventos' },
+                  { type: 'empresa' as ClientType, label: 'Empresa', icon: '🏢', desc: 'Empresa o agencia' },
+                  { type: 'cliente' as ClientType, label: 'Cliente', icon: '👤', desc: 'Cliente particular' },
+                  { type: 'otro' as ClientType, label: 'Otro', icon: '📌', desc: 'Otro tipo' },
+                ]).map(opt => {
+                  const selected = newForm.client_type === opt.type
+                  const colors = CLIENT_TYPE_COLORS[opt.type]
+                  return (
+                    <button key={opt.type} onClick={() => setNewForm(f => ({ ...f, client_type: opt.type }))}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                        padding: '10px 6px 8px', borderRadius: 10, border: `1.5px solid ${selected ? colors.border : 'var(--border)'}`,
+                        background: selected ? colors.bg : '#fff', cursor: 'pointer', transition: 'all .15s',
+                        transform: selected ? 'scale(1.02)' : 'none',
+                      }}
+                      onMouseEnter={e => { if (!selected) { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.background = colors.bg + '66' } }}
+                      onMouseLeave={e => { if (!selected) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = '#fff' } }}>
+                      <span style={{ fontSize: 18, lineHeight: 1 }}>{opt.icon}</span>
+                      <span style={{ fontSize: 11, fontWeight: selected ? 700 : 500, color: selected ? colors.color : 'var(--charcoal)', textAlign: 'center', lineHeight: 1.2 }}>{opt.label}</span>
+                    </button>
+                  )
+                })}
               </div>
-              <Select value={newForm.client_type} onValueChange={(v: string) => setNewForm(f => ({ ...f, client_type: v as ClientType }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(CLIENT_TYPE_LABELS) as ClientType[]).map(t => (
-                    <SelectItem key={t} value={t}>{CLIENT_TYPE_LABELS[t]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <button onClick={handleCreate} disabled={saving || !newForm.name.trim()}
-                style={{ padding: '10px', fontSize: 13, fontWeight: 600, color: '#fff', background: 'var(--gold)', border: 'none', borderRadius: 8, cursor: 'pointer', opacity: saving || !newForm.name.trim() ? 0.5 : 1 }}>
-                {saving ? 'Guardando...' : 'Crear contacto'}
-              </button>
+              {isProfessional(newForm.client_type) && (
+                <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#f3e8ff', fontSize: 11, color: '#5A4878', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Crown size={12} /> Podrás vincular parejas, peticiones y colaboraciones
+                </div>
+              )}
+            </div>
+
+            {/* Form fields */}
+            <div style={{ padding: '0 24px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4, display: 'block' }}>Nombre *</label>
+                <input className="form-input" placeholder={isProfessional(newForm.client_type) ? 'Nombre o nombre de empresa' : 'Nombre completo'} value={newForm.name} onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))} autoFocus />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4, display: 'block' }}>Email</label>
+                <input className="form-input" placeholder="email@ejemplo.com" value={newForm.email} onChange={e => setNewForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4, display: 'block' }}>Teléfono</label>
+                  <input className="form-input" placeholder="+34 600..." value={newForm.phone} onChange={e => setNewForm(f => ({ ...f, phone: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4, display: 'block' }}>WhatsApp</label>
+                  <input className="form-input" placeholder="+34 600..." value={newForm.whatsapp} onChange={e => setNewForm(f => ({ ...f, whatsapp: e.target.value }))} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowNewModal(false)}>Cancelar</button>
+                <button onClick={handleCreate} disabled={saving || !newForm.name.trim()}
+                  style={{ padding: '8px 20px', fontSize: 13, fontWeight: 600, color: '#fff', background: 'var(--gold)', border: 'none', borderRadius: 8, cursor: 'pointer', opacity: saving || !newForm.name.trim() ? 0.5 : 1, transition: 'opacity .15s' }}>
+                  {saving ? 'Guardando...' : 'Crear contacto'}
+                </button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

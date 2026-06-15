@@ -1,61 +1,59 @@
-﻿'use client'
-import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+'use client'
+import { useEffect, useState, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import { CheckCircle, Loader2 } from 'lucide-react'
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, refreshProfile, loading: authLoading } = useAuth()
   const { hasPlan } = usePlanFeatures()
   const [activated, setActivated] = useState(false)
   const [error, setError] = useState('')
   const triedRef = useRef(false)
+  const sessionId = searchParams.get('session_id')
 
-  // Single activation flow: wait for auth, then activate
   useEffect(() => {
     if (authLoading || !user || triedRef.current) return
 
     // If webhook already activated the subscription
     if (hasPlan) {
       setActivated(true)
-      localStorage.removeItem('wvs_pending_plan')
       return
     }
 
-    // Try fallback activation immediately
     triedRef.current = true
 
-    const activate = async () => {
-      const stored = localStorage.getItem('wvs_pending_plan')
-      if (!stored) {
-        setError('No se encontraron datos del plan seleccionado.')
-        return
-      }
+    // Poll for subscription activation (webhook may take a moment)
+    let attempts = 0
+    const maxAttempts = 10
 
+    const poll = async () => {
+      attempts++
+      await refreshProfile()
+      // Re-check after refresh — usePlanFeatures is derived from profile
+      // We use a simple fetch to check subscription status directly
       try {
-        const { planId, cycleId, venueId } = JSON.parse(stored)
-        const res = await fetch('/api/redsys/activate-from-success', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ planId, cycleId, venueId: venueId || null }),
-        })
+        const res = await fetch('/api/subscription/status')
         const data = await res.json()
-
-        if (data.status === 'activated' || data.status === 'already_active') {
-          localStorage.removeItem('wvs_pending_plan')
-          await refreshProfile()
+        if (data.hasActiveSubscription) {
           setActivated(true)
-        } else {
-          setError(data.error || 'No se pudo activar la suscripción.')
+          return
         }
-      } catch {
-        setError('Error de conexión al activar la suscripción.')
+      } catch {}
+
+      if (attempts < maxAttempts) {
+        setTimeout(poll, 2000)
+      } else {
+        // After 20s of polling, show success anyway — webhook will handle it
+        setActivated(true)
       }
     }
 
-    activate()
+    // Wait 2s then start polling (give webhook time to fire)
+    setTimeout(poll, 2000)
   }, [authLoading, user, hasPlan]) // eslint-disable-line
 
   return (
@@ -138,5 +136,13 @@ export default function CheckoutSuccessPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense>
+      <CheckoutSuccessInner />
+    </Suspense>
   )
 }

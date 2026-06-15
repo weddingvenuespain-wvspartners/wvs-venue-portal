@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
-import { Plus, Edit2, ToggleLeft, ToggleRight, ArrowLeft, Trash2, Check, X, Eye, EyeOff, Users, AlertTriangle, Clock, Landmark as LandmarkIcon, ClipboardList, Search } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, ArrowLeft, Trash2, Check, X, Eye, EyeOff, Users, AlertTriangle, Clock, Landmark as LandmarkIcon, ClipboardList, Search, Copy, History, ChevronDown, ChevronUp } from 'lucide-react'
 import type { PlanFeatures } from '@/lib/use-plan-features'
 import { type BillingCycle, EMPTY_CYCLE, CYCLE_PRESETS } from '@/lib/billing-types'
 
@@ -56,6 +56,9 @@ type Plan = {
   is_active: boolean
   visible_on_web: boolean
   target_role: TargetRole
+  sort_order: number
+  comparison_text: string | null
+  grace_period_days: number
   created_at: string
   // loaded client-side
   subscriber_count?: number
@@ -73,6 +76,9 @@ const EMPTY_PLAN: PlanForm = {
   is_active: true,
   visible_on_web: true,
   target_role: 'venue_owner',
+  sort_order: 0,
+  comparison_text: null,
+  grace_period_days: 3,
 }
 
 // ─── Billing cycle row editor ─────────────────────────────────────────────────
@@ -177,6 +183,9 @@ export default function PlanesPage() {
   const [confirmDelete, setConfirmDelete] = useState<Plan | null>(null)
   const [deactivateWarning, setDeactivateWarning] = useState<Plan | null>(null)
   const [plansTab, setPlansTab]           = useState<TargetRole>('venue_owner')
+  const [historyPlan, setHistoryPlan]     = useState<Plan | null>(null)
+  const [history, setHistory]             = useState<any[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   // Trial config state
   const [trialConfig, setTrialConfig]       = useState<TrialConfig>({ is_active: true, trial_days: 14, trial_plan_id: null })
@@ -285,8 +294,46 @@ export default function PlanesPage() {
       is_active: plan.is_active,
       visible_on_web: plan.visible_on_web ?? true,
       target_role: plan.target_role ?? 'venue_owner',
+      sort_order: plan.sort_order ?? 0,
+      comparison_text: plan.comparison_text ?? null,
+      grace_period_days: plan.grace_period_days ?? 3,
     })
     setShowModal(true)
+  }
+
+  const duplicatePlan = (plan: Plan) => {
+    setEditing(null)
+    setForm({
+      name: plan.name + '_copy',
+      display_name: (plan.display_name || plan.name) + ' (copia)',
+      description: plan.description || '',
+      trial_days: plan.trial_days ?? 14,
+      billing_cycles: plan.billing_cycles?.length ? [...plan.billing_cycles] : [{ ...CYCLE_PRESETS[0] }],
+      permissions: plan.permissions ? { ...plan.permissions } : { ...PERMISSIONS_BASIC },
+      is_active: false, // start inactive
+      visible_on_web: false,
+      target_role: plan.target_role ?? 'venue_owner',
+      sort_order: (plan.sort_order ?? 0) + 1,
+      comparison_text: plan.comparison_text ?? null,
+      grace_period_days: plan.grace_period_days ?? 3,
+    })
+    setShowModal(true)
+  }
+
+  const loadHistory = async (plan: Plan) => {
+    setHistoryPlan(plan)
+    setHistoryLoading(true)
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('venue_plan_history')
+        .select('*')
+        .eq('plan_id', plan.id)
+        .order('created_at', { ascending: false })
+        .limit(50)
+      setHistory(data || [])
+    } catch {}
+    setHistoryLoading(false)
   }
 
   const setCycles = (fn: (c: BillingCycle[]) => BillingCycle[]) =>
@@ -313,15 +360,18 @@ export default function PlanesPage() {
     setSaving(true)
     const supabase = createClient()
     const payload = {
-      name:           form.name.trim(),
-      display_name:   form.display_name?.trim() || null,
-      description:    form.description || null,
-      trial_days:     form.trial_days || 14,
-      billing_cycles: form.billing_cycles,
-      permissions:    form.permissions || PERMISSIONS_BASIC,
-      is_active:      form.is_active,
-      visible_on_web: form.visible_on_web,
-      target_role:    form.target_role || 'venue_owner',
+      name:              form.name.trim(),
+      display_name:      form.display_name?.trim() || null,
+      description:       form.description || null,
+      trial_days:        form.trial_days || 14,
+      billing_cycles:    form.billing_cycles,
+      permissions:       form.permissions || PERMISSIONS_BASIC,
+      is_active:         form.is_active,
+      visible_on_web:    form.visible_on_web,
+      target_role:       form.target_role || 'venue_owner',
+      sort_order:        form.sort_order ?? 0,
+      comparison_text:   form.comparison_text?.trim() || null,
+      grace_period_days: form.grace_period_days ?? 3,
     }
     try {
       if (editing) {
@@ -536,121 +586,132 @@ export default function PlanesPage() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
-            {plans.filter(p => (p.target_role ?? 'venue_owner') === plansTab).map(plan => {
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 20 }}>
+            {plans.filter(p => (p.target_role ?? 'venue_owner') === plansTab).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)).map((plan, idx) => {
               const perms: Record<string, unknown> = plan.permissions ?? {}
               const enabled  = FEATURE_DEFS.filter(f => !f.dangerous && perms[f.key] === true)
               const restricted = FEATURE_DEFS.filter(f => f.dangerous && perms[f.key] === true)
               const cycles   = plan.billing_cycles ?? []
+              const isPremiumLook = plan.name.toLowerCase().includes('premium') || (plan.sort_order ?? 0) >= 1
               return (
-                <div key={plan.id} className="card" style={{ opacity: plan.is_active ? 1 : 0.6 }}>
-                  <div className="card-body">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                      <div>
-                        <div style={{ fontSize: 17, fontWeight: 600, fontFamily: 'Inter, sans-serif', color: 'var(--espresso)' }}>
-                          {plan.display_name || plan.name}
+                <div key={plan.id} className="card" style={{
+                  opacity: plan.is_active ? 1 : 0.55,
+                  border: isPremiumLook ? '2px solid var(--gold)' : undefined,
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}>
+                  {/* Premium accent bar */}
+                  {isPremiumLook && (
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'var(--gold)' }} />
+                  )}
+
+                  <div className="card-body" style={{ padding: '24px' }}>
+                    {/* ── Header ── */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                          <span style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Inter, sans-serif', color: 'var(--espresso)' }}>
+                            {plan.display_name || plan.name}
+                          </span>
+                          {(plan.sort_order ?? 0) > 0 && (
+                            <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, background: 'rgba(196,151,90,0.1)', color: 'var(--gold)', fontWeight: 700 }}>
+                              #{plan.sort_order}
+                            </span>
+                          )}
                         </div>
-                        <div style={{ fontSize: 10, color: 'var(--warm-gray)', fontFamily: 'monospace', marginTop: 1 }}>slug: {plan.name}</div>
-                        {plan.description && <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 3 }}>{plan.description}</div>}
+                        {plan.description && <div style={{ fontSize: 12, color: 'var(--warm-gray)', lineHeight: 1.4 }}>{plan.description}</div>}
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                         <span className={`badge ${plan.is_active ? 'badge-active' : 'badge-inactive'}`}>
                           {plan.is_active ? 'Activo' : 'Inactivo'}
                         </span>
-                        <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                           {(plan.subscriber_count ?? 0) > 0 && (
-                            <span style={{ fontSize: 10, background: '#EFF3F7', color: '#3D5E78', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
-                              <Users size={9} style={{ display: 'inline', marginRight: 3 }} />
-                              {plan.subscriber_count} suscriptor{plan.subscriber_count !== 1 ? 'es' : ''}
+                            <span style={{ fontSize: 10, background: 'rgba(61,94,120,0.08)', color: '#3D5E78', padding: '2px 8px', borderRadius: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}>
+                              <Users size={9} />
+                              {plan.subscriber_count}
                             </span>
                           )}
                           <span style={{
-                            fontSize: 10, padding: '1px 7px', borderRadius: 10, fontWeight: 600,
-                            background: plan.visible_on_web ? '#EEF2EC' : '#f9fafb',
+                            fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 500,
+                            background: plan.visible_on_web ? 'rgba(74,107,82,0.08)' : '#f9fafb',
                             color: plan.visible_on_web ? '#4A6B52' : '#9ca3af',
+                            display: 'flex', alignItems: 'center', gap: 3,
                           }}>
-                            {plan.visible_on_web ? <><Eye size={9} style={{ display: 'inline', marginRight: 3 }} />En web</> : <><EyeOff size={9} style={{ display: 'inline', marginRight: 3 }} />Oculto web</>}
+                            {plan.visible_on_web ? <><Eye size={9} />Web</> : <><EyeOff size={9} />Oculto</>}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Billing cycles */}
+                    {/* ── Pricing ── */}
                     {cycles.length > 0 && (
-                      <div style={{ marginBottom: 14 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 7 }}>
-                          Ciclos de pago
-                        </div>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          {cycles.map(c => (
-                            <div key={c.id} style={{ background: 'var(--cream)', borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 80 }}>
-                              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Inter, sans-serif' }}>{c.price}€</div>
-                              <div style={{ fontSize: 10, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{c.label}</div>
-                              {c.commitment_months > 0 && (
-                                <div style={{ fontSize: 9, color: 'var(--warm-gray)', marginTop: 2 }}>{c.commitment_months}m mín.</div>
+                      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+                        {cycles.map(c => {
+                          const monthlyEquiv = c.interval_months > 1 ? Math.round(c.price / c.interval_months) : null
+                          return (
+                            <div key={c.id} style={{
+                              background: isPremiumLook ? 'rgba(196,151,90,0.06)' : 'var(--cream)',
+                              border: `1px solid ${isPremiumLook ? 'rgba(196,151,90,0.2)' : 'var(--ivory)'}`,
+                              borderRadius: 10, padding: '10px 16px', textAlign: 'center', minWidth: 90, flex: 1,
+                            }}>
+                              <div style={{ fontSize: 22, fontWeight: 700, color: isPremiumLook ? 'var(--gold)' : 'var(--espresso)', fontFamily: 'Inter, sans-serif', lineHeight: 1 }}>
+                                {c.price}€
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 3, fontWeight: 500 }}>{c.label}</div>
+                              {monthlyEquiv !== null && (
+                                <div style={{ fontSize: 9, color: '#4A6B52', marginTop: 2, fontWeight: 600 }}>{monthlyEquiv}€/mes</div>
                               )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* ── Features (compact list) ── */}
+                    {enabled.length > 0 && (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px' }}>
+                          {enabled.map(f => (
+                            <div key={f.key} style={{ fontSize: 11, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: 5, padding: '2px 0' }}>
+                              <Check size={11} color={f.tier === 'premium' ? '#C4975A' : '#4A6B52'} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                              <span>{f.label}</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
-
-                    {/* Trial (global) */}
-                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 12 }}>
-                      <Clock size={11} style={{ display: 'inline', verticalAlign: 'middle' }} />
-                      {' '}Trial global:{' '}
-                      <strong style={{ color: trialConfig.is_active ? 'var(--gold)' : 'var(--warm-gray)' }}>
-                        {trialConfig.is_active ? `${trialConfig.trial_days} días` : 'desactivado'}
-                      </strong>
-                      &nbsp;·&nbsp; <LandmarkIcon size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Domiciliación SEPA
-                      &nbsp;·&nbsp; Preaviso: <strong>{cycles[0]?.cancel_notice_days ?? 15} días</strong>
-                    </div>
-
-                    {/* Features */}
-                    {enabled.length > 0 && (
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Funcionalidades</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                          {enabled.map(f => (
-                            <span key={f.key} style={{
-                              fontSize: 11, padding: '2px 8px', borderRadius: 20,
-                              background: f.tier === 'premium' ? '#F6F1E4' : '#EEF2EC',
-                              color:      f.tier === 'premium' ? '#7A5A2E'  : '#4A6B52',
-                              border: `1px solid ${f.tier === 'premium' ? '#E2D4AE' : '#D2DFD3'}`,
-                              fontWeight: 500,
-                            }}>✓ {f.label}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                     {restricted.length > 0 && (
-                      <div style={{ marginBottom: 10, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                      <div style={{ marginBottom: 14, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                         {restricted.map(f => (
-                          <span key={f.key} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#FAF4F3', color: '#B0473E', border: '1px solid #E0C2BD', fontWeight: 500 }}>✕ {f.label}</span>
+                          <span key={f.key} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#FAF4F3', color: '#B0473E', border: '1px solid #E0C2BD', fontWeight: 500 }}>✕ {f.label}</span>
                         ))}
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', gap: 8, paddingTop: 12, borderTop: '1px solid var(--ivory)' }}>
+                    {/* ── Comparison text badge ── */}
+                    {plan.comparison_text && (
+                      <div style={{ fontSize: 11, padding: '6px 10px', borderRadius: 6, background: 'rgba(196,151,90,0.06)', border: '1px solid rgba(196,151,90,0.15)', color: '#7A5A2E', marginBottom: 14 }}>
+                        Texto pricing: &ldquo;{plan.comparison_text}&rdquo;
+                      </div>
+                    )}
+
+                    {/* ── Actions ── */}
+                    <div style={{ display: 'flex', gap: 6, paddingTop: 14, borderTop: '1px solid var(--ivory)' }}>
                       <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => openEdit(plan)}>
                         <Edit2 size={12} /> Editar
                       </button>
-                      {/* Visible en web toggle */}
-                      <button className="btn btn-ghost btn-sm" title={plan.visible_on_web ? 'Ocultar de la web' : 'Mostrar en la web'}
-                        onClick={() => handleToggleWeb(plan)}>
-                        {plan.visible_on_web ? <Eye size={14} style={{ color: '#4A6B52' }} /> : <EyeOff size={14} style={{ color: '#9ca3af' }} />}
+                      <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => duplicatePlan(plan)}>
+                        <Copy size={12} /> Duplicar
                       </button>
-                      {/* Activar/desactivar */}
-                      <button className="btn btn-ghost btn-sm" title={plan.is_active ? 'Desactivar plan' : 'Activar plan'}
-                        onClick={() => handleToggleActive(plan)}>
-                        {plan.is_active ? <ToggleRight size={14} style={{ color: 'var(--gold)' }} /> : <ToggleLeft size={14} />}
+                      <button className="btn btn-ghost btn-sm" onClick={() => loadHistory(plan)} title="Historial de cambios">
+                        <History size={13} />
                       </button>
-                      {/* Borrar — disabled si tiene suscriptores */}
                       <button className="btn btn-ghost btn-sm"
                         title={(plan.subscriber_count ?? 0) > 0 ? 'No se puede eliminar: tiene suscriptores activos' : 'Eliminar plan'}
                         onClick={() => (plan.subscriber_count ?? 0) === 0 && setConfirmDelete(plan)}
                         style={{ opacity: (plan.subscriber_count ?? 0) > 0 ? 0.35 : 1, cursor: (plan.subscriber_count ?? 0) > 0 ? 'not-allowed' : 'pointer' }}>
-                        <Trash2 size={13} style={{ color: '#A8443B' }} />
+                        <Trash2 size={12} style={{ color: '#A8443B' }} />
                       </button>
                     </div>
                   </div>
@@ -694,6 +755,28 @@ export default function PlanesPage() {
               <div style={{ background: 'rgba(196,151,90,0.07)', border: '1px solid rgba(196,151,90,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: 'var(--warm-gray)', display: 'flex', alignItems: 'center', gap: 7 }}>
                 <Clock size={11} color="var(--gold)" style={{ flexShrink: 0 }} />
                 El período de trial se configura globalmente en la sección <strong style={{ color: 'var(--charcoal)' }}>Prueba gratuita</strong> de esta misma página, no por plan.
+              </div>
+
+              {/* Sort order + comparison text + grace period */}
+              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 100px', gap: 10, marginTop: 4 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Orden</label>
+                  <input className="form-input" type="number" value={form.sort_order ?? 0}
+                    onChange={e => setForm(f => ({ ...f, sort_order: parseInt(e.target.value) || 0 }))}
+                    title="Menor = aparece primero en pricing" />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Texto comparativo <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>(ej: Todo lo de Básico +)</span></label>
+                  <input className="form-input" value={form.comparison_text || ''}
+                    onChange={e => setForm(f => ({ ...f, comparison_text: e.target.value }))}
+                    placeholder="Todo lo incluido en Básico, más..." />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Gracia (días)</label>
+                  <input className="form-input" type="number" min={0} max={30} value={form.grace_period_days ?? 3}
+                    onChange={e => setForm(f => ({ ...f, grace_period_days: parseInt(e.target.value) || 3 }))}
+                    title="Días tras fallo de pago antes de suspender" />
+                </div>
               </div>
 
               {/* Tipo de usuario */}
@@ -891,6 +974,60 @@ export default function PlanesPage() {
             <div className="modal-footer">
               <button className="btn btn-ghost" onClick={() => setConfirmDelete(null)}>Cancelar</button>
               <button className="btn btn-danger" onClick={() => handleDelete(confirmDelete)}>Sí, eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── History modal ── */}
+      {historyPlan && (
+        <div className="modal-overlay" onClick={() => setHistoryPlan(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
+            <div className="modal-header">
+              <div className="modal-title">
+                <History size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6 }} />
+                Historial: {historyPlan.display_name || historyPlan.name}
+              </div>
+            </div>
+            <div className="modal-body" style={{ maxHeight: 400, overflowY: 'auto' }}>
+              {historyLoading ? (
+                <div style={{ textAlign: 'center', padding: 30, color: 'var(--warm-gray)', fontSize: 13 }}>Cargando...</div>
+              ) : history.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 30, color: 'var(--warm-gray)', fontSize: 13 }}>
+                  Sin historial de cambios. Se registrarán a partir de ejecutar la migración SQL.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {history.map((h: any) => (
+                    <div key={h.id} style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--cream)', border: '1px solid var(--ivory)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 600, padding: '1px 8px', borderRadius: 4,
+                          background: h.action === 'created' ? '#EEF2EC' : h.action === 'deleted' ? '#FAF4F3' : '#EFF3F7',
+                          color: h.action === 'created' ? '#4A6B52' : h.action === 'deleted' ? '#B0473E' : '#3D5E78',
+                        }}>
+                          {h.action === 'created' ? 'Creado' : h.action === 'updated' ? 'Modificado' : h.action === 'activated' ? 'Activado' : h.action === 'deactivated' ? 'Desactivado' : h.action}
+                        </span>
+                        <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+                          {new Date(h.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      {h.changes && Object.keys(h.changes).length > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4 }}>
+                          {Object.entries(h.changes).map(([field, change]: [string, any]) => (
+                            <div key={field} style={{ marginBottom: 2 }}>
+                              <strong style={{ color: 'var(--charcoal)' }}>{field}</strong>: {JSON.stringify(change.old)} → {JSON.stringify(change.new)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setHistoryPlan(null)}>Cerrar</button>
             </div>
           </div>
         </div>

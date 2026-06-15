@@ -3,7 +3,7 @@
 // de una propuesta concreta. Se integra en el tab "Menús" de ProposalEditor.
 
 import { useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, X, GripVertical, Upload, FileText, Sparkles, Undo2, Wine, UtensilsCrossed, Moon, PartyPopper, Eye, EyeOff, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, X, GripVertical, Upload, FileText, Sparkles, Undo2, Wine, UtensilsCrossed, Moon, PartyPopper, Eye, EyeOff, Plus, Trash2, ImagePlus, LayoutGrid, List } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import DatePicker from '@/components/DatePicker'
@@ -202,7 +202,7 @@ export default function ProposalMenuEditor({
     const newCourses = courses.map((c, idx) => idx === ci ? { ...c, items: [...c.items, { name: '' }] } : c)
     updateMenu(mi, { courses: newCourses })
   }
-  const updateItem = (mi: number, ci: number, ii: number, patch: Partial<{ name: string; description: string; extra_price: string }>) => {
+  const updateItem = (mi: number, ci: number, ii: number, patch: Partial<{ name: string; description: string; extra_price: string; image_url: string }>) => {
     const courses = menus[mi].courses ?? []
     const newCourses = courses.map((c, idx) => idx === ci
       ? { ...c, items: c.items.map((it, iii) => iii === ii ? { ...it, ...patch } : it) }
@@ -215,6 +215,34 @@ export default function ProposalMenuEditor({
       ? { ...c, items: c.items.filter((_, iii) => iii !== ii) }
       : c)
     updateMenu(mi, { courses: newCourses })
+  }
+
+  const [uploadingItem, setUploadingItem] = useState<string | null>(null) // "mi-ci-ii"
+  const uploadDishImage = async (mi: number, ci: number, ii: number, file: File) => {
+    const key = `${mi}-${ci}-${ii}`
+    setUploadingItem(key)
+    try {
+      const form = new FormData(); form.append('file', file)
+      const res = await fetch('/api/upload', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) { console.error('Upload error:', data); return }
+      updateItem(mi, ci, ii, { image_url: data.url })
+    } catch (err) { console.error('Upload failed:', err) }
+    finally { setUploadingItem(null) }
+  }
+
+  // Generic image upload — returns URL or null
+  const [uploadingKey, setUploadingKey] = useState<string | null>(null)
+  const uploadImage = async (key: string, file: File, onDone: (url: string) => void) => {
+    setUploadingKey(key)
+    try {
+      const form = new FormData(); form.append('file', file)
+      const res = await fetch('/api/upload', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) { console.error('Upload error:', data); return }
+      onDone(data.url)
+    } catch (err) { console.error('Upload failed:', err) }
+    finally { setUploadingKey(null) }
   }
 
   // ─── Extras helpers ────────────────────────────────────────────────────────
@@ -286,6 +314,42 @@ export default function ProposalMenuEditor({
           style={{ fontSize: 12 }}
           title="Mínimo de comensales para ofrecer este extra" />
       </div>
+      {/* Photo upload */}
+      {e.photo_url ? (
+        <div style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', height: 72 }}>
+          <img src={e.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', gap: 2, padding: 4 }}>
+            <label style={{ width: 26, height: 26, borderRadius: 6, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <ImagePlus size={12} style={{ color: '#fff' }} />
+              <input type="file" accept="image/*" hidden onChange={ev => {
+                const f = ev.target.files?.[0]; if (f) uploadImage(`extra-${i}`, f, url => updateExtra(i, { photo_url: url })); ev.target.value = ''
+              }} />
+            </label>
+            <button type="button" onClick={() => updateExtra(i, { photo_url: undefined })}
+              style={{ width: 26, height: 26, borderRadius: 6, background: 'rgba(0,0,0,.55)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <Trash2 size={11} style={{ color: '#fff' }} />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <label style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          height: 38, borderRadius: 6, cursor: 'pointer',
+          border: '1.5px dashed var(--gold-light, #D4B896)', background: 'rgba(196,151,90,.04)',
+        }}>
+          {uploadingKey === `extra-${i}` ? (
+            <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 500 }}>Subiendo...</span>
+          ) : (
+            <>
+              <ImagePlus size={14} style={{ color: 'var(--gold)' }} />
+              <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 500 }}>Añadir foto</span>
+            </>
+          )}
+          <input type="file" accept="image/*" hidden onChange={ev => {
+            const f = ev.target.files?.[0]; if (f) uploadImage(`extra-${i}`, f, url => updateExtra(i, { photo_url: url })); ev.target.value = ''
+          }} />
+        </label>
+      )}
       {e.category === 'open_bar' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 6, marginTop: 4 }}>
           <input className="form-input" type="number" min={0} placeholder="Horas incluidas (opc.)"
@@ -453,6 +517,49 @@ export default function ProposalMenuEditor({
                           placeholder="Un item por línea&#10;Crema de melón · Crema de ceps&#10;Airbag con jamón ibérico"
                           value={g.items.join('\n')}
                           onChange={e => setGroupItemsText(i, e.target.value)} />
+                        {/* Group photos — multiple */}
+                        {(() => {
+                          const photos = g.image_urls?.length ? g.image_urls : g.image_url ? [g.image_url] : []
+                          const removePhoto = (pi: number) => {
+                            const next = photos.filter((_, idx) => idx !== pi)
+                            updateGroup(i, { image_urls: next, image_url: next[0] ?? undefined })
+                          }
+                          const addPhoto = (url: string) => {
+                            const next = [...photos, url]
+                            updateGroup(i, { image_urls: next, image_url: next[0] })
+                          }
+                          return (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                              {photos.map((url, pi) => (
+                                <div key={pi} style={{ position: 'relative', width: 72, height: 72, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+                                  <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  <button type="button" onClick={() => removePhoto(pi)}
+                                    style={{ position: 'absolute', top: 2, right: 2, width: 20, height: 20, borderRadius: 4, background: 'rgba(0,0,0,.6)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                                    <X size={10} style={{ color: '#fff' }} />
+                                  </button>
+                                </div>
+                              ))}
+                              <label style={{
+                                width: photos.length ? 72 : '100%', height: photos.length ? 72 : 38,
+                                borderRadius: 6, cursor: 'pointer', flexShrink: 0,
+                                border: '1.5px dashed var(--gold-light, #D4B896)', background: 'rgba(196,151,90,.04)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                              }}>
+                                {uploadingKey === `app-${i}` ? (
+                                  <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 500 }}>Subiendo...</span>
+                                ) : (
+                                  <>
+                                    <ImagePlus size={photos.length ? 16 : 14} style={{ color: 'var(--gold)' }} />
+                                    {!photos.length && <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 500 }}>Añadir fotos</span>}
+                                  </>
+                                )}
+                                <input type="file" accept="image/*" hidden onChange={e => {
+                                  const f = e.target.files?.[0]; if (f) uploadImage(`app-${i}`, f, addPhoto); e.target.value = ''
+                                }} />
+                              </label>
+                            </div>
+                          )
+                        })()}
                       </div>
                     ))}
                     <button type="button" style={addBtn} onClick={addGroup}>+ Añadir grupo de aperitivos</button>
@@ -508,6 +615,58 @@ export default function ProposalMenuEditor({
                 style={{ width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', flexShrink: 0, background: sections.show_menu_prices !== false ? 'var(--gold)' : 'var(--warm-gray)', position: 'relative', transition: 'background .2s' }}>
                 <span style={{ position: 'absolute', top: 3, left: sections.show_menu_prices !== false ? 21 : 3, width: 16, height: 16, borderRadius: 8, background: '#fff', transition: 'left .2s' }} />
               </button>
+            </div>
+
+            {/* Supplements toggle — only visible when prices hidden */}
+            {sections.show_menu_prices === false && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Mostrar suplementos</div>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>
+                    Muestra el precio extra por plato aunque los precios base estén ocultos
+                  </div>
+                </div>
+                <button
+                  type="button" role="switch" aria-checked={sections.show_menu_supplements !== false}
+                  onClick={() => setSections(s => ({ ...s, show_menu_supplements: s.show_menu_supplements === false ? true : false }))}
+                  style={{ width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', flexShrink: 0, background: sections.show_menu_supplements !== false ? 'var(--gold)' : 'var(--warm-gray)', position: 'relative', transition: 'background .2s' }}>
+                  <span style={{ position: 'absolute', top: 3, left: sections.show_menu_supplements !== false ? 21 : 3, width: 16, height: 16, borderRadius: 8, background: '#fff', transition: 'left .2s' }} />
+                </button>
+              </div>
+            )}
+
+            {/* Display mode toggle — list vs gallery */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--cream)', border: '1px solid var(--border)', borderRadius: 8 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Formato visual</div>
+                <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>
+                  Galería muestra tarjetas con fotos de los platos
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 2, background: 'var(--bg)', borderRadius: 6, padding: 2 }}>
+                <button type="button"
+                  onClick={() => setSections(s => ({ ...s, menu_display_mode: 'list' }))}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 5,
+                    border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                    background: (sections.menu_display_mode ?? 'list') === 'list' ? 'var(--gold)' : 'transparent',
+                    color: (sections.menu_display_mode ?? 'list') === 'list' ? '#fff' : 'var(--warm-gray)',
+                    transition: 'all .15s',
+                  }}>
+                  <List size={12} /> Lista
+                </button>
+                <button type="button"
+                  onClick={() => setSections(s => ({ ...s, menu_display_mode: 'gallery' }))}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 5,
+                    border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                    background: sections.menu_display_mode === 'gallery' ? 'var(--gold)' : 'transparent',
+                    color: sections.menu_display_mode === 'gallery' ? '#fff' : 'var(--warm-gray)',
+                    transition: 'all .15s',
+                  }}>
+                  <LayoutGrid size={12} /> Galería
+                </button>
+              </div>
             </div>
 
             {/* Menu pick limit */}
@@ -721,24 +880,65 @@ export default function ProposalMenuEditor({
                           )}
                         </div>
                         {/* Items — each in own card with stacked rows */}
-                        {c.items.map((it, ii) => (
-                          <div key={ii} style={{ background: 'var(--cream)', borderRadius: 6, padding: '6px 8px', marginBottom: 4, marginLeft: 18 }}>
-                            <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                        {c.items.map((it, ii) => {
+                          const imgKey = `${mi}-${ci}-${ii}`
+                          const isUploading = uploadingItem === imgKey
+                          return (
+                          <div key={ii} style={{ background: 'var(--cream)', borderRadius: 8, padding: '8px 10px', marginBottom: 6, marginLeft: 18, border: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                               <input className="form-input" placeholder="Nombre del plato" value={it.name}
-                                onChange={e => updateItem(mi, ci, ii, { name: e.target.value })} style={{ flex: 1, minWidth: 0, fontSize: 12 }} />
+                                onChange={e => updateItem(mi, ci, ii, { name: e.target.value })} style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 500 }} />
                               <button type="button" style={{ ...removeBtn, width: 24, height: 24 }} onClick={() => removeItem(mi, ci, ii)}>
                                 <X size={11} />
                               </button>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 6 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 6, marginBottom: 6 }}>
                               <input className="form-input" placeholder="Descripción (opc.)" value={it.description ?? ''}
                                 onChange={e => updateItem(mi, ci, ii, { description: e.target.value })} style={{ fontSize: 11 }} />
                               <input className="form-input" placeholder="+precio" value={it.extra_price ?? ''}
                                 onChange={e => updateItem(mi, ci, ii, { extra_price: e.target.value })}
                                 style={{ fontSize: 11 }} />
                             </div>
+                            {/* Dish image — prominent upload area */}
+                            {it.image_url ? (
+                              <div style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', height: 80 }}>
+                                <img src={it.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', gap: 2, padding: 4 }}>
+                                  <label style={{ width: 26, height: 26, borderRadius: 6, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                                    <ImagePlus size={12} style={{ color: '#fff' }} />
+                                    <input type="file" accept="image/*" hidden onChange={e => {
+                                      const f = e.target.files?.[0]; if (f) uploadDishImage(mi, ci, ii, f); e.target.value = ''
+                                    }} />
+                                  </label>
+                                  <button type="button" onClick={() => updateItem(mi, ci, ii, { image_url: '' })}
+                                    style={{ width: 26, height: 26, borderRadius: 6, background: 'rgba(0,0,0,.55)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                                    <Trash2 size={11} style={{ color: '#fff' }} />
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <label style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                height: 44, borderRadius: 6, cursor: 'pointer',
+                                border: '1.5px dashed var(--gold-light, #D4B896)', background: 'rgba(196,151,90,.04)',
+                                transition: 'all .15s',
+                              }}>
+                                {isUploading ? (
+                                  <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 500 }}>Subiendo foto...</span>
+                                ) : (
+                                  <>
+                                    <ImagePlus size={16} style={{ color: 'var(--gold)' }} />
+                                    <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 500 }}>Añadir foto del plato</span>
+                                  </>
+                                )}
+                                <input type="file" accept="image/*" hidden onChange={e => {
+                                  const f = e.target.files?.[0]; if (f) uploadDishImage(mi, ci, ii, f); e.target.value = ''
+                                }} />
+                              </label>
+                            )}
                           </div>
-                        ))}
+                          )
+                        })}
                         <button type="button"
                           onClick={() => addItem(mi, ci)}
                           style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', marginLeft: 18, padding: '4px 0' }}>

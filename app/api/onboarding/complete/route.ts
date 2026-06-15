@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession, getServiceClient } from '@/lib/auth-server'
 
 // POST /api/onboarding/complete
-// Called after onboarding step 2 — creates a 14-day trial subscription on the basic plan.
+// Called after onboarding step 2 — creates a trial subscription using global trial config.
 export async function POST() {
   try {
     const session = await getSession()
@@ -14,9 +14,7 @@ export async function POST() {
     const svc = getServiceClient()
 
     // Check if user already has ANY subscription across all their venues.
-    // This acts as the guard that prevents a second (or third) venue from
-    // getting an automatic trial — only the very first venue ever gets one.
-    // Admins can still manually grant a trial via the CRM for any venue.
+    // Only the very first venue ever gets an automatic trial.
     const { data: existing } = await svc
       .from('venue_subscriptions')
       .select('id')
@@ -27,23 +25,35 @@ export async function POST() {
       return NextResponse.json({ ok: true, message: 'Ya tiene suscripción' })
     }
 
-    // Find basic plan (first active plan sorted by creation date)
-    const { data: basicPlan } = await svc
-      .from('venue_plans')
-      .select('id')
-      .eq('is_active', true)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .single()
+    // Read trial configuration
+    const { data: trialConfig } = await svc
+      .from('trial_config')
+      .select('is_active, trial_days, trial_plan_id')
+      .eq('id', 1)
+      .maybeSingle()
 
-    if (!basicPlan) {
-      return NextResponse.json({ error: 'No se encontró el plan básico' }, { status: 500 })
+    if (!trialConfig?.is_active) {
+      return NextResponse.json({ ok: true, message: 'Trial desactivado' })
     }
 
-    // Best-effort: find the user's primary venue to link the trial to a venue_id.
-    // At onboarding time the user_venues row may not exist yet — if so, venue_id
-    // stays null and will be backfilled when the admin later assigns the venue
-    // via assign-venue or apply-changes.
+    // Resolve plan: use trial config's plan, or fall back to first active plan
+    let planId = trialConfig.trial_plan_id
+    if (!planId) {
+      const { data: basicPlan } = await svc
+        .from('venue_plans')
+        .select('id')
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single()
+
+      if (!basicPlan) {
+        return NextResponse.json({ error: 'No se encontró ningún plan activo' }, { status: 500 })
+      }
+      planId = basicPlan.id
+    }
+
+    // Best-effort: find the user's primary venue to link the trial
     const { data: primaryVenue } = await svc
       .from('user_venues')
       .select('id')
@@ -51,16 +61,17 @@ export async function POST() {
       .eq('is_primary', true)
       .maybeSingle()
 
-    // Create trial subscription
+    // Create trial subscription with configured duration
+    const trialDays = trialConfig.trial_days ?? 14
     const trialEnd = new Date()
-    trialEnd.setDate(trialEnd.getDate() + 14)
+    trialEnd.setDate(trialEnd.getDate() + trialDays)
 
     const { error } = await svc
       .from('venue_subscriptions')
       .insert({
         user_id: userId,
         venue_id: primaryVenue?.id ?? null,
-        plan_id: basicPlan.id,
+        plan_id: planId,
         status: 'trial',
         trial_end_date: trialEnd.toISOString(),
       })

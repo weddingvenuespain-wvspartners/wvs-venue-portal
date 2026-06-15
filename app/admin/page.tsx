@@ -368,13 +368,34 @@ function UserPanel({
     const fo = (profile as any).features_override ?? {}
     return typeof fo === 'object' ? fo : {}
   })
-  const setOverride = (key: string, val: OverrideVal) =>
+  const [overrideSaving, setOverrideSaving] = useState<string | null>(null)
+
+  const setOverride = async (key: string, val: OverrideVal) => {
     setFeatOverrides(prev => {
       const next = { ...prev }
       if (val === null) delete next[key]
       else next[key] = val
       return next
     })
+    // Persist via API
+    setOverrideSaving(key)
+    try {
+      if (val === null) {
+        await fetch('/api/admin/feature-overrides', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: profile.user_id, featureKey: key }),
+        })
+      } else {
+        await fetch('/api/admin/feature-overrides', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: profile.user_id, featureKey: key, enabled: val }),
+        })
+      }
+    } catch (e) { console.error('Override save failed', e) }
+    setOverrideSaving(null)
+  }
   const [copied, setCopied] = useState(false)
   const copyEmail = () => {
     if (profile.email) {
@@ -649,7 +670,7 @@ function UserPanel({
                 })()}
                 value={payAmount} onChange={e => setPayAmount(e.target.value)} />
               <input style={{ padding: '5px 9px', borderRadius: 6, border: '1px solid var(--ivory)', fontSize: 12, width: 150, background: '#fff' }}
-                placeholder="Ref. TPV CaixaBank"
+                placeholder="Ref. Stripe / manual"
                 value={payRef} onChange={e => setPayRef(e.target.value)} />
               <button className="btn btn-primary btn-sm" disabled={saving}
                 onClick={() => onRegisterPayment(activeSub, payAmount, payRef)}>
@@ -835,12 +856,14 @@ function UserPanel({
                     { key: 'leads_new_only',    label: <><span>Solo leads nuevos</span> <AlertTriangle size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /></> },
                   ] as { key: string; label: React.ReactNode }[]).map(({ key, label }) => {
                     const val: OverrideVal = key in featOverrides ? featOverrides[key] as boolean : null
+                    const isSaving = overrideSaving === key
                     return (
-                      <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: val === true ? '#EEF2EC' : val === false ? '#FAF3F2' : 'var(--cream)', borderRadius: 6, gap: 6 }}>
+                      <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: val === true ? '#EEF2EC' : val === false ? '#FAF3F2' : 'var(--cream)', borderRadius: 6, gap: 6, opacity: isSaving ? 0.6 : 1, transition: 'opacity 0.2s' }}>
                         <span style={{ fontSize: 11, color: 'var(--charcoal)', flex: 1 }}>{label}</span>
                         <Select
                           value={val === null ? 'auto' : val ? 'on' : 'off'}
                           onValueChange={(v) => setOverride(key, v === 'auto' ? null : v === 'on')}
+                          disabled={isSaving}
                         >
                           <SelectTrigger style={{ width: 'auto', height: 'auto', fontSize: 10, padding: '2px 4px', borderRadius: 4, background: '#fff', color: val === true ? '#4A6B52' : val === false ? '#B0473E' : 'var(--warm-gray)' }}>
                             <SelectValue />
@@ -1301,7 +1324,7 @@ function UserPanel({
                     })()}
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Ref. pago <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>(TPV / mandato)</span></label>
+                    <label className="form-label">Ref. pago <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>(Stripe / manual)</span></label>
                     <input className="form-input" value={subForm.payment_reference}
                       onChange={e => setSubForm(f => ({ ...f, payment_reference: e.target.value }))}
                       placeholder="Ref. de la última transacción" />
@@ -1355,7 +1378,7 @@ function UserPanel({
                       </div>
                     )}
                     <div className="form-group">
-                      <label className="form-label">Ref. pago <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>(TPV / mandato)</span></label>
+                      <label className="form-label">Ref. pago <span style={{ color: 'var(--warm-gray)', fontWeight: 400 }}>(Stripe / manual)</span></label>
                       <input className="form-input" value={subForm.payment_reference}
                         onChange={e => setSubForm(f => ({ ...f, payment_reference: e.target.value }))}
                         placeholder="Ref. de la última transacción" />

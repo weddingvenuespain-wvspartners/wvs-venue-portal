@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import type { ProposalData } from '../page'
 import LodgingSection from '../LodgingSection'
-import { MapPin, Phone, Mail, Calendar as CalendarIcon, Star, Globe } from 'lucide-react'
+import { MapPin, Calendar as CalendarIcon, Star } from 'lucide-react'
 
 const T6_FONT = "'Cormorant Garamond', 'EB Garamond', serif"
 const T6_SANS = "'DM Sans', 'Inter', sans-serif"
@@ -85,13 +85,6 @@ export default function T6Alojamiento({ data }: { data: ProposalData }) {
     .t6-map-iframe { width: 100%; height: 100%; min-height: 280px; border: 0 }
     @media (max-width: 720px) { .t6-map-card { grid-template-columns: 1fr } }
 
-    /* Contact */
-    .t6-contact { background: ${primary}; color: #fff; padding: 60px 40px; text-align: center }
-    .t6-contact h2 { color: #fff; margin-bottom: 12px }
-    .t6-contact-sub { color: rgba(255,255,255,.85); margin-bottom: 28px; font-size: 1rem }
-    .t6-contact-links { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap }
-    .t6-contact-link { display: flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-size: .95rem; font-weight: 500; padding: 10px 18px; border: 1px solid rgba(255,255,255,.3); border-radius: 8px; transition: all .15s }
-    .t6-contact-link:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.6) }
 
     /* Footer */
     .t6-footer { text-align: center; padding: 28px 20px; font-size: .75rem; color: #999; background: #FBFAF7 }
@@ -198,23 +191,6 @@ export default function T6Alojamiento({ data }: { data: ProposalData }) {
           </div>
         </section>
       )}
-
-      {/* Contact CTA */}
-      <section className="t6-contact" id="contact">
-        <h2>¿Listo para reservar?</h2>
-        <p className="t6-contact-sub">Confirma tu selección o ponte en contacto con nosotros</p>
-        <div className="t6-contact-links">
-          {venue?.contact_phone && (
-            <a href={`tel:${venue.contact_phone}`} className="t6-contact-link"><Phone size={16} /> {venue.contact_phone}</a>
-          )}
-          {venue?.contact_email && (
-            <a href={`mailto:${venue.contact_email}`} className="t6-contact-link"><Mail size={16} /> {venue.contact_email}</a>
-          )}
-          {venue?.website && (
-            <a href={venue.website} target="_blank" rel="noopener noreferrer" className="t6-contact-link"><Globe size={16} /> Web</a>
-          )}
-        </div>
-      </section>
 
       <footer className="t6-footer">Generado con FOREVENTOS · {venue?.name ?? ''}</footer>
     </div>

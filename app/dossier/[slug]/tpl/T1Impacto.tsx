@@ -241,6 +241,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
   const [selectedZoneSupplements, setSelectedZoneSupplements] = useState<Record<number, boolean>>({})
   const [selectedAccomRooms, setSelectedAccomRooms] = useState<Record<number, number>>({})
   const [selectedMenus, setSelectedMenus] = useState<string[]>([])
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null)
   const [menuTotal, setMenuTotal] = useState(0)
   const [menuValidationErrors, setMenuValidationErrors] = useState<string[]>([])
   const menuCartRef = useRef<CartSummary | null>(null)
@@ -615,17 +616,6 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
     .t1-cta-h{font-family:${FONT};font-size:clamp(2rem,4.5vw,3.6rem);font-weight:300;color:${pal.text};line-height:1.1;margin-bottom:20px}
     .t1-cta-sub{font-size:.9rem;color:${fg(.45)};line-height:1.85;margin-bottom:32px}
     .t1-cta-contact div{font-size:.83rem;color:${fg(.38)};margin-bottom:8px}
-    /* ── Contact section ── */
-    .t1-contact-inner{max-width:560px;margin:0 auto;text-align:center}
-    .t1-contact-venue-identity{margin-bottom:40px;padding-bottom:36px;border-bottom:1px solid ${fg(.08)}}
-    .t1-contact-channel{display:flex;align-items:center;gap:16px;padding:20px 0;border-bottom:1px solid ${fg(.06)};text-align:left}
-    .t1-contact-channel:last-of-type{border-bottom:none}
-    .t1-contact-channel-icon{width:36px;height:36px;border-radius:50%;background:${fg(.05)};border:1px solid ${fg(.1)};display:flex;align-items:center;justify-content:center;flex-shrink:0;color:${primary}}
-    .t1-contact-channel-info{flex:1;min-width:0}
-    .t1-contact-channel-lbl{font-size:.58rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${fg(.32)};margin-bottom:5px}
-    .t1-contact-channel-val{font-size:.9rem;color:${fg(.78)};font-weight:300;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .t1-contact-btn{background:${fg(.06)};color:${fg(.7)};border:1px solid ${fg(.1)};padding:9px 18px;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;text-decoration:none;white-space:nowrap;transition:background .2s,color .2s;flex-shrink:0}
-    .t1-contact-btn:hover{background:${fg(.1)};color:${pal.text}}
     .t1-form{display:flex;flex-direction:column;gap:20px}
     .t1-field-label{display:block;font-size:.62rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${fg(.32)};margin-bottom:9px}
     .t1-input{width:100%;padding:13px 0;border:none;border-bottom:1px solid ${fg(.16)};background:transparent;font-family:'Inter',sans-serif;font-size:.9rem;color:${pal.text};outline:none;transition:border-color .2s}
@@ -1272,7 +1262,7 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           PAQUETES
       ════════════════════════════════════════════ */}
-      {on('pricing') && on('packages') && (() => {
+      {on('pricing') && (() => {
         const pricingStyle = getActiveStyle(sec, 'pricing')
         const hasRentalRows = (sec.venue_rental?.rows?.length ?? 0) > 0 && (sec.venue_rental?.day_tiers?.length ?? 0) > 0
         const hasContent = pkgs.length > 0 || (pricingStyle === 'rental_grid' && hasRentalRows)
@@ -1290,7 +1280,8 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
                 ) : pricingStyle === 'rental_grid' && hasRentalRows ? (
                   <VenueRentalGrid data={sec.venue_rental} primary={primary} dark={!lightMode} />
                 ) : (
-                  <PricingCards packages={pkgs} primary={primary} dark={!lightMode} font={FONT} />
+                  <PricingCards packages={pkgs} primary={primary} dark={!lightMode} font={FONT}
+                    selectedId={selectedPackageId} onSelect={(id) => setSelectedPackageId(id)} />
                 )}
               </FadeUp>
               {(hasCatering || contactOn) && (
@@ -1305,23 +1296,6 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
           </section>
         )
       })()}
-
-      {/* ════════════════════════════════════════════
-          TARIFAS DE ALQUILER (grid temporada × día)
-      ════════════════════════════════════════════ */}
-      {on('venue_rental') && !(on('space_groups') && visibleSpaceGroups.length > 0) && (sec.venue_rental?.rows && sec.venue_rental.rows.length > 0 ? (
-        <section className="t1-sec">
-          <div className="w">
-            <FadeUp>
-              <span className="t1-label">{sec.venue_rental.title || 'Tarifas de alquiler'}</span>
-              <h2 className="t1-h2">Elegid vuestra fecha</h2>
-            </FadeUp>
-            <FadeUp delay={.1}>
-              <VenueRentalGrid data={sec.venue_rental} primary={primary} dark={!lightMode} />
-            </FadeUp>
-          </div>
-        </section>
-      ) : _preview ? <EmptySec label="Tarifas de alquiler" /> : null)}
 
       {/* ════════════════════════════════════════════
           TEMPORADAS
@@ -1375,25 +1349,48 @@ export default function T1Impacto({ data }: { data: ProposalData }) {
       {/* ════════════════════════════════════════════
           CONFIGURA VUESTRA BODA (WeddingProposal)
       ════════════════════════════════════════════ */}
-      {on('menu') && (hasCatering && (menusStructured?.length || menuExtras?.length || appetizersBase?.length || menuShow.length > 0) ? (
-        <>
-        <WeddingProposal
-          data={data}
-          menus={menusStructured}
-          extras={menuExtras}
-          appetizers={appetizersBase}
-          legacyMenus={menuShow}
-          primary={primary}
-          onPrimary={onPri}
-          dark={!lightMode}
-          onMenusChange={setSelectedMenus}
-          onTotalChange={setMenuTotal}
-          onValidationChange={setMenuValidationErrors}
-          onCartChange={setMenuCart}
-          validationWarning={validationError && menuValidationErrors.length > 0 ? validationError : null}
-        />
-        </>
-      ) : _preview ? <EmptySec label="Menú" /> : null)}
+      {on('menu') && hasCatering && (() => {
+        const pkg = pkgs.find((p: any) => p.id === selectedPackageId) as any
+        const linked: string[] | null = pkg?.linked_menu_ids ?? null
+        const hasPackages = pkgs.length > 0 && (data as any).commercialConfig?.price_model === 'package'
+        if (hasPackages && !selectedPackageId) {
+          return (
+            <section id="menu" className="t1-sec" style={{ textAlign: 'center' }}>
+              <div className="w">
+                <span className="t1-label">Menús</span>
+                <h2 className="t1-h2">Elige primero un paquete arriba para ver los menús disponibles</h2>
+              </div>
+            </section>
+          )
+        }
+        const filterMenus = <T extends { id?: string }>(arr: T[] | undefined): T[] => {
+          if (!arr) return [] as T[]
+          if (!linked || linked.length === 0) return arr
+          return arr.filter(m => m.id && linked.includes(m.id))
+        }
+        const fMenusStructured = filterMenus(menusStructured as any[])
+        const fMenuShow        = filterMenus(menuShow as any[])
+        if (!(fMenusStructured.length || menuExtras?.length || appetizersBase?.length || fMenuShow.length)) {
+          return _preview ? <EmptySec label="Menú" /> : null
+        }
+        return (
+          <WeddingProposal
+            data={data}
+            menus={fMenusStructured as any}
+            extras={menuExtras}
+            appetizers={appetizersBase}
+            legacyMenus={fMenuShow as any}
+            primary={primary}
+            onPrimary={onPri}
+            dark={!lightMode}
+            onMenusChange={setSelectedMenus}
+            onTotalChange={setMenuTotal}
+            onValidationChange={setMenuValidationErrors}
+            onCartChange={setMenuCart}
+            validationWarning={validationError && menuValidationErrors.length > 0 ? validationError : null}
+          />
+        )
+      })()}
 
       {/* ════════════════════════════════════════════
           COLABORADORES (siempre tras menú)

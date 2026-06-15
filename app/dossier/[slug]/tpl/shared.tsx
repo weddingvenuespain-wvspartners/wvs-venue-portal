@@ -1094,7 +1094,26 @@ export function VenueRentalGrid({
 //   • PricingTable: compact tabular comparison
 //   • VenueRentalGrid (above): alternate horario × temporada grid
 
+export type OptionItemDisplay = {
+  id: string
+  name: string
+  description?: string | null
+  supplement_price?: number | null
+  is_default?: boolean
+  sort_order?: number
+}
+
+export type OptionGroupDisplay = {
+  id: string
+  name: string
+  min_selections: number
+  max_selections: number
+  source_type?: string
+  items: OptionItemDisplay[]
+}
+
 export type PackageItem = {
+  id?: string
   name?: string
   subtitle?: string
   price?: string
@@ -1103,9 +1122,10 @@ export type PackageItem = {
   is_recommended?: boolean
   min_guests?: number
   max_guests?: number
+  option_groups?: OptionGroupDisplay[]
 }
 
-export function PricingCards({ packages, primary, dark = true, font }: { packages: PackageItem[]; primary: string; dark?: boolean; font?: string }) {
+export function PricingCards({ packages, primary, dark = true, font, selectedId, onSelect }: { packages: PackageItem[]; primary: string; dark?: boolean; font?: string; selectedId?: string | null; onSelect?: (id: string) => void }) {
   if (!packages.length) return null
   const rgb = toRgb(primary)
   const FONT = font || "'Satoshi', Georgia, serif"
@@ -1113,26 +1133,36 @@ export function PricingCards({ packages, primary, dark = true, font }: { package
   const border = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'
   const text = dark ? 'rgba(255,255,255,.88)' : '#181410'
   const sub = dark ? 'rgba(255,255,255,.45)' : '#6a6560'
+  const interactive = !!onSelect
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-      {packages.map((p, i) => (
-        <div key={i} style={{
-          background: surface, padding: '36px 28px',
-          display: 'flex', flexDirection: 'column',
-          borderRadius: 8, border: `1px solid ${border}`,
-          ...(p.is_recommended ? { borderTop: `2px solid ${primary}` } : {}),
-        }}>
+      {packages.map((p, i) => {
+        const isSel = interactive && selectedId === (p as any).id
+        return (
+        <div key={i}
+          onClick={interactive ? () => onSelect?.((p as any).id) : undefined}
+          style={{
+            background: isSel ? `rgba(${rgb},.10)` : surface, padding: '36px 28px',
+            display: 'flex', flexDirection: 'column',
+            borderRadius: 8,
+            border: `${isSel ? 2 : 1}px solid ${isSel ? primary : border}`,
+            cursor: interactive ? 'pointer' : 'default',
+            transition: 'all .15s',
+            ...(p.is_recommended && !isSel ? { borderTop: `2px solid ${primary}` } : {}),
+          }}>
           {p.is_recommended && (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '.58rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: primary, background: `rgba(${rgb},.12)`, padding: '4px 10px', borderRadius: 100, marginBottom: 14, alignSelf: 'flex-start' }}>
               <span style={{ width: 5, height: 5, borderRadius: '50%', background: primary }} />
               Más elegido
             </div>
           )}
-          <div style={{ fontFamily: FONT, fontSize: '1.7rem', fontWeight: 300, color: text, marginBottom: 4 }}>{p.name}</div>
-          {p.subtitle && <div style={{ fontSize: '.78rem', color: sub, marginBottom: 20 }}>{p.subtitle}</div>}
+          <div style={{ fontFamily: FONT, fontSize: '1.5rem', fontWeight: 300, color: text, marginBottom: 6 }}>{p.name}</div>
+          <div style={{ width: 36, height: 1, background: primary, opacity: .35, marginBottom: 14 }} />
+          {p.description && <div style={{ fontSize: '.82rem', color: sub, lineHeight: 1.6, marginBottom: 14 }}>{p.description}</div>}
+          {p.subtitle && <div style={{ fontSize: '.75rem', color: sub, marginBottom: 14 }}>{p.subtitle}</div>}
           {p.price && (
-            <div style={{ fontFamily: FONT, fontSize: 'clamp(2.2rem,4vw,3.2rem)', fontWeight: 300, color: primary, lineHeight: 1, margin: '8px 0 24px' }}>
-              {p.price} <span style={{ fontSize: '1rem', color: sub, fontFamily: 'Inter, sans-serif' }}>/ persona</span>
+            <div style={{ fontSize: '.95rem', fontWeight: 600, color: primary, marginBottom: 16 }}>
+              {p.price}
             </div>
           )}
           {(p.includes?.length ?? 0) > 0 && (
@@ -1150,8 +1180,14 @@ export function PricingCards({ packages, primary, dark = true, font }: { package
               {p.min_guests && `Mín. ${p.min_guests}`}{p.min_guests && p.max_guests ? ' · ' : ''}{p.max_guests && `Máx. ${p.max_guests}`} invitados
             </div>
           )}
+          {interactive && (
+            <div style={{ marginTop: 16, padding: '8px 14px', textAlign: 'center', fontSize: '.72rem', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', borderRadius: 6, background: isSel ? primary : 'transparent', color: isSel ? (dark ? '#000' : '#fff') : primary, border: `1.5px solid ${primary}` }}>
+              {isSel ? '✓ Seleccionado' : 'Elegir este paquete'}
+            </div>
+          )}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -1196,7 +1232,6 @@ export function PricingTable({ packages, primary, dark = true, font }: { package
                 </td>
                 <td style={{ padding: cellPad, verticalAlign: 'top', textAlign: 'right', whiteSpace: 'nowrap' }}>
                   <span style={{ fontFamily: FONT, fontSize: '1.4rem', fontWeight: 300, color: primary }}>{p.price || '—'}</span>
-                  {p.price && <span style={{ fontSize: '.7rem', color: sub, marginLeft: 4 }}>/ pers.</span>}
                 </td>
               </tr>
             )
@@ -1249,9 +1284,88 @@ export function extractData(data: ProposalData) {
     on: (id: string) => {
       if (sec.sections_enabled?.[id] === false) return false
       if (spaceType && !isSectionAllowed(id, spaceType)) return false
+      // Auto-gate "Paquetes" by price_model (only show when config uses 'package')
+      const pm = (data as any).commercialConfig?.price_model
+      if (pm) {
+        if (id === 'pricing' || id === 'packages') {
+          if (pm !== 'package') return false
+        }
+      }
+      // venue_rental section deprecated — hide everywhere
+      if (id === 'venue_rental') return false
       return true
     },
-    packagesShow:   so.packages_override    != null ? so.packages_override    : vc.packages      ?? [],
+    packagesShow:   (() => {
+      // When price_model='package', derive packages from sub-packages within modalities.
+      // Each modality has N packages (Silver/Gold/Platinum). Dossier shows packages from selected modality.
+      // At extraction time we flatten ALL modality packages; template filters by selected modality.
+      const cc: any = (data as any).commercialConfig
+      const mods: any[] = (data as any).modalities ?? []
+      if (cc?.price_model === 'package' && mods.length > 0) {
+        const allPkgs: any[] = []
+        for (const m of mods) {
+          const pkgs: any[] = m.packages ?? []
+          if (pkgs.length > 0) {
+            // Use sub-packages from within modality
+            for (const pkg of pkgs) {
+              const prices = (pkg.prices ?? []).map((p: any) => p.price_per_person ?? p.price).filter(Boolean).map(Number).filter((n: number) => !isNaN(n) && n > 0)
+              const minPrice = prices.length > 0 ? Math.min(...prices) : null
+              const hasPP = (pkg.prices ?? []).some((p: any) => p.price_per_person != null && p.price_per_person > 0)
+              allPkgs.push({
+                id:             pkg.id,
+                modality_id:    m.id,
+                modality_name:  m.name,
+                name:           pkg.name || pkg.label || m.name,
+                subtitle:       m.duration_label || '',
+                description:    pkg.description ?? m.description ?? '',
+                price:          minPrice ? `Desde ${minPrice.toLocaleString('es-ES')}€${hasPP ? '/pers.' : ''}` : '',
+                min_guests:     pkg.min_guests ?? m.min_guests ?? null,
+                max_guests:     pkg.max_guests ?? m.max_guests ?? null,
+                includes:       Array.isArray(pkg.includes) ? pkg.includes : (Array.isArray(m.includes) ? m.includes : []),
+                is_active:      m.is_active !== false,
+                linked_menu_ids: pkg.linked_menu_ids ?? m.linked_menu_ids ?? [],
+                days_of_week:   Array.isArray(m.days_of_week) ? m.days_of_week : [],
+                sort_order:     pkg.sort_order ?? 0,
+                option_groups:  Array.isArray(pkg.option_groups) ? pkg.option_groups.map((g: any) => ({
+                  id: g.id, name: g.name, min_selections: g.min_selections, max_selections: g.max_selections,
+                  source_type: g.source_type,
+                  items: (g.items ?? []).map((i: any) => ({
+                    id: i.id, name: i.name, description: i.description,
+                    supplement_price: i.supplement_price ? Number(i.supplement_price) : null,
+                    is_default: i.is_default ?? false, sort_order: i.sort_order ?? 0,
+                  })).sort((a: any, b: any) => a.sort_order - b.sort_order),
+                })).sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)) : [],
+              })
+            }
+          } else {
+            // Fallback: modality itself acts as single package (no sub-packages created yet)
+            const directPrices = (m.prices ?? []).filter((p: any) => !p.package_id).map((p: any) => p.price_per_person ?? p.price).filter(Boolean)
+            const all = directPrices.map(Number).filter((n: number) => !isNaN(n) && n > 0)
+            const minPrice = all.length > 0 ? Math.min(...all) : null
+            const hasPPFallback = (m.prices ?? []).some((p: any) => p.price_per_person != null && p.price_per_person > 0)
+            allPkgs.push({
+              id:             m.id,
+              modality_id:    m.id,
+              modality_name:  m.name,
+              name:           m.name,
+              subtitle:       m.duration_label || '',
+              description:    m.description ?? '',
+              price:          minPrice ? `Desde ${minPrice.toLocaleString('es-ES')}€${hasPPFallback ? '/pers.' : ''}` : '',
+              min_guests:     m.min_guests ?? null,
+              max_guests:     m.max_guests ?? null,
+              includes:       Array.isArray(m.includes) ? m.includes : [],
+              is_active:      m.is_active !== false,
+              linked_menu_ids: m.linked_menu_ids ?? [],
+              days_of_week:   Array.isArray(m.days_of_week) ? m.days_of_week : [],
+              sort_order:     m.sort_order ?? 0,
+              option_groups: [],
+            })
+          }
+        }
+        return allPkgs
+      }
+      return so.packages_override != null ? so.packages_override : vc.packages ?? []
+    })(),
     zonesShow:      so.zones_override       != null ? so.zones_override       : vc.zones          ?? [],
     zonesMode:      (so.zones_header?.mode ?? 'zones') as 'single' | 'zones',
     seasonsShow:    so.season_prices_override != null ? so.season_prices_override : vc.season_prices ?? [],
@@ -1622,5 +1736,241 @@ export function TplSingleSpace({
         </FadeUp>
       </div>
     </section>
+  )
+}
+
+// ── PackageOptionSelector ─────────────────────────────────────────────────
+// Interactive checkboxes for package option groups with min/max enforcement and supplement display.
+
+export function PackageOptionSelector({
+  groups,
+  selections,
+  onToggle,
+  primary,
+  dark = false,
+  guests = 0,
+  basePrice = 0,
+  distribution,
+  onDistributionChange,
+}: {
+  groups: OptionGroupDisplay[]
+  selections: Record<string, string[]>
+  onToggle: (groupId: string, itemId: string) => void
+  primary: string
+  dark?: boolean
+  guests?: number
+  basePrice?: number
+  distribution?: Record<string, Record<string, number>>
+  onDistributionChange?: (groupId: string, itemId: string, count: number) => void
+}) {
+  if (!groups.length) return null
+
+  const text = dark ? 'rgba(255,255,255,.88)' : '#181410'
+  const sub = dark ? 'rgba(255,255,255,.50)' : '#6a6560'
+  const border = dark ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.08)'
+  const rgb = toRgb(primary)
+
+  let totalSupp = 0
+  for (const g of groups) {
+    const sel = selections[g.id] ?? []
+    for (const item of g.items) {
+      if (sel.includes(item.id) && item.supplement_price) {
+        totalSupp += item.supplement_price
+      }
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 16 }}>
+      {groups.map(g => {
+        const sel = selections[g.id] ?? []
+        const count = sel.length
+        const atMax = count >= g.max_selections
+        const ruleText = g.min_selections === g.max_selections
+          ? `Escoge ${g.min_selections}`
+          : `Escoge ${g.min_selections}–${g.max_selections}`
+
+        return (
+          <div key={g.id}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: '.78rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: primary }}>{g.name}</div>
+              <div style={{ fontSize: '.72rem', color: sub }}>
+                {ruleText} · <span style={{ fontWeight: 600, color: count >= g.min_selections ? primary : sub }}>{count}/{g.max_selections}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {g.items.map(item => {
+                const checked = sel.includes(item.id)
+                const disabled = !checked && atMax
+                return (
+                  <div
+                    key={item.id}
+                    onClick={disabled ? undefined : () => onToggle(g.id, item.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                      borderRadius: 8, cursor: disabled ? 'not-allowed' : 'pointer',
+                      border: `1px solid ${checked ? primary : border}`,
+                      background: checked ? `rgba(${rgb},.06)` : 'transparent',
+                      opacity: disabled ? 0.45 : 1,
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <div style={{
+                      width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                      border: `2px solid ${checked ? primary : (dark ? 'rgba(255,255,255,.25)' : '#ccc')}`,
+                      background: checked ? primary : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all .15s',
+                    }}>
+                      {checked && <span style={{ color: dark ? '#000' : '#fff', fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '.84rem', color: text, fontWeight: checked ? 600 : 400 }}>{item.name}</div>
+                      {item.description && <div style={{ fontSize: '.72rem', color: sub, marginTop: 2 }}>{item.description}</div>}
+                    </div>
+                    {item.supplement_price != null && item.supplement_price > 0 && (
+                      <div style={{ fontSize: '.72rem', fontWeight: 600, color: primary, whiteSpace: 'nowrap' }}>
+                        +{item.supplement_price.toLocaleString('es-ES')}€/pers
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {/* Guest distribution for groups with multiple selected items */}
+            {onDistributionChange && sel.length > 1 && guests > 0 && (
+              <GuestDistribution
+                items={sel.map(id => {
+                  const item = g.items.find(it => it.id === id)
+                  return { id, label: item?.name ?? id }
+                })}
+                totalGuests={guests}
+                distribution={distribution?.[g.id] ?? {}}
+                onChange={(itemId, count) => onDistributionChange(g.id, itemId, count)}
+                primary={primary}
+                dark={dark}
+              />
+            )}
+          </div>
+        )
+      })}
+
+      {totalSupp > 0 && basePrice > 0 && (
+        <div style={{ borderTop: `1px solid ${border}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.78rem', color: sub }}>
+            <span>Base</span>
+            <span>{basePrice.toLocaleString('es-ES')}€/pers</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.78rem', color: primary, fontWeight: 600 }}>
+            <span>Suplementos</span>
+            <span>+{totalSupp.toLocaleString('es-ES')}€/pers</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.88rem', fontWeight: 700, color: text, marginTop: 4, paddingTop: 8, borderTop: `1px solid ${border}` }}>
+            <span>Total</span>
+            <span>{(basePrice + totalSupp).toLocaleString('es-ES')}€/pers{guests > 0 ? ` × ${guests} = ${((basePrice + totalSupp) * guests).toLocaleString('es-ES')}€` : ''}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── GuestDistribution ─────────────────────────────────────────────────────
+// Number inputs to distribute exact guest counts across selected dishes.
+// Used by both WeddingProposal (menu courses) and PackageOptionSelector (option groups).
+
+export function GuestDistribution({
+  items,
+  totalGuests,
+  distribution,
+  onChange,
+  primary,
+  dark = false,
+}: {
+  items: Array<{ id: string; label: string }>
+  totalGuests: number
+  distribution: Record<string, number>
+  onChange: (itemId: string, count: number) => void
+  primary: string
+  dark?: boolean
+}) {
+  if (!items.length || totalGuests <= 0) return null
+
+  const text = dark ? 'rgba(255,255,255,.88)' : '#181410'
+  const sub = dark ? 'rgba(255,255,255,.50)' : '#6a6560'
+  const border = dark ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.08)'
+  const rgb = toRgb(primary)
+
+  const assigned = items.reduce((sum, it) => sum + (distribution[it.id] || 0), 0)
+  const remaining = totalGuests - assigned
+  const complete = assigned === totalGuests
+  const over = assigned > totalGuests
+
+  // Auto-fill last empty item
+  const emptyItems = items.filter(it => !distribution[it.id])
+  const autoFillId = emptyItems.length === 1 && remaining > 0 ? emptyItems[0].id : null
+
+  // Auto-commit the auto-fill value so validation passes without user interaction
+  useEffect(() => {
+    if (autoFillId && remaining > 0) {
+      onChange(autoFillId, remaining)
+    }
+  }, [autoFillId, remaining]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div style={{ marginTop: 12, padding: '14px 16px', borderRadius: 8, border: `1px solid ${border}`, background: dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)' }}>
+      <div style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: sub, marginBottom: 10 }}>
+        Reparto por comensal
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.map(it => {
+          const val = distribution[it.id] || 0
+          return (
+            <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, fontSize: '.82rem', color: text }}>{it.label}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="number"
+                  min={0}
+                  max={totalGuests}
+                  value={val}
+                  onChange={e => {
+                    const n = Math.max(0, Math.min(totalGuests, parseInt(e.target.value) || 0))
+                    onChange(it.id, n)
+                  }}
+                  style={{
+                    width: 70, textAlign: 'center', fontSize: '.84rem', fontWeight: 600,
+                    padding: '6px 8px', borderRadius: 6,
+                    border: `1.5px solid ${border}`,
+                    background: dark ? 'rgba(255,255,255,.06)' : '#fff',
+                    color: text, outline: 'none',
+                  }}
+                />
+                <span style={{ fontSize: '.72rem', color: sub, whiteSpace: 'nowrap' }}>pers.</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ marginTop: 12 }}>
+        <div style={{ height: 4, borderRadius: 2, background: dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)', overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', borderRadius: 2, transition: 'width .2s, background .2s',
+            width: `${Math.min(100, (assigned / totalGuests) * 100)}%`,
+            background: over ? '#e53e3e' : complete ? primary : `rgba(${rgb},.5)`,
+          }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: '.72rem' }}>
+          <span style={{ color: over ? '#e53e3e' : complete ? primary : sub, fontWeight: complete || over ? 600 : 400 }}>
+            {complete ? `✓ ${assigned} / ${totalGuests} — Completo` : over ? `⚠ ${assigned} / ${totalGuests} — Excedido` : `${assigned} / ${totalGuests} comensales asignados`}
+          </span>
+          {!complete && !over && remaining > 0 && (
+            <span style={{ color: sub }}>{remaining} restantes</span>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }

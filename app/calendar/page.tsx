@@ -296,7 +296,7 @@ export default function CalendarioPage() {
   const today  = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
-  const [calView, setCalView] = useState<'month' | 'week' | 'day' | 'agenda' | 'tasks'>('month')
+  const [calView, setCalView] = useState<'month' | 'week' | 'day' | 'tasks'>('month')
   const [calFullscreen, setCalFullscreen] = useState(false)
 
   // Escape exits fullscreen
@@ -386,10 +386,6 @@ export default function CalendarioPage() {
       to = `${endD.getFullYear()}-${pad2(endD.getMonth()+1)}-${pad2(endD.getDate())}`
     } else if (calView === 'day') {
       from = dayDate; to = dayDate
-    } else if (calView === 'agenda' && subView === 'list') {
-      from = dayDate
-      const endD = new Date(dayDate + 'T12:00:00'); endD.setDate(endD.getDate() + 29)
-      to = `${endD.getFullYear()}-${pad2(endD.getMonth()+1)}-${pad2(endD.getDate())}`
     } else {
       const lastDay = new Date(year, month + 1, 0).getDate()
       from = dateStr(year, month, 1)
@@ -1138,7 +1134,7 @@ export default function CalendarioPage() {
               {/* Calendar header */}
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ivory)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 {/* Left: period label + Hoy (calendar views) OR title + date picker (agenda/tasks) */}
-                {calView !== 'agenda' && calView !== 'tasks' ? (
+                {calView !== 'tasks' ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, color: 'var(--espresso)', fontWeight: 500, letterSpacing: '0.01em' }}>
                       {periodLabel}
@@ -1151,7 +1147,7 @@ export default function CalendarioPage() {
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, color: 'var(--espresso)', fontWeight: 500, letterSpacing: '0.01em' }}>
-                      {calView === 'agenda' ? 'Agenda' : 'Tareas'}
+                      Tareas
                     </span>
                     {/* Sub-toggle: Lista / Calendario */}
                     <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 6, padding: 2, gap: 1 }}>
@@ -1185,7 +1181,7 @@ export default function CalendarioPage() {
 
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   {/* View tabs — two groups */}
-                  {calView !== 'agenda' && calView !== 'tasks' ? (
+                  {calView !== 'tasks' ? (
                     <>
                       {/* Calendar views group */}
                       <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
@@ -1200,24 +1196,22 @@ export default function CalendarioPage() {
                           </button>
                         ))}
                       </div>
-                      {/* Link to Agenda/Tareas */}
-                      <div style={{ display: 'flex', gap: 2 }}>
-                        {(['agenda','tasks'] as const).map(v => {
-                          const pendingOverdue = v === 'tasks' ? tasks.filter(t => !t.completed && t.due_date <= todayIso).length : 0
-                          return (
-                            <button key={v} type="button" onClick={() => { setCalView(v); setSubView('list') }}
-                              style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', cursor: 'pointer', fontWeight: 500,
-                                color: 'var(--warm-gray)', fontFamily: 'Inter, sans-serif', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              {v === 'agenda' ? 'Agenda' : 'Tareas'}
-                              {pendingOverdue > 0 && (
-                                <span style={{ background: '#BC5249', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
-                                  {pendingOverdue}
-                                </span>
-                              )}
-                            </button>
-                          )
-                        })}
-                      </div>
+                      {/* Link to Tareas */}
+                      {(() => {
+                        const pendingOverdue = tasks.filter(t => !t.completed && t.due_date <= todayIso).length
+                        return (
+                          <button type="button" onClick={() => { setCalView('tasks'); setSubView('list') }}
+                            style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--ivory)', background: 'transparent', cursor: 'pointer', fontWeight: 500,
+                              color: 'var(--warm-gray)', fontFamily: 'Inter, sans-serif', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            Tareas
+                            {pendingOverdue > 0 && (
+                              <span style={{ background: '#BC5249', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
+                                {pendingOverdue}
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })()}
                       {/* Period nav arrows */}
                       <button onClick={prevPeriod}
                         style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--ivory)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--charcoal)' }}>
@@ -1230,18 +1224,16 @@ export default function CalendarioPage() {
                     </>
                   ) : (
                     <>
-                      {/* Agenda/Tareas group */}
+                      {/* Tareas label */}
                       <div style={{ display: 'flex', background: '#f3f0ec', borderRadius: 8, padding: 2, gap: 1 }}>
-                        {(['agenda','tasks'] as const).map(v => {
-                          const pendingOverdue = v === 'tasks' ? tasks.filter(t => !t.completed && t.due_date <= todayIso).length : 0
+                        {(() => {
+                          const pendingOverdue = tasks.filter(t => !t.completed && t.due_date <= todayIso).length
                           return (
-                            <button key={v} type="button" onClick={() => { setCalView(v); setSubView('list') }}
+                            <button type="button" onClick={() => { setCalView('tasks'); setSubView('list') }}
                               style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
-                                background: calView === v ? '#fff' : 'transparent',
-                                color: calView === v ? 'var(--charcoal)' : 'var(--warm-gray)',
-                                boxShadow: calView === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none',
+                                background: '#fff', color: 'var(--charcoal)', boxShadow: '0 1px 3px rgba(0,0,0,.08)',
                                 fontFamily: 'Inter, sans-serif', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              {v === 'agenda' ? 'Agenda' : 'Tareas'}
+                              Tareas
                               {pendingOverdue > 0 && (
                                 <span style={{ background: '#BC5249', color: '#fff', borderRadius: 99, fontSize: 9, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: 1.6 }}>
                                   {pendingOverdue}
@@ -1249,7 +1241,7 @@ export default function CalendarioPage() {
                               )}
                             </button>
                           )
-                        })}
+                        })()}
                       </div>
                       {/* Link back to Calendar */}
                       <button type="button" onClick={() => setCalView('month')}
@@ -1277,7 +1269,7 @@ export default function CalendarioPage() {
               </div>
 
               {/* Filter buttons + date range — calendar views only */}
-              {calView !== 'agenda' && calView !== 'tasks' && (
+              {calView !== 'tasks' && (
               <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid var(--ivory)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 {([
                   { key: 'all',    label: 'Todos',             color: 'var(--gold)' },
@@ -1702,7 +1694,7 @@ export default function CalendarioPage() {
               })()}
 
               {/* ── Agenda/Tasks calendar sub-view (mini month) ────────── */}
-              {!loading && (calView === 'agenda' || calView === 'tasks') && subView === 'cal' && (() => {
+              {!loading && calView === 'tasks' && subView === 'cal' && (() => {
                 const lastDayCal = new Date(year, month + 1, 0).getDate()
                 const startDowCal = new Date(year, month, 1).getDay()
                 const offsetCal = startDowCal === 0 ? 6 : startDowCal - 1
@@ -1781,84 +1773,6 @@ export default function CalendarioPage() {
                         </>
                       )}
                     </div>
-                  </div>
-                )
-              })()}
-
-              {/* ── Agenda list view ──────────────────────────────────────── */}
-              {!loading && calView === 'agenda' && subView === 'list' && (() => {
-                const startDate = filterFrom || dayDate
-                const endDate = filterTo || undefined
-                const agendaDates: string[] = []
-                for (let i = 0; i < (endDate ? 365 : 30); i++) {
-                  const d = new Date(startDate + 'T12:00:00'); d.setDate(d.getDate() + i)
-                  const iso = `${d.getFullYear()}-${pad2cal(d.getMonth()+1)}-${pad2cal(d.getDate())}`
-                  if (endDate && iso > endDate) break
-                  agendaDates.push(iso)
-                }
-                const DOW_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
-                return (
-                  <div style={{ maxHeight: 520, overflowY: 'auto' }}>
-                    {agendaDates.map(iso => {
-                      const d = new Date(iso + 'T12:00:00')
-                      const entry = entries[iso]
-                      const isPast = iso < todayIso
-                      const isToday = iso === todayIso
-                      const cfg = entry?.status ? STATUS_CFG[entry.status as Status] ?? STATUS_CFG['libre'] : STATUS_CFG['libre']
-                      const dLeads = (leadsByDate[iso] || [])
-                      const vLeads = leads.filter(l => l.visit_date === iso)
-                      const dInqs = pendingInquiries.filter(i => i.event_at?.slice(0,10) === iso)
-                      const dTasks = tasksByDate[iso] || []
-                      const hasContent = (entry && entry.status !== 'libre') || vLeads.length > 0 || dInqs.length > 0 || dLeads.length > 0 || dTasks.length > 0
-                      return (
-                        <div key={iso} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--ivory)', background: isToday ? '#fffbf0' : 'transparent', opacity: isPast ? 0.45 : 1 }}>
-                          {/* Date */}
-                          <div style={{ minWidth: 52, textAlign: 'center', paddingTop: 2 }}>
-                            <div style={{ fontSize: 9, fontWeight: 600, color: d.getDay() >= 6 ? 'var(--gold)' : 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{DOW_SHORT[d.getDay()]}</div>
-                            <div style={{ fontSize: 17, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--gold)' : 'var(--charcoal)', fontFamily: 'Inter, sans-serif', lineHeight: 1.1 }}>{d.getDate()}</div>
-                            <div style={{ fontSize: 9, color: 'var(--warm-gray)' }}>{MONTHS[d.getMonth()].slice(0,3)}</div>
-                          </div>
-                          {/* Events */}
-                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 2 }}>
-                            {!hasContent && <span style={{ fontSize: 11, color: '#c0bbB4', fontStyle: 'italic' }}>Libre</span>}
-                            {entry && entry.status !== 'libre' && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
-                                <span style={{ fontSize: 11, fontWeight: 600, color: cfg.color }}>{cfg.label}{entry.lead_id && leadsById[entry.lead_id] ? ` · ${leadsById[entry.lead_id].name}` : ''}</span>
-                              </div>
-                            )}
-                            {vLeads.map(vl => (
-                              <div key={vl.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#5C8570', flexShrink: 0 }} />
-                                <span style={{ fontSize: 11, fontWeight: 600, color: '#467A60' }}>Visita · {vl.name}{(vl as any).visit_time ? ` · ${(vl as any).visit_time}` : ''}</span>
-                              </div>
-                            ))}
-                            {dInqs.map(inq => (
-                              <div key={inq.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
-                                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)' }}>{inq.kind === 'visit' ? 'Visita' : inq.kind === 'video' ? 'Videollamada' : 'Llamada'} · {inq.name}</span>
-                              </div>
-                            ))}
-                            {dLeads.filter(l => !vLeads.some(v => v.id === l.id)).map(l => (
-                              <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4F6D8C', flexShrink: 0 }} />
-                                <span style={{ fontSize: 11, color: '#3F5980' }}>{l.name}</span>
-                              </div>
-                            ))}
-                            {dTasks.map(t => (
-                              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7E72A0', flexShrink: 0 }} />
-                                <span style={{ fontSize: 11, color: '#4F417A', fontWeight: 500 }}>{t.title}</span>
-                                <button onClick={() => toggleTask(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#7E72A0', display: 'flex', alignItems: 'center' }} title="Marcar completada">
-                                  <CheckCircle2 size={12} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                          {!isPast && <button onClick={() => setModalDate(iso)} style={{ fontSize: 10, padding: '3px 9px', borderRadius: 6, border: '1px solid var(--ivory)', background: '#faf8f5', color: 'var(--warm-gray)', cursor: 'pointer', flexShrink: 0 }}>Editar</button>}
-                        </div>
-                      )
-                    })}
                   </div>
                 )
               })()}
@@ -1992,7 +1906,7 @@ export default function CalendarioPage() {
               })()}
 
               {/* Legend — hidden in agenda/tasks views */}
-              {calView !== 'tasks' && calView !== 'agenda' && (
+              {calView !== 'tasks' && (
               <div style={{ padding: '12px 20px', borderTop: '1px solid var(--ivory)', display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
                 {Object.entries(STATUS_CFG).map(([key, cfg]) => (
                   <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

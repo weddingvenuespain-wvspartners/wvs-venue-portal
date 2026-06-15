@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const body = await req.json()
-    const { name, description, duration_label, duration_type, day_from, day_to, sort_order, venue_id, commercial_config_id } = body
+    const { name, description, duration_label, duration_type, day_from, day_to, sort_order, venue_id, commercial_config_id, linked_menu_ids, days_of_week, includes, min_guests, max_guests } = body
 
     if (!name?.trim()) return NextResponse.json({ error: 'El nombre es obligatorio' }, { status: 400 })
     if (!commercial_config_id) return NextResponse.json({ error: 'commercial_config_id requerido — toda modalidad pertenece a una configuración' }, { status: 400 })
@@ -66,6 +66,11 @@ export async function POST(req: Request) {
         day_from:       day_from ?? null,
         day_to:         day_to   ?? null,
         sort_order:     sort_order ?? 0,
+        linked_menu_ids: linked_menu_ids ?? null,
+        days_of_week:   days_of_week ?? null,
+        includes:       includes ?? null,
+        min_guests:     min_guests ?? null,
+        max_guests:     max_guests ?? null,
       })
       .select()
       .single()

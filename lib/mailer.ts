@@ -597,3 +597,237 @@ export async function sendNewLeadEmail({
 </body></html>`,
   })
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUBSCRIPTION LIFECYCLE EMAILS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const FOREVENTOS_COLOR = '#4A6B52'
+const portalBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.foreventos.com'
+
+function subscriptionEmailWrapper(title: string, body: string, ctaUrl?: string, ctaLabel?: string): string {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#F5F3ED;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F3ED;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+        <tr><td align="center" style="padding-bottom:24px;">
+          <span style="font-size:20px;font-weight:800;color:${FOREVENTOS_COLOR};letter-spacing:-0.3px;">FOREVENTOS</span>
+        </td></tr>
+        <tr><td style="background:#ffffff;border-radius:12px;padding:32px 28px;border:1px solid #E9E5DC;">
+          <h2 style="margin:0 0 16px;font-size:18px;font-weight:700;color:#453D23;">${title}</h2>
+          ${body}
+          ${ctaUrl ? `<div style="margin-top:24px;" align="center">
+            <a href="${ctaUrl}" style="display:inline-block;background:${FOREVENTOS_COLOR};color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
+              ${ctaLabel || 'Ir al portal'}
+            </a>
+          </div>` : ''}
+        </td></tr>
+        <tr><td align="center" style="padding-top:20px;">
+          <p style="margin:0;font-size:11px;color:#9A8F78;">FOREVENTOS · <a href="mailto:info@foreventos.com" style="color:#9A8F78;">info@foreventos.com</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+}
+
+/** Subscription activated — sent when a new subscription is created */
+export async function sendSubscriptionConfirmedEmail({
+  to, venueName, planName, amount, intervalLabel,
+}: {
+  to: string; venueName: string; planName: string; amount: number; intervalLabel: string
+}) {
+  await transporter.sendMail({
+    from: '"FOREVENTOS" <noreply@weddingvenuesspain.com>',
+    to,
+    subject: `¡Suscripción activada! — ${planName} para ${venueName}`,
+    html: subscriptionEmailWrapper(
+      '¡Tu suscripción está activa!',
+      `<p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        Hola,<br><br>
+        Tu suscripción al plan <strong>${planName}</strong> para <strong>${venueName}</strong> ya está activa. ¡Bienvenido a FOREVENTOS!
+      </p>
+      <div style="background:#F5F3ED;border-radius:8px;padding:14px 18px;margin-bottom:14px;">
+        <table cellpadding="4" style="font-size:14px;color:#453D23;">
+          <tr><td style="color:#796F4E;">Plan:</td><td><strong>${planName}</strong></td></tr>
+          <tr><td style="color:#796F4E;">Importe:</td><td><strong>${amount}€/${intervalLabel}</strong></td></tr>
+        </table>
+      </div>
+      <p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        Ya puedes acceder a todas las funcionalidades de tu plan. Si necesitas ayuda para empezar, no dudes en contactarnos.
+      </p>
+      <p style="margin:0;font-size:13px;color:#8A7D64;line-height:1.6;">
+        ¿Dudas? Escríbenos a <a href="mailto:info@foreventos.com" style="color:${FOREVENTOS_COLOR};">info@foreventos.com</a>.
+      </p>`,
+      `${portalBaseUrl}/dashboard`,
+      'Ir al portal →'
+    ),
+  })
+}
+
+/** Plan upgrade/downgrade — sent when user changes plan */
+export async function sendPlanChangeEmail({
+  to, venueName, oldPlanName, newPlanName, amount, intervalLabel, isUpgrade,
+}: {
+  to: string; venueName: string; oldPlanName: string; newPlanName: string; amount: number; intervalLabel: string; isUpgrade: boolean
+}) {
+  await transporter.sendMail({
+    from: '"FOREVENTOS" <noreply@weddingvenuesspain.com>',
+    to,
+    subject: `Plan ${isUpgrade ? 'mejorado' : 'cambiado'} — ${newPlanName} para ${venueName}`,
+    html: subscriptionEmailWrapper(
+      isUpgrade ? '¡Plan mejorado!' : 'Tu plan ha sido cambiado',
+      `<p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        Hola,<br><br>
+        ${isUpgrade
+          ? `Has mejorado tu plan de <strong>${oldPlanName}</strong> a <strong>${newPlanName}</strong> para <strong>${venueName}</strong>. ¡Genial!`
+          : `Tu plan para <strong>${venueName}</strong> ha cambiado de <strong>${oldPlanName}</strong> a <strong>${newPlanName}</strong>.`
+        }
+      </p>
+      <div style="background:#F5F3ED;border-radius:8px;padding:14px 18px;margin-bottom:14px;">
+        <table cellpadding="4" style="font-size:14px;color:#453D23;">
+          <tr><td style="color:#796F4E;">Nuevo plan:</td><td><strong>${newPlanName}</strong></td></tr>
+          <tr><td style="color:#796F4E;">Importe:</td><td><strong>${amount}€/${intervalLabel}</strong></td></tr>
+        </table>
+      </div>
+      <p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        El cambio se ha aplicado de inmediato con prorrateo automático. Puedes ver los detalles en tu perfil de facturación.
+      </p>
+      <p style="margin:0;font-size:13px;color:#8A7D64;line-height:1.6;">
+        ¿Dudas? Escríbenos a <a href="mailto:info@foreventos.com" style="color:${FOREVENTOS_COLOR};">info@foreventos.com</a>.
+      </p>`,
+      `${portalBaseUrl}/profile?section=plan`,
+      'Ver mi plan →'
+    ),
+  })
+}
+
+/** Trial expiring in N days — sent at 3 days and 1 day before expiry */
+export async function sendTrialExpiringEmail({
+  to, venueName, daysLeft, trialEndDate,
+}: {
+  to: string; venueName: string; daysLeft: number; trialEndDate: string
+}) {
+  const urgency = daysLeft <= 1 ? '⚠️ ' : ''
+  const endFormatted = new Date(trialEndDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  await transporter.sendMail({
+    from: '"FOREVENTOS" <noreply@weddingvenuesspain.com>',
+    to,
+    subject: `${urgency}Tu prueba gratuita termina ${daysLeft <= 1 ? 'mañana' : `en ${daysLeft} días`} — ${venueName}`,
+    html: subscriptionEmailWrapper(
+      daysLeft <= 1 ? 'Tu prueba termina mañana' : `Tu prueba termina en ${daysLeft} días`,
+      `<p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        Hola,<br><br>
+        Tu período de prueba gratuita de <strong>FOREVENTOS</strong> para <strong>${venueName}</strong> finaliza el <strong>${endFormatted}</strong>.
+      </p>
+      <p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        ${daysLeft <= 1
+          ? 'A partir de mañana perderás acceso a las funcionalidades premium: propuestas digitales, presupuestos, estructura comercial y más.'
+          : 'Para seguir disfrutando de todas las funcionalidades sin interrupción, activa tu plan antes de que termine la prueba.'
+        }
+      </p>
+      <p style="margin:0;font-size:13px;color:#8A7D64;line-height:1.6;">
+        Si tienes dudas, responde a este email o contacta con nosotros en <a href="mailto:info@foreventos.com" style="color:${FOREVENTOS_COLOR};">info@foreventos.com</a>.
+      </p>`,
+      `${portalBaseUrl}/pricing`,
+      'Activar mi plan →'
+    ),
+  })
+}
+
+/** Payment failed — card declined or processing error */
+export async function sendPaymentFailedEmail({
+  to, venueName, amount, errorMessage,
+}: {
+  to: string; venueName: string; amount?: number; errorMessage?: string
+}) {
+  await transporter.sendMail({
+    from: '"FOREVENTOS" <noreply@weddingvenuesspain.com>',
+    to,
+    subject: `⚠️ Problema con tu pago — ${venueName}`,
+    html: subscriptionEmailWrapper(
+      'No hemos podido procesar tu pago',
+      `<p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        Hola,<br><br>
+        Hemos intentado procesar ${amount ? `el cobro de <strong>${amount}€</strong>` : 'tu pago'} para la suscripción de <strong>${venueName}</strong> en FOREVENTOS, pero no ha sido posible.
+      </p>
+      ${errorMessage ? `<p style="margin:0 0 14px;font-size:13px;color:#BC5249;background:#FFF5F5;padding:10px 14px;border-radius:6px;border:1px solid #FECDD3;">
+        ${errorMessage}
+      </p>` : ''}
+      <p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        Para evitar la interrupción del servicio, por favor actualiza tu método de pago o contacta con nosotros.
+      </p>
+      <p style="margin:0;font-size:13px;color:#8A7D64;line-height:1.6;">
+        Si ya has resuelto el problema, puedes ignorar este email. El cobro se intentará de nuevo automáticamente.
+      </p>`,
+      `${portalBaseUrl}/profile?section=facturacion`,
+      'Revisar facturación →'
+    ),
+  })
+}
+
+/** Subscription renewal reminder — sent 7 days before renewal */
+export async function sendRenewalReminderEmail({
+  to, venueName, renewalDate, amount, planName,
+}: {
+  to: string; venueName: string; renewalDate: string; amount: number; planName: string
+}) {
+  const dateFormatted = new Date(renewalDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  await transporter.sendMail({
+    from: '"FOREVENTOS" <noreply@weddingvenuesspain.com>',
+    to,
+    subject: `Tu suscripción se renueva pronto — ${venueName}`,
+    html: subscriptionEmailWrapper(
+      'Aviso de renovación',
+      `<p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        Hola,<br><br>
+        Te informamos de que tu suscripción <strong>${planName}</strong> para <strong>${venueName}</strong> se renovará automáticamente el <strong>${dateFormatted}</strong> por un importe de <strong>${amount}€</strong>.
+      </p>
+      <p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        No tienes que hacer nada — la renovación es automática. Si quieres hacer algún cambio en tu plan, puedes hacerlo desde tu perfil.
+      </p>
+      <p style="margin:0;font-size:13px;color:#8A7D64;line-height:1.6;">
+        ¿Dudas? Escríbenos a <a href="mailto:info@foreventos.com" style="color:${FOREVENTOS_COLOR};">info@foreventos.com</a>.
+      </p>`,
+      `${portalBaseUrl}/profile?section=plan`,
+      'Ver mi plan →'
+    ),
+  })
+}
+
+/** Subscription cancelled confirmation */
+export async function sendCancellationConfirmEmail({
+  to, venueName, effectiveDate,
+}: {
+  to: string; venueName: string; effectiveDate: string
+}) {
+  const dateFormatted = new Date(effectiveDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  await transporter.sendMail({
+    from: '"FOREVENTOS" <noreply@weddingvenuesspain.com>',
+    to,
+    subject: `Confirmación de cancelación — ${venueName}`,
+    html: subscriptionEmailWrapper(
+      'Tu suscripción ha sido cancelada',
+      `<p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        Hola,<br><br>
+        Confirmamos que tu suscripción de <strong>${venueName}</strong> en FOREVENTOS ha sido cancelada.
+      </p>
+      <p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        Podrás seguir utilizando la plataforma con normalidad hasta el <strong>${dateFormatted}</strong>. Después de esa fecha, tu cuenta pasará al plan gratuito con funcionalidades limitadas.
+      </p>
+      <p style="margin:0 0 14px;font-size:14px;color:#453D23;line-height:1.6;">
+        Si cambias de opinión, puedes reactivar tu plan en cualquier momento desde tu perfil.
+      </p>
+      <p style="margin:0;font-size:13px;color:#8A7D64;line-height:1.6;">
+        Lamentamos verte partir. Si hay algo que podamos mejorar, nos encantaría saberlo: <a href="mailto:info@foreventos.com" style="color:${FOREVENTOS_COLOR};">info@foreventos.com</a>.
+      </p>`,
+      `${portalBaseUrl}/pricing`,
+      'Reactivar mi plan →'
+    ),
+  })
+}

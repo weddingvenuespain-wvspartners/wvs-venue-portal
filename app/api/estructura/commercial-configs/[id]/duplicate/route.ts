@@ -33,7 +33,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         user_id: session.user.id,
         venue_id: original.venue_id,
         name: newName,
-        config: original.config,
+        config: original.config,                // copies zones/supplements/space_groups inside JSON
+        config_type: original.config_type ?? 'space',
         is_default: false,
         sort_order: original.sort_order + 1,
       })

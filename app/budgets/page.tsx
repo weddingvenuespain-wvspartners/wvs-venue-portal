@@ -12,10 +12,10 @@ import FeatureGate from '@/components/FeatureGate'
 import {
   Plus, Trash2, Send, X, Check, Eye, Pencil, Copy,
   Search, Receipt, Star, MessageCircle, Mail, Link2,
-  Loader2, AlertCircle, User, Calculator, LayoutTemplate, CreditCard,
+  Loader2, AlertCircle, User, Calculator, CreditCard,
   CheckCircle, Clock, ExternalLink,
 } from 'lucide-react'
-import type { Budget, BudgetStatus, PaymentTemplate, LineItemGroup } from '@/lib/budget-types'
+import type { Budget, BudgetStatus, PaymentTemplate } from '@/lib/budget-types'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 const S_BADGE: Record<BudgetStatus, string> = {
@@ -35,15 +35,6 @@ const S_LABEL: Record<BudgetStatus, string> = {
 
 type BudgetLead = { id: string; name: string; email?: string; phone?: string }
 
-type StructureTemplate = {
-  id: string
-  name: string
-  description: string | null
-  is_default: boolean
-  line_items: { groups: LineItemGroup[] }
-  created_at: string
-}
-
 let cachedBudgets: Budget[] | null = null
 
 export default function BudgetsPage() {
@@ -52,11 +43,11 @@ export default function BudgetsPage() {
   const { isBlocked } = useRequireSubscription()
   const features = usePlanFeatures()
 
-  const [activeTab, setActiveTab] = useState<'budgets' | 'payment_templates' | 'structure_templates'>('budgets')
+  const [activeTab, setActiveTab] = useState<'budgets' | 'payment_templates'>('budgets')
   const [budgets, setBudgets] = useState<Budget[]>(cachedBudgets ?? [])
   const [leads, setLeads] = useState<BudgetLead[]>([])
   const [templates, setTemplates] = useState<PaymentTemplate[]>([])
-  const [structureTemplates, setStructureTemplates] = useState<StructureTemplate[]>([])
+
   const [loading, setLoading] = useState(cachedBudgets === null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | BudgetStatus>('all')
@@ -75,16 +66,14 @@ export default function BudgetsPage() {
   const load = async () => {
     if (!activeVenue) { setLoading(false); return }
     const supabase = createClient()
-    const [r1, r2, r3, r4] = await Promise.all([
+    const [r1, r2, r3] = await Promise.all([
       supabase.from('budgets').select('*').eq('venue_id', activeVenue.id).order('created_at', { ascending: false }),
       supabase.from('leads').select('id, name, email, phone').eq('venue_id', activeVenue.id).order('created_at', { ascending: false }),
       supabase.from('budget_payment_templates').select('*').eq('venue_id', activeVenue.id).order('created_at'),
-      supabase.from('budget_structure_templates').select('*').eq('venue_id', activeVenue.id).order('created_at').then(r => r, () => ({ data: null, error: true })),
     ])
     if (r1.data) { cachedBudgets = r1.data as Budget[]; setBudgets(cachedBudgets) }
     if (r2.data) setLeads(r2.data as BudgetLead[])
     if (r3.data) setTemplates(r3.data as PaymentTemplate[])
-    if (r4.data) setStructureTemplates(r4.data as StructureTemplate[])
     setLoading(false)
   }
 
@@ -189,11 +178,10 @@ export default function BudgetsPage() {
 
         <Tabs
           activeKey={activeTab}
-          onChange={k => setActiveTab(k as 'budgets' | 'payment_templates' | 'structure_templates')}
+          onChange={k => setActiveTab(k as 'budgets' | 'payment_templates')}
           tabs={[
-            { key: 'budgets',             label: 'Presupuestos',            icon: Receipt },
-            { key: 'structure_templates', label: 'Plantillas de estructura', icon: LayoutTemplate },
-            { key: 'payment_templates',   label: 'Plantillas de pago',      icon: Calculator },
+            { key: 'budgets',             label: 'Presupuestos',       icon: Receipt },
+            { key: 'payment_templates',   label: 'Plantillas de pago', icon: Calculator },
           ]}
         />
 
@@ -204,8 +192,6 @@ export default function BudgetsPage() {
             </div>
           ) : activeTab === 'payment_templates' ? (
             <PaymentTemplatesTab templates={templates} userId={user!.id} venueId={activeVenue!.id} onRefresh={load} />
-          ) : activeTab === 'structure_templates' ? (
-            <StructureTemplatesTab templates={structureTemplates} userId={user!.id} venueId={activeVenue!.id} onRefresh={load} />
           ) : (
             <>
               {/* Filters */}
@@ -445,7 +431,7 @@ export default function BudgetsPage() {
   )
 }
 
-// ── Payment Templates Tab ─────────────���──────────────────────────────────────
+// ── Payment Templates Tab ──────────────────────────────────────────────────────
 
 function PaymentTemplatesTab({ templates, userId, venueId, onRefresh }: {
   templates: PaymentTemplate[]; userId: string; venueId: string; onRefresh: () => void
@@ -601,117 +587,6 @@ function PaymentTemplatesTab({ templates, userId, venueId, onRefresh }: {
               </div>
             </div>
           ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Structure Templates Tab ──────────────────────────────────────────────────
-
-function StructureTemplatesTab({ templates, userId, venueId, onRefresh }: {
-  templates: StructureTemplate[]; userId: string; venueId: string; onRefresh: () => void
-}) {
-  const router = useRouter()
-  const [saving, setSaving] = useState(false)
-
-  const calcTotal = (groups: LineItemGroup[]) =>
-    groups.reduce((s, g) => s + g.items.reduce((is, i) => is + i.subtotal, 0), 0)
-
-  const createBlank = async () => {
-    setSaving(true)
-    const supabase = createClient()
-    const { data, error } = await supabase.from('budget_structure_templates').insert({
-      user_id: userId,
-      venue_id: venueId,
-      name: 'Mi plantilla',
-      description: null,
-      is_default: templates.length === 0,
-      line_items: { groups: [] },
-    }).select('id').single()
-    if (error) { console.error('Error creating blank template:', error); setSaving(false); return }
-    router.push(`/budgets/templates/${data.id}`)
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar esta plantilla de estructura?')) return
-    const supabase = createClient()
-    await supabase.from('budget_structure_templates').delete().eq('id', id)
-    onRefresh()
-  }
-
-  const setDefault = async (id: string) => {
-    const supabase = createClient()
-    await supabase.from('budget_structure_templates').update({ is_default: false }).eq('venue_id', venueId)
-    await supabase.from('budget_structure_templates').update({ is_default: true }).eq('id', id)
-    onRefresh()
-  }
-
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)', marginBottom: 2 }}>Mis plantillas</div>
-          <div style={{ fontSize: 12, color: 'var(--warm-gray)' }}>
-            Crea estructuras reutilizables con grupos de conceptos y precios base. Se aplican automaticamente al crear un presupuesto nuevo.
-          </div>
-        </div>
-        <button onClick={createBlank} className="btn btn-primary btn-sm" disabled={saving}>
-          <Plus size={12} /> Nueva plantilla
-        </button>
-      </div>
-
-      {templates.length === 0 ? (
-        <div style={{ padding: '40px 20px', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 10, textAlign: 'center' }}>
-          <div style={{ fontSize: 13, color: 'var(--warm-gray)', marginBottom: 12 }}>
-            Todavia no tienes plantillas. Crea una para agilizar la creacion de presupuestos.
-          </div>
-          <button onClick={createBlank} className="btn btn-primary btn-sm" disabled={saving}>
-            <Plus size={12} /> Crear primera plantilla
-          </button>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {templates.map(tpl => {
-            const groups = tpl.line_items?.groups ?? []
-            const total = calcTotal(groups)
-            const groupCount = groups.length
-            const itemCount = groups.reduce((s, g) => s + g.items.length, 0)
-            return (
-              <div
-                key={tpl.id}
-                className="card"
-                style={{ padding: '14px 20px', cursor: 'pointer', transition: 'border-color .15s, box-shadow .15s' }}
-                onClick={() => router.push(`/budgets/templates/${tpl.id}`)}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,.06)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = '' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--espresso)' }}>{tpl.name}</div>
-                      {tpl.is_default && <span style={{ fontSize: 10, background: '#F3EBD8', color: '#7A5A2E', padding: '1px 8px', borderRadius: 10, fontWeight: 600 }}>Predeterminada</span>}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginTop: 2, display: 'flex', gap: 10 }}>
-                      <span>{groupCount} grupo{groupCount !== 1 ? 's' : ''}</span>
-                      <span>{itemCount} concepto{itemCount !== 1 ? 's' : ''}</span>
-                      {total > 0 && <span style={{ fontWeight: 600 }}>~{total.toLocaleString('es-ES')} EUR</span>}
-                    </div>
-                    {tpl.description && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{tpl.description}</div>}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => router.push(`/budgets/templates/${tpl.id}`)} className="btn btn-ghost btn-sm" title="Editar"><Pencil size={13} /></button>
-                    {!tpl.is_default && (
-                      <button onClick={() => setDefault(tpl.id)} className="btn btn-ghost btn-sm" title="Predeterminada"><Star size={13} /></button>
-                    )}
-                    <button onClick={() => handleDelete(tpl.id)} className="btn btn-ghost btn-sm" title="Eliminar">
-                      <Trash2 size={13} style={{ color: 'var(--rose)' }} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
         </div>
       )}
     </div>

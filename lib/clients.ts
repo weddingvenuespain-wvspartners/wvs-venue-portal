@@ -47,10 +47,18 @@ export const CLIENT_TYPE_LABELS: Record<ClientType, string> = {
 export const CLIENT_TYPE_COLORS: Record<ClientType, { bg: string; color: string; border: string }> = {
   pareja:          { bg: '#F3EBD8', color: '#7A5A2E', border: '#E2D4AE' },
   wedding_planner: { bg: '#f3e8ff', color: '#5A4878', border: '#d8b4fe' },
-  organizador:     { bg: '#DDE5EF', color: '#39527A', border: '#AFC0D2' },
-  empresa:         { bg: '#f1f5f9', color: '#334155', border: '#cbd5e1' },
+  organizador:     { bg: '#f3e8ff', color: '#5A4878', border: '#d8b4fe' },
+  empresa:         { bg: '#f3e8ff', color: '#5A4878', border: '#d8b4fe' },
   cliente:         { bg: '#EDF2ED', color: '#35513E', border: '#BFD2C5' },
   otro:            { bg: '#f5f5f4', color: '#57534e', border: '#d6d3d1' },
+}
+
+/** Professional contact types — can have linked couples, collaborations, commissions */
+export const PROFESSIONAL_TYPES: ClientType[] = ['wedding_planner', 'organizador', 'empresa']
+
+/** Check if a client type is a professional/collaborator (WP, organizer, company) */
+export function isProfessional(clientType: ClientType | string | null | undefined): boolean {
+  return PROFESSIONAL_TYPES.includes(clientType as ClientType)
 }
 
 // ── Auto-match: find or create client for a lead ──────────────────────────────

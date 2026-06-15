@@ -11,25 +11,27 @@ import { useAuth } from './auth-context'
 //   'restriction' → internal admin only, never shown on web
 
 export type PlanFeatures = {
-  // ── Basic tier (both plans include these) ──────────────────────────────────
+  // ── Basic tier (all plans include these) ──────────────────────────────────
   ficha:                  boolean  // Ficha del venue — editar y publicar
   leads:                  boolean  // Recibir y gestionar leads
   leads_date_filter:      boolean  // Filtrar leads por rango de fechas
+  leads_export:           boolean  // Exportar leads a CSV/Excel
   calendario:             boolean  // Calendario de disponibilidad
   estadisticas:           boolean  // Estadísticas básicas
 
-  // ── Premium tier (only shown in premium column on web) ────────────────────
-  estructura:             boolean  // Estructura comercial: modalidades y tarifas
-  leads_export:           boolean  // Exportar leads a CSV/Excel
-  pipeline:               boolean  // Pipeline visual de ventas (kanban/embudo)
+  // ── Premium tier (gated — toggling these has real UI impact) ──────────────
   propuestas:             boolean  // Crear propuestas digitales
   propuestas_web:         boolean  // Web pública de propuesta (enlace para parejas)
-  propuestas_pdf:         boolean  // Descargar propuesta en PDF
   comunicacion:           boolean  // Tarifas, zonas y períodos de precio
+  estructura:             boolean  // Estructura comercial: modalidades y tarifas
   presupuestos:           boolean  // Crear presupuestos digitales
+  multiusuario:           boolean  // Múltiples usuarios por cuenta
+
+  // ── Future (not yet enforced but planned) ─────────────────────────────────
+  pipeline:               boolean  // Pipeline visual de ventas (kanban/embudo)
+  propuestas_pdf:         boolean  // Descargar propuesta en PDF
   estadisticas_avanzadas: boolean  // Estadísticas avanzadas e informes
   recordatorios:          boolean  // Recordatorios automáticos a parejas
-  multiusuario:           boolean  // Múltiples usuarios por cuenta
   soporte_prioritario:    boolean  // Soporte prioritario por email y teléfono
 
   // ── Restrictions (internal — true = limitation is ACTIVE) ────────────────
@@ -48,25 +50,27 @@ export type FeatureDef = {
 }
 
 export const FEATURE_DEFS: FeatureDef[] = [
-  // ── Basic ─────────────────────────────────────────────────────────────────
+  // ── Basic (all plans include) ─────────────────────────────────────────────
   { key: 'ficha',                  tier: 'basic',       label: 'Ficha del venue',                description: 'Editar y publicar la ficha del venue en el directorio' },
   { key: 'leads',                  tier: 'basic',       label: 'Gestión de leads',               description: 'Recibir y gestionar consultas de parejas interesadas' },
   { key: 'leads_date_filter',      tier: 'basic',       label: 'Filtrar leads por fecha',         description: 'Filtrar el listado de leads por rango de fechas de boda' },
+  { key: 'leads_export',           tier: 'basic',       label: 'Exportar leads a CSV',           description: 'Descargar todos los leads en formato Excel/CSV' },
   { key: 'calendario',             tier: 'basic',       label: 'Calendario de disponibilidad',   description: 'Ver y gestionar fechas disponibles del venue' },
   { key: 'estadisticas',           tier: 'basic',       label: 'Estadísticas básicas',           description: 'Métricas de leads recibidos, visitas y conversiones' },
 
-  // ── Premium ───────────────────────────────────────────────────────────────
-  { key: 'estructura',              tier: 'premium',     label: 'Estructura comercial',           description: 'Define modalidades de alquiler y tarifas por período para tu venue' },
-  { key: 'leads_export',           tier: 'basic',       label: 'Exportar leads a CSV',           description: 'Descargar todos los leads en formato Excel/CSV' },
-  { key: 'pipeline',               tier: 'premium',     label: 'Pipeline de ventas',             description: 'Vista kanban del embudo comercial con etapas personalizables' },
+  // ── Premium (enforced — toggling has real UI impact) ──────────────────────
   { key: 'propuestas',             tier: 'premium',     label: 'Propuestas digitales',           description: 'Crear y enviar propuestas personalizadas a cada pareja' },
   { key: 'propuestas_web',         tier: 'premium',     label: 'Web pública de propuesta',       description: 'Enlace público con la propuesta, accesible desde cualquier dispositivo' },
-  { key: 'propuestas_pdf',         tier: 'premium',     label: 'Descarga PDF de propuesta',      description: 'Exportar cualquier propuesta en formato PDF profesional' },
   { key: 'comunicacion',           tier: 'premium',     label: 'Tarifas y zonas de precio',      description: 'Configurar tarifas, zonas geográficas y períodos de precio' },
+  { key: 'estructura',             tier: 'premium',     label: 'Estructura comercial',           description: 'Define modalidades de alquiler y tarifas por período para tu venue' },
   { key: 'presupuestos',           tier: 'premium',     label: 'Presupuestos digitales',         description: 'Crear y enviar presupuestos personalizados con desglose y plan de pagos' },
+  { key: 'multiusuario',           tier: 'premium',     label: 'Múltiples usuarios',             description: 'Añadir miembros del equipo con acceso a la cuenta del venue' },
+
+  // ── Future (not yet enforced, shown in plan config for forward-compat) ───
+  { key: 'pipeline',               tier: 'premium',     label: 'Pipeline de ventas',             description: 'Vista kanban del embudo comercial con etapas personalizables' },
+  { key: 'propuestas_pdf',         tier: 'premium',     label: 'Descarga PDF de propuesta',      description: 'Exportar cualquier propuesta en formato PDF profesional' },
   { key: 'estadisticas_avanzadas', tier: 'premium',     label: 'Estadísticas avanzadas',         description: 'Informes detallados, tendencias y análisis de conversión por fuente' },
   { key: 'recordatorios',          tier: 'premium',     label: 'Recordatorios automáticos',      description: 'Enviar recordatorios automáticos a parejas según etapa del pipeline' },
-  { key: 'multiusuario',           tier: 'premium',     label: 'Múltiples usuarios',             description: 'Añadir miembros del equipo con acceso a la cuenta del venue' },
   { key: 'soporte_prioritario',    tier: 'premium',     label: 'Soporte prioritario',            description: 'Atención preferente por email y teléfono con tiempo de respuesta garantizado' },
 
   // ── Restrictions (admin internal — never shown on web) ────────────────────
@@ -76,46 +80,52 @@ export const FEATURE_DEFS: FeatureDef[] = [
 // ── Fallbacks (when plan has no permissions stored in DB) ─────────────────────
 
 export const BASIC_FALLBACK: PlanFeatures = {
+  // basic — all on
   ficha:                  true,
   leads:                  true,
   leads_date_filter:      true,
+  leads_export:           true,
   calendario:             true,
   estadisticas:           true,
-  leads_export:           true,
-  // premium → false
-  estructura:             false,
-  pipeline:               false,
+  // premium — off
   propuestas:             false,
   propuestas_web:         false,
-  propuestas_pdf:         false,
   comunicacion:           false,
+  estructura:             false,
   presupuestos:           false,
+  multiusuario:           false,
+  // future — off
+  pipeline:               false,
+  propuestas_pdf:         false,
   estadisticas_avanzadas: false,
   recordatorios:          false,
-  multiusuario:           false,
   soporte_prioritario:    false,
-  // restrictions → off by default
+  // restrictions — off
   leads_new_only:         false,
 }
 
 export const PREMIUM_FALLBACK: PlanFeatures = {
+  // basic — all on
   ficha:                  true,
   leads:                  true,
   leads_date_filter:      true,
+  leads_export:           true,
   calendario:             true,
   estadisticas:           true,
-  estructura:             true,
-  leads_export:           true,
-  pipeline:               true,
+  // premium — all on
   propuestas:             true,
   propuestas_web:         true,
-  propuestas_pdf:         true,
   comunicacion:           true,
+  estructura:             true,
   presupuestos:           true,
+  multiusuario:           true,
+  // future — on for premium
+  pipeline:               true,
+  propuestas_pdf:         true,
   estadisticas_avanzadas: true,
   recordatorios:          true,
-  multiusuario:           true,
   soporte_prioritario:    true,
+  // restrictions — off
   leads_new_only:         false,
 }
 

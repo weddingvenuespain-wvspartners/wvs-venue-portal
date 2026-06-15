@@ -7,8 +7,6 @@ import { useEffect, useState } from 'react'
 import type { ProposalData } from './page'
 import T1Impacto     from './tpl/T1Impacto'
 import T2Emocion     from './tpl/T2Emocion'
-import T3TodoClaro   from './tpl/T3TodoClaro'
-import T4SocialProof from './tpl/T4SocialProof'
 import T5Minimalista from './tpl/T5Minimalista'
 import T6Alojamiento from './tpl/T6Alojamiento'
 import LodgingSection from './LodgingSection'
@@ -139,8 +137,8 @@ export default function ProposalLanding({ data, preview }: { data: ProposalData;
   const tpl = (() => {
     switch (templateId) {
       case 2:  return <T2Emocion     data={withPlaceholders} />
-      case 3:  return <T3TodoClaro   data={withPlaceholders} />
-      case 4:  return <T4SocialProof data={withPlaceholders} />
+      case 3:  return <T2Emocion     data={withPlaceholders} />  // legacy fallback → T2
+      case 4:  return <T2Emocion     data={withPlaceholders} />  // legacy fallback → T2
       case 5:  return <T5Minimalista data={withPlaceholders} />
       case 6:  return <T6Alojamiento data={withPlaceholders} />
       case 1:

@@ -7,6 +7,7 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useRequireSubscription } from '@/lib/use-require-subscription'
 import NoVenueState from '@/components/NoVenueState'
+import DatePicker from '@/components/DatePicker'
 import { usePlanFeatures } from '@/lib/use-plan-features'
 import ImportLeadsModal from '@/components/ImportLeadsModal'
 import { expandLeadDates, expandBudgetDates, pad } from '@/lib/lead-dates'
@@ -2146,25 +2147,15 @@ function LeadsPageInner() {
                 placeholder="Ej: Llamar para seguimiento" autoFocus />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label" style={{ fontSize: 11 }}>Fecha *</label>
-                <input type="date" className="form-input" style={{ fontSize: 12 }}
-                  value={quickTaskForm.due_date}
-                  onChange={e => setQuickTaskForm(f => ({ ...f, due_date: e.target.value }))} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label" style={{ fontSize: 11 }}>Categoría</label>
-                <select className="form-input" style={{ fontSize: 12 }}
-                  value={quickTaskForm.category}
-                  onChange={e => setQuickTaskForm(f => ({ ...f, category: e.target.value }))}>
-                  <option value="llamar">📞 Llamar</option>
-                  <option value="enviar_dossier">📄 Enviar dossier</option>
-                  <option value="seguimiento">🔄 Seguimiento</option>
-                  <option value="visita">🏠 Visita</option>
-                  <option value="otro">📌 Otro</option>
-                </select>
-              </div>
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label className="form-label" style={{ fontSize: 11 }}>Fecha *</label>
+              <DatePicker
+                value={quickTaskForm.due_date}
+                onChange={v => setQuickTaskForm(f => ({ ...f, due_date: v }))}
+                accent="#7E72A0"
+                allowPast
+                placeholder="Seleccionar fecha"
+              />
             </div>
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

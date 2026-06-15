@@ -7,10 +7,10 @@
 
 import type { SectionsData } from './proposal-types'
 
-export type DefaultTemplateId = 't1' | 't2' | 't3' | 't4' | 't5' | 't6'
+export type DefaultTemplateId = 't1' | 't2' | 't5' | 't6'
 
 // Nombre de icono lucide-react que el componente resuelve vía lookup.
-export type DefaultTemplateIcon = 'zap' | 'sparkles' | 'clipboard-list' | 'message-circle' | 'target' | 'bed-double'
+export type DefaultTemplateIcon = 'zap' | 'sparkles' | 'target' | 'bed-double'
 
 export type DefaultTemplate = {
   id: DefaultTemplateId
@@ -45,9 +45,10 @@ const BASE_SECTIONS: SectionsData = {
   availability_message: 'Fecha confirmada · Última disponibilidad en junio',
   sections_enabled: {
     hero: true, availability: true, welcome: true, experience: true,
-    gallery: true, zones: true, venue_rental: false, inclusions: true,
+    gallery: true, zones: true, pricing: true, inclusions: true,
     testimonials: true, collaborators: true, accommodation: true,
     extra_services: true, faq: true, map: true, contact: true,
+    floating_contact: true,
   },
   contact: {
     phone: '+34 600 123 456',
@@ -189,8 +190,8 @@ const BASE_SECTIONS: SectionsData = {
 }
 
 // Helper: combina BASE_SECTIONS con el branding visual de cada plantilla.
-function styled(visual_template_id: 1 | 2 | 3 | 4 | 5, color_mode: 'light' | 'dark', primary: string, secondary: string, font: string): SectionsData {
-  return {
+function styled(visual_template_id: 1 | 2 | 5, color_mode: 'light' | 'dark', primary: string, secondary: string, font: string, opts?: { hideContact?: boolean }): SectionsData {
+  const sections: SectionsData = {
     ...BASE_SECTIONS,
     visual_template_id,
     color_mode,
@@ -198,53 +199,35 @@ function styled(visual_template_id: 1 | 2 | 3 | 4 | 5, color_mode: 'light' | 'da
     secondary_color: secondary,
     font_family: font,
   }
+  if (opts?.hideContact) {
+    sections.sections_enabled = { ...(BASE_SECTIONS.sections_enabled ?? {}), contact: false }
+  }
+  return sections
 }
 
-// ── Las 5 plantillas por defecto ──────────────────────────────────────────────
+// ── Plantillas por defecto ────────────────────────────────────────────────────
 export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
+  {
+    id: 't2',
+    name: 'Emoción Primero',
+    description: 'Editorial cálido · galería arriba · tipografía limpia',
+    icon: 'sparkles',
+    preview_url: '/dossier/templates/t2/preview',
+    is_default: true,
+    ...BASE_PROPOSAL,
+    branding: { primary_color: '#4A6B52', font_family: "'Inter', sans-serif" },
+    sections_data: styled(2, 'light', '#4A6B52', '#8FAA94', "'Inter', sans-serif", { hideContact: true }),
+  },
   {
     id: 't1',
     name: 'Impacto Directo',
     description: 'Dark luxury · precio visible · CTA al frente',
     icon: 'zap',
     preview_url: '/dossier/templates/t1/preview',
-    is_default: true,
+    is_default: false,
     ...BASE_PROPOSAL,
     branding: { primary_color: '#C4975A', font_family: "'Cormorant Garamond', serif" },
     sections_data: styled(1, 'dark', '#C4975A', '#8B6914', "'Cormorant Garamond', serif"),
-  },
-  {
-    id: 't2',
-    name: 'Emoción Primero',
-    description: 'Cream editorial · galería arriba · emotivo',
-    icon: 'sparkles',
-    preview_url: '/dossier/templates/t2/preview',
-    is_default: false,
-    ...BASE_PROPOSAL,
-    branding: { primary_color: '#8B6914', font_family: "'Cormorant Garamond', serif" },
-    sections_data: styled(2, 'light', '#8B6914', '#C4975A', "'Cormorant Garamond', serif"),
-  },
-  {
-    id: 't3',
-    name: 'Todo Claro',
-    description: 'Sidebar + índice · estructurado',
-    icon: 'clipboard-list',
-    preview_url: '/dossier/templates/t3/preview',
-    is_default: false,
-    ...BASE_PROPOSAL,
-    branding: { primary_color: '#2D4A3A', font_family: "'Inter', sans-serif" },
-    sections_data: styled(3, 'light', '#2D4A3A', '#5A7A6A', "'Inter', sans-serif"),
-  },
-  {
-    id: 't4',
-    name: 'Social Proof',
-    description: 'Stats + testimonios · confianza',
-    icon: 'message-circle',
-    preview_url: '/dossier/templates/t4/preview',
-    is_default: false,
-    ...BASE_PROPOSAL,
-    branding: { primary_color: '#4A5C8A', font_family: "'Inter', sans-serif" },
-    sections_data: styled(4, 'light', '#4A5C8A', '#8FA1C7', "'Inter', sans-serif"),
   },
   {
     id: 't5',

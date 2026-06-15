@@ -1,5 +1,5 @@
 ﻿'use client'
-import { useEffect, useState, useRef } from 'react'
+import { Fragment, useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import Tabs from '@/components/Tabs'
@@ -74,7 +74,10 @@ type ModalityPrice = {
 
 type ModalityPackage = {
   id: string; modality_id: string
-  day_from: number; day_to: number; label: string | null; sort_order: number
+  day_from: number | null; day_to: number | null; label: string | null; sort_order: number
+  name: string | null; description: string | null
+  includes: string[] | null; min_guests: number | null; max_guests: number | null
+  linked_menu_ids: string[] | null
   prices: ModalityPrice[]
 }
 
@@ -83,6 +86,12 @@ type Modality = {
   duration_type: DurationType; sort_order: number; is_active: boolean
   packages: ModalityPackage[]
   prices: ModalityPrice[]      // direct prices (non-package type)
+  // Package-specific fields (when commercial config price_model='package')
+  days_of_week?: number[] | null    // 0=Mon ... 6=Sun. null/empty = all days
+  includes?: string[] | null        // bullets array
+  min_guests?: number | null
+  max_guests?: number | null
+  linked_menu_ids?: string[] | null
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -136,7 +145,14 @@ function pkgShortLabel(from: number, to: number): string {
   return `${DAY_SHORT[from]}→${DAY_SHORT[to]}${wrap ? '*' : ''}`
 }
 
-const emptyModalForm = { name: '', description: '', duration_type: 'custom' as DurationType }
+const emptyModalForm = {
+  name: '', description: '', duration_type: 'custom' as DurationType,
+  linked_menu_ids: [] as string[],
+  days_of_week: [] as number[],
+  includes: [] as string[],
+  min_guests: null as number | null,
+  max_guests: null as number | null,
+}
 const emptyPriceForm = {
   date_from: '', date_to: '', price: '', notes: '',
   price_per_person: '',
@@ -424,6 +440,8 @@ export default function EstructuraPage() {
   const [configNameInput, setConfigNameInput]     = useState('')
   const [renamingConfigId, setRenamingConfigId]   = useState<string | null>(null)
   const [renameValue, setRenameValue]             = useState('')
+  // Menus catalog (from user's templates) — used to link modalidad ↔ menú
+  const [availableMenus, setAvailableMenus]       = useState<Array<{ id: string; name: string }>>([])
   const [configDropdownOpen, setConfigDropdownOpen] = useState(false)
   const [configHelperOpen, setConfigHelperOpen] = useState(false)
 
@@ -476,13 +494,22 @@ export default function EstructuraPage() {
   const [modalSaving, setModalSaving] = useState(false)
   const [modalError, setModalError]   = useState('')
 
-  // Package slot state
+  // Package slot state (day-range packages for duration_type='package')
   const [addingPkg, setAddingPkg]         = useState<string | null>(null)         // modality id
   const [pkgForm, setPkgForm]             = useState<{ day_from: number | null; day_to: number | null; label: string }>({ day_from: null, day_to: null, label: '' })
   const [editingPkg, setEditingPkg]       = useState<string | null>(null)         // package id
   const [editPkgForm, setEditPkgForm]     = useState<{ day_from: number | null; day_to: number | null; label: string }>({ day_from: null, day_to: null, label: '' })
   const [pkgSaving, setPkgSaving]         = useState(false)
   const [pkgError, setPkgError]           = useState('')
+
+  // Named package state (for price_model='package')
+  type NamedPkgForm = { name: string; description: string; includes: string[]; min_guests: number | null; max_guests: number | null; linked_menu_ids: string[] }
+  const emptyNamedPkgForm: NamedPkgForm = { name: '', description: '', includes: [], min_guests: null, max_guests: null, linked_menu_ids: [] }
+  const [addingNamedPkg, setAddingNamedPkg] = useState<string | null>(null)     // modality id
+  const [namedPkgForm, setNamedPkgForm]     = useState<NamedPkgForm>(emptyNamedPkgForm)
+  const [editingNamedPkg, setEditingNamedPkg] = useState<string | null>(null)   // package id
+  const [namedPkgSaving, setNamedPkgSaving] = useState(false)
+  const [namedPkgError, setNamedPkgError]   = useState('')
 
   // Price state
   type PriceAdding = { modalityId: string; packageId: string | null }
@@ -498,6 +525,26 @@ export default function EstructuraPage() {
     if (!user) { router.push('/login'); return }
     load()
   }, [user, authLoading, activeVenue?.id]) // eslint-disable-line
+
+  // Fetch available menus across all user templates (for linking modality ↔ menú)
+  useEffect(() => {
+    if (!user) return
+    fetch('/api/dossier-templates').then(r => r.ok ? r.json() : null).then(d => {
+      if (!Array.isArray(d)) return
+      const menus: Array<{ id: string; name: string }> = []
+      const seen = new Set<string>()
+      for (const tpl of d) {
+        const arr = (tpl?.sections_data as any)?.menus_override ?? []
+        for (const m of arr) {
+          if (m?.id && !seen.has(m.id)) {
+            seen.add(m.id)
+            menus.push({ id: m.id, name: m.name || 'Sin nombre' })
+          }
+        }
+      }
+      setAvailableMenus(menus)
+    }).catch(() => {})
+  }, [user?.id])
 
   // Load calendar_entries for the visible range (month / week / day / agenda)
   useEffect(() => {
@@ -561,16 +608,24 @@ export default function EstructuraPage() {
       setCommercialConfig(defaultCfg.config)
       // Filter modalities by this config
       setModalities(mods.filter((m: Modality & { commercial_config_id?: string }) => m.commercial_config_id === defaultCfg.id))
+      // Load zones/supplements/space_groups from this config (per-config storage)
+      // Falls back to legacy venue_settings if config doesn't have them yet
+      const cfgAny = defaultCfg.config as any
+      const cfgZones        = Array.isArray(cfgAny?.zones)        ? cfgAny.zones        : (settingsRow?.zones        as ZoneItem[]        | undefined ?? [])
+      const cfgSupplements  = Array.isArray(cfgAny?.supplements)  ? cfgAny.supplements  : (settingsRow?.supplements  as SupplementItem[]  | undefined ?? [])
+      const cfgSpaceGroups  = Array.isArray(cfgAny?.space_groups) ? cfgAny.space_groups : (Array.isArray(settingsRow?.space_groups) ? settingsRow.space_groups as VenueSpaceGroup[] : [])
+      setZones(cfgZones)
+      setSupplements(cfgSupplements)
+      setSpaceGroups(cfgSpaceGroups)
     } else {
       // Fallback: use venue_settings.commercial_config (legacy)
       setModalities(mods)
       if (settingsRow?.commercial_config) setCommercialConfig(settingsRow.commercial_config as CommercialConfig)
-    }
-
-    if (settingsRow?.zones)        setZones(settingsRow.zones as ZoneItem[])
-    if (settingsRow?.supplements)  setSupplements(settingsRow.supplements as SupplementItem[])
-    if (Array.isArray(settingsRow?.space_groups)) {
-      setSpaceGroups(settingsRow.space_groups as VenueSpaceGroup[])
+      if (settingsRow?.zones)        setZones(settingsRow.zones as ZoneItem[])
+      if (settingsRow?.supplements)  setSupplements(settingsRow.supplements as SupplementItem[])
+      if (Array.isArray(settingsRow?.space_groups)) {
+        setSpaceGroups(settingsRow.space_groups as VenueSpaceGroup[])
+      }
     }
     if (settingsRow?.google_calendar) setGcalConfig(settingsRow.google_calendar as any)
     if (settingsRow?.visit_availability) {
@@ -599,7 +654,34 @@ export default function EstructuraPage() {
       // Lodging configs don't drive space sub-tabs — clear so existing conditions evaluate false
       setCommercialConfig(isLodging ? null : cfg.config)
       setModalities(allModalities.filter((m: any) => m.commercial_config_id === configId))
+      // Load zones/supplements/space_groups from this config (per-config storage)
+      const cfgAny = cfg.config as any
+      if (Array.isArray(cfgAny?.zones))        setZones(cfgAny.zones)
+      else                                      setZones([])
+      if (Array.isArray(cfgAny?.supplements))  setSupplements(cfgAny.supplements)
+      else                                      setSupplements([])
+      if (Array.isArray(cfgAny?.space_groups)) setSpaceGroups(cfgAny.space_groups as VenueSpaceGroup[])
+      else                                      setSpaceGroups([])
     }
+  }
+
+  // Save zones/supplements/space_groups directly into active config's JSON
+  // (per-config storage — each config has its own structure)
+  const saveConfigField = async (patch: Record<string, unknown>) => {
+    if (!activeConfigId) return false
+    const cur = commercialConfigs.find(c => c.id === activeConfigId)
+    if (!cur) return false
+    const newConfig = { ...(cur.config as any), ...patch }
+    const res = await fetch(`/api/estructura/commercial-configs/${activeConfigId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: newConfig }),
+    })
+    if (res.ok) {
+      const j = await res.json()
+      setCommercialConfigs(prev => prev.map(c => c.id === activeConfigId ? j.config : c))
+    }
+    return res.ok
   }
 
   const saveSettings = async (patch: Record<string, unknown>) => {
@@ -662,13 +744,16 @@ export default function EstructuraPage() {
 
   const saveZonesSupplements = async (newZones: ZoneItem[], newSupps: SupplementItem[]) => {
     setSavingZS(true)
-    await saveSettings({ zones: newZones, supplements: newSupps })
+    // Save per-config (preferred) — fall back to venue_settings if no active config
+    if (activeConfigId) await saveConfigField({ zones: newZones, supplements: newSupps })
+    else await saveSettings({ zones: newZones, supplements: newSupps })
     setSavingZS(false)
   }
 
   const saveSpaceGroups = async (groups: VenueSpaceGroup[]) => {
     setSavingSG(true)
-    await saveSettings({ space_groups: groups })
+    if (activeConfigId) await saveConfigField({ space_groups: groups })
+    else await saveSettings({ space_groups: groups })
     setSavingSG(false)
     setSpaceGroupsDirty(false)
   }
@@ -762,7 +847,16 @@ export default function EstructuraPage() {
 
   const openEdit = (m: Modality) => {
     setEditing(m)
-    setModalForm({ name: m.name, description: m.description ?? '', duration_type: m.duration_type ?? 'custom' })
+    setModalForm({
+      name: m.name,
+      description: m.description ?? '',
+      duration_type: m.duration_type ?? 'custom',
+      linked_menu_ids: (m as any).linked_menu_ids ?? [],
+      days_of_week: (m as any).days_of_week ?? [],
+      includes: (m as any).includes ?? [],
+      min_guests: (m as any).min_guests ?? null,
+      max_guests: (m as any).max_guests ?? null,
+    })
     setModalError(''); setModalOpen(true)
   }
 
@@ -855,6 +949,71 @@ export default function EstructuraPage() {
     ))
   }
 
+  // ── Named package CRUD (for price_model='package') ───────────────────────
+
+  const startAddNamedPkg = (modalityId: string) => {
+    setAddingNamedPkg(modalityId); setNamedPkgForm(emptyNamedPkgForm); setNamedPkgError('')
+    if (!expanded.has(modalityId)) toggle(modalityId)
+  }
+
+  const saveNamedPkg = async () => {
+    if (!addingNamedPkg) return
+    if (!namedPkgForm.name.trim()) { setNamedPkgError('Nombre obligatorio'); return }
+    setNamedPkgSaving(true); setNamedPkgError('')
+    try {
+      const existingPkgs = modalities.find(m => m.id === addingNamedPkg)?.packages ?? []
+      const res = await fetch(`/api/estructura/modalities/${addingNamedPkg}/packages`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...namedPkgForm, sort_order: existingPkgs.length, venue_id: activeVenue?.id ?? null }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setNamedPkgError(json.error ?? 'Error al guardar'); setNamedPkgSaving(false); return }
+      updateModalities(prev => prev.map(m => m.id === addingNamedPkg
+        ? { ...m, packages: [...m.packages, json.package] }
+        : m
+      ))
+      setAddingNamedPkg(null)
+    } catch { setNamedPkgError('Error de red') }
+    setNamedPkgSaving(false)
+  }
+
+  const startEditNamedPkg = (pkg: ModalityPackage) => {
+    setEditingNamedPkg(pkg.id)
+    setNamedPkgForm({
+      name: pkg.name ?? '', description: pkg.description ?? '',
+      includes: pkg.includes ?? [], min_guests: pkg.min_guests ?? null,
+      max_guests: pkg.max_guests ?? null, linked_menu_ids: pkg.linked_menu_ids ?? [],
+    })
+    setNamedPkgError('')
+  }
+
+  const saveEditNamedPkg = async (modalityId: string, pkgId: string) => {
+    if (!namedPkgForm.name.trim()) { setNamedPkgError('Nombre obligatorio'); return }
+    setNamedPkgSaving(true); setNamedPkgError('')
+    try {
+      const res = await fetch(`/api/estructura/packages/${pkgId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(namedPkgForm),
+      })
+      const json = await res.json()
+      if (!res.ok) { setNamedPkgError(json.error ?? 'Error'); setNamedPkgSaving(false); return }
+      updateModalities(prev => prev.map(m => m.id === modalityId
+        ? { ...m, packages: m.packages.map(p => p.id === pkgId ? { ...p, ...json.package } : p) }
+        : m
+      ))
+      setEditingNamedPkg(null)
+    } catch { setNamedPkgError('Error de red') }
+    setNamedPkgSaving(false)
+  }
+
+  const deleteNamedPkg = async (modalityId: string, pkgId: string) => {
+    if (!confirm('¿Eliminar este paquete y todos sus precios?')) return
+    const res = await fetch(`/api/estructura/packages/${pkgId}`, { method: 'DELETE' })
+    if (res.ok) updateModalities(prev => prev.map(m =>
+      m.id === modalityId ? { ...m, packages: m.packages.filter(p => p.id !== pkgId) } : m
+    ))
+  }
+
   // Change pricing_mode on a group and persist
   const handlePricingModeChange = (groupId: string, mode: 'group_base' | 'per_space') => {
     const updated = spaceGroups.map(g => g.id === groupId ? { ...g, pricing_mode: mode } : g)
@@ -908,7 +1067,7 @@ export default function EstructuraPage() {
     if (!priceForm.date_from || !priceForm.date_to) { setPriceError('Las fechas son obligatorias'); return }
     const isMulti = commercialConfig?.space_type === 'multiple_independent'
     const isSupp2 = commercialConfig?.space_type === 'single_with_supplements'
-    if (!isMulti && !isSupp2 && !priceForm.price) { setPriceError('El precio es obligatorio'); return }
+    if (!isMulti && !isSupp2 && !priceForm.price && !priceForm.price_per_person) { setPriceError('El precio es obligatorio'); return }
     if (isMulti) {
       const filledZones = Object.entries(priceForm.zone_prices).filter(([zid, v]) => (v !== '' && v !== '0') || (priceForm.zone_tier_prices[zid]?.length ?? 0) > 0)
       const filledTierZones = Object.values(priceForm.zone_tier_prices).filter(t => t.length > 0)
@@ -955,7 +1114,7 @@ export default function EstructuraPage() {
   const saveEditPrice = async (modalityId: string, packageId: string | null, priceId: string) => {
     if (!editPriceForm.date_from || !editPriceForm.date_to) { setPriceError('Las fechas son obligatorias'); return }
     const isMulti = commercialConfig?.space_type === 'multiple_independent'
-    if (!isMulti && !editPriceForm.price) { setPriceError('El precio es obligatorio'); return }
+    if (!isMulti && !editPriceForm.price && !editPriceForm.price_per_person) { setPriceError('El precio es obligatorio'); return }
     if (isMulti) {
       const filledZones = Object.entries(editPriceForm.zone_prices).filter(([zid, v]) => (v !== '' && v !== '0') || (editPriceForm.zone_tier_prices[zid]?.length ?? 0) > 0)
       const filledTierZones = Object.values(editPriceForm.zone_tier_prices).filter(t => t.length > 0)
@@ -1020,7 +1179,7 @@ export default function EstructuraPage() {
   if (authLoading || loading) return (
     <div style={{ display: 'flex' }}><Sidebar />
       <div className="main-layout">
-        <div className="topbar"><div className="topbar-title">Configuración</div></div>
+        <div className="topbar"><div className="topbar-title">Mi espacio</div></div>
         <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
           <div style={{ color: 'var(--warm-gray)', fontSize: 13 }}>Cargando...</div>
         </div>
@@ -1047,7 +1206,7 @@ export default function EstructuraPage() {
       <Sidebar />
       <div className="main-layout">
         <div className="topbar">
-          <div className="topbar-title">Configuración</div>
+          <div className="topbar-title">Mi espacio</div>
         </div>
 
         <Tabs
@@ -1073,15 +1232,15 @@ export default function EstructuraPage() {
             const spaceLabel = activeCfg ? ({ single: 'Único', single_with_supplements: 'Base + zonas', multiple_independent: 'Grupos' }[activeCfg.space_type] ?? '') : ''
             const priceLabel = activeCfg ? ({ rental: 'Alquiler', per_person: 'Por persona', package: 'Paquetes' }[activeCfg.price_model] ?? '') : ''
             const actions = activeCc ? [
-              { label: 'Editar tipo', icon: <Pencil size={11} />, onClick: () => openWizard(activeCc.id) },
-              { label: 'Duplicar', icon: <Copy size={11} />, onClick: async () => {
+              { label: 'Editar tipo', icon: <Pencil size={12} />, onClick: () => openWizard(activeCc.id) },
+              { label: 'Duplicar', icon: <Copy size={12} />, onClick: async () => {
                 const res = await fetch(`/api/estructura/commercial-configs/${activeCc.id}/duplicate`, {
                   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
                 })
                 if (res.ok) { load() }
               } },
-              { label: 'Renombrar', onClick: () => { setRenamingConfigId(activeCc.id); setRenameValue(activeCc.name) } },
-              { label: 'Eliminar', danger: true, onClick: async () => {
+              { label: 'Renombrar', icon: <Pencil size={12} />, onClick: () => { setRenamingConfigId(activeCc.id); setRenameValue(activeCc.name) } },
+              { label: 'Eliminar', icon: <Trash2 size={12} />, danger: true, onClick: async () => {
                 if (!confirm(`¿Eliminar "${activeCc.name}"? Las modalidades asociadas se eliminarán.`)) return
                 await fetch(`/api/estructura/commercial-configs/${activeCc.id}`, { method: 'DELETE' })
                 setCommercialConfigs(prev => prev.filter(c => c.id !== activeCc.id))
@@ -1096,7 +1255,7 @@ export default function EstructuraPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid var(--ivory)', background: 'var(--cream)', borderTopLeftRadius: 11, borderTopRightRadius: 11 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                   <Settings2 size={14} style={{ color: 'var(--gold)' }} />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Configuración comercial</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--charcoal)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Estructura comercial</span>
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <button onClick={() => setConfigHelperOpen(true)} title="¿Qué configuración escoger?"
@@ -1234,24 +1393,37 @@ export default function EstructuraPage() {
 
                 {/* Stats — solo si config es de espacio */}
                 {activeCc && (activeCc.config_type ?? 'space') === 'space' && (
-                  <div style={{ display: 'flex', gap: 14, fontSize: 11, color: 'var(--warm-gray)', flexShrink: 0, alignItems: 'center' }}>
-                    <span><strong style={{ color: 'var(--charcoal)' }}>{modalities.filter(m => m.is_active).length}</strong> activas</span>
-                    <span><strong style={{ color: 'var(--charcoal)' }}>{modalities.length}</strong> total</span>
-                    <span><strong style={{ color: 'var(--charcoal)' }}>{totalPrices}</strong> tarifas</span>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+                    {[
+                      { value: modalities.filter(m => m.is_active).length, label: 'activas', color: '#4A6B52', bg: '#EDF2ED' },
+                      { value: modalities.length, label: 'total', color: '#47648A', bg: '#EEF2F7' },
+                      { value: totalPrices, label: 'tarifas', color: '#8B6F47', bg: '#FAF5EE' },
+                    ].map(s => (
+                      <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: s.bg, fontSize: 11 }}>
+                        <strong style={{ color: s.color, fontSize: 13, fontWeight: 700 }}>{s.value}</strong>
+                        <span style={{ color: s.color, opacity: 0.75, fontWeight: 500 }}>{s.label}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
 
               {/* FOOTER: actions */}
               {actions.length > 0 && (
-                <div style={{ display: 'flex', gap: 0, flexWrap: 'wrap', padding: '6px 8px', borderTop: '1px solid var(--ivory)', background: 'var(--cream)', borderBottomLeftRadius: 11, borderBottomRightRadius: 11 }}>
+                <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', padding: '5px 10px', borderTop: '1px solid var(--ivory)', background: 'var(--cream)', borderBottomLeftRadius: 11, borderBottomRightRadius: 11, alignItems: 'center' }}>
                   {actions.map((btn, i) => (
-                    <button key={i} onClick={btn.onClick} title={btn.label}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 500, padding: '5px 10px', borderRadius: 5, color: btn.danger ? '#BC5249' : 'var(--warm-gray)', transition: 'all .1s', display: 'flex', alignItems: 'center', gap: 4 }}
-                      onMouseEnter={e => { e.currentTarget.style.background = btn.danger ? '#FAF3F2' : '#fff'; e.currentTarget.style.color = btn.danger ? '#BC5249' : 'var(--charcoal)' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = btn.danger ? '#BC5249' : 'var(--warm-gray)' }}>
-                      {btn.icon}{btn.label}
-                    </button>
+                    <Fragment key={i}>
+                      {i > 0 && !btn.danger && !actions[i - 1]?.danger && (
+                        <div style={{ width: 1, height: 14, background: 'var(--ivory)', margin: '0 2px' }} />
+                      )}
+                      {btn.danger && <div style={{ flex: 1 }} />}
+                      <button onClick={btn.onClick} title={btn.label}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 500, padding: '5px 10px', borderRadius: 6, color: btn.danger ? '#BC5249' : 'var(--warm-gray)', transition: 'all .15s', display: 'flex', alignItems: 'center', gap: 5 }}
+                        onMouseEnter={e => { e.currentTarget.style.background = btn.danger ? '#FAF3F2' : '#f5f3ef'; e.currentTarget.style.color = btn.danger ? '#BC5249' : 'var(--charcoal)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = btn.danger ? '#BC5249' : 'var(--warm-gray)' }}>
+                        {btn.icon}{btn.label}
+                      </button>
+                    </Fragment>
                   ))}
                 </div>
               )}
@@ -1911,8 +2083,8 @@ export default function EstructuraPage() {
                                         ))}
                                         {pkg.prices.length === 0 && !isAddingPriceHere && (
                                           <div style={{ padding: '10px 4px', color: 'var(--warm-gray)', fontSize: 12 }}>
-                                            Sin per�odos.{' '}
-                                            <button style={{ background: 'none', border: 'none', color: dt.color, cursor: 'pointer', fontSize: 12, fontWeight: 600 }} onClick={() => startAddPrice(m.id, pkg.id)}>+ A�adir</button>
+                                            Sin períodos.{' '}
+                                            <button style={{ background: 'none', border: 'none', color: dt.color, cursor: 'pointer', fontSize: 12, fontWeight: 600 }} onClick={() => startAddPrice(m.id, pkg.id)}>+ Añadir</button>
                                           </div>
                                         )}
                                       </div>
@@ -1961,8 +2133,288 @@ export default function EstructuraPage() {
                             </div>
                           )}
 
-                          {/* ── NON-PACKAGE TYPE ──────────────────────────── */}
-                          {!isPkg && (() => {
+                          {/* ── NAMED PACKAGES (price_model='package') ──── */}
+                          {commercialConfig?.price_model === 'package' && (
+                            <div>
+                              <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, background: '#FAFAF9', borderTop: '1px solid var(--ivory)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+                                  <Package size={12} color="var(--gold)" />
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warm-gray)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Paquetes</span>
+                                  {m.packages.length > 0 && (
+                                    <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 20, background: 'var(--cream)', border: '1px solid var(--ivory)', color: 'var(--warm-gray)' }}>{m.packages.length}</span>
+                                  )}
+                                </div>
+                                <button className="btn btn-ghost btn-sm" onClick={() => startAddNamedPkg(m.id)} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold)' }}>
+                                  <Plus size={11} /> Nuevo paquete
+                                </button>
+                              </div>
+
+                              {/* List existing named packages */}
+                              {m.packages.map(pkg => {
+                                const isEditingThis = editingNamedPkg === pkg.id
+                                const pkgName = pkg.name || pkg.label || 'Sin nombre'
+                                const incl = pkg.includes ?? []
+
+                                if (isEditingThis) return (
+                                  <div key={pkg.id} style={{ padding: '14px 16px', borderBottom: '1px solid var(--ivory)', background: '#FAFAF9' }}>
+                                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Editar paquete</div>
+                                    <div className="form-group" style={{ marginBottom: 10 }}>
+                                      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Nombre *</label>
+                                      <input className="form-input" value={namedPkgForm.name} onChange={e => setNamedPkgForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Gold, Premium, Todo Incluido" style={{ fontSize: 12 }} autoFocus />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: 10 }}>
+                                      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Descripción</label>
+                                      <textarea className="form-input" value={namedPkgForm.description} onChange={e => setNamedPkgForm(f => ({ ...f, description: e.target.value }))} rows={2} style={{ fontSize: 12, resize: 'vertical' }} placeholder="Descripción breve del paquete" />
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                                      <div>
+                                        <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Mín. invitados</label>
+                                        <input className="form-input" type="number" min={0} placeholder="Opcional" value={namedPkgForm.min_guests ?? ''} onChange={e => setNamedPkgForm(f => ({ ...f, min_guests: e.target.value === '' ? null : parseInt(e.target.value) }))} style={{ fontSize: 12 }} />
+                                      </div>
+                                      <div>
+                                        <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Máx. invitados</label>
+                                        <input className="form-input" type="number" min={0} placeholder="Opcional" value={namedPkgForm.max_guests ?? ''} onChange={e => setNamedPkgForm(f => ({ ...f, max_guests: e.target.value === '' ? null : parseInt(e.target.value) }))} style={{ fontSize: 12 }} />
+                                      </div>
+                                    </div>
+                                    <div style={{ marginBottom: 10 }}>
+                                      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4, display: 'block' }}>Qué incluye</label>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        {namedPkgForm.includes.map((item, idx) => (
+                                          <div key={idx} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
+                                            <input className="form-input" value={item} style={{ fontSize: 12, flex: 1 }}
+                                              onChange={e => setNamedPkgForm(f => { const next = [...f.includes]; next[idx] = e.target.value; return { ...f, includes: next } })} />
+                                            <button type="button" onClick={() => setNamedPkgForm(f => ({ ...f, includes: f.includes.filter((_, i) => i !== idx) }))}
+                                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BC5249', padding: 2 }}><X size={12} /></button>
+                                          </div>
+                                        ))}
+                                        <button type="button" onClick={() => setNamedPkgForm(f => ({ ...f, includes: [...f.includes, ''] }))}
+                                          style={{ alignSelf: 'flex-start', background: 'none', border: '1px dashed var(--ivory)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--gold)', padding: '3px 8px', fontWeight: 600 }}>+ Añadir</button>
+                                      </div>
+                                    </div>
+                                    <div style={{ marginBottom: 10 }}>
+                                      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4, display: 'block' }}>Menús asociados (opcional)</label>
+                                      {availableMenus.length > 0 ? (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                          {availableMenus.map(menu => {
+                                            const sel = namedPkgForm.linked_menu_ids.includes(menu.id)
+                                            return (
+                                              <button key={menu.id} type="button"
+                                                onClick={() => setNamedPkgForm(f => ({ ...f, linked_menu_ids: sel ? f.linked_menu_ids.filter(x => x !== menu.id) : [...f.linked_menu_ids, menu.id] }))}
+                                                style={{ padding: '3px 8px', fontSize: 10, borderRadius: 12, cursor: 'pointer', background: sel ? 'var(--gold)' : 'var(--cream)', color: sel ? '#fff' : 'var(--charcoal)', border: `1px solid ${sel ? 'var(--gold)' : 'var(--ivory)'}`, fontWeight: sel ? 700 : 500 }}>
+                                                {sel ? '✓ ' : ''}{menu.name}
+                                              </button>
+                                            )
+                                          })}
+                                        </div>
+                                      ) : (
+                                        <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                                          Crea menús en Dossier → Plantillas primero. Sin asociación se muestran todos los menús.
+                                        </div>
+                                      )}
+                                    </div>
+                                    {namedPkgError && <div style={{ fontSize: 11, color: 'var(--rose)', marginBottom: 6 }}>{namedPkgError}</div>}
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                      <button className="btn btn-primary btn-sm" disabled={namedPkgSaving} onClick={() => saveEditNamedPkg(m.id, pkg.id)}><Check size={12} /> {namedPkgSaving ? 'Guardando…' : 'Guardar'}</button>
+                                      <button className="btn btn-ghost btn-sm" onClick={() => setEditingNamedPkg(null)}>Cancelar</button>
+                                    </div>
+                                  </div>
+                                )
+
+                                const isAddingPriceHere = priceAdding?.packageId === pkg.id
+
+                                return (
+                                  <div key={pkg.id} style={{ borderBottom: '1px solid var(--ivory)' }}>
+                                    {/* Package header row */}
+                                    <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                                      <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(196,151,90,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                        <Package size={16} color="var(--gold)" />
+                                      </div>
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--charcoal)' }}>{pkgName}</div>
+                                        {pkg.description && <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 2 }}>{pkg.description}</div>}
+                                        <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                                          {(pkg.min_guests || pkg.max_guests) && (
+                                            <span style={{ fontSize: 10, background: 'var(--cream)', padding: '1px 6px', borderRadius: 8, color: 'var(--warm-gray)' }}>
+                                              <Users size={9} style={{ verticalAlign: 'middle', marginRight: 3 }} />
+                                              {pkg.min_guests && pkg.max_guests ? `${pkg.min_guests}–${pkg.max_guests}` : pkg.min_guests ? `Mín. ${pkg.min_guests}` : `Máx. ${pkg.max_guests}`}
+                                            </span>
+                                          )}
+                                          {incl.length > 0 && (
+                                            <span style={{ fontSize: 10, background: 'var(--cream)', padding: '1px 6px', borderRadius: 8, color: 'var(--warm-gray)' }}>
+                                              {incl.length} incluido{incl.length !== 1 ? 's' : ''}
+                                            </span>
+                                          )}
+                                          {(pkg.linked_menu_ids ?? []).length > 0 && (
+                                            <span style={{ fontSize: 10, background: 'var(--cream)', padding: '1px 6px', borderRadius: 8, color: 'var(--warm-gray)' }}>
+                                              {(pkg.linked_menu_ids ?? []).length} menú{(pkg.linked_menu_ids ?? []).length !== 1 ? 's' : ''}
+                                            </span>
+                                          )}
+                                          {pkg.prices.length > 0 && (
+                                            <span style={{ fontSize: 10, background: '#F3EBD8', padding: '1px 6px', borderRadius: 8, color: '#7A5A2E', fontWeight: 600 }}>
+                                              {pkg.prices.length} tarifa{pkg.prices.length !== 1 ? 's' : ''}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                                        {!isAddingPriceHere && (
+                                          <button className="btn btn-ghost btn-sm" onClick={() => startAddPrice(m.id, pkg.id)} title="Añadir tarifa" style={{ padding: '4px 6px' }}><CreditCard size={12} /></button>
+                                        )}
+                                        <button className="btn btn-ghost btn-sm" onClick={() => startEditNamedPkg(pkg)} title="Editar" style={{ padding: '4px 6px' }}><Pencil size={12} /></button>
+                                        <button className="btn btn-ghost btn-sm" onClick={() => deleteNamedPkg(m.id, pkg.id)} title="Eliminar" style={{ padding: '4px 6px', color: 'var(--rose)' }}><Trash2 size={12} /></button>
+                                      </div>
+                                    </div>
+
+                                    {/* Price form for this package (simplified) */}
+                                    {isAddingPriceHere && (
+                                      <div style={{ padding: '8px 16px 4px' }}>
+                                        <PriceForm
+                                          form={priceForm}
+                                          onChange={setPriceForm}
+                                          accent={dt.color}
+                                          saving={priceSaving}
+                                          error={priceError}
+                                          onSave={savePrice}
+                                          onCancel={cancelAddPrice}
+                                          cfg={commercialConfig}
+                                          zones={zones}
+                                          supplements={supplements}
+                                          spaceGroups={spaceGroups}
+                                          onPricingModeChange={handlePricingModeChange}
+                                          packageMode
+                                        />
+                                      </div>
+                                    )}
+
+                                    {/* Existing prices */}
+                                    {pkg.prices.length > 0 && (
+                                      <div style={{ padding: '0 16px 8px' }}>
+                                        {pkg.prices.map(p => (
+                                          <div key={p.id} style={{ marginBottom: 4 }}>
+                                            {editingPrice === p.id ? (
+                                              <PriceForm
+                                                form={editPriceForm}
+                                                onChange={setEditPriceForm}
+                                                accent={dt.color}
+                                                saving={priceSaving}
+                                                error={priceError}
+                                                onSave={() => saveEditPrice(m.id, pkg.id, p.id)}
+                                                onCancel={() => setEditingPrice(null)}
+                                                isEdit
+                                                cfg={commercialConfig}
+                                                zones={zones}
+                                                supplements={supplements}
+                                                spaceGroups={spaceGroups}
+                                                onPricingModeChange={handlePricingModeChange}
+                                                packageMode
+                                              />
+                                            ) : (
+                                              <PriceRow
+                                                price={p}
+                                                accent={dt.color}
+                                                cfg={commercialConfig}
+                                                zones={zones}
+                                                supplements={supplements}
+                                                spaceGroups={spaceGroups}
+                                                onEdit={() => startEditPrice(p)}
+                                                onDelete={() => deletePrice(m.id, pkg.id, p.id)}
+                                                onDuplicate={() => duplicatePrice(m.id, pkg.id, p)}
+                                              />
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Empty state */}
+                                    {pkg.prices.length === 0 && !isAddingPriceHere && (
+                                      <div style={{ padding: '4px 16px 12px', color: 'var(--warm-gray)', fontSize: 11 }}>
+                                        Sin tarifas.{' '}
+                                        <button style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: 11, fontWeight: 600 }} onClick={() => startAddPrice(m.id, pkg.id)}>+ Añadir tarifa</button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+
+                              {/* Add new named package form */}
+                              {addingNamedPkg === m.id && (
+                                <div style={{ padding: '14px 16px', background: '#FAFAF9', borderBottom: '1px solid var(--ivory)' }}>
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Nuevo paquete</div>
+                                  <div className="form-group" style={{ marginBottom: 10 }}>
+                                    <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Nombre *</label>
+                                    <input className="form-input" value={namedPkgForm.name} onChange={e => setNamedPkgForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Gold, Premium, Todo Incluido" style={{ fontSize: 12 }} autoFocus />
+                                  </div>
+                                  <div className="form-group" style={{ marginBottom: 10 }}>
+                                    <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Descripción</label>
+                                    <textarea className="form-input" value={namedPkgForm.description} onChange={e => setNamedPkgForm(f => ({ ...f, description: e.target.value }))} rows={2} style={{ fontSize: 12, resize: 'vertical' }} placeholder="Descripción breve del paquete" />
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                                    <div>
+                                      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Mín. invitados</label>
+                                      <input className="form-input" type="number" min={0} placeholder="Opcional" value={namedPkgForm.min_guests ?? ''} onChange={e => setNamedPkgForm(f => ({ ...f, min_guests: e.target.value === '' ? null : parseInt(e.target.value) }))} style={{ fontSize: 12 }} />
+                                    </div>
+                                    <div>
+                                      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Máx. invitados</label>
+                                      <input className="form-input" type="number" min={0} placeholder="Opcional" value={namedPkgForm.max_guests ?? ''} onChange={e => setNamedPkgForm(f => ({ ...f, max_guests: e.target.value === '' ? null : parseInt(e.target.value) }))} style={{ fontSize: 12 }} />
+                                    </div>
+                                  </div>
+                                  <div style={{ marginBottom: 10 }}>
+                                    <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4, display: 'block' }}>Qué incluye</label>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                      {namedPkgForm.includes.map((item, idx) => (
+                                        <div key={idx} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
+                                          <input className="form-input" value={item} style={{ fontSize: 12, flex: 1 }}
+                                            onChange={e => setNamedPkgForm(f => { const next = [...f.includes]; next[idx] = e.target.value; return { ...f, includes: next } })} />
+                                          <button type="button" onClick={() => setNamedPkgForm(f => ({ ...f, includes: f.includes.filter((_, i) => i !== idx) }))}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BC5249', padding: 2 }}><X size={12} /></button>
+                                        </div>
+                                      ))}
+                                      <button type="button" onClick={() => setNamedPkgForm(f => ({ ...f, includes: [...f.includes, ''] }))}
+                                        style={{ alignSelf: 'flex-start', background: 'none', border: '1px dashed var(--ivory)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--gold)', padding: '3px 8px', fontWeight: 600 }}>+ Añadir</button>
+                                    </div>
+                                  </div>
+                                  <div style={{ marginBottom: 10 }}>
+                                    <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4, display: 'block' }}>Menús asociados (opcional)</label>
+                                    {availableMenus.length > 0 ? (
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                        {availableMenus.map(menu => {
+                                          const sel = namedPkgForm.linked_menu_ids.includes(menu.id)
+                                          return (
+                                            <button key={menu.id} type="button"
+                                              onClick={() => setNamedPkgForm(f => ({ ...f, linked_menu_ids: sel ? f.linked_menu_ids.filter(x => x !== menu.id) : [...f.linked_menu_ids, menu.id] }))}
+                                              style={{ padding: '3px 8px', fontSize: 10, borderRadius: 12, cursor: 'pointer', background: sel ? 'var(--gold)' : 'var(--cream)', color: sel ? '#fff' : 'var(--charcoal)', border: `1px solid ${sel ? 'var(--gold)' : 'var(--ivory)'}`, fontWeight: sel ? 700 : 500 }}>
+                                              {sel ? '✓ ' : ''}{menu.name}
+                                            </button>
+                                          )
+                                        })}
+                                      </div>
+                                    ) : (
+                                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                                        Crea menús en Dossier → Plantillas primero. Sin asociación se muestran todos los menús.
+                                      </div>
+                                    )}
+                                  </div>
+                                  {namedPkgError && <div style={{ fontSize: 11, color: 'var(--rose)', marginBottom: 6 }}>{namedPkgError}</div>}
+                                  <div style={{ display: 'flex', gap: 6 }}>
+                                    <button className="btn btn-primary btn-sm" disabled={namedPkgSaving} onClick={saveNamedPkg}><Check size={12} /> {namedPkgSaving ? 'Guardando…' : 'Crear paquete'}</button>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => setAddingNamedPkg(null)}>Cancelar</button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {m.packages.length === 0 && addingNamedPkg !== m.id && (
+                                <div style={{ padding: '16px', textAlign: 'center', color: 'var(--warm-gray)', fontSize: 12 }}>
+                                  Añade paquetes a esta modalidad (ej: Silver, Gold, Premium). Cada uno con sus propios includes y precios.
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* ── NON-PACKAGE TYPE (hidden when price_model='package' — prices live inside packages) */}
+                          {!isPkg && commercialConfig?.price_model !== 'package' && (() => {
                             const nonPkgPrices  = m.prices.filter(p => !p.package_id)
                             const isPricesCollapsed = pricesCollapsed.has(m.id)
                             const togglePricesCollapsed = () => setPricesCollapsed(prev => {
@@ -3037,6 +3489,148 @@ export default function EstructuraPage() {
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>Descripción (opcional)</div>
                 <textarea className="form-input" placeholder="Qué incluye esta modalidad, horas exactas, condiciones especiales…" value={modalForm.description} onChange={e => setModalForm(f => ({ ...f, description: e.target.value }))} rows={3} style={{ resize: 'vertical', fontSize: 12 }} />
               </div>
+              {/* ── Package-only fields (days_of_week, guests, includes, linked menus) ── */}
+              {commercialConfig?.price_model === 'package' && (<>
+              {/* Días de la semana aplicables — opcional, colapsado por defecto */}
+              <div style={{ marginTop: 14, border: '1px solid var(--ivory)', borderRadius: 8, overflow: 'hidden' }}>
+                <button type="button"
+                  onClick={() => setModalForm(f => ({ ...f, _dow_open: !(f as any)._dow_open } as any))}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--cream)', border: 'none', cursor: 'pointer', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <CalendarDays size={13} color="var(--warm-gray)" />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                      Restringir días de la semana
+                    </span>
+                    {(modalForm.days_of_week ?? []).length > 0 && (
+                      <span style={{ fontSize: 10, background: 'var(--gold)', color: '#fff', borderRadius: 10, padding: '1px 7px', fontWeight: 700 }}>
+                        {(modalForm.days_of_week ?? []).length} días
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+                      {(modalForm as any)._dow_open ? 'Ocultar' : 'Vacío = cualquier día'}
+                    </span>
+                    {(modalForm as any)._dow_open ? <ChevronUp size={13} color="var(--warm-gray)" /> : <ChevronDown size={13} color="var(--warm-gray)" />}
+                  </div>
+                </button>
+                {(modalForm as any)._dow_open && (
+                  <div style={{ padding: '10px 12px', borderTop: '1px solid var(--ivory)' }}>
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 8 }}>Selecciona solo si esta modalidad aplica a días concretos. Dejar vacío = todos los días.</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {DAY_SHORT.map((d, i) => {
+                        const selected = (modalForm.days_of_week ?? []).includes(i)
+                        return (
+                          <button key={i} type="button"
+                            onClick={() => setModalForm(f => {
+                              const cur = f.days_of_week ?? []
+                              const next = selected ? cur.filter(x => x !== i) : [...cur, i].sort((a, b) => a - b)
+                              return { ...f, days_of_week: next }
+                            })}
+                            style={{
+                              flex: 1, padding: '8px 0', fontSize: 12, fontWeight: 700, borderRadius: 6, cursor: 'pointer',
+                              background: selected ? 'var(--gold)' : '#fff',
+                              color: selected ? '#fff' : 'var(--charcoal)',
+                              border: `1px solid ${selected ? 'var(--gold)' : 'var(--ivory)'}`,
+                              transition: 'all .12s',
+                            }}>
+                            {d}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {(modalForm.days_of_week ?? []).length > 0 && (
+                      <button type="button"
+                        onClick={() => setModalForm(f => ({ ...f, days_of_week: [] }))}
+                        style={{ marginTop: 8, fontSize: 10, color: 'var(--warm-gray)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                        Quitar restricción (todos los días)
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Min / max invitados */}
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>Invitados</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <input className="form-input" type="number" min={0} placeholder="Mín. (opcional)"
+                    value={modalForm.min_guests ?? ''}
+                    onChange={e => setModalForm(f => ({ ...f, min_guests: e.target.value === '' ? null : parseInt(e.target.value) }))}
+                    style={{ fontSize: 12 }} />
+                  <input className="form-input" type="number" min={0} placeholder="Máx. (opcional)"
+                    value={modalForm.max_guests ?? ''}
+                    onChange={e => setModalForm(f => ({ ...f, max_guests: e.target.value === '' ? null : parseInt(e.target.value) }))}
+                    style={{ fontSize: 12 }} />
+                </div>
+              </div>
+
+              {/* Qué incluye (bullets) */}
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>Qué incluye este paquete</div>
+                <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 8 }}>Una línea por elemento. Aparecerán como bullets en la card del paquete.</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {(modalForm.includes ?? []).map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0, marginLeft: 6 }} />
+                      <input className="form-input" value={item} style={{ fontSize: 12, flex: 1 }}
+                        onChange={e => setModalForm(f => {
+                          const next = [...(f.includes ?? [])]
+                          next[idx] = e.target.value
+                          return { ...f, includes: next }
+                        })} />
+                      <button type="button"
+                        onClick={() => setModalForm(f => ({ ...f, includes: (f.includes ?? []).filter((_, i) => i !== idx) }))}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BC5249', padding: 4, display: 'flex' }}>
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button"
+                    onClick={() => setModalForm(f => ({ ...f, includes: [...(f.includes ?? []), ''] }))}
+                    style={{ alignSelf: 'flex-start', background: 'none', border: '1px dashed var(--ivory)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--gold)', padding: '4px 10px', fontWeight: 600 }}>
+                    + Añadir elemento
+                  </button>
+                </div>
+              </div>
+
+              {/* Menús asociados — si esta modalidad es tipo "paquete" o quieres ofrecer menús */}
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--charcoal)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>Menús asociados (opcional)</div>
+                {availableMenus.length > 0 ? (
+                  <>
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 8 }}>Si vinculas menús, el cliente podrá elegir uno al seleccionar este paquete en el dossier. Sin vinculación se muestran todos.</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {availableMenus.map(m => {
+                        const selected = (modalForm.linked_menu_ids ?? []).includes(m.id)
+                        return (
+                          <button key={m.id} type="button"
+                            onClick={() => setModalForm(f => {
+                              const cur = f.linked_menu_ids ?? []
+                              const next = selected ? cur.filter(x => x !== m.id) : [...cur, m.id]
+                              return { ...f, linked_menu_ids: next }
+                            })}
+                            style={{
+                              padding: '5px 10px', fontSize: 11, borderRadius: 14, cursor: 'pointer',
+                              background: selected ? 'var(--gold)' : 'var(--cream)',
+                              color: selected ? '#fff' : 'var(--charcoal)',
+                              border: `1px solid ${selected ? 'var(--gold)' : 'var(--ivory)'}`,
+                              fontWeight: selected ? 700 : 500,
+                              transition: 'all .12s',
+                            }}>
+                            {selected ? '✓ ' : ''}{m.name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                    Crea menús en Dossier → Plantillas primero. Sin asociación se muestran todos los menús.
+                  </div>
+                )}
+              </div>
+              </>)}
               {modalError && <div style={{ background: '#FAF3F2', border: '1px solid #E9D4D0', color: '#B0473E', borderRadius: 8, padding: '8px 12px', fontSize: 12, marginTop: 14 }}>{modalError}</div>}
             </div>
             <div style={{ padding: '14px 24px', borderTop: '1px solid var(--ivory)', display: 'flex', gap: 8, justifyContent: 'flex-end', background: '#FAFAF9', flexShrink: 0 }}>
@@ -3100,7 +3694,9 @@ function PriceRow({ price, accent, cfg, zones, supplements, spaceGroups = [], on
     }
     return (
       <span style={{ fontSize: 14, fontWeight: 700, color: accent }}>
-        {fmt(price.price)}{(model === 'per_person' || model === 'package') && <span style={{ fontSize: 11, fontWeight: 400 }}>/pers.</span>}
+        {(model === 'per_person' || model === 'package') && price.price_per_person != null
+          ? <>{fmt(price.price_per_person)}<span style={{ fontSize: 11, fontWeight: 400 }}>/pers.</span></>
+          : fmt(price.price)}
       </span>
     )
   }
@@ -3174,7 +3770,9 @@ function PriceRow({ price, accent, cfg, zones, supplements, spaceGroups = [], on
           {/* Simple price (single) */}
           {space === 'single' && (
             <span style={{ fontSize: 13, fontWeight: 700, color: accent }}>
-              {fmt(price.price)}{(model === 'per_person' || model === 'package') && <span style={{ fontSize: 11, fontWeight: 400 }}> /pers.</span>}
+              {(model === 'per_person' || model === 'package') && price.price_per_person != null
+                ? <>{fmt(price.price_per_person)}<span style={{ fontSize: 11, fontWeight: 400 }}> /pers.</span></>
+                : fmt(price.price)}
             </span>
           )}
           {/* Notes */}
@@ -3221,7 +3819,7 @@ function TierRows({ tiers, accent, onChange }: { tiers: PriceTier[]; accent: str
   )
 }
 
-function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, isEdit = false, cfg, zones, supplements, spaceGroups = [], existingRanges = [], onPricingModeChange }: {
+function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, isEdit = false, cfg, zones, supplements, spaceGroups = [], existingRanges = [], onPricingModeChange, packageMode = false }: {
   form: typeof emptyPriceForm; onChange: (f: typeof emptyPriceForm) => void
   accent: string; saving: boolean; error: string
   onSave: () => void; onCancel: () => void
@@ -3231,6 +3829,7 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
   spaceGroups?: VenueSpaceGroup[]
   existingRanges?: { from: string; to: string }[]
   onPricingModeChange?: (groupId: string, mode: 'group_base' | 'per_space') => void
+  packageMode?: boolean
 }) {
   const model = cfg?.price_model ?? 'rental'
   const space = cfg?.space_type  ?? 'single'
@@ -3240,6 +3839,69 @@ function PriceForm({ form, onChange, accent, saving, error, onSave, onCancel, is
   const showBase = model === 'rental'
 
   const labelBase = model === 'per_person' ? 'PRECIO/PERSONA €' : model === 'package' ? 'PRECIO PAQUETE €' : 'PRECIO €'
+
+  // Simplified form for named packages: dates + fixed/per_person toggle + price
+  const [pkgPriceType, setPkgPriceType] = useState<'fixed' | 'per_person'>(
+    isEdit && form.price_per_person && form.price_per_person !== '' ? 'per_person' : 'fixed'
+  )
+  if (packageMode) {
+    return (
+      <div style={{ background: '#fff', border: `2px ${isEdit ? 'solid' : 'dashed'} ${accent}${isEdit ? '' : '55'}`, borderRadius: 10, padding: '14px' }}>
+        {!isEdit && (
+          <div style={{ fontSize: 10, fontWeight: 700, color: accent, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>
+            Nueva tarifa
+          </div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <DatePicker label="DESDE" value={form.date_from} onChange={v => onChange({ ...form, date_from: v })} accent={accent} disabledRanges={existingRanges} />
+          <DatePicker label="HASTA" value={form.date_to}   onChange={v => onChange({ ...form, date_to: v })}   accent={accent} minDate={form.date_from || undefined} disabledRanges={existingRanges} />
+        </div>
+        <div style={{ border: '1px solid var(--ivory)', borderRadius: 8, padding: '10px', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '0.05em', textTransform: 'uppercase', flex: 1 }}>Tipo de precio</span>
+            <div style={{ display: 'flex', borderRadius: 20, border: '1px solid #d1d5db', overflow: 'hidden', flexShrink: 0 }}>
+              {([{ key: 'fixed' as const, label: 'Precio fijo' }, { key: 'per_person' as const, label: 'Por persona' }]).map(({ key, label }) => {
+                const active = pkgPriceType === key
+                return (
+                  <button key={key} type="button"
+                    onClick={() => {
+                      setPkgPriceType(key)
+                      const currentValue = key === 'fixed' ? (form.price_per_person || form.price || '') : (form.price || form.price_per_person || '')
+                      if (key === 'fixed') onChange({ ...form, price: currentValue, price_per_person: '' })
+                      else onChange({ ...form, price_per_person: currentValue, price: '' })
+                    }}
+                    style={{ fontSize: 10, padding: '3px 10px', border: 'none', borderLeft: key === 'per_person' ? '1px solid #d1d5db' : 'none', background: active ? accent : 'transparent', color: active ? '#fff' : 'var(--warm-gray)', cursor: 'pointer', fontWeight: active ? 600 : 400 }}>
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input type="number" className="form-input" placeholder="0"
+              value={pkgPriceType === 'per_person' ? (form.price_per_person ?? '') : form.price}
+              onChange={e => {
+                if (pkgPriceType === 'per_person') onChange({ ...form, price_per_person: e.target.value, price: '' })
+                else onChange({ ...form, price: e.target.value, price_per_person: '' })
+              }}
+              style={{ fontSize: 13, width: 120, textAlign: 'right', fontWeight: 600 }} />
+            <span style={{ fontSize: 12, color: 'var(--warm-gray)' }}>{pkgPriceType === 'per_person' ? '€/persona' : '€ total'}</span>
+          </div>
+        </div>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--warm-gray)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 4 }}>NOTAS (opcional)</div>
+          <input type="text" className="form-input" placeholder="Ej: Precio especial para lunes y martes" value={form.notes} onChange={e => onChange({ ...form, notes: e.target.value })} style={{ fontSize: 12 }} />
+        </div>
+        {error && <div style={{ fontSize: 11, color: 'var(--rose)', marginBottom: 8 }}>{error}</div>}
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn btn-primary btn-sm" disabled={saving} onClick={onSave} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Check size={12} /> {saving ? 'Guardando…' : isEdit ? 'Guardar' : 'Crear tarifa'}
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancelar</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ background: '#fff', border: `2px ${isEdit ? 'solid' : 'dashed'} ${accent}${isEdit ? '' : '55'}`, borderRadius: 10, padding: '14px' }}>

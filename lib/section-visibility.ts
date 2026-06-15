@@ -16,7 +16,6 @@ export const SECTION_SPACE_TYPES: Record<string, Array<'single' | 'single_with_s
   single_space: ['single', 'single_with_supplements'],
   zones: ['single_with_supplements'],
   space_groups: ['multiple_independent', 'single_with_supplements'],
-  venue_rental: ['single', 'single_with_supplements'],
 }
 
 export function isSectionAllowed(secId: string, spaceType: SpaceType): boolean {
@@ -29,8 +28,6 @@ export function isSectionAllowed(secId: string, spaceType: SpaceType): boolean {
       return spaceType !== 'multiple_independent'
     case 'space_groups':
       return true  // always visible in sidebar; default on/off controlled by getDefaultSections
-    case 'venue_rental':
-      return spaceType !== 'multiple_independent'
     default:
       return true
   }
@@ -45,10 +42,6 @@ export function getSectionLabel(secId: string, spaceType: SpaceType, fallback: s
       return 'Los espacios'
     case 'space_groups':
       return 'Grupos de espacios'
-    case 'venue_rental':
-      if (spaceType === 'single') return 'Tarifa de alquiler'
-      if (spaceType === 'single_with_supplements') return 'Tarifa base de alquiler'
-      return fallback
     default:
       return fallback
   }

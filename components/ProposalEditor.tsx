@@ -270,6 +270,12 @@ export default function ProposalEditor({ proposal: initial }: { proposal: Editor
           sections_enabled: getDefaultSections(cfg),
         }
 
+        // Auto-default: hide menu prices + supplements for package mode
+        if (cfg.price_model === 'package') {
+          if (autoPatch.show_menu_prices === undefined) autoPatch.show_menu_prices = false
+          if (autoPatch.show_menu_supplements === undefined) autoPatch.show_menu_supplements = false
+        }
+
         // Task 2: Auto-populate space_groups from venue config
         if (!fromTemplate && (cfg.space_type === 'multiple_independent' || cfg.space_type === 'single_with_supplements') && spaceGroups.length > 0) {
           // Gather supplement prices from modality tariffs: {zone_id → [{season_label, price}]}

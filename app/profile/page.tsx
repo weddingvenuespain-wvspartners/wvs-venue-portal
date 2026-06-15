@@ -182,6 +182,13 @@ function PerfilPageContent() {
   // Billing
   const [payments, setPayments]           = useState<PaymentEvent[]>([])
   const [paymentsLoaded, setPaymentsLoaded] = useState(false)
+  const [cancelModal, setCancelModal]     = useState(false)
+  const [cancelReason, setCancelReason]   = useState('')
+  const [cancelling, setCancelling]       = useState(false)
+  const [paymentsExpanded, setPaymentsExpanded] = useState(false)
+  const PAYMENTS_PREVIEW = 6
+  // Stripe portal
+  const [portalLoading, setPortalLoading] = useState(false)
 
   // Plan usage
   const [leadsCount, setLeadsCount]         = useState<number | null>(null)
@@ -256,6 +263,43 @@ function PerfilPageContent() {
   const notify = (msg: string, isErr = false) => {
     isErr ? setError(msg) : setSuccess(msg)
     setTimeout(() => { setSuccess(''); setError('') }, 4500)
+  }
+
+  const handleCancelSubscription = async () => {
+    setCancelling(true)
+    try {
+      const res = await fetch('/api/subscription/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: cancelReason }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error')
+      notify(data.message || 'Suscripción cancelada correctamente')
+      setCancelModal(false)
+      setCancelReason('')
+      // Refresh payments
+      const supabase = createClient()
+      const { data: fresh } = await supabase.from('venue_payment_history').select('*').eq('user_id', user!.id).order('created_at', { ascending: false })
+      if (fresh) setPayments(fresh)
+    } catch (e: any) {
+      notify(e.message || 'Error al cancelar', true)
+    } finally {
+      setCancelling(false)
+    }
+  }
+
+  const handleOpenStripePortal = async () => {
+    setPortalLoading(true)
+    try {
+      const res = await fetch('/api/stripe/portal-session', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok || !data.url) throw new Error(data.error || 'Error al abrir portal')
+      window.location.href = data.url
+    } catch (e: any) {
+      notify(e.message || 'Error al abrir portal de pago', true)
+      setPortalLoading(false)
+    }
   }
 
   // ─── Password strength ─────────────────────────────────────────────────────
@@ -1470,18 +1514,25 @@ function PerfilPageContent() {
                             </div>
                             <div style={{ fontSize: 12, color: '#8A6A38', lineHeight: 1.6, marginBottom: 10 }}>
                               Desbloquea propuestas digitales, estadísticas avanzadas, exportar leads y comunicación de tarifas.
+                              El cambio se aplica de inmediato con prorrateo automático de Stripe.
                             </div>
-                            <a href="mailto:info@foreventos.com?subject=Quiero%20pasar%20a%20Premium"
-                              className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex' }}>
-                              Solicitar upgrade →
+                            <a href="/pricing"
+                              className="btn btn-primary btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', background: '#8A6A38' }}>
+                              <Zap size={12} /> Cambiar de plan →
                             </a>
                           </div>
                         )}
 
-                        <a href="mailto:info@foreventos.com?subject=Gestión%20de%20suscripción"
-                          className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
-                          Gestionar suscripción
-                        </a>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <a href="/pricing"
+                            className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
+                            Ver planes disponibles
+                          </a>
+                          <a href="mailto:info@foreventos.com?subject=Gestión%20de%20suscripción"
+                            className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
+                            Contactar soporte
+                          </a>
+                        </div>
                       </>
                     ) : (
                       <div style={{ padding: '20px', textAlign: 'center', color: 'var(--warm-gray)' }}>
@@ -1602,15 +1653,16 @@ function PerfilPageContent() {
                       </div>
                     ) : (
                       <div>
-                        {payments.map(ev => {
+                        {(paymentsExpanded ? payments : payments.slice(0, PAYMENTS_PREVIEW)).map(ev => {
                           const eventLabels: Record<string, string> = {
-                            payment: 'Pago recibido', trial_started: 'Trial iniciado',
-                            activated: 'Suscripción activada', plan_changed: 'Cambio de plan',
-                            cancelled: 'Cancelación', reactivated: 'Reactivación', note: 'Nota',
+                            payment: 'Pago recibido', payment_failed: 'Pago fallido', trial_started: 'Trial iniciado',
+                            activated: 'Suscripción activada', plan_changed: 'Cambio de plan', upgraded: 'Plan mejorado',
+                            cancelled: 'Cancelación', reactivated: 'Reactivación', note: 'Nota', past_due: 'Pago pendiente',
                           }
                           const eventColors: Record<string, string> = {
-                            payment: '#5C7E64', trial_started: '#8A6A38', activated: '#5C7E64',
-                            plan_changed: '#4F6D8C', cancelled: '#BC5249', reactivated: '#5C7E64', note: '#6b7280',
+                            payment: '#5C7E64', payment_failed: '#BC5249', trial_started: '#8A6A38', activated: '#5C7E64',
+                            plan_changed: '#4F6D8C', upgraded: '#4F6D8C', cancelled: '#BC5249', reactivated: '#5C7E64',
+                            note: '#6b7280', past_due: '#BC5249',
                           }
                           const color = eventColors[ev.event_type] || '#6b7280'
                           return (
@@ -1633,27 +1685,164 @@ function PerfilPageContent() {
                                 </div>
                                 {ev.notes && <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 3, fontStyle: 'italic' }}>{ev.notes}</div>}
                               </div>
+                              {ev.event_type === 'payment' && ev.amount && ev.amount > 0 && (
+                                <a
+                                  href={`/api/invoices/${ev.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
+                                    fontSize: 11, fontWeight: 500, color: '#5C7E64', background: '#EDF2ED',
+                                    borderRadius: 6, textDecoration: 'none', flexShrink: 0, alignSelf: 'center',
+                                  }}
+                                >
+                                  <FileText size={12} /> Factura
+                                </a>
+                              )}
                             </div>
                           )
                         })}
+                        {payments.length > PAYMENTS_PREVIEW && (
+                          <button
+                            onClick={() => setPaymentsExpanded(v => !v)}
+                            style={{
+                              display: 'block', width: '100%', padding: '10px 0', marginTop: 4,
+                              fontSize: 12, fontWeight: 500, color: 'var(--gold)', background: 'none',
+                              border: 'none', cursor: 'pointer', textAlign: 'center',
+                            }}
+                          >
+                            {paymentsExpanded
+                              ? 'Ver menos ↑'
+                              : `Ver todos (${payments.length} registros) ↓`}
+                          </button>
+                        )}
                       </div>
                     )}
                   </Section>
 
-                  <Section title="Forma de pago" description="Método de pago asociado a tu suscripción.">
-                    <div style={{ padding: '10px 0', fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.7 }}>
-                      Los pagos se gestionan mediante domiciliación bancaria (SEPA) o transferencia.
-                      Para actualizar tu método de pago contacta con tu gestor.
+                  <Section title="Forma de pago" description="Gestiona tu método de pago a través del portal seguro de Stripe.">
+                    <div style={{ padding: '10px 0' }}>
+                      <div style={{ fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.7, marginBottom: 12 }}>
+                        Puedes actualizar tu tarjeta, consultar facturas y gestionar tu método de pago desde el portal de Stripe.
+                      </div>
+                      <button
+                        onClick={handleOpenStripePortal}
+                        disabled={portalLoading}
+                        className="btn btn-primary btn-sm"
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: portalLoading ? 0.6 : 1 }}
+                      >
+                        {portalLoading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <ExternalLink size={13} />}
+                        Gestionar método de pago
+                      </button>
                     </div>
-                    <a href="mailto:info@foreventos.com?subject=Actualizar%20método%20de%20pago"
-                      className="btn btn-ghost btn-sm" style={{ marginTop: 8, textDecoration: 'none' }}>
-                      Contactar para actualizar →
-                    </a>
                   </Section>
 
                   <Section title="Pagos online de presupuestos" description="Permite a las parejas pagar cuotas de presupuestos con tarjeta.">
                     <StripeConnectBlock />
                   </Section>
+
+                  <Section title="Cancelar suscripción" description="Cancela tu suscripción activa. Mantendrás el acceso hasta el fin del período." danger>
+                    <div style={{ padding: '8px 0', fontSize: 13, color: 'var(--warm-gray)', lineHeight: 1.7 }}>
+                      Si cancelas, tu suscripción seguirá activa hasta la fecha de renovación.
+                      Después tu cuenta pasará al plan gratuito con funcionalidades limitadas.
+                    </div>
+                    <button
+                      onClick={() => setCancelModal(true)}
+                      style={{
+                        marginTop: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600,
+                        color: '#BC5249', background: 'rgba(188,82,73,0.08)', border: '1px solid rgba(188,82,73,0.2)',
+                        borderRadius: 8, cursor: 'pointer',
+                      }}
+                    >
+                      Cancelar mi suscripción
+                    </button>
+                  </Section>
+
+                  {/* Cancel modal */}
+                  {cancelModal && (
+                    <div style={{
+                      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+                    }} onClick={() => !cancelling && setCancelModal(false)}>
+                      <div onClick={e => e.stopPropagation()} style={{
+                        background: '#fff', borderRadius: 14, padding: '28px 24px', maxWidth: 420, width: '100%',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                          <AlertTriangle size={20} style={{ color: '#BC5249' }} />
+                          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#B0473E', margin: 0 }}>¿Cancelar suscripción?</h3>
+                        </div>
+                        <p style={{ fontSize: 13, color: 'var(--charcoal)', lineHeight: 1.7, margin: '0 0 16px' }}>
+                          Tu suscripción se mantendrá activa hasta el fin del período actual.
+                          Después perderás acceso a las funcionalidades premium.
+                        </p>
+                        {(() => {
+                          const wordCount = cancelReason.trim().split(/\s+/).filter(Boolean).length
+                          const MIN_WORDS = 50
+                          const isValid = wordCount >= MIN_WORDS
+                          return (
+                            <>
+                              <div style={{ marginBottom: 16 }}>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--warm-gray)', display: 'block', marginBottom: 4 }}>
+                                  Motivo de cancelación <span style={{ color: '#BC5249' }}>*</span>
+                                </label>
+                                <textarea
+                                  value={cancelReason}
+                                  onChange={e => setCancelReason(e.target.value)}
+                                  placeholder="Explícanos con detalle por qué cancelas tu suscripción. Tu feedback nos ayuda a mejorar la plataforma para todos los espacios..."
+                                  rows={5}
+                                  style={{
+                                    width: '100%', padding: '10px 12px', fontSize: 13,
+                                    border: `1px solid ${cancelReason.trim() && !isValid ? 'rgba(188,82,73,0.4)' : 'var(--ivory)'}`,
+                                    borderRadius: 8, resize: 'vertical', fontFamily: 'inherit',
+                                  }}
+                                />
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                                  <span style={{ fontSize: 10, color: 'var(--warm-gray)' }}>
+                                    Mínimo {MIN_WORDS} palabras para poder cancelar
+                                  </span>
+                                  <span style={{
+                                    fontSize: 10, fontWeight: 600,
+                                    color: isValid ? '#5C7E64' : wordCount > 0 ? '#BC5249' : 'var(--warm-gray)',
+                                  }}>
+                                    {wordCount}/{MIN_WORDS} palabras
+                                  </span>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                                <button
+                                  onClick={() => setCancelModal(false)}
+                                  disabled={cancelling}
+                                  style={{
+                                    padding: '8px 18px', fontSize: 13, fontWeight: 500,
+                                    color: 'var(--charcoal)', background: 'var(--ivory)',
+                                    border: 'none', borderRadius: 8, cursor: 'pointer',
+                                  }}
+                                >
+                                  Volver
+                                </button>
+                                <button
+                                  onClick={handleCancelSubscription}
+                                  disabled={cancelling || !isValid}
+                                  title={!isValid ? `Escribe al menos ${MIN_WORDS} palabras` : ''}
+                                  style={{
+                                    padding: '8px 18px', fontSize: 13, fontWeight: 600,
+                                    color: '#fff', background: '#BC5249',
+                                    border: 'none', borderRadius: 8, cursor: isValid ? 'pointer' : 'not-allowed',
+                                    opacity: cancelling || !isValid ? 0.5 : 1,
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                  }}
+                                >
+                                  {cancelling && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+                                  Confirmar cancelación
+                                </button>
+                              </div>
+                            </>
+                          )
+                        })()}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 

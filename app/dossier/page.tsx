@@ -350,15 +350,6 @@ function PropuestasPageContent() {
         <div className="page-content">
           <>
 
-          {smtpConfigured === false && (
-            <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <AlertCircle size={15} style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: 13 }}>
-                No tienes configurado el correo de envío. Los emails de propuestas saldrán desde el servidor de FOREVENTOS.{' '}
-                <a href="/profile" style={{ color: 'inherit', fontWeight: 600, textDecoration: 'underline' }}>Configurar ahora →</a>
-              </span>
-            </div>
-          )}
           {limitWarn && (
             <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
               <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
@@ -538,9 +529,9 @@ function PropuestasPageContent() {
                             </button>
                             <button
                               className="btn btn-primary btn-sm"
-                              onClick={() => { if (smtpConfigured !== false && sendingId !== p.id) markSent(p) }}
-                              title={smtpConfigured === false ? 'Configura el correo' : p.status === 'draft' ? 'Enviar' : 'Reenviar'}
-                              style={{ height: 28, fontSize: 11, padding: '0 10px', ...(smtpConfigured === false || sendingId === p.id ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}
+                              onClick={() => { if (sendingId !== p.id) markSent(p) }}
+                              title={p.status === 'draft' ? 'Enviar' : 'Reenviar'}
+                              style={{ height: 28, fontSize: 11, padding: '0 10px', ...(sendingId === p.id ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}
                             >
                               {sendingId === p.id ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />} {sendingId === p.id ? '…' : p.status === 'draft' ? 'Enviar' : 'Reenviar'}
                             </button>
