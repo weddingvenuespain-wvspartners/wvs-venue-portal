@@ -495,6 +495,9 @@ const BUDGET_LABEL: Record<string, string> = {
   'wvs_40k_51k':    '40.000 – 51.000 €',
   'wvs_51k_60k':    '51.000 – 60.000 €',
   'wvs_mas_60k':    '> 60.000 €',
+  'wvs_35k_60k':    '35.000 – 60.000 €',
+  'wvs_60k_100k':   '60.000 – 100.000 €',
+  'wvs_mas_100k':   '> 100.000 €',
 }
 
 export async function sendNewLeadEmail({

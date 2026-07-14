@@ -3,8 +3,6 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
-const WP_URL = process.env.NEXT_PUBLIC_WP_URL || 'https://weddingvenuesspain.com'
-
 function getServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -64,24 +62,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Error al guardar la configuración' }, { status: 500 })
     }
 
-    // If venue already has a WP post, update email_del_venue directly in WordPress
-    const { data: profile } = await svc
-      .from('venue_profiles')
-      .select('wp_venue_id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (profile?.wp_venue_id) {
-      const token = process.env.WVS_REST_TOKEN
-      if (token) {
-        await fetch(`${WP_URL}/wp-json/wvs/v1/venue/${profile.wp_venue_id}/update`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-WVS-Token': token },
-          body: JSON.stringify({ acf: { email_del_venue: leadsEmail } }),
-        })
-      }
-    }
-
+    // Los emails de leads viven solo en ficha_data: /api/leads/create los lee
+    // de ahí. Ya no se sincronizan a WordPress (web antigua retirada).
     return NextResponse.json({ success: true })
   } catch (err: any) {
     console.error('[save-config]', err)

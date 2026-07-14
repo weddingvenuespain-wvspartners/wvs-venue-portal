@@ -139,6 +139,7 @@ const BUDGET_LABEL: Record<string, string> = {
   menos_20k: '< 20k€', '20k_35k': '20–35k€', '35k_50k': '35–50k€', mas_50k: '> 50k€',
   wvs_menos_20k: '< 20k€', wvs_20k_35k: '20–35k€', wvs_35k_40k: '35–40k€',
   wvs_40k_51k: '40–51k€', wvs_51k_60k: '51–60k€', wvs_mas_60k: '> 60k€',
+  wvs_35k_60k: '35–60k€', wvs_60k_100k: '60–100k€', wvs_mas_100k: '> 100k€',
 }
 
 const PROPOSAL_STATUS: Record<string, { label: string; color: string; bg: string }> = {

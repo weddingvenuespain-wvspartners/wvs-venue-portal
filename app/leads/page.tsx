@@ -82,11 +82,15 @@ const BUDGET_LABEL: Record<string, string> = {
   'wvs_40k_51k':   '40.000–51.000€',
   'wvs_51k_60k':   '51.000–60.000€',
   'wvs_mas_60k':   '> 60.000€',
+  'wvs_35k_60k':   '35.000–60.000€',
+  'wvs_60k_100k':  '60.000–100.000€',
+  'wvs_mas_100k':  '> 100.000€',
 }
 const BUDGET_OPTS = [
   'sin_definir',
-  'wvs_menos_20k', 'wvs_20k_35k', 'wvs_35k_40k',
+  'wvs_menos_20k', 'wvs_20k_35k', 'wvs_35k_40k', 'wvs_35k_60k',
   'wvs_40k_51k', 'wvs_51k_60k', 'wvs_mas_60k',
+  'wvs_60k_100k', 'wvs_mas_100k',
 ]
 const CEREMONY_LABEL: Record<string, string> = {
   sin_definir: '—', civil: 'Civil', religiosa: 'Religiosa', simbolica: 'Simbólica',

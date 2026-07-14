@@ -24,24 +24,33 @@ function wordCount(text: string) {
   return plain ? plain.split(/\s+/).length : 0
 }
 
-function autoSymbol(input: string): '$' | '$$' | '$$$' | '' {
+function autoSymbol(input: string): '€' | '€€' | '€€€' | '' {
   const n = parseFloat(input.replace(/[^\d.]/g, ''))
   if (isNaN(n) || !input.trim()) return ''
-  if (n < 4000)  return '$'
-  if (n < 8000)  return '$$'
-  return '$$$'
+  if (n < 4000)  return '€'
+  if (n < 8000)  return '€€'
+  return '€€€'
 }
 
 function legacyToSymbol(v: string): string {
-  if (v === 'budget') return '$'
-  if (v === 'mid')    return '$$'
-  if (v === 'luxury' || v === 'ultra') return '$$$'
+  if (v === 'budget' || v === '$')  return '€'
+  if (v === 'mid'    || v === '$$') return '€€'
+  if (v === 'luxury' || v === 'ultra' || v === '$$$') return '€€€'
   return v
 }
 
 const REGIONS = [
   'Mallorca', 'Ibiza', 'Barcelona', 'Madrid', 'Costa Brava',
   'Alicante', 'Malaga', 'Marbella', 'Sevilla', 'Valencia',
+]
+
+const STYLE_OPTIONS: { slug: string; label: string }[] = [
+  { slug: 'beach',    label: 'Playa' },
+  { slug: 'castle',   label: 'Castillo' },
+  { slug: 'hotel',    label: 'Hotel' },
+  { slug: 'luxury',   label: 'Lujo' },
+  { slug: 'villa',    label: 'Villa' },
+  { slug: 'vineyard', label: 'Viñedo' },
 ]
 
 const WC_COLORS = (count: number, limit: number) =>
@@ -93,11 +102,15 @@ export default function FichaPage() {
   const [venuePriceMode, setVenuePriceMode]   = useState<VenuePriceMode>('auto')
   const [venuePriceInput, setVenuePriceInput] = useState('')
   const [venuePriceSaved, setVenuePriceSaved] = useState('')
+  const [whatsappNumber, setWhatsappNumber]   = useState('')
+  const [capacityMin, setCapacityMin]         = useState('')
+  const [styles, setStyles]                   = useState<string[]>([])
 
   // ── Descripción ─────────────────────────────────────────────────────────────
   const [miniDesc,      setMiniDesc]      = useState('')
   const [miniParagraph, setMiniParagraph] = useState('')
   const [postContent,   setPostContent]   = useState('')
+  const [faqs,          setFaqs]          = useState<{ question: string; answer: string }[]>([])
 
   // ── Precios ─────────────────────────────────────────────────────────────────
   const [venueFeeValue,    setVenueFeeValue]    = useState('')
@@ -120,11 +133,14 @@ export default function FichaPage() {
   const [airportName,   setAirportName]   = useState('')
   const [airportKm,     setAirportKm]     = useState('')
   const [airportMins,   setAirportMins]   = useState('')
+  const [latitude,      setLatitude]      = useState('')
+  const [longitude,     setLongitude]     = useState('')
 
   // ── Fotos ───────────────────────────────────────────────────────────────────
   const [verticalPhoto,     setVerticalPhoto]     = useState<{ id: number; url: string } | null>(null)
   const [uploadingVertical, setUploadingVertical] = useState(false)
   const [hGallery,          setHGallery]          = useState<(null | { id: number; url: string })[]>(Array(8).fill(null))
+  const [videoHeroUrl,      setVideoHeroUrl]      = useState('')
   const [uploadingPhoto,    setUploadingPhoto]    = useState(false)
   const [uploadMsg,         setUploadMsg]         = useState('')
 
@@ -216,6 +232,20 @@ export default function FichaPage() {
         setLoading(false)
         setIsDirty(false); setDirtyTabs(new Set())
 
+        // Load WP venue metadata in background (for external link, title, etc.)
+        fetch(`/api/venues/wp-venue?id=${wpVenueId}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => { if (data) setVenue(data) })
+          .catch(() => {})
+        return
+      }
+
+      // Intermediate path: no ficha_data yet, but the venue may already be published
+      // in the public_venues view — load from there before falling back to WP
+      const publishedOk = await populateFromPublished(wpVenueId)
+      if (publishedOk) {
+        setLoading(false)
+        setIsDirty(false); setDirtyTabs(new Set())
         // Load WP venue metadata in background (for external link, title, etc.)
         fetch(`/api/venues/wp-venue?id=${wpVenueId}`)
           .then(res => res.ok ? res.json() : null)
@@ -373,6 +403,83 @@ export default function FichaPage() {
     setReviewsEnabled(acf.reviews_enabled !== false)
   }
 
+  // Fallback: venue published in public_venues but without ficha_data in Supabase.
+  // Reverse-maps the public columns into the editor state (best-effort).
+  async function populateFromPublished(wpVenueId: number): Promise<boolean> {
+    try {
+      const supabase = createClient()
+      const { data: pub } = await supabase
+        .from('public_venues')
+        .select('name, description, tagline, region, city, latitude, longitude, capacity_min, capacity_max, menu_price, venue_price_level, venue_from_display, catering_from, accommodation_note, airport_info, nearby, video_hero_url, whatsapp_number, style_slugs, photo_urls, content_html, testimonials, faqs')
+        .eq('wp_post_id', wpVenueId)
+        .maybeSingle()
+      if (!pub) return false
+
+      setH1_Venue(pub.name || '')
+      setShortDesc(pub.description || '')
+      setMiniDesc(pub.tagline || '')
+      setLocation(pub.region ? pub.region.charAt(0).toUpperCase() + pub.region.slice(1) : '')
+      setSpecificLocation(pub.city || '')
+      setCapacity(pub.capacity_max ? String(pub.capacity_max) : '')
+      setCapacityMin(pub.capacity_min ? String(pub.capacity_min) : '')
+
+      const mpRaw = pub.menu_price || ''
+      const mpMatch = mpRaw.match(/[\d.,]+/)
+      setMenuPriceValue(mpMatch ? mpMatch[0].replace(',', '.') : '')
+      setMenuPriceUnit(mpRaw.toLowerCase().includes('person') ? 'person' : mpRaw.toLowerCase().includes('day') ? 'day' : 'person')
+
+      const priceSymbol = legacyToSymbol(pub.venue_price_level || '')
+      setVenuePriceSaved(priceSymbol)
+      setVenuePriceMode(priceSymbol === 'included' ? 'included' : 'auto')
+
+      const fee = parseLegacyFee(pub.venue_from_display || '')
+      setVenueFeeValue(fee.value); setVenueFeeNights(fee.nights); setVenueFeeIncluded(fee.included)
+      const cat = parseLegacyCatering(pub.catering_from || '')
+      setCateringFeeValue(cat.value); setCateringFeeUnit(cat.unit)
+      const accomNote = (pub.accommodation_note || '').toLowerCase()
+      if (accomNote.startsWith('included')) setAccommodation('yes')
+      else if (accomNote === 'request') setAccommodation('optional')
+      else if (accomNote === 'not included') setAccommodation('no')
+
+      const photos: string[] = Array.isArray(pub.photo_urls) ? pub.photo_urls : []
+      if (photos[0]) setHeroImage({ id: 0, url: photos[0] })
+      const galleryUrls = photos.slice(1, 9)
+      setHGallery(Array(8).fill(null).map((_, i) => galleryUrls[i] ? { id: 0, url: galleryUrls[i] } : null))
+
+      setPostContent(pub.content_html || '')
+
+      const nearbyParts = (pub.nearby || '').split(' - ').map((s: string) => s.trim())
+      setPlacesNearby1(nearbyParts[0] || '')
+      setPlacesNearby2(nearbyParts[1] || '')
+      setPlacesNearby3(nearbyParts[2] || '')
+      const airportParts = (pub.airport_info || '').split(' - ').map((s: string) => s.trim())
+      setAirportName(airportParts[0] || '')
+      setAirportKm(airportParts[1] || '')
+      setAirportMins(airportParts[2] || '')
+
+      setWhatsappNumber(pub.whatsapp_number || '')
+      setVideoHeroUrl(pub.video_hero_url || '')
+      setStyles(Array.isArray(pub.style_slugs) ? pub.style_slugs : [])
+      setLatitude(pub.latitude !== null && pub.latitude !== undefined ? String(pub.latitude) : '')
+      setLongitude(pub.longitude !== null && pub.longitude !== undefined ? String(pub.longitude) : '')
+      setFaqs(Array.isArray(pub.faqs) ? pub.faqs : [])
+
+      const testimonials: any[] = Array.isArray(pub.testimonials) ? pub.testimonials : []
+      if (testimonials.length > 0) {
+        setReviews(testimonials.slice(0, 3).map((t: any) => ({
+          couple_name: (t.author || '').split(',')[0] || '',
+          country: (t.author || '').split(',').slice(1).join(',').trim(),
+          text: t.quote || '',
+        })))
+      }
+      setReviewsEnabled(testimonials.length > 0)
+
+      return true
+    } catch {
+      return false
+    }
+  }
+
   function populateFromFichaData(d: any) {
     if (!d) return
     setH1_Venue(d.H1_Venue || '')
@@ -432,6 +539,13 @@ export default function FichaPage() {
     }
     if (Array.isArray(d.reviews)) setReviews(d.reviews)
     setReviewsEnabled(d.reviewsEnabled !== false)
+    setWhatsappNumber(d.whatsappNumber || '')
+    setCapacityMin(d.capacityMin || '')
+    setStyles(Array.isArray(d.styles) ? d.styles : [])
+    setLatitude(d.latitude || '')
+    setLongitude(d.longitude || '')
+    setVideoHeroUrl(d.videoHeroUrl || '')
+    setFaqs(Array.isArray(d.faqs) ? d.faqs : [])
   }
 
   function buildVenueFee(): string {
@@ -488,6 +602,9 @@ export default function FichaPage() {
       leadsEmail,
       gallery: hGallery.map(p => p ? { id: p.id, url: p.url } : null),
       reviewsEnabled, reviews,
+      whatsappNumber, capacityMin, styles,
+      latitude, longitude, videoHeroUrl,
+      faqs: faqs.filter(f => f.question.trim() && f.answer.trim()),
     }
   }
 
@@ -500,6 +617,13 @@ export default function FichaPage() {
     const merged: Record<string, any> = { ...raw }
     for (const [k, v] of Object.entries(raw)) {
       if (typeof v === 'string' && v === '' && published[k] !== undefined && published[k] !== null && published[k] !== '') {
+        merged[k] = published[k]
+      }
+    }
+    // Arrays: keep published value if local is empty (styles, faqs)
+    for (const k of ['styles', 'faqs']) {
+      const localArr = (raw as any)[k]
+      if (Array.isArray(localArr) && localArr.length === 0 && Array.isArray(published[k]) && published[k].length > 0) {
         merged[k] = published[k]
       }
     }
@@ -626,6 +750,8 @@ export default function FichaPage() {
       errs.push({ field: 'Precio del venue', tab: 'info', msg: 'Introduce el precio o selecciona otra opción' })
     if (!menuPriceValue.trim())
       errs.push({ field: 'Starting price del menú', tab: 'info', msg: 'Obligatorio' })
+    if (whatsappNumber.trim() && !/^\+?[\d\s-]{7,20}$/.test(whatsappNumber.trim()))
+      errs.push({ field: 'WhatsApp', tab: 'info', msg: 'WhatsApp no válido' })
 
     // Descripción
     if (!miniDesc.trim())                errs.push({ field: 'Mini título (H2)',          tab: 'descripcion', msg: 'Obligatorio' })
@@ -654,6 +780,12 @@ export default function FichaPage() {
       errs.push({ field: '3 lugares cercanos', tab: 'ubicacion', msg: 'Rellena los 3 lugares cercanos' })
     if (!airportName.trim())
       errs.push({ field: 'Aeropuerto más cercano', tab: 'ubicacion', msg: 'Indica el nombre del aeropuerto' })
+    if (latitude.trim() || longitude.trim()) {
+      const lat = parseFloat(latitude)
+      const lng = parseFloat(longitude)
+      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180)
+        errs.push({ field: 'Coordenadas', tab: 'ubicacion', msg: 'Coordenadas no válidas' })
+    }
 
     // Fotos
     if (!verticalPhoto)
@@ -1023,10 +1155,55 @@ export default function FichaPage() {
                     {wcShort > 30 && <FieldError msg="Supera las 30 palabras." />}
                   </div>
 
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">WhatsApp (opcional)</label>
+                    <input className="form-input" value={whatsappNumber}
+                      onChange={e => setWhatsappNumber(e.target.value)}
+                      placeholder="+34 600 000 000"
+                      style={{ borderColor: hasError('WhatsApp') ? ERR : undefined }}
+                      disabled={isLocked} />
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 4, lineHeight: 1.5 }}>
+                      Si lo añades, se mostrará un botón de contacto por WhatsApp en la página de tu venue.
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Estilos del venue (máx. 3)</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                      {STYLE_OPTIONS.map(opt => {
+                        const selected = styles.includes(opt.slug)
+                        const disabledChip = isLocked || (!selected && styles.length >= 3)
+                        return (
+                          <button key={opt.slug} type="button" disabled={disabledChip}
+                            onClick={() => {
+                              setStyles(prev => prev.includes(opt.slug) ? prev.filter(s => s !== opt.slug) : [...prev, opt.slug])
+                              setIsDirty(true); setDirtyTabs(prev => new Set(prev).add('info'))
+                            }}
+                            style={{
+                              padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 500,
+                              cursor: disabledChip ? 'default' : 'pointer', border: '1px solid',
+                              borderColor: selected ? 'var(--gold)' : 'var(--ivory)',
+                              background: selected ? '#fef9ec' : 'transparent',
+                              color: selected ? 'var(--gold)' : 'var(--warm-gray)',
+                              opacity: disabledChip && !selected ? 0.45 : 1,
+                            }}>
+                            {opt.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
                 </div>
 
                 {/* Right column */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Capacidad mínima (opcional)</label>
+                    <input className="form-input" type="number" min={0} value={capacityMin}
+                      onChange={e => setCapacityMin(e.target.value)} placeholder="Ej: 40" disabled={isLocked} />
+                  </div>
+
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Máximo nº de invitados</label>
                     <input className="form-input" type="number" min={0} value={capacity}
@@ -1054,7 +1231,7 @@ export default function FichaPage() {
                         onChange={e => setVenuePriceInput(e.target.value)} placeholder="4,500.00" disabled={isLocked} />
                     </div>
                     <div style={{ marginTop: 8, fontSize: 11, color: 'var(--warm-gray)', lineHeight: 1.8 }}>
-                      <strong style={{ color: 'var(--gold)' }}>$</strong> hasta 4.000€ · <strong style={{ color: 'var(--gold)' }}>$$</strong> 4.000–8.000€ · <strong style={{ color: 'var(--gold)' }}>$$$</strong> más de 8.000€
+                      <strong style={{ color: 'var(--gold)' }}>€</strong> hasta 4.000€ · <strong style={{ color: 'var(--gold)' }}>€€</strong> 4.000–8.000€ · <strong style={{ color: 'var(--gold)' }}>€€€</strong> más de 8.000€
                     </div>
                   </div>
                 </div>
@@ -1153,6 +1330,55 @@ export default function FichaPage() {
                   />
                   {wcPost > 280 && <FieldError msg={`Supera las 280 palabras (${wcPost - 280} de más).`} />}
                 </div>
+
+                {/* Preguntas frecuentes (FAQ) */}
+                <Divider />
+                <SectionTitle>Preguntas frecuentes (FAQ)</SectionTitle>
+                <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 14, lineHeight: 1.6 }}>
+                  Añade hasta 6 preguntas con sus respuestas. Aparecerán en tu ficha pública.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {faqs.map((faq, i) => (
+                    <div key={i} style={{ padding: '16px', background: 'var(--cream)', borderRadius: 10, border: '1px solid var(--ivory)', position: 'relative' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--charcoal)' }}>Pregunta {i + 1}</span>
+                        {!isLocked && (
+                          <button type="button"
+                            onClick={() => {
+                              setFaqs(prev => prev.filter((_, j) => j !== i))
+                              setIsDirty(true); setDirtyTabs(prev => new Set(prev).add('descripcion'))
+                            }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warm-gray)', padding: 2, display: 'flex', alignItems: 'center' }}
+                            title="Eliminar pregunta">
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 10 }}>
+                        <input className="form-input" value={faq.question}
+                          onChange={e => { const f = [...faqs]; f[i] = { ...f[i], question: e.target.value }; setFaqs(f) }}
+                          placeholder="Ej: Is there accommodation on site?"
+                          disabled={isLocked} />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <textarea className="form-textarea" style={{ minHeight: 70 }} value={faq.answer}
+                          onChange={e => { const f = [...faqs]; f[i] = { ...f[i], answer: e.target.value }; setFaqs(f) }}
+                          placeholder="Respuesta..."
+                          disabled={isLocked} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {!isLocked && faqs.length < 6 && (
+                  <button type="button"
+                    onClick={() => {
+                      setFaqs(prev => [...prev, { question: '', answer: '' }])
+                      setIsDirty(true); setDirtyTabs(prev => new Set(prev).add('descripcion'))
+                    }}
+                    style={{ marginTop: 12, fontSize: 12, color: 'var(--gold)', background: 'none', border: '1px solid var(--gold)', borderRadius: 6, cursor: 'pointer', padding: '6px 14px' }}>
+                    + Añadir pregunta
+                  </button>
+                )}
 
               </div>
             </div>
@@ -1390,6 +1616,31 @@ export default function FichaPage() {
                   </div>
                 </div>
 
+                <div className="form-group">
+                  <label className="form-label">Coordenadas (opcional)</label>
+                  <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 6, lineHeight: 1.5 }}>
+                    Copia las coordenadas desde Google Maps (clic derecho sobre el venue → copiar coordenadas)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Latitud</div>
+                      <input className="form-input" type="number" step="any" value={latitude}
+                        onChange={e => setLatitude(e.target.value)}
+                        placeholder="Ej. 39.5696"
+                        disabled={isLocked}
+                        style={{ width: '100%', borderColor: hasError('Coordenadas') ? ERR : undefined }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginBottom: 4 }}>Longitud</div>
+                      <input className="form-input" type="number" step="any" value={longitude}
+                        onChange={e => setLongitude(e.target.value)}
+                        placeholder="Ej. 2.6502"
+                        disabled={isLocked}
+                        style={{ width: '100%', borderColor: hasError('Coordenadas') ? ERR : undefined }} />
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
           )}
@@ -1475,6 +1726,24 @@ export default function FichaPage() {
                         onRemove={() => { const g = [...hGallery]; g[i] = null; setHGallery(g) }}
                       />
                     ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Vídeo de cabecera */}
+              <div className="card" style={{ border: '1px solid var(--ivory)', borderRadius: 12 }}>
+                <div style={{ padding: '24px 28px 18px' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--espresso)', letterSpacing: '-0.01em' }}>Vídeo de cabecera (opcional)</div>
+                </div>
+                <div style={{ padding: '0 28px 28px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <input className="form-input" value={videoHeroUrl}
+                      onChange={e => setVideoHeroUrl(e.target.value)}
+                      placeholder="https://... (mp4 o YouTube)"
+                      disabled={isLocked} />
+                    <div style={{ fontSize: 11, color: 'var(--warm-gray)', marginTop: 6, lineHeight: 1.5 }}>
+                      Si lo añades, el vídeo se mostrará en lugar de (o sobre) la foto de cabecera en la web.
+                    </div>
                   </div>
                 </div>
               </div>

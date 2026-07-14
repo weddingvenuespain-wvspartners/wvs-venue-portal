@@ -35,6 +35,7 @@ const BUDGET_LABELS: Record<string, string> = {
   menos_20k: '< 20k€', '20k_35k': '20–35k€', '35k_50k': '35–50k€', mas_50k: '> 50k€',
   'wvs_menos_20k': '< 20k€', 'wvs_20k_35k': '20–35k€', 'wvs_35k_40k': '35–40k€',
   'wvs_40k_51k': '40–51k€', 'wvs_51k_60k': '51–60k€', 'wvs_mas_60k': '> 60k€',
+  'wvs_35k_60k': '35–60k€', 'wvs_60k_100k': '60–100k€', 'wvs_mas_100k': '> 100k€',
 }
 
 type LeadStatusFilter = 'all' | 'active' | 'won' | 'lost' | 'no_leads'
@@ -49,6 +50,7 @@ const BUDGET_ORDER: Record<string, number> = {
   menos_20k: 1, '20k_35k': 4, '35k_50k': 6, mas_50k: 8,
   wvs_menos_20k: 1, wvs_20k_35k: 4, wvs_35k_40k: 5,
   wvs_40k_51k: 7, wvs_51k_60k: 8, wvs_mas_60k: 10,
+  wvs_35k_60k: 7, wvs_60k_100k: 9, wvs_mas_100k: 10,
 }
 
 export default function CrmListPage() {

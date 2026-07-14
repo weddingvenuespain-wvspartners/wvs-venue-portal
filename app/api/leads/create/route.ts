@@ -139,7 +139,8 @@ export async function POST(req: NextRequest) {
 
       const leadsEmailEnabled = onb?.ficha_data?.leadsEmailEnabled !== false
       const rawEmails: string = onb?.ficha_data?.leadsEmail || ''
-      const emailList = rawEmails.split(',').map((e: string) => e.trim()).filter(Boolean)
+      // Máximo 2 emails por venue (el tab de configuración también lo limita)
+      const emailList = rawEmails.split(',').map((e: string) => e.trim()).filter(Boolean).slice(0, 2)
 
       if (leadsEmailEnabled && emailList.length > 0) {
         await sendNewLeadEmail({

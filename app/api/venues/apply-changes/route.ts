@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { buildPublicVenueColumns, slugify, revalidateWvsWeb } from '@/lib/wvs-publish'
 
-const WP_URL = process.env.NEXT_PUBLIC_WP_URL || 'https://weddingvenuesspain.com'
+// Aprobación admin del canal weddingvenuesspain.com.
+// Antes publicaba a WordPress; ahora escribe las columnas planas de la fila
+// 'published' de venue_onboarding, que la vista public_venues expone a la web
+// nueva (wvs-web). La fila del editor (ficha_data) y la fila publicada son
+// registros distintos unidos por wp_post_id.
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -15,174 +20,6 @@ function getServiceClient() {
     )
   }
   return createClient(url, key, { auth: { persistSession: false } })
-}
-
-// Build WordPress auth headers.
-// Priority 1: custom WVS token (X-WVS-Token), if configured.
-// Priority 2: JWT auth — POST credentials to /wp-json/jwt-auth/v1/token, use Bearer token.
-async function getWpHeaders(): Promise<Record<string, string>> {
-  const wvsToken = process.env.WVS_REST_TOKEN
-  if (wvsToken) {
-    return { 'Content-Type': 'application/json', 'X-WVS-Token': wvsToken }
-  }
-
-  const user = process.env.WORDPRESS_ADMIN_USER
-  const pass = process.env.WORDPRESS_ADMIN_PASSWORD
-  if (!user || !pass) {
-    throw new Error(
-      'No hay credenciales de WordPress configuradas. ' +
-      'Añade WORDPRESS_ADMIN_USER y WORDPRESS_ADMIN_PASSWORD en Vercel → Settings → Environment Variables.'
-    )
-  }
-
-  // Obtain a short-lived JWT token using the WP JWT Auth plugin
-  const jwtRes = await fetch(`${WP_URL}/wp-json/jwt-auth/v1/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: user, password: pass }),
-  })
-  const jwtData = await jwtRes.json()
-  if (!jwtRes.ok || !jwtData.token) {
-    throw new Error(
-      `JWT auth de WordPress falló (${jwtRes.status}): ${jwtData?.message || jwtData?.code || 'sin token en respuesta'}. ` +
-      'Verifica que WORDPRESS_ADMIN_USER y WORDPRESS_ADMIN_PASSWORD sean correctos en Vercel.'
-    )
-  }
-
-  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwtData.token}` }
-}
-
-// Remove dangerous HTML tags and attributes before sending to WordPress
-function stripDangerousHtml(html: string): string {
-  if (!html) return ''
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-    .replace(/\son\w+="[^"]*"/gi, '')
-    .replace(/\son\w+='[^']*'/gi, '')
-    .replace(/javascript:/gi, '')
-}
-
-// Strip empty block elements that contentEditable inserts (e.g. <div><br></div>)
-// These are invisible in the editor but create big gaps in WordPress
-function cleanPostContent(html: string): string {
-  return html
-    .replace(/<div>(\s*<br\s*\/?>?\s*)<\/div>/gi, '')
-    .replace(/<p>(\s*<br\s*\/?>?\s*)<\/p>/gi, '')
-    .trim()
-}
-
-// Clean rich text field (compact fields: zones, catering description)
-// Converts <p>text</p> → text<br> to avoid big paragraph gaps in WordPress
-function cleanRichField(html: string): string {
-  if (!html) return ''
-  return html
-    .replace(/<p>(\s*<br\s*\/?>?\s*)<\/p>/gi, '')   // remove empty <p>
-    .replace(/<p>(.*?)<\/p>/gi, '$1<br>')             // <p>text</p> → text<br>
-    .replace(/<br\s*\/?>\s*$/i, '')                   // remove trailing <br>
-    .trim()
-}
-
-// Build WP ACF payload from ficha_data JSON
-function buildWpPayload(d: Record<string, any>) {
-  // Gallery: send Supabase URLs — PHP will sideload them into WP media library
-  const rawGallery = (d.gallery || []) as any[]
-  const hFields = ['h2_gallery','h2_gallery_copy','h2_gallery_copy2','h2_gallery_copy3',
-                   'h2_gallery_copy4','h2_gallery_copy5','h2_gallery_copy6','h2_gallery_copy7']
-  const galleryAcf: Record<string, any> = {}
-  hFields.forEach((f, i) => {
-    const entry = rawGallery[i]
-    galleryAcf[f] = (entry && typeof entry === 'object' ? entry.url : '') || ''
-  })
-
-  // Starting price: {value}€/{unit} — no "From" prefix
-  const menuUnit = d.menuPriceUnit && d.menuPriceUnit !== '' ? `/${d.menuPriceUnit}` : ''
-  const startingPrice = d.menuPriceValue ? `${d.menuPriceValue}€${menuUnit}` : ''
-
-  // Accommodation WP formatted value (field: accommodation)
-  let accommodationWp = ''
-  if (d.wvsAccomHelp) {
-    accommodationWp = 'Request'
-  } else if (d.accommodation === 'yes') {
-    accommodationWp = 'yes'
-  } else if (d.accommodation === 'optional') {
-    accommodationWp = 'Request'
-  } else if (d.accommodation === 'no') {
-    accommodationWp = 'no'
-  }
-
-  // Accommodation breakdown (starting_price_breakdown_4)
-  let accomBreakdownText = ''
-  if (d.accommodation === 'yes') {
-    const g = d.accomGuests ? `${d.accomGuests} guests` : 'guests'
-    const n = d.accomNights ? ` ${d.accomNights} night${parseInt(d.accomNights) !== 1 ? 's' : ''}` : ''
-    accomBreakdownText = `Included for ${g}${n}`
-  } else if (d.accommodation === 'optional') {
-    accomBreakdownText = 'Request'
-  } else if (d.accommodation === 'no') {
-    accomBreakdownText = 'Not Included'
-  }
-  const accomBreakdown4 = `Accommodation <br><p style="font-weight: 300;">- ${accomBreakdownText}</p>`
-
-  // Venue fee: HTML format for WP
-  const nights = parseInt(d.venueFeeNights) || 0
-  const nightsText = nights === 0 ? '' : nights === 1 ? ' inc. 1 night' : ` inc. ${nights} nights`
-  const venueBreakdown1 = d.venueFeeIncluded
-    ? `Venue <br><p style="font-weight: 300;">- included in menu</p>`
-    : `Venue <br><p style="font-weight: 300;">- starting at ${d.venueFeeValue}€${nightsText}</p>`
-  const venueBreakdown1text = ''
-
-  // Catering: HTML format for WP
-  const cUnit              = d.cateringFeeUnit ? `/${d.cateringFeeUnit}` : ''
-  const cateringBreakdown3 = d.cateringFeeValue
-    ? `Catering & Drinks <br><p style="font-weight: 300;">- starting at ${d.cateringFeeValue}€${cUnit}</p>`
-    : 'Catering & Drinks <br><p style="font-weight: 300;">- </p>'
-  const cateringBreakdown3text = ''
-
-  return {
-    title: d.H1_Venue || '',
-    content: stripDangerousHtml(cleanPostContent(d.postContent || '')),
-    excerpt: d.shortDesc || '',
-    acf: {
-      H1_Venue:                        d.H1_Venue || '',
-      location:                        d.location || '',
-      Short_Description_of_Venue:      d.shortDesc || '',
-      venue_starting_price:            startingPrice,
-      Capacity_of_Venue:               d.capacity || '',
-      accommodation:                   accommodationWp,
-      Min_Nights_of_Venue:             d.venuePrice || '',
-      wvs_accommodation_help:          d.wvsAccomHelp ? 'yes' : 'no',
-      h1_image:                        d.heroImageUrl || '',      // URL — PHP sideloads to WP media
-      vertical_photo:                  d.verticalPhotoUrl || '',  // URL — PHP sideloads to WP media
-      section_2_image:                 d.verticalPhotoUrl || '',  // same photo → section_2_image (PHP sideloads)
-      'h2-Venue_and_mini_description': d.miniDesc || '',
-      mini_paragraph:                  d.miniParagraph || '',
-      start_of_post_content:           d.miniParagraph || '',     // mini párrafo → start_of_post_content
-      starting_price_breakdown1:            venueBreakdown1,
-      starting_price_breakdown_text_area_1: stripDangerousHtml(cleanRichField(d.breakdown1text || '')),
-      starting_price_breakdown_3:           cateringBreakdown3,
-      starting_price_breakdown_text_area_3: cateringBreakdown3text,
-      catering_and_drinks_description:      stripDangerousHtml(cleanRichField(d.breakdown3text || '')),
-      starting_price_breakdown_4:           accomBreakdown4,
-      starting_price_breakdown_text_area_4: '',
-      Specific_Location:               d.specificLocation || '',
-      Places_Nearby:                   d.placesNearby || '',
-      Closest_Airport_to_Venue:        d.closestAirport || '',
-      reviews_enabled:                 d.reviewsEnabled ? 1 : 0,
-      reviews:                         Array.isArray(d.reviews) ? d.reviews : [],
-      // Individual testimonial fields — WP template reads these directly
-      testimonial_1:         (d.reviews?.[0]?.text        || ''),
-      testimonial_name_1:    (d.reviews?.[0]?.couple_name || ''),
-      testimonial_country_1: (d.reviews?.[0]?.country     || ''),
-      testimonial_2:         (d.reviews?.[1]?.text        || ''),
-      testimonial_name_2:    (d.reviews?.[1]?.couple_name || ''),
-      testimonial_country_2: (d.reviews?.[1]?.country     || ''),
-      testimonial_3:         (d.reviews?.[2]?.text        || ''),
-      testimonial_name_3:    (d.reviews?.[2]?.couple_name || ''),
-      testimonial_country_3: (d.reviews?.[2]?.country     || ''),
-      ...galleryAcf,
-    }
-  }
 }
 
 export async function POST(req: NextRequest) {
@@ -203,11 +40,11 @@ export async function POST(req: NextRequest) {
 
     const { target_user_id, venue_id, is_initial } = await req.json()
 
-    // Use service role for all Supabase reads/writes (bypasses RLS so admin can access any user's data)
+    // Service role para todas las lecturas/escrituras (salta RLS: el admin
+    // necesita acceder a datos de otros usuarios)
     const svc = getServiceClient()
 
-    // Load onboarding via service role — anon client blocked by RLS for cross-user reads.
-    // Use venue_id when provided (multi-venue users have one row per venue).
+    // Fila del editor del usuario (multi-venue: una fila por venue)
     let onbQuery = svc.from('venue_onboarding').select('*').eq('user_id', target_user_id)
     if (venue_id) onbQuery = onbQuery.eq('venue_id', venue_id)
     const { data: onb, error: onbErr } = await onbQuery.single()
@@ -216,23 +53,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
     }
 
-    // For mis-routed submissions (not-yet-published venue that sent changes_data instead of ficha_data),
-    // treat changes_data as the initial ficha_data when is_initial=true
+    // Envíos mal encaminados (venue aún no publicado que mandó changes_data en
+    // vez de ficha_data): con is_initial=true tratamos changes_data como inicial
     const fichaData = is_initial
       ? (onb.ficha_data || onb.changes_data)
       : onb.changes_data
     if (!fichaData) return NextResponse.json({ error: 'Sin datos de ficha' }, { status: 400 })
 
-    const wpPayload = buildWpPayload(fichaData)
-    const wvsHeaders = await getWpHeaders()
+    if (!String(fichaData.H1_Venue || '').trim()) {
+      return NextResponse.json({ error: 'La ficha no tiene nombre de venue (H1)' }, { status: 400 })
+    }
 
-    let wpRes: Response
-    let resolvedWpId: number | null = null
-
-    // Determine the existing WP post ID.
-    // Priority 1: venue_onboarding.wp_post_id (already set for approved venues)
-    // Priority 2: user_venues.wp_venue_id scoped to this specific venue_id (multi-venue)
-    // Priority 3: venue_profiles.wp_venue_id (legacy single-venue fallback)
+    // ID del venue publicado (antes era el post de WP; ahora es la clave que
+    // une fila del editor, fila publicada y los leads del formulario).
+    // Prioridad 1: venue_onboarding.wp_post_id
+    // Prioridad 2: user_venues.wp_venue_id de este venue concreto (multi-venue)
+    // Prioridad 3: venue_profiles.wp_venue_id (legado single-venue)
     let existingWpId: number | null = onb.wp_post_id || null
     if (!existingWpId && venue_id) {
       const { data: uvRow } = await svc
@@ -241,43 +77,58 @@ export async function POST(req: NextRequest) {
     }
     if (!existingWpId) {
       const { data: vp } = await svc
-        .from('venue_profiles').select('wp_venue_id').eq('user_id', target_user_id).single()
+        .from('venue_profiles').select('wp_venue_id').eq('user_id', target_user_id).maybeSingle()
       existingWpId = vp?.wp_venue_id || null
     }
 
-    // Store leads email in WP ACF field email_del_venue (set by venue in portal)
-    const leadsEmail = fichaData?.leadsEmail || ''
-    if (leadsEmail) (wpPayload.acf as any).email_del_venue = leadsEmail
+    const cols = buildPublicVenueColumns(fichaData)
 
-    // Build a scoped update query (always scope to venue_id when present)
+    // Update de la fila del editor, siempre acotado a venue_id si existe
     const scopedUpdate = (payload: Record<string, any>) => {
       let q = svc.from('venue_onboarding').update(payload).eq('user_id', target_user_id)
       if (venue_id) q = q.eq('venue_id', venue_id)
       return q
     }
 
+    let resolvedWpId: number
+    let publishedSlug: string
+
     if (existingWpId) {
-      // WP post already exists — always UPDATE, never create a duplicate
-      wpRes = await fetch(`${WP_URL}/wp-json/wvs/v1/venue/${existingWpId}/update`, {
-        method: 'POST',
-        headers: wvsHeaders,
-        body: JSON.stringify(wpPayload),
-      })
-      const wpData = await wpRes.json()
-      if (!wpRes.ok) {
-        const wpMsg = wpData?.message || wpData?.code || 'WP error'
-        const isAuth = wpMsg.includes('not allowed') || wpMsg.includes('rest_forbidden') || wpData?.code === 'rest_forbidden'
-        const friendlyMsg = isAuth
-          ? `WordPress rechazó la autenticación. Verifica que WVS_REST_TOKEN esté configurado correctamente en Vercel (Settings → Environment Variables). Error WP: "${wpMsg}"`
-          : `Error de WordPress: ${wpMsg}`
-        return NextResponse.json({ error: friendlyMsg }, { status: 500 })
-      }
       resolvedWpId = existingWpId
 
+      // Fila publicada existente (las importadas tienen user_id NULL y slug)
+      const { data: pubRow } = await svc
+        .from('venue_onboarding')
+        .select('id, slug')
+        .eq('wp_post_id', existingWpId)
+        .eq('status', 'published')
+        .maybeSingle()
+
+      if (pubRow) {
+        publishedSlug = pubRow.slug
+        const { error: pubErr } = await svc
+          .from('venue_onboarding')
+          .update(cols)
+          .eq('id', pubRow.id)
+        if (pubErr) {
+          console.error('[apply-changes] publish update error', pubErr)
+          return NextResponse.json({ error: `Error al publicar en la web: ${pubErr.message}` }, { status: 500 })
+        }
+      } else {
+        // Tiene wp_post_id pero nunca se publicó en la web nueva: crear fila
+        publishedSlug = await uniqueSlug(svc, slugify(cols.name))
+        const { error: insErr } = await svc
+          .from('venue_onboarding')
+          .insert({ ...cols, user_id: null, slug: publishedSlug, status: 'published', wp_post_id: existingWpId })
+        if (insErr) {
+          console.error('[apply-changes] publish insert error', insErr)
+          return NextResponse.json({ error: `Error al publicar en la web: ${insErr.message}` }, { status: 500 })
+        }
+      }
+
       if (is_initial) {
-        // Re-approving an already-published venue — update status and also write ficha_data
-        // so the next load reads from Supabase (fast path) with all current fields.
-        // fichaData was derived from ficha_data || changes_data earlier in this handler.
+        // Re-aprobación de venue ya publicado: actualizar estado y guardar
+        // ficha_data para que la próxima carga lea de Supabase (fast path)
         await scopedUpdate({
           status: 'approved',
           wp_post_id: existingWpId,
@@ -285,7 +136,7 @@ export async function POST(req: NextRequest) {
           ficha_data: fichaData,
         })
       } else {
-        // Approving submitted changes — promote changes_data → ficha_data and clear pending
+        // Aprobación de cambios: promover changes_data → ficha_data
         await scopedUpdate({
           ficha_data: onb.changes_data,
           changes_data: null,
@@ -294,39 +145,41 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      // Ensure venue_profiles always has the correct wp_venue_id (upsert handles missing rows)
+      // venue_profiles siempre con el wp_venue_id correcto
       await svc.from('venue_profiles').upsert(
         { user_id: target_user_id, wp_venue_id: existingWpId, status: 'active' },
         { onConflict: 'user_id' }
       )
 
     } else {
-      // No WP post yet — create new
-      wpRes = await fetch(`${WP_URL}/wp-json/wvs/v1/venue/create`, {
-        method: 'POST',
-        headers: wvsHeaders,
-        body: JSON.stringify(wpPayload),
-      })
-      const wpData = await wpRes.json()
-      if (!wpRes.ok) {
-        const wpMsg = wpData?.message || wpData?.code || 'WP error'
-        const isAuth = wpMsg.includes('not allowed') || wpMsg.includes('rest_forbidden') || wpData?.code === 'rest_forbidden'
-        const friendlyMsg = isAuth
-          ? `WordPress rechazó la autenticación. Verifica que WVS_REST_TOKEN esté configurado en Vercel. Error WP: "${wpMsg}"`
-          : `Error de WordPress al crear venue: ${wpMsg}`
-        return NextResponse.json({ error: friendlyMsg }, { status: 500 })
-      }
-      resolvedWpId = wpData.id
+      // Venue nuevo sin id: generamos uno sintético (max + 1). WordPress ya no
+      // interviene; el id solo enlaza editor, fila publicada y leads.
+      const { data: maxRow } = await svc
+        .from('venue_onboarding')
+        .select('wp_post_id')
+        .not('wp_post_id', 'is', null)
+        .order('wp_post_id', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      resolvedWpId = (maxRow?.wp_post_id || 100000) + 1
 
-      // Save WP ID — upsert ensures row is created even if venue_profiles didn't exist
+      publishedSlug = await uniqueSlug(svc, slugify(cols.name))
+      const { error: insErr } = await svc
+        .from('venue_onboarding')
+        .insert({ ...cols, user_id: null, slug: publishedSlug, status: 'published', wp_post_id: resolvedWpId })
+      if (insErr) {
+        console.error('[apply-changes] publish insert error', insErr)
+        return NextResponse.json({ error: `Error al publicar en la web: ${insErr.message}` }, { status: 500 })
+      }
+
       await svc.from('venue_profiles').upsert(
         { user_id: target_user_id, wp_venue_id: resolvedWpId, status: 'active' },
         { onConflict: 'user_id' }
       )
       await scopedUpdate({ status: 'approved', wp_post_id: resolvedWpId, reviewed_at: new Date().toISOString(), ficha_data: fichaData })
 
-      // Insert into user_venues so the CRM shows the assigned venue.
-      // Count first to know if this is the user's first-ever venue (set is_primary).
+      // Alta en user_venues para que el CRM muestre el venue asignado.
+      // Contamos antes para saber si es el primer venue del usuario (is_primary).
       const { count: venueCount } = await svc
         .from('user_venues')
         .select('*', { count: 'exact', head: true })
@@ -342,7 +195,7 @@ export async function POST(req: NextRequest) {
         .select('id')
         .single()
 
-      // Backfill venue_id on any null subscriptions for this user (e.g. onboarding trial)
+      // Backfill de venue_id en suscripciones sueltas (p. ej. trial de onboarding)
       if (isFirstVenue && uvRow?.id) {
         await svc
           .from('venue_subscriptions')
@@ -352,11 +205,29 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, wp_venue_id: resolvedWpId })
+    // Regenerar la página en wvs-web (no fatal: ISR la refresca cada 24 h)
+    await revalidateWvsWeb(publishedSlug)
+
+    return NextResponse.json({ success: true, wp_venue_id: resolvedWpId, slug: publishedSlug })
 
   } catch (err: any) {
     console.error('[/api/venues/apply-changes]', err)
     const msg = err?.message || String(err) || 'Error interno desconocido'
     return NextResponse.json({ error: msg }, { status: 500 })
   }
+}
+
+// Slug único entre las filas publicadas: "masia-x", "masia-x-2", "masia-x-3"...
+async function uniqueSlug(svc: ReturnType<typeof getServiceClient>, base: string): Promise<string> {
+  const fallback = base || 'venue'
+  const { data: rows } = await svc
+    .from('venue_onboarding')
+    .select('slug')
+    .like('slug', `${fallback}%`)
+  const taken = new Set((rows || []).map((r: any) => r.slug))
+  if (!taken.has(fallback)) return fallback
+  for (let i = 2; i < 100; i++) {
+    if (!taken.has(`${fallback}-${i}`)) return `${fallback}-${i}`
+  }
+  return `${fallback}-${Date.now()}`
 }
