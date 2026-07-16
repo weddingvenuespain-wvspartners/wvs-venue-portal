@@ -29,7 +29,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { wp_venue_id, name, email, phone, guests, date, budget, message, wants_wedding_planner, whatsapp_consent } = body
+    const {
+      wp_venue_id, name, email, phone, guests, date, budget, message,
+      wants_wedding_planner, whatsapp_consent,
+      venue_slug, venue_name, language,
+    } = body
 
     if (!wp_venue_id) {
       return NextResponse.json({ error: 'Missing wp_venue_id' }, { status: 400 })
@@ -58,8 +62,32 @@ export async function POST(req: NextRequest) {
       userId = uv?.user_id ?? null
     }
 
+    // Venue publicado en la web pero sin cuenta vinculada en el portal:
+    // guardamos el lead en orphan_leads para que el admin lo gestione a mano.
+    // Responde 200 para que wvs-web lo considere entregado y no dispare
+    // el email de red de seguridad.
     if (!userId) {
-      return NextResponse.json({ error: 'Venue not found', wp_venue_id }, { status: 404 })
+      const wedding_date = parseDate(date)
+      const { data: orphan, error: orphanErr } = await svc.from('orphan_leads').insert({
+        venue_slug:            venue_slug || null,
+        venue_name:            venue_name || null,
+        wp_venue_id:           wp_venue_id,
+        name:                  name || '',
+        email:                 email || null,
+        phone:                 phone || null,
+        guests:                guests ? String(guests) : null,
+        wedding_date:          wedding_date,
+        budget:                budget || null,
+        message:               message || null,
+        wants_wedding_planner: wants_wedding_planner === true || wants_wedding_planner === 'true' || false,
+        whatsapp_consent:      whatsapp_consent === true || whatsapp_consent === 'true' || false,
+        language:              language || null,
+      }).select('id').single()
+      if (orphanErr) {
+        console.error('[leads/create] orphan insert failed:', orphanErr)
+        return NextResponse.json({ error: orphanErr.message }, { status: 500 })
+      }
+      return NextResponse.json({ success: true, orphan: true, lead_id: orphan.id })
     }
 
     // Look up the user_venues row so we can store venue_id on the lead

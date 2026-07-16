@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Inbox, Users, Calendar, BookOpen, Calculator,
   Store, MessageSquare, BarChart3, Receipt, FileSignature, Settings,
   LifeBuoy, Heart, UtensilsCrossed, Palette, Building2, Layers, UserPlus,
-  FileText, TrendingUp, Ticket, type LucideIcon,
+  FileText, TrendingUp, Ticket, Mail, type LucideIcon,
 } from 'lucide-react'
 
 export default function Sidebar() {
@@ -102,6 +102,16 @@ export default function Sidebar() {
       .then(({ count }) => setPendingUsersCount(count ?? 0))
   }, [user?.id, isAdmin]) // eslint-disable-line
 
+  // Badge: orphan leads (admin) — leads sin venue vinculado en el portal
+  const [orphanNewCount, setOrphanNewCount] = useState(0)
+  useEffect(() => {
+    if (!user || !isAdmin) return
+    const supabase = createClient()
+    supabase.from('orphan_leads').select('id', { count: 'exact', head: true })
+      .eq('status', 'new')
+      .then(({ count }) => setOrphanNewCount(count ?? 0))
+  }, [user?.id, isAdmin]) // eslint-disable-line
+
   // Badge: new wedding planner requests (admin)
   const [wpNewCount, setWpNewCount] = useState(0)
   const fetchWpCount = () => {
@@ -191,6 +201,7 @@ export default function Sidebar() {
     { href: '/admin/plans',             label: 'Planes',          icon: Layers },
     { href: '/admin/onboarding',         label: 'Solicitudes',     icon: UserPlus, badge: pendingOnboardingCount },
     { href: '/admin/wedding-planners',   label: 'Peticiones WP', icon: Heart,    badge: wpNewCount },
+    { href: '/admin/orphan-leads',       label: 'Leads WVS',       icon: Mail,     badge: orphanNewCount },
     { href: '/admin/coupons',           label: 'Cupones',          icon: Ticket },
     { href: '/admin/stats',             label: 'Estadísticas',    icon: TrendingUp },
   ]

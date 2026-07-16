@@ -302,6 +302,11 @@ function SignupPageInner() {
               </div>
             </div>
 
+            {/* Nota sobre gestión de leads */}
+            <div style={{ background: '#F7F3E8', border: '1px solid #C2A968', borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: 12, color: '#5F5340', lineHeight: 1.55 }}>
+              <strong style={{ color: '#7A5A2E' }}>Cómo llegan tus leads.</strong> Los leads de parejas que provienen de weddingvenuesspain.com y de nuestros canales pueden ser contactados directamente por nuestro equipo antes o en lugar de reenviártelos, para verificar la petición y añadir contexto. Solo compartiremos los datos contigo cuando encaje con tu venue.
+            </div>
+
             {/* Consents */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
               <AuthCheckbox checked={acceptTerms} onChange={setAcceptTerms} flash={termsFlash}>

@@ -1,14 +1,32 @@
 import nodemailer from 'nodemailer'
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'mail.weddingvenuesspain.com',
-  port: parseInt(process.env.SMTP_PORT || '465'),
-  secure: (process.env.SMTP_PORT || '465') === '465',
-  auth: {
-    user: process.env.SMTP_USER || 'noreply@weddingvenuesspain.com',
-    pass: process.env.SMTP_PASS,
+// Envío de plataforma vía Resend (dominio foreventos.com verificado en Resend).
+// Sustituye al SMTP del hosting antiguo de weddingvenuesspain.com.
+// El SMTP propio de cada venue (smtpConfig) sigue saliendo por nodemailer.
+const transporter = {
+  async sendMail(mail: {
+    from: string
+    to: string | string[]
+    subject: string
+    html: string
+    replyTo?: string
+  }) {
+    const key = process.env.RESEND_API_KEY
+    if (!key) throw new Error('RESEND_API_KEY no configurada')
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: mail.from,
+        to: Array.isArray(mail.to) ? mail.to : [mail.to],
+        subject: mail.subject,
+        html: mail.html,
+        ...(mail.replyTo ? { reply_to: mail.replyTo } : {}),
+      }),
+    })
+    if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`)
   },
-})
+}
 
 type SmtpConfig = {
   host: string
@@ -54,7 +72,7 @@ export async function sendProposalEmail({
 
   const fromAddress = smtpConfig
     ? `"${venueName}" <${smtpConfig.fromEmail}>`
-    : `"${venueName}" <noreply@weddingvenuesspain.com>`
+    : `"${venueName}" <noreply@foreventos.com>`
 
   await activeTransporter.sendMail({
     from: fromAddress,
@@ -176,7 +194,7 @@ export async function sendMenuSelectionEmail({
 
   const fromAddress = smtpConfig
     ? `"${venueName}" <${smtpConfig.fromEmail}>`
-    : `"Wedding Venues Spain" <noreply@weddingvenuesspain.com>`
+    : `"Wedding Venues Spain" <noreply@foreventos.com>`
 
   const formatEuro = (n: number) =>
     new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -251,7 +269,7 @@ export async function sendActivationEmail(to: string, venueName: string) {
   const portalUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.weddingvenuesspain.com'
 
   await transporter.sendMail({
-    from: '"Wedding Venues Spain" <noreply@weddingvenuesspain.com>',
+    from: '"Wedding Venues Spain" <noreply@foreventos.com>',
     to,
     subject: '¡Tu cuenta ha sido activada! Ya puedes elegir tu plan',
     html: `<!DOCTYPE html>
@@ -264,7 +282,7 @@ export async function sendActivationEmail(to: string, venueName: string) {
 
         <tr>
           <td align="center" style="padding-bottom:28px;">
-            <img src="https://weddingvenuesspain.com/wp-content/uploads/2024/10/logo-wedding-venues-spain-white-e1732122540714.png"
+            <img src="https://weddingvenuesspain.com/logo-white.png"
               alt="Wedding Venues Spain" style="height:32px;display:block;">
           </td>
         </tr>
@@ -343,7 +361,7 @@ export async function sendVisitRequestEmail({
   const t = smtpConfig
     ? nodemailer.createTransport({ host: smtpConfig.host, port: smtpConfig.port, secure: smtpConfig.port === 465, auth: { user: smtpConfig.user, pass: smtpConfig.pass } })
     : transporter
-  const from = smtpConfig ? `"${venueName}" <${smtpConfig.fromEmail}>` : '"Wedding Venues Spain" <noreply@weddingvenuesspain.com>'
+  const from = smtpConfig ? `"${venueName}" <${smtpConfig.fromEmail}>` : '"Wedding Venues Spain" <noreply@foreventos.com>'
   const dateLabel = new Date(visitDate + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const spacesHtml = selectedSpaces?.length ? selectedSpaces.map(s => `<li><strong>${s.group_name}:</strong> ${s.space_name}</li>`).join('') : null
   const menusHtml = selectedMenus?.length ? selectedMenus.map(m => `<li>${m}</li>`).join('') : null
@@ -397,7 +415,7 @@ export async function sendFirstViewEmail({
   const t = smtpConfig
     ? nodemailer.createTransport({ host: smtpConfig.host, port: smtpConfig.port, secure: smtpConfig.port === 465, auth: { user: smtpConfig.user, pass: smtpConfig.pass } })
     : transporter
-  const from = smtpConfig ? `"${venueName}" <${smtpConfig.fromEmail}>` : '"Wedding Venues Spain" <noreply@weddingvenuesspain.com>'
+  const from = smtpConfig ? `"${venueName}" <${smtpConfig.fromEmail}>` : '"Wedding Venues Spain" <noreply@foreventos.com>'
 
   await t.sendMail({
     from, to,
@@ -443,7 +461,7 @@ export async function sendInquiryEmail({
   const t = smtpConfig
     ? nodemailer.createTransport({ host: smtpConfig.host, port: smtpConfig.port, secure: smtpConfig.port === 465, auth: { user: smtpConfig.user, pass: smtpConfig.pass } })
     : transporter
-  const from = smtpConfig ? `"${venueName}" <${smtpConfig.fromEmail}>` : '"Wedding Venues Spain" <noreply@weddingvenuesspain.com>'
+  const from = smtpConfig ? `"${venueName}" <${smtpConfig.fromEmail}>` : '"Wedding Venues Spain" <noreply@foreventos.com>'
   const kindLabel = customKindLabel || KIND_LABEL[kind] || 'Consulta'
   const datesHtml = preferredDates?.length
     ? preferredDates.map(d => `<li>${new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</li>`).join('')
@@ -547,7 +565,7 @@ export async function sendNewLeadEmail({
   ].filter(Boolean).join('')
 
   await transporter.sendMail({
-    from: '"Wedding Venues Spain" <noreply@weddingvenuesspain.com>',
+    from: '"Wedding Venues Spain" <noreply@foreventos.com>',
     to: recipients,
     subject: `Nueva petición de boda — ${coupleName || 'Nueva pareja'}`,
     html: `<!DOCTYPE html>
@@ -643,7 +661,7 @@ export async function sendSubscriptionConfirmedEmail({
   to: string; venueName: string; planName: string; amount: number; intervalLabel: string
 }) {
   await transporter.sendMail({
-    from: '"FOREVENTOS" <noreply@weddingvenuesspain.com>',
+    from: '"FOREVENTOS" <noreply@foreventos.com>',
     to,
     subject: `¡Suscripción activada! — ${planName} para ${venueName}`,
     html: subscriptionEmailWrapper(
@@ -677,7 +695,7 @@ export async function sendPlanChangeEmail({
   to: string; venueName: string; oldPlanName: string; newPlanName: string; amount: number; intervalLabel: string; isUpgrade: boolean
 }) {
   await transporter.sendMail({
-    from: '"FOREVENTOS" <noreply@weddingvenuesspain.com>',
+    from: '"FOREVENTOS" <noreply@foreventos.com>',
     to,
     subject: `Plan ${isUpgrade ? 'mejorado' : 'cambiado'} — ${newPlanName} para ${venueName}`,
     html: subscriptionEmailWrapper(
@@ -717,7 +735,7 @@ export async function sendTrialExpiringEmail({
   const endFormatted = new Date(trialEndDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 
   await transporter.sendMail({
-    from: '"FOREVENTOS" <noreply@weddingvenuesspain.com>',
+    from: '"FOREVENTOS" <noreply@foreventos.com>',
     to,
     subject: `${urgency}Tu prueba gratuita termina ${daysLeft <= 1 ? 'mañana' : `en ${daysLeft} días`} — ${venueName}`,
     html: subscriptionEmailWrapper(
@@ -748,7 +766,7 @@ export async function sendPaymentFailedEmail({
   to: string; venueName: string; amount?: number; errorMessage?: string
 }) {
   await transporter.sendMail({
-    from: '"FOREVENTOS" <noreply@weddingvenuesspain.com>',
+    from: '"FOREVENTOS" <noreply@foreventos.com>',
     to,
     subject: `⚠️ Problema con tu pago — ${venueName}`,
     html: subscriptionEmailWrapper(
@@ -781,7 +799,7 @@ export async function sendRenewalReminderEmail({
   const dateFormatted = new Date(renewalDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 
   await transporter.sendMail({
-    from: '"FOREVENTOS" <noreply@weddingvenuesspain.com>',
+    from: '"FOREVENTOS" <noreply@foreventos.com>',
     to,
     subject: `Tu suscripción se renueva pronto — ${venueName}`,
     html: subscriptionEmailWrapper(
@@ -811,7 +829,7 @@ export async function sendCancellationConfirmEmail({
   const dateFormatted = new Date(effectiveDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 
   await transporter.sendMail({
-    from: '"FOREVENTOS" <noreply@weddingvenuesspain.com>',
+    from: '"FOREVENTOS" <noreply@foreventos.com>',
     to,
     subject: `Confirmación de cancelación — ${venueName}`,
     html: subscriptionEmailWrapper(

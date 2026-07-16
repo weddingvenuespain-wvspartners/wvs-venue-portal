@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { buildPublicVenueColumns, slugify, revalidateWvsWeb } from '@/lib/wvs-publish'
+import { translateVenueAll } from '@/lib/translate'
 
 // Aprobación admin del canal weddingvenuesspain.com.
 // Antes publicaba a WordPress; ahora escribe las columnas planas de la fila
@@ -83,6 +84,27 @@ export async function POST(req: NextRequest) {
 
     const cols = buildPublicVenueColumns(fichaData)
 
+    // Traducciones automáticas (ES/DE/FR) via DeepL. No fatal: si falla algún
+    // idioma se guarda vacío y la web hace fallback al inglés.
+    let translations: Record<string, any> | null = null
+    try {
+      translations = await translateVenueAll({
+        name:               cols.name,
+        description:        cols.description,
+        tagline:            cols.tagline,
+        content_html:       cols.content_html,
+        seo_title:          cols.seo_title,
+        seo_description:    cols.seo_description,
+        accommodation_note: cols.accommodation_note,
+        testimonials:       cols.testimonials,
+        faqs:               cols.faqs,
+      })
+    } catch (e) {
+      console.error('[apply-changes] traducción falló, publicando solo en EN:', e)
+    }
+
+    const publishPayload = translations ? { ...cols, translations } : cols
+
     // Update de la fila del editor, siempre acotado a venue_id si existe
     const scopedUpdate = (payload: Record<string, any>) => {
       let q = svc.from('venue_onboarding').update(payload).eq('user_id', target_user_id)
@@ -108,7 +130,7 @@ export async function POST(req: NextRequest) {
         publishedSlug = pubRow.slug
         const { error: pubErr } = await svc
           .from('venue_onboarding')
-          .update(cols)
+          .update(publishPayload)
           .eq('id', pubRow.id)
         if (pubErr) {
           console.error('[apply-changes] publish update error', pubErr)
@@ -119,7 +141,7 @@ export async function POST(req: NextRequest) {
         publishedSlug = await uniqueSlug(svc, slugify(cols.name))
         const { error: insErr } = await svc
           .from('venue_onboarding')
-          .insert({ ...cols, user_id: null, slug: publishedSlug, status: 'published', wp_post_id: existingWpId })
+          .insert({ ...publishPayload, user_id: null, slug: publishedSlug, status: 'published', wp_post_id: existingWpId })
         if (insErr) {
           console.error('[apply-changes] publish insert error', insErr)
           return NextResponse.json({ error: `Error al publicar en la web: ${insErr.message}` }, { status: 500 })
@@ -166,7 +188,7 @@ export async function POST(req: NextRequest) {
       publishedSlug = await uniqueSlug(svc, slugify(cols.name))
       const { error: insErr } = await svc
         .from('venue_onboarding')
-        .insert({ ...cols, user_id: null, slug: publishedSlug, status: 'published', wp_post_id: resolvedWpId })
+        .insert({ ...publishPayload, user_id: null, slug: publishedSlug, status: 'published', wp_post_id: resolvedWpId })
       if (insErr) {
         console.error('[apply-changes] publish insert error', insErr)
         return NextResponse.json({ error: `Error al publicar en la web: ${insErr.message}` }, { status: 500 })
